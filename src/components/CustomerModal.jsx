@@ -1,0 +1,195 @@
+import { useState, useEffect } from 'react';
+import { useStore, getCollectionSlots } from '../store';
+
+export default function CustomerModal({ orderType, onConfirm, onCancel }) {
+  const { searchCustomers, addToHistory, showToast } = useStore();
+  const [name, setName]       = useState('');
+  const [phone, setPhone]     = useState('');
+  const [email, setEmail]     = useState('');
+  const [notes, setNotes]     = useState('');
+  const [isASAP, setIsASAP]   = useState(true);
+  const [slotIdx, setSlotIdx] = useState(0);
+  const [results, setResults] = useState([]);
+  const [searched, setSearched] = useState(false);
+
+  const slots = getCollectionSlots();
+  const isCollection = orderType === 'collection';
+
+  // Live phone/name search
+  useEffect(() => {
+    const q = phone.length >= 3 ? phone : name.length >= 3 ? name : '';
+    if (q) { setResults(searchCustomers(q)); setSearched(true); }
+    else { setResults([]); setSearched(false); }
+  }, [phone, name]);
+
+  const selectCustomer = (c) => {
+    setName(c.name); setPhone(c.phone); setEmail(c.email || '');
+    setResults([]); setSearched(false);
+  };
+
+  const handleConfirm = () => {
+    if (!name.trim() || !phone.trim()) {
+      showToast('Name and phone number are required', 'error'); return;
+    }
+    const customer = {
+      name: name.trim(), phone: phone.trim(), email: email.trim(), notes: notes.trim(),
+      isASAP,
+      collectionTime: isASAP ? slots[0]?.label : slots[slotIdx]?.label,
+      collectionISO:  isASAP ? slots[0]?.value  : slots[slotIdx]?.value,
+    };
+    addToHistory(customer);
+    onConfirm(customer);
+  };
+
+  const inputStyle = {
+    width: '100%', background: 'var(--bg3)', border: '1px solid var(--bdr2)',
+    borderRadius: 10, padding: '0 14px', height: 42,
+    fontSize: 14, color: 'var(--t1)', fontFamily: 'inherit', outline: 'none',
+  };
+
+  return (
+    <div className="modal-back">
+      <div style={{
+        background: 'var(--bg2)', border: '1px solid var(--bdr2)',
+        borderRadius: 20, width: '100%', maxWidth: 420,
+        maxHeight: '90vh', overflow: 'auto', padding: 24,
+        boxShadow: 'var(--sh3)',
+      }}>
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--t1)' }}>
+              {orderType === 'collection' ? '📦 Collection order' : '🥡 Takeaway order'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>
+              {orderType === 'collection' ? 'Customer collects from the counter' : 'Order to be taken away now'}
+            </div>
+          </div>
+          <button onClick={onCancel} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:22, lineHeight:1 }}>×</button>
+        </div>
+
+        {/* Customer search results */}
+        {results.length > 0 && (
+          <div style={{ marginBottom: 14, background: 'var(--bg3)', borderRadius: 10, border: '1px solid var(--bdr2)', overflow: 'hidden' }}>
+            <div style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', borderBottom: '1px solid var(--bdr)' }}>
+              Returning customers
+            </div>
+            {results.map(c => (
+              <div key={c.id} onClick={() => selectCustomer(c)} style={{
+                padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+                borderBottom: '1px solid var(--bdr)', transition: 'background .1s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg4)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--acc-d)', border: '1px solid var(--acc-b)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'var(--acc)', flexShrink: 0 }}>
+                  {c.name.split(' ').map(n => n[0]).join('').slice(0,2)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 1 }}>{c.phone} · {c.visits} visit{c.visits!==1?'s':''} · {c.lastOrder}</div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--acc)', fontWeight: 600 }}>Select →</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {searched && results.length === 0 && (
+          <div style={{ marginBottom: 10, fontSize: 12, color: 'var(--t3)', padding: '6px 0' }}>
+            No existing customer found — creating new profile
+          </div>
+        )}
+
+        {/* Form fields */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+              Name <span style={{ color: 'var(--red)' }}>*</span>
+            </label>
+            <input style={inputStyle} placeholder="Customer name" value={name} onChange={e => setName(e.target.value)}/>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+              Phone <span style={{ color: 'var(--red)' }}>*</span>
+            </label>
+            <input style={inputStyle} type="tel" placeholder="07700 000000" value={phone} onChange={e => setPhone(e.target.value)}/>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+              Email <span style={{ fontSize: 10, color: 'var(--t3)', textTransform: 'none', letterSpacing: 0 }}>(optional — for receipt)</span>
+            </label>
+            <input style={inputStyle} type="email" placeholder="email@example.com" value={email} onChange={e => setEmail(e.target.value)}/>
+          </div>
+        </div>
+
+        {/* Collection time — only for collection orders */}
+        {isCollection && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+              Collection time
+            </label>
+
+            {/* ASAP toggle */}
+            <div style={{ display: 'flex', border: '1px solid var(--bdr2)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+              <button onClick={() => setIsASAP(true)} style={{
+                flex: 1, padding: '10px', cursor: 'pointer', fontFamily: 'inherit',
+                background: isASAP ? 'var(--acc)' : 'transparent',
+                color: isASAP ? '#0e0f14' : 'var(--t2)',
+                border: 'none', fontSize: 13, fontWeight: 700, transition: 'all .15s',
+              }}>
+                ⚡ ASAP ({slots[0]?.label})
+              </button>
+              <button onClick={() => setIsASAP(false)} style={{
+                flex: 1, padding: '10px', cursor: 'pointer', fontFamily: 'inherit',
+                background: !isASAP ? 'var(--acc)' : 'transparent',
+                color: !isASAP ? '#0e0f14' : 'var(--t2)',
+                border: 'none', fontSize: 13, fontWeight: 700, transition: 'all .15s',
+              }}>
+                🕐 Scheduled time
+              </button>
+            </div>
+
+            {/* Time slot grid */}
+            {!isASAP && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                {slots.slice(1).map((slot, i) => {
+                  const idx = i + 1;
+                  const active = slotIdx === idx;
+                  return (
+                    <button key={slot.value} onClick={() => setSlotIdx(idx)} style={{
+                      padding: '10px 4px', borderRadius: 8, cursor: 'pointer', textAlign: 'center',
+                      border: `1.5px solid ${active ? 'var(--acc)' : 'var(--bdr)'}`,
+                      background: active ? 'var(--acc-d)' : 'var(--bg3)',
+                      color: active ? 'var(--acc)' : 'var(--t2)',
+                      fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all .12s',
+                    }}>
+                      {slot.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Order notes */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+            Order notes <span style={{ fontSize: 10, color: 'var(--t3)', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+          </label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)}
+            placeholder="Allergies, special requests, parking space..."
+            rows={2}
+            style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:10, padding:'10px 14px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none' }}/>
+        </div>
+
+        {/* Confirm / cancel */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onCancel}>Cancel</button>
+          <button className="btn btn-acc" style={{ flex: 2, height: 46, fontSize: 15 }} onClick={handleConfirm}>
+            Confirm {orderType === 'collection' ? 'collection' : 'takeaway'} →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
