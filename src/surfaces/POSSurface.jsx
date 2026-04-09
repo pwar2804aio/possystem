@@ -35,6 +35,7 @@ export default function POSSurface() {
     eightySixIds, toggle86,
     customer, setCustomer, clearCustomer,
     orderQueue, orderNote, setOrderNote,
+    closeTable, setSurface,
   } = store;
 
   const [cat, setCat]               = useState('quick');
@@ -311,7 +312,7 @@ export default function POSSurface() {
               <div style={{ padding:'7px 12px 12px',display:'flex',gap:6 }}>
                 <button onClick={()=>setShowCustom(true)} title="Add custom item" style={{ width:34,height:34,borderRadius:8,border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:18,flexShrink:0 }}>+</button>
                 <button className="btn btn-ghost" style={{ flex:1,height:34 }} onClick={handleSend}>
-                  {hasSentOrder?'Add →':'Send →'}
+                  {hasSentOrder ? 'Send →' : 'Send →'}
                 </button>
                 <button className="btn btn-acc" style={{ flex:1,height:34 }} onClick={()=>setShowCheckout(true)}>
                   Pay £{total.toFixed(2)}
@@ -454,7 +455,17 @@ export default function POSSurface() {
       {/* ══ MODALS ════════════════════════════════════════════════ */}
       {pendingItem&&<AllergenModal item={pendingItem} activeAllergens={allergens} onConfirm={()=>{const i=pendingItem;clearPendingItem();openFlow(i);}} onCancel={clearPendingItem}/>}
       {modalItem&&<ProductModal item={modalItem} activeAllergens={allergens} onConfirm={(item,mods,cfg,opts)=>{addToOrder(item,mods,cfg,opts);setModalItem(null);showToast(`${opts.displayName||item.name} added`,'success');}} onCancel={()=>setModalItem(null)}/>}
-      {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={tableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={()=>{setShowCheckout(false);clearOrder();showToast('Payment complete','success');}}/>}
+      {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={tableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={()=>{
+        setShowCheckout(false);
+        if (tableId && tableId !== 'walkin') {
+          closeTable(tableId);
+          setSurface('tables');
+          showToast('Payment complete — table cleared', 'success');
+        } else {
+          clearOrder();
+          showToast('Payment complete', 'success');
+        }
+      }}/>}
 
       {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} onConfirm={handleCustomerConfirm} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
       {showQueue&&<CollectionQueue onClose={()=>setShowQueue(false)}/>}
