@@ -26,7 +26,7 @@ export default function POSSurface() {
     updateItemSeat, updateItemCourse, setOrderNote,
     sendToKitchen, fireCourse,
     getPOSItems, getPOSTotals, getPOSOrderNote,
-    activeTableId, tables, clearTable, clearWalkIn,
+    activeTableId, tables, clearTable, clearWalkIn, setActiveTableId,
     orderType, setOrderType, customer, setCustomer, clearCustomer,
     orderQueue, showToast,
     pendingItem, setPendingItem, clearPendingItem,
@@ -92,12 +92,17 @@ export default function POSSurface() {
   };
 
   const handleSend = () => {
-    if (!items.length) { showToast('No items on order','error'); return; }
-    if (orderType !== 'dine-in' && !customer) { setPendingOrderType(orderType); setShowCustomerModal(true); return; }
+    if (!items.length) { showToast('No items on order', 'error'); return; }
+    if (orderType !== 'dine-in' && !customer) {
+      setPendingOrderType(orderType); setShowCustomerModal(true); return;
+    }
     sendToKitchen();
-    // Walk-in orders (takeaway / collection / quick dine-in) clear immediately after send
-    // Table orders stay open — server keeps adding throughout the meal
-    if (!activeTableId) {
+    // Always clear after send — table order is committed and lives on the table,
+    // walk-in order is sent. POS resets for the next order.
+    if (activeTableId) {
+      setActiveTableId(null);   // exit table context, session stays on the table
+      showToast(`${activeTable?.label} order sent to kitchen`, 'success');
+    } else {
       clearWalkIn();
     }
   };
