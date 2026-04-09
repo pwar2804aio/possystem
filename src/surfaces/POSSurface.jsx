@@ -34,7 +34,7 @@ export default function POSSurface() {
     pendingItem, setPendingItem, clearPendingItem,
     eightySixIds, toggle86,
     customer, setCustomer, clearCustomer,
-    orderQueue,
+    orderQueue, orderNote, setOrderNote,
   } = store;
 
   const [cat, setCat]               = useState('quick');
@@ -273,6 +273,17 @@ export default function POSSurface() {
         </div>
 
         {/* Totals + actions */}
+        {/* Order note */}
+        {items.length > 0 && (
+          <div style={{ padding:'6px 12px 0', flexShrink:0 }}>
+            <textarea
+              value={orderNote} onChange={e => setOrderNote(e.target.value)}
+              placeholder="Order note for kitchen (allergies, preferences…)"
+              rows={orderNote ? 2 : 1}
+              style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr)', borderRadius:8, padding:'7px 10px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.5, display:'block' }}/>
+          </div>
+        )}
+
         <div style={{ flexShrink:0, borderTop:'1px solid var(--bdr)', background:'var(--bg2)' }}>
           {items.length>0&&(
             <>

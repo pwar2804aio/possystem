@@ -1,0 +1,615 @@
+import { useState, useMemo, useEffect } from 'react';
+import { useStore } from '../store';
+import { CATEGORIES, MENU_ITEMS, ALLERGENS, QUICK_IDS } from '../data/seed';
+import ProductModal, { AllergenModal } from '../components/ProductModal';
+
+const CAT_META = {
+  quick:    { icon:'⚡', color:'#e8a020' },
+  starters: { icon:'🥗', color:'#22c55e' },
+  mains:    { icon:'🍽', color:'#3b82f6' },
+  pizza:    { icon:'🍕', color:'#f07020' },
+  sides:    { icon:'🍟', color:'#a855f7' },
+  desserts: { icon:'🍮', color:'#e84066' },
+  drinks:   { icon:'🍷', color:'#e84040' },
+  cocktails:{ icon:'🍸', color:'#22d3ee' },
+};
+
+const STATUS_META = {
+  open:    { color:'#22c55e', bg:'rgba(34,197,94,.1)',   label:'Open'    },
+  running: { color:'#f97316', bg:'rgba(249,115,22,.1)',  label:'Running' },
+  closing: { color:'#e8a020', bg:'rgba(232,160,32,.1)',  label:'Closing' },
+  closed:  { color:'#5c5a64', bg:'rgba(92,90,100,.1)',   label:'Closed'  },
+};
+
+function timeOpen(date) {
+  const mins = Math.floor((Date.now() - new Date(date)) / 60000);
+  if (mins < 60) return `${mins}m`;
+  return `${Math.floor(mins/60)}h ${mins%60}m`;
+}
+
+// ─── Open Tab Modal ──────────────────────────────────────────────────────────
+function OpenTabModal({ onConfirm, onCancel }) {
+  const { tables } = useStore();
+  const [name, setName]           = useState('');
+  const [seatId, setSeatId]       = useState('');
+  const [linked, setLinked]       = useState('');   // table id
+  const [preAuth, setPreAuth]     = useState(true);
+  const [preAmt, setPreAmt]       = useState('50');
+  const [note, setNote]           = useState('');
+  const barSeats = ['B1','B2','B3','B4'];
+  const openTables = tables.filter(t=>t.status==='open'||t.status==='available');
+
+  return (
+    <div className="modal-back">
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:20, width:'100%', maxWidth:400, padding:24, boxShadow:'var(--sh3)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <div style={{ fontSize:17, fontWeight:700, color:'var(--t1)' }}>Open bar tab</div>
+          <button onClick={onCancel} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:22 }}>×</button>
+        </div>
+
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div>
+            <label style={labelStyle}>Tab name <span style={{color:'var(--red)'}}>*</span></label>
+            <input className="input" placeholder="Guest name or party name" value={name} onChange={e=>setName(e.target.value)} autoFocus/>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Bar seat (optional)</label>
+            <div style={{ display:'flex', gap:6 }}>
+              {barSeats.map(s=>(
+                <button key={s} onClick={()=>setSeatId(s===seatId?'':s)} style={{
+                  flex:1, padding:'8px 4px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                  border:`1.5px solid ${seatId===s?'var(--acc)':'var(--bdr)'}`,
+                  background:seatId===s?'var(--acc-d)':'var(--bg3)',
+                  color:seatId===s?'var(--acc)':'var(--t2)', fontSize:13, fontWeight:700,
+                }}>{s}</button>
+              ))}
+              <button onClick={()=>setSeatId('')} style={{
+                flex:1.5, padding:'8px 4px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                border:`1.5px solid ${'roaming'===seatId||seatId===''?'var(--acc)':'var(--bdr)'}`,
+                background:'roaming'===seatId||seatId===''?'var(--acc-d)':'var(--bg3)',
+                color:'roaming'===seatId||seatId===''?'var(--acc)':'var(--t2)', fontSize:12, fontWeight:700,
+              }}>🚶 Roaming</button>
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Link to table (optional)</label>
+            <select value={linked} onChange={e=>setLinked(e.target.value)} style={{ width:'100%', height:40, background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:10, padding:'0 12px', color:'var(--t1)', fontFamily:'inherit', fontSize:13, outline:'none' }}>
+              <option value="">No table — bar only</option>
+              {openTables.map(t=><option key={t.id} value={t.id}>{t.label} (covers {t.covers})</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Tab note (optional)</label>
+            <input className="input" placeholder="Birthday, celebrating, VIP..." value={note} onChange={e=>setNote(e.target.value)}/>
+          </div>
+
+          <div style={{ background:'var(--bg3)', borderRadius:12, padding:'12px 14px', border:'1px solid var(--bdr)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: preAuth ? 10 : 0 }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>Card pre-authorisation</div>
+                <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>Places a hold on card — no charge until tab closes</div>
+              </div>
+              <button onClick={()=>setPreAuth(p=>!p)} style={{
+                width:40, height:22, borderRadius:11, cursor:'pointer', border:'none', transition:'all .2s',
+                background:preAuth?'var(--acc)':'var(--bg5)', position:'relative', flexShrink:0,
+              }}>
+                <div style={{ width:16, height:16, borderRadius:'50%', background:'#fff', position:'absolute', top:3, transition:'left .2s', left:preAuth?20:3 }}/>
+              </button>
+            </div>
+            {preAuth && (
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ fontSize:13, color:'var(--t3)' }}>Hold amount</span>
+                <div style={{ display:'flex', gap:4, marginLeft:'auto' }}>
+                  {['20','50','100','200'].map(a=>(
+                    <button key={a} onClick={()=>setPreAmt(a)} style={{
+                      padding:'4px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                      border:`1px solid ${preAmt===a?'var(--acc)':'var(--bdr)'}`,
+                      background:preAmt===a?'var(--acc-d)':'transparent',
+                      color:preAmt===a?'var(--acc)':'var(--t3)', fontSize:12, fontWeight:600,
+                    }}>£{a}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:8, marginTop:20 }}>
+          <button className="btn btn-ghost" style={{ flex:1 }} onClick={onCancel}>Cancel</button>
+          <button className="btn btn-acc" style={{ flex:2, height:46 }}
+            disabled={!name.trim()}
+            onClick={() => onConfirm({ name, seatId:seatId||null, tableId:linked||null, preAuth, preAuthAmount:parseInt(preAmt)||50, note })}>
+            Open tab →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const labelStyle = { display:'block', fontSize:11, fontWeight:700, color:'var(--t2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 };
+
+// ─── Main Bar Surface ─────────────────────────────────────────────────────────
+export default function BarSurface() {
+  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem } = useStore();
+
+  const [showOpenModal, setShowOpenModal]   = useState(false);
+  const [cat, setCat]                       = useState('cocktails');
+  const [search, setSearch]                 = useState('');
+  const [roundItems, setRoundItems]         = useState([]);  // items being built for next round
+  const [roundNote, setRoundNote]           = useState('');
+  const [modalItem, setModalItem]           = useState(null);
+  const [editingNote, setEditingNote]       = useState(false);
+  const [noteVal, setNoteVal]               = useState('');
+  const [showTabFilter, setShowTabFilter]   = useState('active'); // active | all
+
+  useEffect(() => { if (tabs.length===0) seedTabs(); }, []);
+
+  const activeTab = tabs.find(t=>t.id===activeTabId);
+  const filteredTabs = tabs.filter(t=>showTabFilter==='active' ? t.status!=='closed' : true);
+
+  const catMeta = CAT_META[cat] || CAT_META.cocktails;
+  const rawItems = cat==='quick' ? QUICK_IDS.map(id=>MENU_ITEMS.find(i=>i.id===id)).filter(Boolean) : MENU_ITEMS.filter(i=>i.cat===cat);
+  const displayItems = useMemo(()=>{
+    if (!search.trim()) return rawItems;
+    const q=search.toLowerCase();
+    return MENU_ITEMS.filter(i=>i.name.toLowerCase().includes(q)||i.description?.toLowerCase().includes(q));
+  },[cat,search]);
+
+  const roundTotal = roundItems.reduce((s,i)=>s+i.price*i.qty,0);
+  const roundCount = roundItems.reduce((s,i)=>s+i.qty,0);
+
+  const addToRound = (item, mods=[], opts={}) => {
+    const price = opts.linePrice!=null ? opts.linePrice/(opts.qty||1) : item.price;
+    const name  = opts.displayName || item.name;
+    setRoundItems(prev=>{
+      // Same item+mods → increment qty
+      const idx = prev.findIndex(r=>r.itemId===item.id && JSON.stringify(r.mods)===JSON.stringify(mods) && !opts.notes);
+      if (idx>=0 && !opts.notes) return prev.map((r,i)=>i===idx?{...r,qty:r.qty+1}:r);
+      return [...prev, { uid:`r${Date.now()}`, itemId:item.id, name, price, qty:opts.qty||1, mods, notes:opts.notes||'', allergens:item.allergens||[] }];
+    });
+    showToast(`${name} added to round`,'success');
+  };
+
+  const removeFromRound = (uid) => setRoundItems(p=>p.filter(r=>r.uid!==uid));
+  const updateRoundQty  = (uid,d) => setRoundItems(p=>p.map(r=>r.uid===uid?{...r,qty:Math.max(1,r.qty+d)}:r));
+
+  const handleItemTap = (item) => {
+    if (eightySixIds.includes(item.id)) { showToast(`${item.name} is 86'd`,'error'); return; }
+    if (!activeTab) { showToast('Select or open a tab first','error'); return; }
+    if (allergens.some(a=>(item.allergens||[]).includes(a))) { setPendingItem(item); return; }
+    openItemFlow(item);
+  };
+
+  const openItemFlow = (item) => {
+    if (item.type==='simple') addToRound(item,[],{});
+    else setModalItem(item);
+  };
+
+  const fireRound = () => {
+    if (!activeTab||!roundItems.length) return;
+    addRoundToTab(activeTab.id, roundItems, roundNote);
+    setRoundItems([]);
+    setRoundNote('');
+    showToast(`Round ${activeTab.rounds.length+1} sent to bar`,'success');
+  };
+
+  const handleOpenTab = (opts) => {
+    const tab = openTab(opts);
+    setShowOpenModal(false);
+    showToast(`${opts.name} tab opened`,'success');
+  };
+
+  const handleCloseTab = (tab) => {
+    updateTabStatus(tab.id,'closing');
+    showToast(`${tab.name} — proceed to checkout`,'info');
+  };
+
+  return (
+    <div style={{ display:'flex', flex:1, overflow:'hidden', minWidth:0 }}>
+
+      {/* ══ TABS LIST (LEFT) ═════════════════════════════════════════ */}
+      <div style={{ width:260, flexShrink:0, display:'flex', flexDirection:'column', background:'var(--bg1)', borderRight:'1px solid var(--bdr2)', overflow:'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding:'14px 12px 10px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>Bar tabs</div>
+            <button onClick={()=>setShowOpenModal(true)} style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0e0f14', fontSize:12, fontWeight:700 }}>+ New</button>
+          </div>
+          <div style={{ display:'flex', gap:4 }}>
+            {[['active','Active'],['all','All']].map(([f,l])=>(
+              <button key={f} onClick={()=>setShowTabFilter(f)} style={{ flex:1, padding:'4px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', border:`1px solid ${showTabFilter===f?'var(--acc-b)':'var(--bdr)'}`, background:showTabFilter===f?'var(--acc-d)':'transparent', color:showTabFilter===f?'var(--acc)':'var(--t3)', fontSize:11, fontWeight:700 }}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab cards */}
+        <div style={{ flex:1, overflowY:'auto', padding:'8px 10px' }}>
+          {filteredTabs.length===0&&(
+            <div style={{ textAlign:'center', padding:'40px 0', color:'var(--t3)' }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>🍸</div>
+              <div style={{ fontSize:13, fontWeight:600, color:'var(--t2)', marginBottom:4 }}>No open tabs</div>
+              <div style={{ fontSize:12 }}>Tap + New to open a tab</div>
+            </div>
+          )}
+          {filteredTabs.map(tab=>{
+            const sm=STATUS_META[tab.status]||STATUS_META.open;
+            const isActive=activeTabId===tab.id;
+            return (
+              <div key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{
+                padding:'12px 12px', borderRadius:12, marginBottom:8, cursor:'pointer',
+                background:isActive?'var(--bg3)':'var(--bg2)',
+                border:`1.5px solid ${isActive?'var(--acc-b)':'var(--bdr)'}`,
+                transition:'all .12s',
+              }}>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                  <div style={{ width:36,height:36, borderRadius:'50%', background:sm.bg, border:`2px solid ${sm.color}44`, display:'flex',alignItems:'center',justifyContent:'center', fontSize:12,fontWeight:800,color:sm.color, flexShrink:0 }}>
+                    {tab.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontSize:13,fontWeight:700,color:'var(--t1)',marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{tab.name}</div>
+                    <div style={{ fontSize:11,color:'var(--t3)', display:'flex', gap:8 }}>
+                      <span>{tab.seatId||'Roaming'}</span>
+                      <span>·</span>
+                      <span>{timeOpen(tab.openedAt)}</span>
+                      <span>·</span>
+                      <span>{tab.rounds.length} round{tab.rounds.length!==1?'s':''}</span>
+                    </div>
+                    {tab.note&&<div style={{ fontSize:10,color:'#f97316',marginTop:3,fontStyle:'italic',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>📝 {tab.note}</div>}
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:8 }}>
+                  <span style={{ fontSize:11,fontWeight:700,padding:'2px 7px',borderRadius:20,background:sm.bg,color:sm.color }}>{sm.label}</span>
+                  <span style={{ fontSize:15,fontWeight:800,color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{tab.total.toFixed(2)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ══ ACTIVE TAB (CENTRE) ════════════════════════════════════════ */}
+      <div style={{ width:320, flexShrink:0, display:'flex', flexDirection:'column', background:'var(--bg1)', borderRight:'1px solid var(--bdr2)', overflow:'hidden' }}>
+
+        {!activeTab ? (
+          <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:'var(--t3)', padding:24 }}>
+            <div style={{ fontSize:40,marginBottom:12,opacity:.4 }}>🍺</div>
+            <div style={{ fontSize:14,fontWeight:600,color:'var(--t2)',marginBottom:6 }}>Select a tab</div>
+            <div style={{ fontSize:12,textAlign:'center',lineHeight:1.6 }}>Tap a tab from the list, or open a new one to start ordering</div>
+            <button onClick={()=>setShowOpenModal(true)} className="btn btn-acc" style={{ marginTop:20, height:42 }}>Open new tab</button>
+          </div>
+        ) : (
+          <>
+            {/* Tab header */}
+            <div style={{ padding:'14px 14px 10px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
+              <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                <div>
+                  <div style={{ fontSize:15,fontWeight:700,color:'var(--t1)' }}>{activeTab.name}</div>
+                  <div style={{ fontSize:11,color:'var(--t3)',marginTop:2, display:'flex',gap:8 }}>
+                    <span>{activeTab.ref}</span>
+                    <span>·</span>
+                    <span>{activeTab.seatId||'Roaming'}</span>
+                    <span>·</span>
+                    <span>Opened by {activeTab.openedBy}</span>
+                    <span>·</span>
+                    <span>{timeOpen(activeTab.openedAt)} ago</span>
+                  </div>
+                  <div style={{ display:'flex',gap:6,marginTop:6,flexWrap:'wrap' }}>
+                    {(() => {const sm=STATUS_META[activeTab.status]; return <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:20,background:sm.bg,color:sm.color}}>{sm.label}</span>;})()}
+                    {activeTab.preAuth&&<span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:20,background:'var(--blu-d)',color:'var(--blu)',border:'1px solid var(--blu-b)'}}>💳 Pre-auth £{activeTab.preAuthAmount}</span>}
+                    {activeTab.tableId&&<span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:20,background:'var(--bg3)',color:'var(--t2)'}}>Table linked</span>}
+                  </div>
+                </div>
+                <div style={{ marginLeft:'auto',textAlign:'right',flexShrink:0 }}>
+                  <div style={{ fontSize:20,fontWeight:800,color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{activeTab.total.toFixed(2)}</div>
+                  <div style={{ fontSize:11,color:'var(--t3)' }}>{activeTab.rounds.reduce((s,r)=>s+r.items.reduce((s2,i)=>s2+i.qty,0),0)} items · {activeTab.rounds.length} rounds</div>
+                </div>
+              </div>
+
+              {/* Tab note */}
+              {editingNote ? (
+                <div style={{ marginTop:10 }}>
+                  <textarea value={noteVal} onChange={e=>setNoteVal(e.target.value)} rows={2} placeholder="Tab note..." style={{ width:'100%',background:'var(--bg3)',border:'1px solid var(--acc-b)',borderRadius:8,padding:'7px 10px',color:'var(--t1)',fontSize:12,fontFamily:'inherit',resize:'none',outline:'none' }}/>
+                  <div style={{ display:'flex',gap:6,marginTop:5 }}>
+                    <button onClick={()=>{updateTabNote(activeTab.id,noteVal);setEditingNote(false);showToast('Note saved','success');}} style={{ flex:1,padding:'5px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0e0f14',fontSize:12,fontWeight:700 }}>Save</button>
+                    <button onClick={()=>{setEditingNote(false);setNoteVal(activeTab.note);}} style={{ flex:1,padding:'5px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t2)',fontSize:12 }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div onClick={()=>{setEditingNote(true);setNoteVal(activeTab.note);}} style={{ marginTop:8,padding:'6px 10px',borderRadius:8,cursor:'pointer',background:'var(--bg3)',border:'1px dashed var(--bdr2)',fontSize:12, display:'flex',alignItems:'center',gap:6 }}>
+                  {activeTab.note ? <span style={{color:'#f97316'}}>📝 {activeTab.note}</span> : <span style={{color:'var(--t4)'}}>Add tab note...</span>}
+                </div>
+              )}
+            </div>
+
+            {/* Rounds history */}
+            <div style={{ flex:1, overflowY:'auto', padding:'10px 12px' }}>
+              {activeTab.rounds.length===0&&roundItems.length===0&&(
+                <div style={{ textAlign:'center',padding:'30px 0',color:'var(--t3)' }}>
+                  <div style={{ fontSize:28,marginBottom:8,opacity:.5 }}>🍹</div>
+                  <div style={{ fontSize:12 }}>No rounds yet — pick items from the menu →</div>
+                </div>
+              )}
+
+              {/* Current round being built */}
+              {roundItems.length>0&&(
+                <div style={{ marginBottom:14, background:'rgba(232,160,32,.06)', border:'1px solid var(--acc-b)', borderRadius:12, overflow:'hidden' }}>
+                  <div style={{ padding:'8px 12px', borderBottom:'1px solid var(--acc-b)', display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+                    <span style={{ fontSize:11,fontWeight:700,color:'var(--acc)',textTransform:'uppercase',letterSpacing:'.06em' }}>
+                      🔥 Round {activeTab.rounds.length+1} — building
+                    </span>
+                    <span style={{ fontSize:13,fontWeight:700,color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{roundTotal.toFixed(2)}</span>
+                  </div>
+                  <div style={{ padding:'8px 12px' }}>
+                    {roundItems.map(item=>(
+                      <RoundItem key={item.uid} item={item}
+                        onQty={d=>updateRoundQty(item.uid,d)}
+                        onRemove={()=>removeFromRound(item.uid)}/>
+                    ))}
+                    <div style={{ marginTop:8 }}>
+                      <input value={roundNote} onChange={e=>setRoundNote(e.target.value)} placeholder="Round note (e.g. extra ice on the Negroni)..." style={{ width:'100%',background:'var(--bg3)',border:'1px solid var(--bdr2)',borderRadius:8,padding:'7px 10px',color:'var(--t1)',fontSize:12,fontFamily:'inherit',outline:'none' }}/>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Past rounds (newest first) */}
+              {[...activeTab.rounds].reverse().map((round,idx)=>{
+                const rNum = activeTab.rounds.length-idx;
+                return (
+                  <div key={round.id} style={{ marginBottom:10, background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:10, overflow:'hidden' }}>
+                    <div style={{ padding:'7px 12px', borderBottom:'1px solid var(--bdr)', display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--bg3)' }}>
+                      <div style={{ fontSize:11,fontWeight:700,color:'var(--t2)' }}>
+                        Round {rNum} · {new Date(round.sentAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
+                      </div>
+                      <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+                        <span style={{ fontSize:13,fontWeight:700,color:'var(--t2)',fontFamily:'DM Mono,monospace' }}>£{round.subtotal.toFixed(2)}</span>
+                        <button onClick={()=>{if(window.confirm(`Void round ${rNum}?`))voidTabRound(activeTab.id,round.id);}} style={{ fontSize:10,color:'var(--red)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0 }}>Void</button>
+                      </div>
+                    </div>
+                    <div style={{ padding:'8px 12px' }}>
+                      {round.items.map((item,i)=>(
+                        <div key={i} style={{ display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:3 }}>
+                          <div>
+                            <span style={{ color:'var(--t2)' }}>{item.qty}× {item.name}</span>
+                            {item.mods?.length>0&&<span style={{ color:'var(--t3)',marginLeft:5 }}>({item.mods.map(m=>m.label).join(', ')})</span>}
+                            {item.notes&&<span style={{ color:'#f97316',marginLeft:5,fontStyle:'italic' }}>· {item.notes}</span>}
+                          </div>
+                          <span style={{ color:'var(--t3)',fontFamily:'DM Mono,monospace' }}>£{(item.price*item.qty).toFixed(2)}</span>
+                        </div>
+                      ))}
+                      {round.note&&<div style={{ fontSize:11,color:'#f97316',marginTop:4,fontStyle:'italic' }}>📝 {round.note}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer actions */}
+            <div style={{ padding:'10px 12px', borderTop:'1px solid var(--bdr)', background:'var(--bg2)', flexShrink:0 }}>
+              <div style={{ display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:2 }}>
+                <span>{activeTab.rounds.length} rounds · {activeTab.rounds.reduce((s,r)=>s+r.items.reduce((s2,i)=>s2+i.qty,0),0)} items</span>
+                <span style={{ fontFamily:'DM Mono,monospace' }}>{activeTab.rounds.length>0?`Avg round £${(activeTab.total/activeTab.rounds.length).toFixed(2)}`:'No rounds yet'}</span>
+              </div>
+              <div style={{ display:'flex',justifyContent:'space-between',fontSize:19,fontWeight:800,marginBottom:10,paddingTop:8,borderTop:'1px solid var(--bdr3)' }}>
+                <span>Total</span>
+                <span style={{ color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{(activeTab.total+roundTotal).toFixed(2)}</span>
+              </div>
+              <div style={{ display:'flex',gap:6 }}>
+                {roundItems.length>0 && (
+                  <button onClick={fireRound} style={{ flex:2,height:38,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0e0f14',fontSize:13,fontWeight:700 }}>
+                    🔥 Send round {activeTab.rounds.length+1} · £{roundTotal.toFixed(2)}
+                  </button>
+                )}
+                {roundItems.length===0 && activeTab.status!=='closed' && (
+                  <button onClick={()=>handleCloseTab(activeTab)} style={{ flex:2,height:38,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:13,fontWeight:700 }}>
+                    Close tab · £{activeTab.total.toFixed(2)}
+                  </button>
+                )}
+                <button onClick={()=>setActiveTab(null)} style={{ width:38,height:38,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:18 }}>←</button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ══ PRODUCT GRID (RIGHT) ══════════════════════════════════════ */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minWidth:0 }}>
+        {/* Category pills + search */}
+        <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
+            <div style={{ position:'relative', flex:1 }}>
+              <span style={{ position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'var(--t3)',fontSize:13 }}>🔍</span>
+              <input className="input" placeholder="Search drinks & food…" value={search} onChange={e=>setSearch(e.target.value)} style={{ paddingLeft:32,height:34,fontSize:12 }}/>
+              {search&&<button onClick={()=>setSearch('')} style={{ position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:15 }}>×</button>}
+            </div>
+            {!activeTab&&<button onClick={()=>setShowOpenModal(true)} className="btn btn-acc btn-sm">+ New tab</button>}
+          </div>
+          <div style={{ display:'flex',gap:4,overflowX:'auto',paddingBottom:2 }}>
+            {CATEGORIES.map(c=>{
+              const m=CAT_META[c.id]||{};
+              const isActive=cat===c.id&&!search;
+              return(
+                <button key={c.id} onClick={()=>{setCat(c.id);setSearch('');}} style={{
+                  padding:'4px 11px',borderRadius:20,fontSize:11,fontWeight:600,
+                  whiteSpace:'nowrap',cursor:'pointer',border:`1px solid ${isActive?m.color+'88':'var(--bdr)'}`,
+                  background:isActive?(m.color+'18'):'transparent',
+                  color:isActive?m.color:'var(--t3)',fontFamily:'inherit',
+                }}>{m.icon} {c.label}</button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Items */}
+        <div style={{ flex:1, overflowY:'auto', padding:12 }}>
+          {!activeTab&&(
+            <div style={{ margin:'0 0 14px', padding:'12px 16px', background:'rgba(232,160,32,.08)', border:'1px solid var(--acc-b)', borderRadius:12, fontSize:13, color:'var(--acc)' }}>
+              Select a tab or open a new one to start adding items
+            </div>
+          )}
+          <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:8 }}>
+            {displayItems.map(item=>{
+              const m=CAT_META[item.cat]||CAT_META.cocktails;
+              const is86=eightySixIds.includes(item.id);
+              const fromPrice=item.type==='variants'?Math.min(...item.variants.map(v=>v.price)):item.price;
+              const inRound=roundItems.filter(r=>r.itemId===item.id).reduce((s,r)=>s+r.qty,0);
+              return(
+                <button key={item.id} onClick={()=>handleItemTap(item)} style={{
+                  display:'flex',flexDirection:'column',padding:0,overflow:'hidden',
+                  background:is86?'var(--bg3)':'var(--bg2)',
+                  border:`1px solid ${is86?'var(--bdr)':inRound?m.color+'66':'var(--bdr)'}`,
+                  borderRadius:11,cursor:is86?'not-allowed':'pointer',
+                  opacity:is86?.4:1,fontFamily:'inherit',position:'relative',
+                }}>
+                  {inRound>0&&<div style={{ position:'absolute',top:6,right:6,width:18,height:18,borderRadius:'50%',background:m.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:'#fff',zIndex:1 }}>{inRound}</div>}
+                  <div style={{ height:3,background:is86?'var(--bg5)':m.color+'66',width:'100%' }}/>
+                  <div style={{ padding:'10px 10px 9px',flex:1,display:'flex',flexDirection:'column' }}>
+                    <div style={{ fontSize:20,marginBottom:6 }}>{m.icon}</div>
+                    <div style={{ fontSize:12,fontWeight:700,color:'var(--t1)',lineHeight:1.3,marginBottom:3,flex:1 }}>{item.name}</div>
+                    {item.description&&<div style={{ fontSize:10,color:'var(--t3)',lineHeight:1.3,marginBottom:4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{item.description}</div>}
+                    <div style={{ fontSize:14,fontWeight:800,color:m.color,fontFamily:'DM Mono,monospace',marginTop:'auto' }}>
+                      {item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}
+                    </div>
+                    {item.type!=='simple'&&<div style={{ fontSize:9,color:'var(--t3)',marginTop:2 }}>{item.type==='variants'?'▼ sizes':item.type==='modifiers'?'⊕ options':'🍕 build'}</div>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {showOpenModal&&<OpenTabModal onConfirm={handleOpenTab} onCancel={()=>setShowOpenModal(false)}/>}
+      {pendingItem&&<AllergenModal item={pendingItem} activeAllergens={allergens} onConfirm={()=>{const i=pendingItem;clearPendingItem();openItemFlow(i);}} onCancel={clearPendingItem}/>}
+      {modalItem&&(
+        <div className="modal-back">
+          <div style={{ background:'var(--bg2)',border:'1px solid var(--bdr2)',borderRadius:20,width:'100%',maxWidth:460,maxHeight:'88vh',overflow:'auto',boxShadow:'var(--sh3)' }}>
+            <QuickItemBuilder item={modalItem} onConfirm={(mods,opts)=>{addToRound(modalItem,mods,opts);setModalItem(null);}} onCancel={()=>setModalItem(null)}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Round Item Row ──────────────────────────────────────────────────────────
+function RoundItem({ item, onQty, onRemove }) {
+  const [editNote, setEditNote] = useState(false);
+  const [note, setNote] = useState(item.notes||'');
+  return (
+    <div style={{ marginBottom:6, paddingBottom:6, borderBottom:'1px solid rgba(232,160,32,.15)' }}>
+      <div style={{ display:'flex',alignItems:'flex-start',gap:8 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:12,fontWeight:600,color:'var(--t1)' }}>{item.name}</div>
+          {item.mods?.length>0&&<div style={{ fontSize:10,color:'var(--t3)' }}>{item.mods.map(m=>m.label).join(', ')}</div>}
+          {item.notes&&!editNote&&<div style={{ fontSize:10,color:'#f97316',fontStyle:'italic' }}>📝 {item.notes}</div>}
+          {editNote&&(
+            <input value={note} onChange={e=>setNote(e.target.value)} onBlur={()=>{item.notes=note;setEditNote(false);}} onKeyDown={e=>e.key==='Enter'&&(item.notes=note,setEditNote(false))} placeholder="Item note..." autoFocus style={{ marginTop:3,width:'100%',background:'var(--bg4)',border:'1px solid var(--acc-b)',borderRadius:5,padding:'3px 7px',color:'var(--t1)',fontSize:11,fontFamily:'inherit',outline:'none' }}/>
+          )}
+        </div>
+        <div style={{ fontSize:12,fontWeight:700,color:'var(--acc)',fontFamily:'DM Mono,monospace',whiteSpace:'nowrap' }}>£{(item.price*item.qty).toFixed(2)}</div>
+      </div>
+      <div style={{ display:'flex',alignItems:'center',gap:8,marginTop:4 }}>
+        <div style={{ display:'flex',alignItems:'center',gap:1,background:'var(--bg4)',border:'1px solid var(--bdr)',borderRadius:6,overflow:'hidden' }}>
+          <button onClick={()=>onQty(-1)} style={{ width:22,height:20,background:'transparent',border:'none',color:'var(--t2)',fontSize:14,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center' }}>−</button>
+          <div style={{ width:22,height:20,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'var(--t1)' }}>{item.qty}</div>
+          <button onClick={()=>onQty(1)} style={{ width:22,height:20,background:'transparent',border:'none',color:'var(--t2)',fontSize:14,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center' }}>+</button>
+        </div>
+        <button onClick={()=>{setEditNote(true);setNote(item.notes||'');}} style={{ fontSize:10,color:item.notes?'#f97316':'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit' }}>📝 {item.notes?'Edit note':'Add note'}</button>
+        <button onClick={onRemove} style={{ marginLeft:'auto',fontSize:10,color:'var(--red)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit' }}>Remove</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Quick Item Builder (variants/modifiers inline) ───────────────────────────
+function QuickItemBuilder({ item, onConfirm, onCancel }) {
+  const [selections, setSelections] = useState({});
+  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [qty, setQty] = useState(1);
+  const [note, setNote] = useState('');
+
+  const allRequired = (item.modifierGroups||[]).filter(g=>g.required).every(g=>!!selections[g.id]);
+  const extraCost = Object.values(selections).flat().filter(Boolean).reduce((s,m)=>s+(m?.price||0),0);
+  const varPrice = item.type==='variants'?(selectedVariant?.price||item.price):item.price;
+  const total = (varPrice+extraCost)*qty;
+
+  const canConfirm = item.type==='variants' ? !!selectedVariant : (item.type==='modifiers' ? allRequired : true);
+
+  const buildMods = () => {
+    if (item.type==='variants') return selectedVariant?[{label:selectedVariant.label,price:selectedVariant.price}]:[];
+    return Object.entries(selections).flatMap(([gid,val])=>{
+      if (!val) return [];
+      const group=(item.modifierGroups||[]).find(g=>g.id===gid);
+      const arr=Array.isArray(val)?val:[val];
+      return arr.filter(Boolean).map(m=>({groupLabel:group?.label,label:m.label,price:m.price||0}));
+    });
+  };
+
+  const displayName = item.type==='variants'&&selectedVariant ? `${item.name} — ${selectedVariant.label}` : item.name;
+
+  return (
+    <div style={{ padding:20 }}>
+      <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}>
+        <div style={{ fontSize:16,fontWeight:700,color:'var(--t1)' }}>{item.name}</div>
+        <button onClick={onCancel} style={{ background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:20 }}>×</button>
+      </div>
+
+      {item.type==='variants'&&(
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8 }}>Choose size</div>
+          {item.variants.map(v=>(
+            <button key={v.id} onClick={()=>setSelectedVariant(v)} style={{ display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'10px 14px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',marginBottom:6,border:`1.5px solid ${selectedVariant?.id===v.id?'var(--acc)':'var(--bdr)'}`,background:selectedVariant?.id===v.id?'var(--acc-d)':'var(--bg3)',color:selectedVariant?.id===v.id?'var(--acc)':'var(--t1)',textAlign:'left' }}>
+              <span style={{ fontSize:13,fontWeight:500 }}>{v.label}</span>
+              <span style={{ fontSize:14,fontWeight:700,fontFamily:'DM Mono,monospace' }}>£{v.price.toFixed(2)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {(item.modifierGroups||[]).map(group=>(
+        <div key={group.id} style={{ marginBottom:14 }}>
+          <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:8 }}>
+            <span style={{ fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em' }}>{group.label}</span>
+            {group.required&&<span style={{ fontSize:10,color:'var(--red)',fontWeight:600 }}>Required</span>}
+          </div>
+          {group.options.map(opt=>{
+            const cur=selections[group.id];
+            const isSel=group.multi?!!(cur||[]).find(o=>o.id===opt.id):cur?.id===opt.id;
+            const toggle=()=>setSelections(s=>group.multi?{...s,[group.id]:isSel?(cur||[]).filter(o=>o.id!==opt.id):[...(cur||[]),opt]}:{...s,[group.id]:isSel?null:opt});
+            return(
+              <button key={opt.id} onClick={toggle} style={{ display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'9px 12px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',marginBottom:5,border:`1.5px solid ${isSel?'var(--acc)':'var(--bdr)'}`,background:isSel?'var(--acc-d)':'var(--bg3)' }}>
+                <span style={{ fontSize:13,fontWeight:500,color:isSel?'var(--acc)':'var(--t1)' }}>{opt.label}</span>
+                {opt.price>0&&<span style={{ fontSize:12,fontWeight:600,color:isSel?'var(--acc)':'var(--t3)' }}>+£{opt.price.toFixed(2)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+
+      <div style={{ marginBottom:14 }}>
+        <div style={{ fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6 }}>Item note</div>
+        <input value={note} onChange={e=>setNote(e.target.value)} placeholder="No ice, extra lime, well done..." className="input"/>
+      </div>
+
+      <div style={{ display:'flex',alignItems:'center',gap:12,marginBottom:14 }}>
+        <span style={{ fontSize:12,color:'var(--t2)' }}>Qty</span>
+        <div style={{ display:'flex',alignItems:'center',gap:8,marginLeft:'auto' }}>
+          <button onClick={()=>setQty(q=>Math.max(1,q-1))} style={{ width:28,height:28,borderRadius:'50%',border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center' }}>−</button>
+          <span style={{ fontSize:16,fontWeight:700,minWidth:24,textAlign:'center',color:'var(--t1)' }}>{qty}</span>
+          <button onClick={()=>setQty(q=>q+1)} style={{ width:28,height:28,borderRadius:'50%',border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center' }}>+</button>
+        </div>
+      </div>
+
+      <button onClick={()=>onConfirm(buildMods(),{displayName,qty,linePrice:total,notes:note})} disabled={!canConfirm} className="btn btn-acc btn-full btn-lg" style={{ opacity:canConfirm?1:.4 }}>
+        Add to round · £{total.toFixed(2)}
+      </button>
+    </div>
+  );
+}
