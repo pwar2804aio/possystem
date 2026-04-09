@@ -93,8 +93,13 @@ export default function POSSurface() {
 
   const handleSend = () => {
     if (!items.length) { showToast('No items on order','error'); return; }
-    if (orderType!=='dine-in'&&!customer) { setPendingOrderType(orderType); setShowCustomerModal(true); return; }
+    if (orderType !== 'dine-in' && !customer) { setPendingOrderType(orderType); setShowCustomerModal(true); return; }
     sendToKitchen();
+    // Walk-in orders (takeaway / collection / quick dine-in) clear immediately after send
+    // Table orders stay open — server keeps adding throughout the meal
+    if (!activeTableId) {
+      clearWalkIn();
+    }
   };
 
   const handlePayComplete = () => {
