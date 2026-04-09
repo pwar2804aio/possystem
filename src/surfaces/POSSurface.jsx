@@ -28,7 +28,7 @@ export default function POSSurface() {
   const {
     staff, allergens, toggleAllergen, clearAllergens,
     order, addToOrder, addCustomItem, removeFromOrder, updateQty,
-    updateItemSeat, updateItemCourse, sendToKitchen, fireCourse, clearOrder,
+    updateItemSeat, updateItemCourse, updateItemNote, sendToKitchen, fireCourse, clearOrder,
     getOrderTotals, tableId, orderType, setOrderType, covers, setCovers,
     activeSeat, setActiveSeat, showToast,
     pendingItem, setPendingItem, clearPendingItem,
@@ -265,6 +265,7 @@ export default function POSSurface() {
                   <OrderItem key={item.uid} item={item} covers={covers} orderType={orderType}
                     onQty={d=>updateQty(item.uid,d)} onRemove={()=>removeFromOrder(item.uid)}
                     onSeat={s=>updateItemSeat(item.uid,s)} onCourse={c=>updateItemCourse(item.uid,c)}
+                    onNote={n=>updateItemNote(item.uid,n)}
                     seatList={seatList}/>
                 ))}
               </div>
@@ -485,15 +486,41 @@ export default function POSSurface() {
   );
 }
 
-function OrderItem({ item, covers, orderType, onQty, onRemove, onSeat, onCourse, seatList }) {
+function OrderItem({ item, covers, orderType, onQty, onRemove, onSeat, onCourse, onNote, seatList }) {
   const [showMenu, setShowMenu] = useState(false);
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteVal, setNoteVal] = useState(item.notes || '');
   return (
     <div style={{ background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:10,padding:'9px 10px',marginBottom:6 }}>
       <div style={{ display:'flex',justifyContent:'space-between',gap:8 }}>
         <div style={{ flex:1 }}>
           <div style={{ fontSize:13,fontWeight:600,lineHeight:1.3,color:'var(--t1)' }}>{item.name}</div>
           {item.mods?.map((m,i)=><div key={i} style={{ fontSize:11,color:'var(--t3)',display:'flex',justifyContent:'space-between',marginTop:1 }}><span>{m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}</span>{m.price>0&&<span style={{ color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>+£{m.price.toFixed(2)}</span>}</div>)}
-          {item.notes&&<div style={{ fontSize:11,color:'#f97316',marginTop:2,fontStyle:'italic' }}>📝 {item.notes}</div>}
+          {/* Inline note editor */}
+          {editingNote ? (
+            <div style={{ marginTop:5 }}>
+              <input
+                autoFocus
+                value={noteVal}
+                onChange={e => setNoteVal(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { onNote(noteVal); setEditingNote(false); }
+                  if (e.key === 'Escape') { setNoteVal(item.notes||''); setEditingNote(false); }
+                }}
+                placeholder="No ice, well done, allergy note…"
+                style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--acc-b)', borderRadius:6, padding:'5px 8px', color:'var(--t1)', fontSize:11, fontFamily:'inherit', outline:'none' }}
+              />
+              <div style={{ display:'flex', gap:5, marginTop:4 }}>
+                <button onClick={() => { onNote(noteVal); setEditingNote(false); }} style={{ flex:1, padding:'3px', borderRadius:5, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0e0f14', fontSize:11, fontWeight:700 }}>Save</button>
+                <button onClick={() => { setNoteVal(item.notes||''); setEditingNote(false); }} style={{ flex:1, padding:'3px', borderRadius:5, cursor:'pointer', fontFamily:'inherit', background:'var(--bg4)', border:'1px solid var(--bdr)', color:'var(--t2)', fontSize:11 }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div onClick={() => { setNoteVal(item.notes||''); setEditingNote(true); }} style={{ marginTop:5, padding:'4px 8px', borderRadius:6, cursor:'pointer', border:'1px dashed var(--bdr2)', fontSize:11, display:'flex', alignItems:'center', gap:5, color: item.notes ? '#f97316' : 'var(--t4)' }}>
+              <span>📝</span>
+              <span style={{ fontStyle: item.notes ? 'italic' : 'normal' }}>{item.notes || 'Add item note…'}</span>
+            </div>
+          )}
           {item.allergens?.length>0&&<div style={{ fontSize:10,color:'var(--red)',marginTop:2 }}>⚠ {item.allergens.map(a=>ALLERGENS.find(x=>x.id===a)?.label).filter(Boolean).join(' · ')}</div>}
           <div style={{ display:'flex',gap:4,marginTop:5,flexWrap:'wrap' }}>
             {orderType==='dine-in'&&covers>1&&<span onClick={()=>setShowMenu(s=>!s)} style={{ fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)',cursor:'pointer' }}>{item.seat==='shared'?'Shared':`Seat ${item.seat}`}</span>}
