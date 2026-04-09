@@ -456,11 +456,12 @@ export default function POSSurface() {
       {pendingItem&&<AllergenModal item={pendingItem} activeAllergens={allergens} onConfirm={()=>{const i=pendingItem;clearPendingItem();openFlow(i);}} onCancel={clearPendingItem}/>}
       {modalItem&&<ProductModal item={modalItem} activeAllergens={allergens} onConfirm={(item,mods,cfg,opts)=>{addToOrder(item,mods,cfg,opts);setModalItem(null);showToast(`${opts.displayName||item.name} added`,'success');}} onCancel={()=>setModalItem(null)}/>}
       {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={tableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={()=>{
+        const tid = tableId; // capture now before any state changes
         setShowCheckout(false);
-        if (tableId && tableId !== 'walkin') {
-          closeTable(tableId);
-          setSurface('tables');
+        if (tid && tid !== 'walkin') {
+          closeTable(tid);   // clears order + resets table to available
           showToast('Payment complete — table cleared', 'success');
+          setSurface('tables');
         } else {
           clearOrder();
           showToast('Payment complete', 'success');

@@ -261,8 +261,9 @@ export const useStore = create((set, get) => ({
     set({ surface:'pos', activeSeat:'shared' });
   },
   closeTable: (id) => {
-    get().updateTable(id,{status:'available',seated:null,server:null,orderTotal:null,seatedAt:null});
-    set(s=>({ order:s.tableId===id?null:s.order, tableId:s.tableId===id?null:s.tableId }));
+    get().updateTable(id, { status:'available', seated:null, server:null, orderTotal:null, seatedAt:null });
+    // Always clear order when closing a table — don't rely on s.tableId matching
+    set({ order:null, tableId:null, activeSeat:'shared', customer:null, orderNote:'' });
   },
 
   // ── KDS ───────────────────────────────────
