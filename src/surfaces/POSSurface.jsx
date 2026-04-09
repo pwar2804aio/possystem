@@ -455,18 +455,25 @@ export default function POSSurface() {
       {/* ══ MODALS ════════════════════════════════════════════════ */}
       {pendingItem&&<AllergenModal item={pendingItem} activeAllergens={allergens} onConfirm={()=>{const i=pendingItem;clearPendingItem();openFlow(i);}} onCancel={clearPendingItem}/>}
       {modalItem&&<ProductModal item={modalItem} activeAllergens={allergens} onConfirm={(item,mods,cfg,opts)=>{addToOrder(item,mods,cfg,opts);setModalItem(null);showToast(`${opts.displayName||item.name} added`,'success');}} onCancel={()=>setModalItem(null)}/>}
-      {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={tableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={()=>{
-        const tid = tableId; // capture now before any state changes
-        setShowCheckout(false);
-        if (tid && tid !== 'walkin') {
-          closeTable(tid);   // clears order + resets table to available
-          showToast('Payment complete — table cleared', 'success');
-          setSurface('tables');
-        } else {
-          clearOrder();
-          showToast('Payment complete', 'success');
-        }
-      }}/>}
+      {showCheckout&&<CheckoutModal
+        items={items} subtotal={subtotal} service={service} total={total}
+        orderType={orderType} covers={covers} tableId={tableId}
+        seatList={seatList} customer={customer}
+        onClose={()=>setShowCheckout(false)}
+        onComplete={()=>{
+          // Read fresh state at the moment of payment — never trust closure values for this
+          const { tableId: tid, closeTable: ct, clearOrder: co, setSurface: ss, showToast: st } = useStore.getState();
+          setShowCheckout(false);
+          co(); // always clear order
+          if (tid && tid !== 'walkin') {
+            ct(tid); // reset table → available
+            st('Payment complete — table cleared', 'success');
+            ss('tables');
+          } else {
+            st('Payment complete', 'success');
+          }
+        }}
+      />}
 
       {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} onConfirm={handleCustomerConfirm} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
       {showQueue&&<CollectionQueue onClose={()=>setShowQueue(false)}/>}
