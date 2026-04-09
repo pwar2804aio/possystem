@@ -102,14 +102,22 @@ export default function POSSurface() {
 
   const handleSend = () => {
     if (!items.length) { showToast('No items on order', 'error'); return; }
+
+    // Dine-in must have a table
+    if (orderType === 'dine-in' && !activeTableId) {
+      showToast('Select a table from the Floor plan first', 'error');
+      setSurface('tables');
+      return;
+    }
+
+    // Takeaway / collection must have customer details
     if (orderType !== 'dine-in' && !customer) {
       setPendingOrderType(orderType); setShowCustomerModal(true); return;
     }
+
     sendToKitchen();
-    // Always clear after send — table order is committed and lives on the table,
-    // walk-in order is sent. POS resets for the next order.
     if (activeTableId) {
-      setActiveTableId(null);   // exit table context, session stays on the table
+      setActiveTableId(null);
       showToast(`${activeTable?.label} order sent to kitchen`, 'success');
     } else {
       clearWalkIn();
@@ -223,6 +231,17 @@ export default function POSSurface() {
             );
           })}
         </div>
+
+        {/* No table warning for dine-in */}
+        {orderType === 'dine-in' && !activeTableId && items.length > 0 && (
+          <div onClick={() => setSurface('tables')} style={{ margin:'0 10px 6px', padding:'8px 12px', borderRadius:8, background:'var(--red-d)', border:'1px solid var(--red-b)', cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:14 }}>⚠</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--red)' }}>No table selected</div>
+              <div style={{ fontSize:11, color:'var(--red)', opacity:.8 }}>Tap to go to Floor plan →</div>
+            </div>
+          </div>
+        )}
 
         {/* Order note */}
         {items.length>0&&(
