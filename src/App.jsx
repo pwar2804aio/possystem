@@ -7,20 +7,81 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const NAV = [
-  { id:'tables',     label:'Floor', icon:'⬚' },
-  { id:'pos',        label:'POS',   icon:'⊞' },
-  { id:'bar',        label:'Bar',   icon:'🍸' },
-  { id:'kds',        label:'KDS',   icon:'▣' },
-  { id:'backoffice', label:'Office',icon:'⚙' },
+const VERSION = '0.4.1';
+
+const CHANGELOG = [
+  {
+    version: '0.4.1', date: 'Apr 2026', label: 'Table sessions',
+    changes: [
+      'Tables now own their order sessions — no sync issues',
+      'Proper floor plan with Seat Guests modal (covers, server, note)',
+      'Occupied tables show server, time seated, running total on the node',
+      'Clicking occupied table on floor loads existing order in POS',
+      'Send fires to kitchen AND commits to table in one action',
+      'Payment clears table and returns to floor automatically',
+    ],
+  },
+  {
+    version: '0.4.0', date: 'Apr 2026', label: 'Bar tabs',
+    changes: [
+      'Full bar tab system with rounds, pre-auth toggle, roaming tabs',
+      'Open tab modal — name, bar seat, table link, pre-auth hold amount',
+      'Round builder — add items, item notes, round note, fire to bar',
+      'Per-round history with time, subtotal, void option',
+      'Close tab → full checkout flow (card / cash / split)',
+      'Inline tab note editing',
+      'Item notes — tap any order line to add a kitchen note',
+      'Order-level notes field on every order',
+    ],
+  },
+  {
+    version: '0.3.0', date: 'Apr 2026', label: 'Takeaway & collection',
+    changes: [
+      'Customer info capture triggered on Takeaway / Collection',
+      'Returning customer lookup by phone or name',
+      'Collection time slots — ASAP or scheduled in 15-min increments',
+      'Collection queue panel — Received → In prep → Ready → Collected',
+      'Urgency colour coding (overdue, under 10 min, normal)',
+      'Mark Ready fires SMS notification hook',
+      'No service charge on takeaway or collection orders',
+    ],
+  },
+  {
+    version: '0.2.0', date: 'Mar 2026', label: 'POS core ordering',
+    changes: [
+      'Product variants — size options with per-variant pricing (wine: 175ml / 250ml / bottle)',
+      'Required & optional modifier groups (steak cooking, cocktail spirit, sauce)',
+      'Multi-select modifier groups',
+      'Pizza half & half builder with per-side topping selection',
+      'Course management — auto-assign by category, hold & fire per course',
+      'Seat assignment — tag items to seats, tap to reassign',
+      'Live 86 — one tap, propagates to all terminals, category badge count',
+      'Custom items — open price with description and kitchen note',
+      'Fire Course banner — appears when next course is ready',
+    ],
+  },
+  {
+    version: '0.1.0', date: 'Mar 2026', label: 'Foundation',
+    changes: [
+      'Three-column POS layout — order panel, category nav, product grid',
+      'Quick Screen — AI-ranked items by daypart and sales patterns',
+      'All 14 EU/UK mandatory allergens — filter, warn, audit trail',
+      'KDS with urgency colouring, bump and recall',
+      'Visual floor plan with table sections (main, bar, patio)',
+      'Back office — shift overview, printer management, staff profiles',
+      'PIN login with role-based staff profiles',
+      'Dark premium design system (Plus Jakarta Sans, DM Mono)',
+    ],
+  },
 ];
 
 export default function App() {
   const { staff, surface, setSurface, toast, shift } = useStore();
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
   if (!staff) return <PINScreen />;
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
-      <ShiftBar shift={shift} />
+      <ShiftBar shift={shift} version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} />
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
         <Sidebar surface={surface} setSurface={setSurface} />
         <div style={{ display:'flex', flex:1, overflow:'hidden', minWidth:0 }}>
@@ -32,11 +93,20 @@ export default function App() {
         </div>
       </div>
       {toast && <Toast toast={toast} />}
+      {showWhatsNew && <WhatsNewModal onClose={()=>setShowWhatsNew(false)} />}
     </div>
   );
 }
 
-function ShiftBar({ shift }) {
+const NAV = [
+  { id:'tables',     label:'Floor', icon:'⬚' },
+  { id:'pos',        label:'POS',   icon:'⊞' },
+  { id:'bar',        label:'Bar',   icon:'🍸' },
+  { id:'kds',        label:'KDS',   icon:'▣' },
+  { id:'backoffice', label:'Office',icon:'⚙' },
+];
+
+function ShiftBar({ shift, version, onWhatsNew }) {
   return (
     <div style={{ height:40, display:'flex', alignItems:'center', background:'var(--bg1)', borderBottom:'1px solid var(--bdr2)', flexShrink:0 }}>
       <div style={{ width:'var(--nav)', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', borderRight:'1px solid var(--bdr2)', flexShrink:0 }}>
@@ -48,8 +118,82 @@ function ShiftBar({ shift }) {
         <span style={{ fontSize:12, color:'var(--t3)' }}>Sales <strong style={{ color:'var(--t1)', fontWeight:600 }}>£{shift.sales.toLocaleString()}</strong></span>
         <span style={{ fontSize:12, color:'var(--t3)' }}>Avg <strong style={{ color:'var(--t1)', fontWeight:600 }}>£{shift.avgCheck.toFixed(2)}</strong></span>
       </div>
-      <div style={{ padding:'0 20px', fontSize:12, color:'var(--t3)', fontFamily:'DM Mono, monospace' }}>
-        {new Date().toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 16px' }}>
+        <div style={{ fontSize:12, color:'var(--t3)', fontFamily:'DM Mono, monospace' }}>
+          {new Date().toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+        </div>
+        <button onClick={onWhatsNew} style={{
+          display:'flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:20, cursor:'pointer',
+          background:'var(--bg3)', border:'1px solid var(--bdr2)', fontFamily:'inherit',
+          fontSize:11, fontWeight:700, color:'var(--t3)', transition:'all .15s',
+        }}
+        onMouseEnter={e=>{ e.currentTarget.style.borderColor='var(--acc-b)'; e.currentTarget.style.color='var(--acc)'; }}
+        onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--bdr2)'; e.currentTarget.style.color='var(--t3)'; }}>
+          <span style={{ fontFamily:'DM Mono, monospace' }}>v{version}</span>
+          <span style={{ color:'var(--t4)' }}>·</span>
+          <span>What's new</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WhatsNewModal({ onClose }) {
+  const [selected, setSelected] = useState(CHANGELOG[0].version);
+  const entry = CHANGELOG.find(c => c.version === selected) || CHANGELOG[0];
+  return (
+    <div className="modal-back" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{
+        background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:20,
+        width:'100%', maxWidth:560, maxHeight:'80vh',
+        display:'flex', flexDirection:'column', boxShadow:'var(--sh3)', overflow:'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ padding:'18px 22px 14px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+          <div>
+            <div style={{ fontSize:17, fontWeight:700, color:'var(--t1)' }}>What's new</div>
+            <div style={{ fontSize:12, color:'var(--t3)', marginTop:2 }}>Restaurant OS · version history</div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:22, lineHeight:1 }}>×</button>
+        </div>
+
+        <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
+          {/* Version list */}
+          <div style={{ width:160, flexShrink:0, borderRight:'1px solid var(--bdr)', overflowY:'auto', padding:'8px 0' }}>
+            {CHANGELOG.map((c, i) => (
+              <button key={c.version} onClick={()=>setSelected(c.version)} style={{
+                width:'100%', padding:'10px 14px', textAlign:'left', cursor:'pointer',
+                fontFamily:'inherit', border:'none', transition:'background .1s',
+                background: selected===c.version ? 'var(--bg3)' : 'transparent',
+                borderLeft: `2px solid ${selected===c.version ? 'var(--acc)' : 'transparent'}`,
+              }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+                  <span style={{ fontSize:12, fontWeight:700, color: selected===c.version?'var(--acc)':'var(--t1)', fontFamily:'DM Mono, monospace' }}>v{c.version}</span>
+                  {i===0 && <span style={{ fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:20, background:'var(--acc)', color:'#0e0f14' }}>LATEST</span>}
+                </div>
+                <div style={{ fontSize:11, color:'var(--t3)' }}>{c.label}</div>
+                <div style={{ fontSize:10, color:'var(--t4)', marginTop:1 }}>{c.date}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Changes detail */}
+          <div style={{ flex:1, overflowY:'auto', padding:'18px 20px' }}>
+            <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom:4 }}>
+              <span style={{ fontSize:20, fontWeight:800, color:'var(--t1)', fontFamily:'DM Mono, monospace' }}>v{entry.version}</span>
+              <span style={{ fontSize:13, color:'var(--acc)', fontWeight:600 }}>{entry.label}</span>
+            </div>
+            <div style={{ fontSize:11, color:'var(--t4)', marginBottom:16 }}>{entry.date}</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {entry.changes.map((change, i) => (
+                <div key={i} style={{ display:'flex', gap:10, padding:'8px 12px', background:'var(--bg3)', borderRadius:8, border:'1px solid var(--bdr)' }}>
+                  <span style={{ color:'var(--acc)', fontWeight:700, flexShrink:0, marginTop:1 }}>✓</span>
+                  <span style={{ fontSize:13, color:'var(--t2)', lineHeight:1.5 }}>{change}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
