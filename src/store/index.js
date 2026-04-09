@@ -1,20 +1,63 @@
 import { create } from 'zustand';
-import { INITIAL_TABLES, INITIAL_KDS, SHIFT } from '../data/seed';
+import { INITIAL_KDS, SHIFT } from '../data/seed';
 
-let _uid = 1;
-const uid = () => `li-${_uid++}`;
-let _orderNum = 1001;
-let _tabNum = 1;
+// ─── ID helpers ──────────────────────────────────────────────────────────────
+let _itemUid = 1;
+const uid = () => `i${_itemUid++}`;
+let _orderNum = 1000;
+let _tabNum   = 1;
 
-const CAT_COURSE = {
-  starters:1, mains:2, pizza:2, sides:2,
-  desserts:3, drinks:0, cocktails:0, quick:1,
-};
+const CAT_COURSE = { starters:1, mains:2, pizza:2, sides:2, desserts:3, drinks:0, cocktails:0, quick:1 };
+
+// ─── Tables with static config + runtime session ──────────────────────────────
+// session: null | { id, items[], firedCourses[], sentAt, server, covers, seatedAt, note }
+const TABLES_CONFIG = [
+  { id:'t1',  label:'T1',        maxCovers:2, shape:'sq', x:18,  y:30,  w:70,  h:60,  section:'main'  },
+  { id:'t2',  label:'T2',        maxCovers:4, shape:'sq', x:110, y:30,  w:80,  h:60,  section:'main'  },
+  { id:'t3',  label:'T3',        maxCovers:2, shape:'sq', x:214, y:30,  w:70,  h:60,  section:'main'  },
+  { id:'t4',  label:'T4',        maxCovers:4, shape:'sq', x:306, y:30,  w:80,  h:60,  section:'main'  },
+  { id:'t5',  label:'T5',        maxCovers:3, shape:'rd', x:18,  y:118, w:78,  h:78,  section:'main'  },
+  { id:'t6',  label:'T6',        maxCovers:3, shape:'rd', x:120, y:118, w:78,  h:78,  section:'main'  },
+  { id:'t7',  label:'Banquette', maxCovers:8, shape:'sq', x:224, y:120, w:150, h:68,  section:'main'  },
+  { id:'t8',  label:'T8',        maxCovers:2, shape:'sq', x:18,  y:220, w:68,  h:60,  section:'main'  },
+  { id:'t9',  label:'T9',        maxCovers:4, shape:'sq', x:108, y:220, w:80,  h:60,  section:'main'  },
+  { id:'t10', label:'T10',       maxCovers:4, shape:'sq', x:208, y:220, w:80,  h:60,  section:'main'  },
+  { id:'b1',  label:'B1',        maxCovers:1, shape:'rd', x:415, y:30,  w:50,  h:50,  section:'bar'   },
+  { id:'b2',  label:'B2',        maxCovers:1, shape:'rd', x:415, y:96,  w:50,  h:50,  section:'bar'   },
+  { id:'b3',  label:'B3',        maxCovers:1, shape:'rd', x:415, y:162, w:50,  h:50,  section:'bar'   },
+  { id:'b4',  label:'B4',        maxCovers:1, shape:'rd', x:415, y:228, w:50,  h:50,  section:'bar'   },
+  { id:'p1',  label:'P1',        maxCovers:4, shape:'sq', x:500, y:30,  w:78,  h:64,  section:'patio' },
+  { id:'p2',  label:'P2',        maxCovers:4, shape:'sq', x:500, y:118, w:78,  h:64,  section:'patio' },
+  { id:'p3',  label:'P3',        maxCovers:6, shape:'sq', x:500, y:206, w:90,  h:68,  section:'patio' },
+];
+
+// Seed with a couple of occupied tables for demo
+function buildInitialTables() {
+  return TABLES_CONFIG.map(t => {
+    const base = { ...t, status:'available', session:null, reservation:null };
+    if (t.id==='t2') return { ...base, status:'occupied', session:{ id:`ORD-DEMO1`, items:[
+      { uid:'d1', itemId:'m6',  name:'Carbonara pasta',  price:14.5,  qty:2, mods:[{label:'Regular',price:0}],   notes:'', allergens:['gluten','eggs','milk'], course:2, fired:true, status:'sent', seat:'shared' },
+      { uid:'d2', itemId:'m28', name:'House red wine — 250ml', price:10.5, qty:1, mods:[],            notes:'', allergens:['sulphites'],             course:0, fired:true, status:'sent', seat:'shared' },
+    ], firedCourses:[0,2], sentAt:new Date(Date.now()-18*60000), server:'Sarah', covers:2, seatedAt:Date.now()-22*60000, note:'', orderNote:'' } };
+    if (t.id==='t5') return { ...base, status:'occupied', session:{ id:`ORD-DEMO2`, items:[
+      { uid:'d3', itemId:'m7',  name:'Ribeye steak 8oz', price:32,    qty:1, mods:[{label:'Cooking: Medium rare',price:0},{label:'Sauce: Peppercorn',price:0}], notes:'', allergens:[], course:2, fired:true, status:'sent', seat:'shared' },
+      { uid:'d4', itemId:'m10', name:'Chicken supreme',  price:22,    qty:1, mods:[],            notes:'', allergens:['milk'],                    course:2, fired:true, status:'sent', seat:'shared' },
+    ], firedCourses:[0,2], sentAt:new Date(Date.now()-35*60000), server:'Tom', covers:2, seatedAt:Date.now()-40*60000, note:'', orderNote:'' } };
+    if (t.id==='t3') return { ...base, status:'reserved', reservation:{ name:'Johnson party', phone:'07700 900111', time:'7:30 PM', partySize:2 } };
+    if (t.id==='p2') return { ...base, status:'reserved', reservation:{ name:'Chen table',   phone:'07700 900222', time:'8:00 PM', partySize:4 } };
+    return base;
+  });
+}
+
+// ─── Utility: recalc session totals ──────────────────────────────────────────
+function calcSessionTotals(session) {
+  if (!session) return null;
+  const subtotal = session.items.reduce((s,i) => s + i.price * i.qty, 0);
+  return { ...session, subtotal, total: subtotal * 1.125 };
+}
 
 export function getCollectionSlots() {
-  const slots = [];
-  const now = new Date();
-  const start = new Date(now);
+  const slots = [], now = new Date(), start = new Date(now);
   start.setMinutes(Math.ceil((now.getMinutes()+15)/15)*15, 0, 0);
   for (let i=0; i<12; i++) {
     const t = new Date(start.getTime() + i*15*60000);
@@ -23,265 +66,326 @@ export function getCollectionSlots() {
   return slots;
 }
 
+// ─── Store ────────────────────────────────────────────────────────────────────
 export const useStore = create((set, get) => ({
 
   // ── Auth ──────────────────────────────────
   staff: null,
-  login:  (s) => set({ staff:s }),
-  logout: () => set({ staff:null, order:null, tableId:null, customer:null }),
+  login:  s => set({ staff:s }),
+  logout: () => set({ staff:null, activeTableId:null, orderType:'dine-in', customer:null }),
 
-  // ── Surface ───────────────────────────────
-  surface: 'pos',
-  setSurface: (s) => set({ surface:s }),
+  // ── Navigation ────────────────────────────
+  surface: 'tables',
+  setSurface: s => set({ surface:s }),
+
+  // ── Tables (source of truth for all orders) ──────────
+  tables: buildInitialTables(),
+
+  // Helper to update a single table
+  _updateTable: (id, patch) => set(s => ({ tables: s.tables.map(t => t.id===id ? { ...t, ...patch } : t) })),
+
+  // Seat a table: create session, go to POS
+  seatTable: (tableId, { covers, server }) => {
+    const session = {
+      id: `ORD-${++_orderNum}`,
+      items: [], firedCourses: [],
+      sentAt: null, covers, server,
+      seatedAt: Date.now(), note: '', orderNote: '',
+      subtotal: 0, total: 0,
+    };
+    get()._updateTable(tableId, { status:'open', session, reservation:null });
+    set({ activeTableId:tableId, surface:'pos', orderType:'dine-in' });
+  },
+
+  // Open an already-seated table (go to its POS)
+  openTableInPOS: (tableId) => {
+    set({ activeTableId:tableId, surface:'pos', orderType:'dine-in' });
+  },
+
+  // Close / clear a table after payment
+  clearTable: (tableId) => {
+    get()._updateTable(tableId, { status:'available', session:null });
+    set(s => ({ activeTableId: s.activeTableId===tableId ? null : s.activeTableId }));
+  },
+
+  // Add/remove reservation
+  setReservation: (tableId, res) => {
+    get()._updateTable(tableId, { status: res?'reserved':'available', reservation: res||null });
+  },
+
+  // ── Active table context ───────────────────
+  activeTableId: null,
+  setActiveTableId: id => set({ activeTableId:id }),
+
+  getActiveTable: () => get().tables.find(t => t.id === get().activeTableId) || null,
+
+  // ── Add item to active table's session ────
+  addItem: (item, mods=[], pizzaConfig=null, opts={}) => {
+    const { activeTableId, staff, tables } = get();
+    const qty = opts.qty || 1;
+    const price = opts.linePrice != null ? opts.linePrice/qty : item.price;
+    const newItem = {
+      uid: uid(), itemId: item.id,
+      name: opts.displayName || item.name,
+      price, qty, mods: mods||[], notes: opts.notes||'',
+      pizzaConfig, allergens: item.allergens||[],
+      centreId: item.centreId,
+      seat: 'shared',
+      course: CAT_COURSE[item.cat] ?? 1,
+      fired: CAT_COURSE[item.cat] === 0,
+      status: 'pending',
+    };
+
+    if (activeTableId) {
+      // Add to the table's session
+      set(s => ({
+        tables: s.tables.map(t => {
+          if (t.id !== activeTableId) return t;
+          const session = t.session || { id:`ORD-${++_orderNum}`, items:[], firedCourses:[], sentAt:null, covers:2, server:staff?.name||'Staff', seatedAt:Date.now(), note:'', orderNote:'', subtotal:0, total:0 };
+          const items = [...session.items, newItem];
+          const subtotal = items.reduce((s,i)=>s+i.price*i.qty, 0);
+          return { ...t, status:t.status==='available'?'open':t.status, session:{ ...session, items, subtotal, total:subtotal*1.125 } };
+        }),
+      }));
+    } else {
+      // Walk-in / takeaway: use standalone order
+      set(s => {
+        const items = [...(s.walkInOrder?.items||[]), newItem];
+        const subtotal = items.reduce((a,i)=>a+i.price*i.qty, 0);
+        return { walkInOrder:{ ...(s.walkInOrder||{id:`ORD-${++_orderNum}`}), items, subtotal, total:subtotal } };
+      });
+    }
+  },
+
+  addCustomItem: (name, price, notes) => {
+    const { activeTableId, staff } = get();
+    const newItem = { uid:uid(), itemId:'custom', name, price:parseFloat(price)||0, qty:1, mods:[], notes, allergens:[], seat:'shared', course:1, fired:false, status:'pending' };
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if (t.id!==activeTableId) return t;
+        const session = t.session||{ id:`ORD-${++_orderNum}`, items:[], firedCourses:[], sentAt:null, covers:2, server:staff?.name||'Staff', seatedAt:Date.now(), note:'', orderNote:'', subtotal:0, total:0 };
+        const items=[...session.items, newItem];
+        const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
+        return {...t, session:{...session, items, subtotal, total:subtotal*1.125}};
+      }) }));
+    } else {
+      set(s=>{const items=[...(s.walkInOrder?.items||[]),newItem];return{walkInOrder:{...(s.walkInOrder||{id:`ORD-${++_orderNum}`}),items}};});
+    }
+  },
+
+  removeItem: (itemUid) => {
+    const { activeTableId } = get();
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if(t.id!==activeTableId||!t.session)return t;
+        const items=t.session.items.filter(i=>i.uid!==itemUid);
+        const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
+        return {...t, session:{...t.session, items, subtotal, total:subtotal*1.125}};
+      })}) );
+    } else {
+      set(s=>{const items=(s.walkInOrder?.items||[]).filter(i=>i.uid!==itemUid);return{walkInOrder:{...s.walkInOrder,items}};});
+    }
+  },
+
+  updateItemQty: (itemUid, delta) => {
+    const { activeTableId } = get();
+    const applyQty = items => items.map(i=>i.uid===itemUid?{...i,qty:Math.max(1,i.qty+delta)}:i);
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if(t.id!==activeTableId||!t.session)return t;
+        const items=applyQty(t.session.items);
+        const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
+        return {...t,session:{...t.session,items,subtotal,total:subtotal*1.125}};
+      })}) );
+    } else {
+      set(s=>{const items=applyQty(s.walkInOrder?.items||[]);return{walkInOrder:{...s.walkInOrder,items}};});
+    }
+  },
+
+  updateItemNote: (itemUid, note) => {
+    const { activeTableId } = get();
+    const apply = items => items.map(i=>i.uid===itemUid?{...i,notes:note}:i);
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if(t.id!==activeTableId||!t.session)return t;
+        return {...t,session:{...t.session,items:apply(t.session.items)}};
+      })}) );
+    } else {
+      set(s=>({walkInOrder:{...s.walkInOrder,items:apply(s.walkInOrder?.items||[])}}));
+    }
+  },
+
+  setOrderNote: (note) => {
+    const { activeTableId } = get();
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>t.id===activeTableId&&t.session?{...t,session:{...t.session,orderNote:note}}:t) }));
+    } else {
+      set(s=>({ walkInOrder:{...s.walkInOrder,orderNote:note} }));
+    }
+  },
+
+  updateItemSeat: (itemUid, seat) => {
+    const { activeTableId } = get();
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if(t.id!==activeTableId||!t.session)return t;
+        return {...t,session:{...t.session,items:t.session.items.map(i=>i.uid===itemUid?{...i,seat}:i)}};
+      })}) );
+    }
+  },
+
+  updateItemCourse: (itemUid, course) => {
+    const { activeTableId } = get();
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if(t.id!==activeTableId||!t.session)return t;
+        return {...t,session:{...t.session,items:t.session.items.map(i=>i.uid===itemUid?{...i,course}:i)}};
+      })}) );
+    }
+  },
+
+  // ── SEND TO KITCHEN ────────────────────────
+  // Fires courses 0+1, marks table occupied, updates totals
+  sendToKitchen: () => {
+    const { activeTableId, staff, orderType, customer, addToQueue } = get();
+
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if(t.id!==activeTableId||!t.session)return t;
+        const fired=[0,1];
+        const firedCourses=[...new Set([...(t.session.firedCourses||[]),...fired])];
+        const items=t.session.items.map(i=>firedCourses.includes(i.course)?{...i,fired:true,status:'sent'}:i);
+        const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
+        return {...t, status:'occupied', session:{...t.session, items, firedCourses, sentAt:t.session.sentAt||new Date(), server:staff?.name||t.session.server, subtotal, total:subtotal*1.125 }};
+      })}) );
+      get().showToast('Sent to kitchen','success');
+    } else {
+      // Walk-in / takeaway
+      const order = get().walkInOrder;
+      if (!order?.items?.length) return;
+      if (orderType!=='dine-in' && customer) {
+        const ref = `#${++_orderNum}`;
+        addToQueue({ ref, type:orderType, customer:{...customer}, items:order.items, total:order.items.reduce((s,i)=>s+i.price*i.qty,0), status:'received', createdAt:new Date(), collectionTime:customer.collectionTime, isASAP:customer.isASAP, staff:staff?.name });
+      }
+      set(s=>({ walkInOrder:{ ...(s.walkInOrder||{}), sentAt:new Date(), items:(s.walkInOrder?.items||[]).map(i=>[0,1].includes(i.course)?{...i,fired:true,status:'sent'}:i) } }));
+      get().showToast(orderType==='dine-in'?'Sent to kitchen':`Order for ${customer?.name} sent`,'success');
+    }
+  },
+
+  fireCourse: (courseNum) => {
+    const { activeTableId } = get();
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if(t.id!==activeTableId||!t.session)return t;
+        const firedCourses=[...new Set([...(t.session.firedCourses||[]),courseNum])];
+        const items=t.session.items.map(i=>i.course===courseNum?{...i,fired:true,status:'sent'}:i);
+        return {...t,session:{...t.session,items,firedCourses}};
+      })}) );
+      get().showToast(`Course ${courseNum} fired`,'success');
+    }
+  },
+
+  // ── Walk-in order (non-table) ──────────────
+  walkInOrder: null,
+  clearWalkIn: () => set({ walkInOrder:null, customer:null, orderType:'dine-in' }),
+
+  // Get current items/totals for POS (works for both table and walk-in)
+  getPOSItems: () => {
+    const { activeTableId, tables, walkInOrder } = get();
+    if (activeTableId) {
+      return tables.find(t=>t.id===activeTableId)?.session?.items || [];
+    }
+    return walkInOrder?.items || [];
+  },
+
+  getPOSTotals: () => {
+    const { activeTableId, tables, walkInOrder, orderType } = get();
+    let items;
+    if (activeTableId) {
+      items = tables.find(t=>t.id===activeTableId)?.session?.items || [];
+      const subtotal = items.reduce((s,i)=>s+i.price*i.qty,0);
+      const service  = orderType==='dine-in' ? subtotal*0.125 : 0;
+      return { subtotal, service, total:subtotal+service, itemCount:items.reduce((s,i)=>s+i.qty,0) };
+    }
+    items = walkInOrder?.items || [];
+    const subtotal = items.reduce((s,i)=>s+i.price*i.qty,0);
+    const service  = orderType==='dine-in' ? subtotal*0.125 : 0;
+    return { subtotal, service, total:subtotal+service, itemCount:items.reduce((s,i)=>s+i.qty,0) };
+  },
+
+  getPOSOrderNote: () => {
+    const { activeTableId, tables, walkInOrder } = get();
+    if (activeTableId) return tables.find(t=>t.id===activeTableId)?.session?.orderNote || '';
+    return walkInOrder?.orderNote || '';
+  },
 
   // ── Allergens ─────────────────────────────
   allergens: [],
-  toggleAllergen: (id) => set(s=>({ allergens: s.allergens.includes(id)?s.allergens.filter(a=>a!==id):[...s.allergens,id] })),
+  toggleAllergen: id => set(s=>({ allergens:s.allergens.includes(id)?s.allergens.filter(a=>a!==id):[...s.allergens,id] })),
   clearAllergens: () => set({ allergens:[] }),
 
-  // ── Order context ─────────────────────────
-  tableId: null,
-  setTableId: (id) => set({ tableId:id }),
+  // ── Order type / customer ─────────────────
   orderType: 'dine-in',
-  setOrderType: (t) => set({ orderType:t }),
-  covers: 2,
-  setCovers: (n) => set({ covers:Math.max(1,n) }),
-  activeSeat: 'shared',
-  setActiveSeat: (s) => set({ activeSeat:s }),
-  orderNote: '',
-  setOrderNote: (n) => set({ orderNote:n }),
-
-  // ── Customer ──────────────────────────────
+  setOrderType: t => set({ orderType:t }),
   customer: null,
-  setCustomer: (c) => set({ customer:c }),
+  setCustomer: c => set({ customer:c }),
   clearCustomer: () => set({ customer:null }),
   customerHistory: [
     { id:'c1', name:'James Wilson',   phone:'07700 900123', email:'james@email.com',  visits:8,  lastOrder:'2 days ago' },
     { id:'c2', name:'Sophie Chen',    phone:'07700 900456', email:'sophie@email.com', visits:14, lastOrder:'1 week ago' },
     { id:'c3', name:'Marcus Johnson', phone:'07700 900789', email:'',                 visits:3,  lastOrder:'3 weeks ago' },
   ],
-  searchCustomers: (q) => {
-    if (!q||q.length<3) return [];
-    const l=q.toLowerCase();
-    return get().customerHistory.filter(c=>c.name.toLowerCase().includes(l)||c.phone.replace(/\s/g,'').includes(q.replace(/\s/g,'')));
-  },
-  addToHistory: (c) => set(s=>({ customerHistory:[{...c,id:`c${Date.now()}`,visits:1,lastOrder:'Just now'},...s.customerHistory.filter(x=>x.phone!==c.phone)] })),
+  searchCustomers: q => { if(!q||q.length<3)return[]; const l=q.toLowerCase(); return get().customerHistory.filter(c=>c.name.toLowerCase().includes(l)||c.phone.replace(/\s/g,'').includes(q.replace(/\s/g,''))); },
+  addToHistory: c => set(s=>({ customerHistory:[{...c,id:`c${Date.now()}`,visits:1,lastOrder:'Just now'},...s.customerHistory.filter(x=>x.phone!==c.phone)] })),
 
   // ── Collection queue ──────────────────────
   orderQueue: [],
-  addToQueue: (o) => set(s=>({ orderQueue:[o,...s.orderQueue] })),
+  addToQueue: o => set(s=>({ orderQueue:[o,...s.orderQueue] })),
   updateQueueStatus: (ref,status) => set(s=>({ orderQueue:s.orderQueue.map(o=>o.ref===ref?{...o,status}:o) })),
-  removeFromQueue: (ref) => set(s=>({ orderQueue:s.orderQueue.filter(o=>o.ref!==ref) })),
-
-  // ── BAR TABS ──────────────────────────────
-  tabs: [],
-  activeTabId: null,
-
-  openTab: ({ name, seatId=null, tableId=null, preAuth=false, preAuthAmount=50 }) => {
-    const tab = {
-      id: `tab-${Date.now()}`,
-      ref: `TAB-${_tabNum++}`,
-      name: name.trim(),
-      seatId,
-      tableId,
-      openedBy: get().staff?.name || 'Staff',
-      openedAt: new Date(),
-      status: 'open',   // open | running | closing | closed
-      preAuth,
-      preAuthAmount,
-      rounds: [],       // each send creates a round: { id, sentAt, items[] }
-      note: '',
-      total: 0,
-    };
-    set(s=>({ tabs:[tab,...s.tabs], activeTabId:tab.id }));
-    return tab;
-  },
-
-  setActiveTab: (id) => set({ activeTabId:id }),
-
-  addRoundToTab: (tabId, items, note='') => {
-    const round = {
-      id: uid(),
-      sentAt: new Date(),
-      items: items.map(i=>({...i})),
-      subtotal: items.reduce((s,i)=>s+i.price*i.qty,0),
-      note,
-    };
-    set(s=>({
-      tabs: s.tabs.map(t=>{
-        if (t.id!==tabId) return t;
-        const rounds=[...t.rounds, round];
-        return { ...t, rounds, status:'running', total:rounds.reduce((s,r)=>s+r.subtotal,0) };
-      }),
-    }));
-    return round;
-  },
-
-  updateTabNote: (tabId, note) => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,note}:t) })),
-  updateTabStatus: (tabId, status) => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status}:t) })),
-
-  closeTab: (tabId) => {
-    set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status:'closed'}:t), activeTabId:s.activeTabId===tabId?null:s.activeTabId }));
-  },
-
-  voidTabRound: (tabId, roundId) => set(s=>({
-    tabs: s.tabs.map(t=>{
-      if (t.id!==tabId) return t;
-      const rounds=t.rounds.filter(r=>r.id!==roundId);
-      return {...t,rounds,total:rounds.reduce((s,r)=>s+r.subtotal,0)};
-    }),
-  })),
-
-  // Seed some demo tabs
-  seedTabs: () => {
-    const demo = [
-      { id:'t-demo1', ref:'TAB-001', name:'Maria G.', seatId:'B1', tableId:null, openedBy:'Maria', openedAt:new Date(Date.now()-22*60000), status:'running', preAuth:true, preAuthAmount:50, note:'Celebrating birthday', total:45.50,
-        rounds:[{ id:'r1', sentAt:new Date(Date.now()-20*60000), subtotal:22.00, note:'', items:[{uid:'i1',name:'Negroni',price:11,qty:2,mods:[{label:'Hendrick\'s',price:3}],notes:''}] },
-                { id:'r2', sentAt:new Date(Date.now()-8*60000), subtotal:23.50, note:'', items:[{uid:'i2',name:'Espresso Martini',price:12.50,qty:1,mods:[],notes:''},{uid:'i3',name:'Peroni — Pint',price:6.50,qty:1,mods:[],notes:'No glass'}] }] },
-      { id:'t-demo2', ref:'TAB-002', name:'Tom & Sarah', seatId:null, tableId:'t4', openedBy:'Tom', openedAt:new Date(Date.now()-45*60000), status:'running', preAuth:false, preAuthAmount:0, note:'', total:56.00,
-        rounds:[{ id:'r3', sentAt:new Date(Date.now()-40*60000), subtotal:28.00, note:'', items:[{uid:'i4',name:'Old Fashioned',price:12,qty:2,mods:[{label:'Woodford Reserve',price:3}],notes:''}] },
-                { id:'r4', sentAt:new Date(Date.now()-15*60000), subtotal:28.00, note:'No ice in Tom\'s', items:[{uid:'i5',name:'House red wine — 250ml',price:10.50,qty:1,mods:[],notes:''},{uid:'i6',name:'Margarita',price:11.50,qty:1,mods:[{label:'On the rocks',price:0}],notes:'Salt rim'},{uid:'i7',name:'Still water — 500ml',price:3,qty:2,mods:[],notes:''}] }] },
-    ];
-    set({ tabs:demo });
-  },
-
-  // ── Main order ────────────────────────────
-  order: null,
-
-  startOrder: (tableId) => set({
-    order:{ id:`ORD-${Date.now()}`, tableId, items:[], firedCourses:[], sentAt:null },
-    tableId,
-  }),
-
-  addToOrder: (item, mods=[], pizzaConfig=null, opts={}) => {
-    const s=get();
-    if (!s.order) {
-      const tid=s.tableId||'walkin';
-      set({ order:{ id:`ORD-${Date.now()}`, tableId:tid, items:[], firedCourses:[], sentAt:null }, tableId:tid });
-    }
-    const qty=opts.qty||1;
-    const price=opts.linePrice!=null?opts.linePrice/qty:item.price;
-    const newItem={
-      uid:uid(), itemId:item.id,
-      name:opts.displayName||item.name,
-      price, qty,
-      mods:mods||[], notes:opts.notes||'',
-      pizzaConfig, allergens:item.allergens||[],
-      centreId:item.centreId,
-      seat:get().activeSeat,
-      course:CAT_COURSE[item.cat]??1,
-      fired:CAT_COURSE[item.cat]===0,
-      status:'pending',
-    };
-    set(s2=>{
-      const base=s2.order||{ id:`ORD-${Date.now()}`, tableId:s2.tableId||'walkin', items:[], firedCourses:[], sentAt:null };
-      return { order:{ ...base, items:[...base.items,newItem] } };
-    });
-  },
-
-  addCustomItem: (name,price,notes) => {
-    if (!get().order) set({ order:{ id:`ORD-${Date.now()}`, tableId:get().tableId||'walkin', items:[], firedCourses:[], sentAt:null } });
-    const newItem={ uid:uid(), itemId:'custom', name, price:parseFloat(price)||0, qty:1, mods:[], notes, allergens:[], seat:'shared', course:1, fired:false, status:'pending' };
-    set(s=>({ order:{ ...s.order, items:[...(s.order?.items||[]),newItem] } }));
-  },
-
-  removeFromOrder: (uid) => set(s=>({ order:s.order?{...s.order,items:s.order.items.filter(i=>i.uid!==uid)}:null })),
-
-  updateQty: (uid,delta) => set(s=>{
-    if (!s.order) return s;
-    return { order:{ ...s.order, items:s.order.items.map(i=>i.uid===uid?{...i,qty:Math.max(1,i.qty+delta)}:i) } };
-  }),
-
-  updateItemNote: (uid, note) => set(s=>({
-    order: s.order?{ ...s.order, items:s.order.items.map(i=>i.uid===uid?{...i,notes:note}:i) }:null,
-  })),
-
-  updateItemSeat: (uid,seat) => set(s=>({ order:s.order?{...s.order,items:s.order.items.map(i=>i.uid===uid?{...i,seat}:i)}:null })),
-  updateItemCourse: (uid,course) => set(s=>({ order:s.order?{...s.order,items:s.order.items.map(i=>i.uid===uid?{...i,course}:i)}:null })),
-
-  // SEND TO KITCHEN — also updates table status to occupied
-  sendToKitchen: () => {
-    const { tableId, staff, getOrderTotals, updateTable, orderType, customer, addToQueue, order } = get();
-    const { total } = getOrderTotals();
-
-    set(s=>{
-      if (!s.order) return s;
-      const fired=[0,1];
-      const items=s.order.items.map(i=>fired.includes(i.course)?{...i,fired:true,status:'sent'}:i);
-      return { order:{ ...s.order, items, firedCourses:fired, sentAt:new Date() } };
-    });
-
-    // ✅ Update table to occupied
-    if (tableId && tableId!=='walkin') {
-      updateTable(tableId, {
-        status:'occupied',
-        server: staff?.name,
-        orderTotal: total,
-        seated: Math.round((Date.now() - (get().tables.find(t=>t.id===tableId)?.seatedAt||Date.now()))/60000) || 0,
-      });
-    }
-
-    // Add to collection queue for takeaway/collection
-    if (orderType!=='dine-in' && customer) {
-      const ref=`#${_orderNum++}`;
-      addToQueue({ ref, type:orderType, customer:{...customer}, items:order?.items||[], total, status:'received', createdAt:new Date(), collectionTime:customer.collectionTime, isASAP:customer.isASAP, staff:staff?.name });
-    }
-  },
-
-  fireCourse: (courseNum) => {
-    set(s=>{
-      if (!s.order) return s;
-      const firedCourses=[...(s.order.firedCourses||[]),courseNum];
-      const items=s.order.items.map(i=>i.course===courseNum?{...i,fired:true,status:'sent'}:i);
-      return { order:{ ...s.order, items, firedCourses } };
-    });
-    get().showToast(`Course ${courseNum} fired to kitchen`,'success');
-  },
-
-  clearOrder: () => set({ order:null, tableId:null, activeSeat:'shared', customer:null, orderNote:'' }),
-
-  getOrderTotals: () => {
-    const { order, orderType } = get();
-    const items=order?.items||[];
-    const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
-    const service=orderType==='dine-in'?subtotal*0.125:0;
-    return { subtotal, service, total:subtotal+service, itemCount:items.reduce((s,i)=>s+i.qty,0) };
-  },
+  removeFromQueue: ref => set(s=>({ orderQueue:s.orderQueue.filter(o=>o.ref!==ref) })),
 
   // ── 86 ────────────────────────────────────
   eightySixIds: [],
-  toggle86: (id) => set(s=>({ eightySixIds:s.eightySixIds.includes(id)?s.eightySixIds.filter(x=>x!==id):[...s.eightySixIds,id] })),
+  toggle86: id => set(s=>({ eightySixIds:s.eightySixIds.includes(id)?s.eightySixIds.filter(x=>x!==id):[...s.eightySixIds,id] })),
 
-  // ── Tables ────────────────────────────────
-  tables: INITIAL_TABLES,
-  updateTable: (id,patch) => set(s=>({ tables:s.tables.map(t=>t.id===id?{...t,...patch}:t) })),
-  openTable: (id) => {
-    get().updateTable(id,{status:'open',seatedAt:Date.now()});
-    get().startOrder(id);
-    set({ surface:'pos', activeSeat:'shared' });
+  // ── Bar tabs ──────────────────────────────
+  tabs: [],
+  activeTabId: null,
+  openTab: ({ name, seatId=null, tableId=null, preAuth=false, preAuthAmount=50, note='' }) => {
+    const tab = { id:`tab-${Date.now()}`, ref:`TAB-${_tabNum++}`, name:name.trim(), seatId, tableId, openedBy:get().staff?.name||'Staff', openedAt:new Date(), status:'open', preAuth, preAuthAmount, rounds:[], note, total:0 };
+    set(s=>({ tabs:[tab,...s.tabs], activeTabId:tab.id }));
+    return tab;
   },
-  closeTable: (id) => {
-    get().updateTable(id, { status:'available', seated:null, server:null, orderTotal:null, seatedAt:null });
-    // Always clear order when closing a table — don't rely on s.tableId matching
-    set({ order:null, tableId:null, activeSeat:'shared', customer:null, orderNote:'' });
+  setActiveTab: id => set({ activeTabId:id }),
+  addRoundToTab: (tabId, items, note='') => {
+    const round = { id:uid(), sentAt:new Date(), items:items.map(i=>({...i})), subtotal:items.reduce((s,i)=>s+i.price*i.qty,0), note };
+    set(s=>({ tabs:s.tabs.map(t=>{ if(t.id!==tabId)return t; const rounds=[...t.rounds,round]; return{...t,rounds,status:'running',total:rounds.reduce((s,r)=>s+r.subtotal,0)}; }) }));
+    return round;
   },
+  updateTabNote: (tabId,note) => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,note}:t) })),
+  updateTabStatus: (tabId,status) => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status}:t) })),
+  closeTab: tabId => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status:'closed'}:t), activeTabId:s.activeTabId===tabId?null:s.activeTabId })),
+  voidTabRound: (tabId,roundId) => set(s=>({ tabs:s.tabs.map(t=>{ if(t.id!==tabId)return t; const rounds=t.rounds.filter(r=>r.id!==roundId); return{...t,rounds,total:rounds.reduce((s,r)=>s+r.subtotal,0)}; }) })),
+  seedTabs: () => set({ tabs:[
+    { id:'t-demo1', ref:'TAB-001', name:'Maria G.', seatId:'B1', tableId:null, openedBy:'Maria', openedAt:new Date(Date.now()-22*60000), status:'running', preAuth:true, preAuthAmount:50, note:'Birthday', total:45.50,
+      rounds:[{ id:'r1', sentAt:new Date(Date.now()-20*60000), subtotal:22, note:'', items:[{uid:'ri1',name:'Negroni',price:11,qty:2,mods:[{label:"Hendrick's",price:3}],notes:''}] },{ id:'r2', sentAt:new Date(Date.now()-8*60000), subtotal:23.50, note:'', items:[{uid:'ri2',name:'Espresso Martini',price:12.50,qty:1,mods:[],notes:''},{uid:'ri3',name:'Peroni — Pint',price:6.50,qty:1,mods:[],notes:'No glass'}] }] },
+    { id:'t-demo2', ref:'TAB-002', name:'Tom & Sarah', seatId:null, tableId:'t4', openedBy:'Tom', openedAt:new Date(Date.now()-45*60000), status:'running', preAuth:false, preAuthAmount:0, note:'', total:56,
+      rounds:[{ id:'r3', sentAt:new Date(Date.now()-40*60000), subtotal:28, note:'', items:[{uid:'ri4',name:'Old Fashioned',price:12,qty:2,mods:[{label:'Woodford Reserve',price:3}],notes:''}] }] },
+  ] }),
 
   // ── KDS ───────────────────────────────────
   kdsTickets: INITIAL_KDS,
-  bumpTicket: (id) => set(s=>({ kdsTickets:s.kdsTickets.filter(t=>t.id!==id) })),
+  bumpTicket: id => set(s=>({ kdsTickets:s.kdsTickets.filter(t=>t.id!==id) })),
 
   // ── Shift ─────────────────────────────────
   shift: SHIFT,
 
   // ── Toast ─────────────────────────────────
   toast: null,
-  showToast: (msg,type='info') => {
-    set({ toast:{ msg,type,key:Date.now() } });
-    setTimeout(()=>set({toast:null}),2800);
-  },
+  showToast: (msg,type='info') => { set({ toast:{ msg,type,key:Date.now() } }); setTimeout(()=>set({toast:null}),2800); },
 
   // ── Allergen pending ──────────────────────
   pendingItem: null,
-  setPendingItem: (item) => set({ pendingItem:item }),
+  setPendingItem: item => set({ pendingItem:item }),
   clearPendingItem: () => set({ pendingItem:null }),
 }));
