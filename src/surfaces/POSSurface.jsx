@@ -289,21 +289,24 @@ export default function POSSurface() {
                 </div>
               )}
 
-              {/* Action row */}
+              {/* Action row — discount, print, void */}
               <div style={{padding:'7px 12px 4px',display:'flex',gap:5,flexWrap:'wrap'}}>
                 <button onClick={()=>setShowDiscount(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>🏷 Discount</button>
                 <button onClick={()=>setShowReceipt(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>🖨 Print check</button>
                 {hasSent&&<button onClick={()=>setShowReprint(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>↻ Reprint</button>}
                 {activeTableId&&hasSent&&<button onClick={()=>setVoidTarget({type:'check',items:items.filter(i=>!i.voided)})} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:11,fontWeight:600,minWidth:80}}>⊘ Void check</button>}
               </div>
-              <div style={{padding:'0 12px 12px',display:'flex',gap:6}}>
-                <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:34,height:34,borderRadius:8,border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:18,flexShrink:0}}>+</button>
-                <button className="btn btn-ghost" style={{flex:1,height:34}} onClick={handleSend}>Send →</button>
-                <button className="btn btn-acc" style={{flex:1,height:34}} onClick={()=>setShowCheckout(true)}>Pay £{total.toFixed(2)}</button>
-              </div>
             </>
           )}
-          {items.length===0&&orderType==='dine-in'&&<div style={{height:10}}/>}
+
+          {/* Send / Pay — always visible */}
+          <div style={{padding:'8px 12px 12px',display:'flex',gap:6}}>
+            <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:34,height:34,borderRadius:8,border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:18,flexShrink:0}}>+</button>
+            <button className="btn btn-ghost" style={{flex:1,height:34,opacity:items.length===0?.4:1}} onClick={handleSend}>Send →</button>
+            <button className="btn btn-acc" style={{flex:1,height:34,opacity:items.length===0?.4:1}} onClick={()=>items.length>0&&setShowCheckout(true)}>
+              {items.length>0 ? `Pay £${total.toFixed(2)}` : 'Pay'}
+            </button>
+          </div>
         </div>
       </div>
 
