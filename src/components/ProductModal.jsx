@@ -17,18 +17,18 @@ function ModalShell({ item, price, children, onAdd, canAdd, onCancel, addLabel =
   return (
     <div className="modal-back" onClick={e => e.target === e.currentTarget && onCancel()}>
       <div style={{
-        background:'var(--c-surf)', border:'1px solid var(--bdr2)', borderRadius:24,
+        background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:24,
         width:'100%', maxWidth:500, maxHeight:'90vh', overflow:'auto',
-        boxShadow:'var(--shadow-lg)', display:'flex', flexDirection:'column',
+        boxShadow:'var(--sh3)', display:'flex', flexDirection:'column',
       }}>
         {/* Header */}
         <div style={{ padding:'20px 24px 16px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:19, fontWeight:700, lineHeight:1.2, marginBottom:4 }}>{item.name}</div>
-              {item.description && <div style={{ fontSize:13, color:'var(--c-text2)', lineHeight:1.5 }}>{item.description}</div>}
+              {item.description && <div style={{ fontSize:13, color:'var(--t2)', lineHeight:1.5 }}>{item.description}</div>}
             </div>
-            <button onClick={onCancel} style={{ fontSize:20, color:'var(--c-text3)', background:'none', border:'none', cursor:'pointer', lineHeight:1, padding:0, flexShrink:0 }}>×</button>
+            <button onClick={onCancel} style={{ fontSize:20, color:'var(--t3)', background:'none', border:'none', cursor:'pointer', lineHeight:1, padding:0, flexShrink:0 }}>×</button>
           </div>
 
           {/* Allergen flags */}
@@ -40,9 +40,9 @@ function ModalShell({ item, price, children, onAdd, canAdd, onCancel, addLabel =
                 return (
                   <span key={a} style={{
                     fontSize:11, padding:'2px 7px', borderRadius:6, fontWeight:500,
-                    background: isFlagged ? 'var(--c-red-dim)' : 'var(--c-raised)',
-                    border: `1px solid ${isFlagged ? 'var(--c-red-bdr)' : 'var(--bdr)'}`,
-                    color: isFlagged ? 'var(--c-red)' : 'var(--c-text3)',
+                    background: isFlagged ? 'var(--red-d)' : 'var(--bg3)',
+                    border: `1px solid ${isFlagged ? 'var(--red-b)' : 'var(--bdr)'}`,
+                    color: isFlagged ? 'var(--red)' : 'var(--t3)',
                   }}>{al?.icon} {al?.label}</span>
                 );
               })}
@@ -79,17 +79,17 @@ function ModalShellWrapper({ item, price, children, onAdd, canAdd, onCancel, add
   return (
     <div className="modal-back" onClick={e => e.target === e.currentTarget && onCancel()}>
       <div style={{
-        background:'var(--c-surf)', border:'1px solid var(--bdr2)', borderRadius:24,
+        background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:24,
         width:'100%', maxWidth:500, maxHeight:'92vh', overflow:'auto',
-        boxShadow:'var(--shadow-lg)', display:'flex', flexDirection:'column',
+        boxShadow:'var(--sh3)', display:'flex', flexDirection:'column',
       }}>
         <div style={{ padding:'20px 24px 16px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:19, fontWeight:700, lineHeight:1.2, marginBottom:4 }}>{item.name}</div>
-              {item.description && <div style={{ fontSize:13, color:'var(--c-text2)', lineHeight:1.5 }}>{item.description}</div>}
+              {item.description && <div style={{ fontSize:13, color:'var(--t2)', lineHeight:1.5 }}>{item.description}</div>}
             </div>
-            <button onClick={onCancel} style={{ fontSize:22, color:'var(--c-text3)', background:'none', border:'none', cursor:'pointer', lineHeight:1, padding:0, flexShrink:0 }}>×</button>
+            <button onClick={onCancel} style={{ fontSize:22, color:'var(--t3)', background:'none', border:'none', cursor:'pointer', lineHeight:1, padding:0, flexShrink:0 }}>×</button>
           </div>
           {item.allergens?.length > 0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:10 }}>
@@ -99,16 +99,16 @@ function ModalShellWrapper({ item, price, children, onAdd, canAdd, onCancel, add
                 return (
                   <span key={a} style={{
                     fontSize:11, padding:'2px 7px', borderRadius:6, fontWeight:500,
-                    background: isActive ? 'var(--c-red-dim)' : 'var(--c-raised)',
-                    border: `1px solid ${isActive ? 'var(--c-red-bdr)' : 'var(--bdr)'}`,
-                    color: isActive ? 'var(--c-red)' : 'var(--c-text3)',
+                    background: isActive ? 'var(--red-d)' : 'var(--bg3)',
+                    border: `1px solid ${isActive ? 'var(--red-b)' : 'var(--bdr)'}`,
+                    color: isActive ? 'var(--red)' : 'var(--t3)',
                   }}>{al?.icon} {al?.label}</span>
                 );
               })}
             </div>
           )}
           {flagged.length > 0 && (
-            <div style={{ marginTop:10, padding:'8px 12px', borderRadius:8, background:'var(--c-red-dim)', border:'1px solid var(--c-red-bdr)', fontSize:12, color:'var(--c-red)' }}>
+            <div style={{ marginTop:10, padding:'8px 12px', borderRadius:8, background:'var(--red-d)', border:'1px solid var(--red-b)', fontSize:12, color:'var(--red)' }}>
               ⚠ Contains active guest allergen — confirm before adding
             </div>
           )}
@@ -158,15 +158,15 @@ function VariantsModal({ item, activeAllergens, onConfirm, onCancel }) {
         {item.variants.map(v => (
           <button key={v.id} onClick={() => setSelected(v)} style={{
             padding:'12px 16px', borderRadius:12, cursor:'pointer', textAlign:'left',
-            border:`1.5px solid ${selected?.id === v.id ? 'var(--c-acc)' : 'var(--bdr)'}`,
-            background: selected?.id === v.id ? 'var(--c-acc-dim)' : 'var(--c-raised)',
+            border:`1.5px solid ${selected?.id === v.id ? 'var(--acc)' : 'var(--bdr)'}`,
+            background: selected?.id === v.id ? 'var(--acc-d)' : 'var(--bg3)',
             display:'flex', alignItems:'center', justifyContent:'space-between',
             transition:'all .12s', fontFamily:'inherit',
           }}>
-            <div style={{ fontSize:14, fontWeight:500, color: selected?.id === v.id ? 'var(--c-acc)' : 'var(--c-text)' }}>
+            <div style={{ fontSize:14, fontWeight:500, color: selected?.id === v.id ? 'var(--acc)' : 'var(--t1)' }}>
               {v.label}
             </div>
-            <div style={{ fontSize:15, fontWeight:700, color: selected?.id === v.id ? 'var(--c-acc)' : 'var(--c-text2)' }}>
+            <div style={{ fontSize:15, fontWeight:700, color: selected?.id === v.id ? 'var(--acc)' : 'var(--t2)' }}>
               £{v.price.toFixed(2)}
             </div>
           </button>
@@ -176,16 +176,16 @@ function VariantsModal({ item, activeAllergens, onConfirm, onCancel }) {
       <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:16 }}>
         <div className="label-xs">Quantity</div>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginLeft:'auto' }}>
-          <button onClick={() => setQty(q => Math.max(1, q-1))} style={{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--bdr2)', background:'transparent', color:'var(--c-text)', fontSize:20, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>−</button>
+          <button onClick={() => setQty(q => Math.max(1, q-1))} style={{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--bdr2)', background:'transparent', color:'var(--t1)', fontSize:20, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>−</button>
           <span style={{ fontSize:18, fontWeight:600, minWidth:24, textAlign:'center' }}>{qty}</span>
-          <button onClick={() => setQty(q => q+1)} style={{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--bdr2)', background:'transparent', color:'var(--c-text)', fontSize:20, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>+</button>
+          <button onClick={() => setQty(q => q+1)} style={{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--bdr2)', background:'transparent', color:'var(--t1)', fontSize:20, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>+</button>
         </div>
       </div>
 
       <div>
         <div className="label-xs" style={{ marginBottom:6 }}>Notes for kitchen (optional)</div>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. No ice" rows={2}
-          style={{ width:'100%', background:'var(--c-raised)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'8px 12px', color:'var(--c-text)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none' }}/>
+          style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'8px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none' }}/>
       </div>
     </ModalShellWrapper>
   );
@@ -235,8 +235,8 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
         <div key={group.id} style={{ marginBottom:20 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
             <span className="label-xs">{group.label}</span>
-            {group.required && <span style={{ fontSize:11, color:'var(--c-red)', fontWeight:600 }}>Required</span>}
-            {group.multi    && <span style={{ fontSize:11, color:'var(--c-blu)' }}>Choose multiple</span>}
+            {group.required && <span style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>Required</span>}
+            {group.multi    && <span style={{ fontSize:11, color:'var(--blu)' }}>Choose multiple</span>}
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {group.options.map(opt => {
@@ -249,8 +249,8 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
                   onClick={() => group.multi ? toggleMulti(group.id, opt) : toggleSingle(group.id, opt)}
                   style={{
                     padding:'11px 14px', borderRadius:10, cursor:'pointer',
-                    border:`1.5px solid ${isSelected ? 'var(--c-acc)' : 'var(--bdr)'}`,
-                    background: isSelected ? 'var(--c-acc-dim)' : 'var(--c-raised)',
+                    border:`1.5px solid ${isSelected ? 'var(--acc)' : 'var(--bdr)'}`,
+                    background: isSelected ? 'var(--acc-d)' : 'var(--bg3)',
                     display:'flex', alignItems:'center', justifyContent:'space-between',
                     transition:'all .12s', fontFamily:'inherit',
                   }}>
@@ -258,16 +258,16 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
                     <div style={{
                       width:18, height:18,
                       borderRadius: group.multi ? 4 : '50%',
-                      border:`2px solid ${isSelected ? 'var(--c-acc)' : 'var(--bdr2)'}`,
-                      background: isSelected ? 'var(--c-acc)' : 'transparent',
+                      border:`2px solid ${isSelected ? 'var(--acc)' : 'var(--bdr2)'}`,
+                      background: isSelected ? 'var(--acc)' : 'transparent',
                       display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
                     }}>
-                      {isSelected && <div style={{ width:6, height:6, borderRadius:group.multi?1:'50%', background:'var(--c-inverse)' }}/>}
+                      {isSelected && <div style={{ width:6, height:6, borderRadius:group.multi?1:'50%', background:'#0e0f14' }}/>}
                     </div>
-                    <span style={{ fontSize:14, fontWeight:500, color: isSelected ? 'var(--c-acc)' : 'var(--c-text)' }}>{opt.label}</span>
+                    <span style={{ fontSize:14, fontWeight:500, color: isSelected ? 'var(--acc)' : 'var(--t1)' }}>{opt.label}</span>
                   </div>
                   {opt.price > 0 && (
-                    <span style={{ fontSize:13, fontWeight:600, color: isSelected ? 'var(--c-acc)' : 'var(--c-text3)' }}>+£{opt.price.toFixed(2)}</span>
+                    <span style={{ fontSize:13, fontWeight:600, color: isSelected ? 'var(--acc)' : 'var(--t3)' }}>+£{opt.price.toFixed(2)}</span>
                   )}
                 </button>
               );
@@ -279,16 +279,16 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
       <div style={{ display:'flex', alignItems:'center', gap:16, paddingTop:4, marginBottom:16 }}>
         <div className="label-xs">Quantity</div>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginLeft:'auto' }}>
-          <button onClick={() => setQty(q => Math.max(1, q-1))} style={{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--bdr2)', background:'transparent', color:'var(--c-text)', fontSize:20, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>−</button>
+          <button onClick={() => setQty(q => Math.max(1, q-1))} style={{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--bdr2)', background:'transparent', color:'var(--t1)', fontSize:20, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>−</button>
           <span style={{ fontSize:18, fontWeight:600, minWidth:24, textAlign:'center' }}>{qty}</span>
-          <button onClick={() => setQty(q => q+1)} style={{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--bdr2)', background:'transparent', color:'var(--c-text)', fontSize:20, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>+</button>
+          <button onClick={() => setQty(q => q+1)} style={{ width:32, height:32, borderRadius:'50%', border:'1px solid var(--bdr2)', background:'transparent', color:'var(--t1)', fontSize:20, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>+</button>
         </div>
       </div>
 
       <div>
         <div className="label-xs" style={{ marginBottom:6 }}>Notes (optional)</div>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Allergy note, special request..." rows={2}
-          style={{ width:'100%', background:'var(--c-raised)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'8px 12px', color:'var(--c-text)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none' }}/>
+          style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'8px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none' }}/>
       </div>
     </ModalShellWrapper>
   );
@@ -356,11 +356,11 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
 
   return (
     <div className="modal-back" onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background:'var(--c-surf)', border:'1px solid var(--bdr2)', borderRadius:24, width:'100%', maxWidth:620, maxHeight:'92vh', overflow:'auto', boxShadow:'var(--shadow-lg)' }}>
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:24, width:'100%', maxWidth:620, maxHeight:'92vh', overflow:'auto', boxShadow:'var(--sh3)' }}>
         {/* Header */}
         <div style={{ padding:'18px 24px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div style={{ fontSize:18, fontWeight:700 }}>{item.name}</div>
-          <button onClick={onCancel} style={{ fontSize:22, color:'var(--c-text3)', background:'none', border:'none', cursor:'pointer' }}>×</button>
+          <button onClick={onCancel} style={{ fontSize:22, color:'var(--t3)', background:'none', border:'none', cursor:'pointer' }}>×</button>
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 188px' }}>
@@ -374,11 +374,11 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
                 {PIZZA_SIZES.map(s => (
                   <button key={s.id} onClick={() => setSize(s)} style={{
                     flex:1, padding:'9px 6px', borderRadius:9, cursor:'pointer', textAlign:'center',
-                    border:`1.5px solid ${size.id===s.id?'var(--c-acc)':'var(--bdr)'}`,
-                    background:size.id===s.id?'var(--c-acc-dim)':'var(--c-raised)', transition:'all .12s', fontFamily:'inherit',
+                    border:`1.5px solid ${size.id===s.id?'var(--acc)':'var(--bdr)'}`,
+                    background:size.id===s.id?'var(--acc-d)':'var(--bg3)', transition:'all .12s', fontFamily:'inherit',
                   }}>
-                    <div style={{ fontSize:12, fontWeight:500, color:size.id===s.id?'var(--c-acc)':'var(--c-text)' }}>{s.name}</div>
-                    <div style={{ fontSize:11, color:'var(--c-text3)' }}>£{s.basePrice}</div>
+                    <div style={{ fontSize:12, fontWeight:500, color:size.id===s.id?'var(--acc)':'var(--t1)' }}>{s.name}</div>
+                    <div style={{ fontSize:11, color:'var(--t3)' }}>£{s.basePrice}</div>
                   </button>
                 ))}
               </div>
@@ -391,9 +391,9 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
                 {PIZZA_BASES.map(b => (
                   <button key={b.id} onClick={() => setBase(b)} style={{
                     padding:'6px 11px', borderRadius:7, cursor:'pointer', fontSize:12, fontWeight:500,
-                    border:`1.5px solid ${base.id===b.id?'var(--c-acc)':'var(--bdr)'}`,
-                    background:base.id===b.id?'var(--c-acc-dim)':'var(--c-raised)',
-                    color:base.id===b.id?'var(--c-acc)':'var(--c-text2)', fontFamily:'inherit',
+                    border:`1.5px solid ${base.id===b.id?'var(--acc)':'var(--bdr)'}`,
+                    background:base.id===b.id?'var(--acc-d)':'var(--bg3)',
+                    color:base.id===b.id?'var(--acc)':'var(--t2)', fontFamily:'inherit',
                   }}>{b.name}</button>
                 ))}
               </div>
@@ -406,9 +406,9 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
                 {PIZZA_CRUSTS.map(c => (
                   <button key={c.id} onClick={() => setCrust(c)} style={{
                     padding:'6px 11px', borderRadius:7, cursor:'pointer', fontSize:12, fontWeight:500,
-                    border:`1.5px solid ${crust.id===c.id?'var(--c-acc)':'var(--bdr)'}`,
-                    background:crust.id===c.id?'var(--c-acc-dim)':'var(--c-raised)',
-                    color:crust.id===c.id?'var(--c-acc)':'var(--c-text2)', fontFamily:'inherit',
+                    border:`1.5px solid ${crust.id===c.id?'var(--acc)':'var(--bdr)'}`,
+                    background:crust.id===c.id?'var(--acc-d)':'var(--bg3)',
+                    color:crust.id===c.id?'var(--acc)':'var(--t2)', fontFamily:'inherit',
                   }}>{c.name}{c.extra?` +£${c.extra}`:''}</button>
                 ))}
               </div>
@@ -421,8 +421,8 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
                 {[['whole','Whole pizza'],['half','Half & half']].map(([v,l]) => (
                   <button key={v} onClick={() => { setSplit(v); setSide(v==='whole'?'whole':'left'); }} style={{
                     flex:1, padding:'8px', cursor:'pointer', fontSize:12, fontWeight:600,
-                    background:split===v?'var(--c-acc)':'transparent',
-                    color:split===v?'var(--c-inverse)':'var(--c-text3)',
+                    background:split===v?'var(--acc)':'transparent',
+                    color:split===v?'#0e0f14':'var(--t3)',
                     border:'none', fontFamily:'inherit', transition:'all .15s',
                   }}>{l}</button>
                 ))}
@@ -440,11 +440,11 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
                       <button key={s} onClick={() => setSide(s)} style={{
                         flex:1, padding:'9px 8px', borderRadius:9, cursor:'pointer', textAlign:'center',
                         border:`1.5px solid ${side===s?col:'var(--bdr)'}`,
-                        background:side===s?(s==='left'?'rgba(59,130,246,.1)':'rgba(34,197,94,.1)'):'var(--c-raised)',
+                        background:side===s?(s==='left'?'rgba(59,130,246,.1)':'rgba(34,197,94,.1)'):'var(--bg3)',
                         fontFamily:'inherit',
                       }}>
-                        <div style={{ fontSize:12, fontWeight:600, color:side===s?col:'var(--c-text2)' }}>{s==='left'?'Left':'Right'} half</div>
-                        <div style={{ fontSize:10, color:'var(--c-text3)', marginTop:2 }}>{count} topping{count!==1?'s':''}</div>
+                        <div style={{ fontSize:12, fontWeight:600, color:side===s?col:'var(--t2)' }}>{s==='left'?'Left':'Right'} half</div>
+                        <div style={{ fontSize:10, color:'var(--t3)', marginTop:2 }}>{count} topping{count!==1?'s':''}</div>
                       </button>
                     );
                   })}
@@ -466,11 +466,11 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
                   <button key={top.id} onClick={() => toggleTop(top)} style={{
                     padding:'8px 5px', borderRadius:8, cursor:'pointer', textAlign:'center',
                     border:`1.5px solid ${active?col+'88':'var(--bdr)'}`,
-                    background:active?col+'14':'var(--c-raised)', transition:'all .12s', fontFamily:'inherit',
+                    background:active?col+'14':'var(--bg3)', transition:'all .12s', fontFamily:'inherit',
                   }}>
                     <div style={{ width:9, height:9, borderRadius:'50%', background:top.color, margin:'0 auto 4px' }}/>
-                    <div style={{ fontSize:10, fontWeight:500, color:active?col:'var(--c-text2)', lineHeight:1.2 }}>{top.name}</div>
-                    {top.price>0&&<div style={{ fontSize:9, color:'var(--c-text3)' }}>+£{top.price}</div>}
+                    <div style={{ fontSize:10, fontWeight:500, color:active?col:'var(--t2)', lineHeight:1.2 }}>{top.name}</div>
+                    {top.price>0&&<div style={{ fontSize:9, color:'var(--t3)' }}>+£{top.price}</div>}
                     {active&&st!=='both'&&st!=='whole'&&<div style={{ fontSize:9, fontWeight:700, color:col, textTransform:'uppercase' }}>{st}</div>}
                     {st==='both'&&<div style={{ fontSize:9, fontWeight:700, color:col }}>both</div>}
                   </button>
@@ -481,39 +481,39 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
             <div style={{ marginTop:14 }}>
               <div className="label-xs" style={{ marginBottom:6 }}>Notes</div>
               <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Extra crispy, well done, etc." rows={2}
-                style={{ width:'100%', background:'var(--c-raised)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'8px 12px', color:'var(--c-text)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none' }}/>
+                style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'8px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none' }}/>
             </div>
           </div>
 
           {/* Summary panel */}
           <div style={{ padding:'18px 16px', display:'flex', flexDirection:'column' }}>
             <div className="label-xs" style={{ marginBottom:10 }}>Your pizza</div>
-            <div style={{ fontSize:12, color:'var(--c-text3)', marginBottom:4 }}>{size.name} · {crust.name}</div>
-            <div style={{ fontSize:12, color:'var(--c-text3)', marginBottom:12 }}>{base.name} base</div>
+            <div style={{ fontSize:12, color:'var(--t3)', marginBottom:4 }}>{size.name} · {crust.name}</div>
+            <div style={{ fontSize:12, color:'var(--t3)', marginBottom:12 }}>{base.name} base</div>
 
             {split==='half' ? (
               <>
                 <div style={{ background:'rgba(59,130,246,.08)', borderRadius:8, padding:'8px 10px', marginBottom:6 }}>
                   <div style={{ fontSize:10, fontWeight:700, color:SC.left, marginBottom:4 }}>LEFT HALF</div>
-                  {left.length ? left.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--c-text2)',marginBottom:2}}><div style={{width:7,height:7,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--c-text3)',fontStyle:'italic'}}>No toppings</div>}
+                  {left.length ? left.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--t2)',marginBottom:2}}><div style={{width:7,height:7,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--t3)',fontStyle:'italic'}}>No toppings</div>}
                 </div>
                 <div style={{ background:'rgba(34,197,94,.08)', borderRadius:8, padding:'8px 10px', marginBottom:10 }}>
                   <div style={{ fontSize:10, fontWeight:700, color:SC.right, marginBottom:4 }}>RIGHT HALF</div>
-                  {right.length ? right.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--c-text2)',marginBottom:2}}><div style={{width:7,height:7,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--c-text3)',fontStyle:'italic'}}>No toppings</div>}
+                  {right.length ? right.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--t2)',marginBottom:2}}><div style={{width:7,height:7,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--t3)',fontStyle:'italic'}}>No toppings</div>}
                 </div>
               </>
             ) : (
               <div style={{ background:'rgba(240,165,0,.08)', borderRadius:8, padding:'8px 10px', marginBottom:10 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'var(--c-acc)', marginBottom:4 }}>WHOLE PIZZA</div>
-                {left.length ? left.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--c-text2)',marginBottom:2}}><div style={{width:7,height:7,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--c-text3)',fontStyle:'italic'}}>Cheese only</div>}
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--acc)', marginBottom:4 }}>WHOLE PIZZA</div>
+                {left.length ? left.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--t2)',marginBottom:2}}><div style={{width:7,height:7,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--t3)',fontStyle:'italic'}}>Cheese only</div>}
               </div>
             )}
 
             <div style={{ borderTop:'1px solid var(--bdr)', paddingTop:10, marginTop:'auto' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--c-text3)', marginBottom:2 }}><span>Base</span><span>£{size.basePrice.toFixed(2)}</span></div>
-              {crust.extra>0&&<div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--c-text3)', marginBottom:2 }}><span>Crust</span><span>+£{crust.extra.toFixed(2)}</span></div>}
-              {toppingCost>0&&<div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--c-text3)', marginBottom:2 }}><span>Toppings</span><span>+£{toppingCost.toFixed(2)}</span></div>}
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:16, fontWeight:700, marginTop:6, color:'var(--c-acc)' }}><span>Total</span><span>£{total.toFixed(2)}</span></div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', marginBottom:2 }}><span>Base</span><span>£{size.basePrice.toFixed(2)}</span></div>
+              {crust.extra>0&&<div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', marginBottom:2 }}><span>Crust</span><span>+£{crust.extra.toFixed(2)}</span></div>}
+              {toppingCost>0&&<div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', marginBottom:2 }}><span>Toppings</span><span>+£{toppingCost.toFixed(2)}</span></div>}
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:16, fontWeight:700, marginTop:6, color:'var(--acc)' }}><span>Total</span><span>£{total.toFixed(2)}</span></div>
             </div>
           </div>
         </div>
@@ -538,17 +538,17 @@ export function AllergenModal({ item, activeAllergens, onConfirm, onCancel }) {
   return (
     <div className="modal-back">
       <div className="modal-box" style={{ maxWidth:380 }}>
-        <div style={{ width:52, height:52, borderRadius:'50%', background:'var(--c-red-dim)', border:'2px solid var(--c-red-bdr)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, margin:'0 auto 16px' }}>⚠</div>
+        <div style={{ width:52, height:52, borderRadius:'50%', background:'var(--red-d)', border:'2px solid var(--red-b)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, margin:'0 auto 16px' }}>⚠</div>
         <div style={{ fontSize:18, fontWeight:600, textAlign:'center', marginBottom:4 }}>Allergen warning</div>
-        <div style={{ fontSize:13, color:'var(--c-text2)', textAlign:'center', marginBottom:20 }}>This item contains an active guest allergen filter</div>
+        <div style={{ fontSize:13, color:'var(--t2)', textAlign:'center', marginBottom:20 }}>This item contains an active guest allergen filter</div>
         <div style={{ fontSize:15, fontWeight:500, marginBottom:10 }}>{item.name}</div>
         <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginBottom:16 }}>
           {flagged.map(a => {
             const al = ALLERGENS.find(x => x.id === a);
-            return <span key={a} style={{ padding:'3px 9px', borderRadius:20, fontSize:12, fontWeight:600, background:'var(--c-red-dim)', border:'1px solid var(--c-red-bdr)', color:'var(--c-red)' }}>{al?.icon} {al?.label}</span>;
+            return <span key={a} style={{ padding:'3px 9px', borderRadius:20, fontSize:12, fontWeight:600, background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)' }}>{al?.icon} {al?.label}</span>;
           })}
         </div>
-        <div style={{ background:'var(--c-red-dim)', border:'1px solid var(--c-red-bdr)', borderRadius:10, padding:'10px 14px', marginBottom:20, fontSize:12, color:'var(--c-red)', lineHeight:1.6 }}>
+        <div style={{ background:'var(--red-d)', border:'1px solid var(--red-b)', borderRadius:10, padding:'10px 14px', marginBottom:20, fontSize:12, color:'var(--red)', lineHeight:1.6 }}>
           Confirming adds this item and creates an allergen audit record. Ensure the guest has been informed.
         </div>
         <div style={{ display:'flex', gap:8 }}>

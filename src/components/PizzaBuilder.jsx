@@ -108,9 +108,9 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
   return (
     <div className="modal-back" style={{ alignItems:'flex-start', paddingTop: 20 }}>
       <div style={{
-        background:'var(--c-surf)', border:'1px solid var(--bdr2)', borderRadius:24,
+        background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:24,
         width:'100%', maxWidth:640, maxHeight:'92vh', overflow:'auto',
-        boxShadow:'var(--shadow-lg)',
+        boxShadow:'var(--sh3)',
       }}>
         {/* Header */}
         <div style={{ padding:'20px 24px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -129,12 +129,12 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
                 {PIZZA_SIZES.map(s => (
                   <button key={s.id} onClick={() => setSize(s)} style={{
                     flex:1, padding:'10px 6px', borderRadius:10, cursor:'pointer',
-                    border:`1.5px solid ${size.id===s.id?'var(--c-acc)':'var(--bdr)'}`,
-                    background: size.id===s.id?'var(--c-acc-dim)':'var(--c-raised)',
+                    border:`1.5px solid ${size.id===s.id?'var(--acc)':'var(--bdr)'}`,
+                    background: size.id===s.id?'var(--acc-d)':'var(--bg3)',
                     transition:'all .12s',
                   }}>
-                    <div style={{ fontSize:12, fontWeight:500, color: size.id===s.id?'var(--c-acc)':'var(--c-text)' }}>{s.name}</div>
-                    <div style={{ fontSize:11, color:'var(--c-text3)', marginTop:2 }}>£{s.basePrice.toFixed(2)}</div>
+                    <div style={{ fontSize:12, fontWeight:500, color: size.id===s.id?'var(--acc)':'var(--t1)' }}>{s.name}</div>
+                    <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>£{s.basePrice.toFixed(2)}</div>
                   </button>
                 ))}
               </div>
@@ -147,9 +147,9 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
                 {PIZZA_BASES.map(b => (
                   <button key={b.id} onClick={() => setBase(b)} style={{
                     padding:'6px 12px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:500,
-                    border:`1.5px solid ${base.id===b.id?'var(--c-acc)':'var(--bdr)'}`,
-                    background: base.id===b.id?'var(--c-acc-dim)':'var(--c-raised)',
-                    color: base.id===b.id?'var(--c-acc)':'var(--c-text2)',
+                    border:`1.5px solid ${base.id===b.id?'var(--acc)':'var(--bdr)'}`,
+                    background: base.id===b.id?'var(--acc-d)':'var(--bg3)',
+                    color: base.id===b.id?'var(--acc)':'var(--t2)',
                     transition:'all .12s',
                   }}>{b.name}</button>
                 ))}
@@ -163,9 +163,9 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
                 {PIZZA_CRUSTS.map(c => (
                   <button key={c.id} onClick={() => setCrust(c)} style={{
                     padding:'6px 12px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:500,
-                    border:`1.5px solid ${crust.id===c.id?'var(--c-acc)':'var(--bdr)'}`,
-                    background: crust.id===c.id?'var(--c-acc-dim)':'var(--c-raised)',
-                    color: crust.id===c.id?'var(--c-acc)':'var(--c-text2)',
+                    border:`1.5px solid ${crust.id===c.id?'var(--acc)':'var(--bdr)'}`,
+                    background: crust.id===c.id?'var(--acc-d)':'var(--bg3)',
+                    color: crust.id===c.id?'var(--acc)':'var(--t2)',
                     transition:'all .12s',
                   }}>
                     {c.name}{c.extra?<span style={{fontSize:10,opacity:.7}}> +£{c.extra.toFixed(2)}</span>:null}
@@ -181,8 +181,8 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
                 {[['whole','Whole pizza'],['half','Half & half']].map(([v,l]) => (
                   <button key={v} onClick={() => { setSplit(v); setSide(v==='whole'?'whole':'left'); }} style={{
                     flex:1, padding:'9px 6px', cursor:'pointer', fontSize:12, fontWeight:500,
-                    background: split===v?'var(--c-acc)':'transparent',
-                    color: split===v?'var(--c-inverse)':'var(--c-text2)',
+                    background: split===v?'var(--acc)':'transparent',
+                    color: split===v?'#0e0f14':'var(--t2)',
                     border:'none', transition:'all .15s', fontFamily:'inherit',
                   }}>{l}</button>
                 ))}
@@ -202,13 +202,13 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
                       <button key={s} onClick={() => setSide(s)} style={{
                         flex:1, padding:'9px 8px', borderRadius:10, cursor:'pointer',
                         border:`1.5px solid ${side===s?sideColor[s]:'var(--bdr)'}`,
-                        background: side===s?(s==='left'?'rgba(59,130,246,.08)':'rgba(34,197,94,.08)'):'var(--c-raised)',
+                        background: side===s?(s==='left'?'rgba(59,130,246,.08)':'rgba(34,197,94,.08)'):'var(--bg3)',
                         transition:'all .12s',
                       }}>
-                        <div style={{ fontSize:12, fontWeight:600, color: side===s?sideColor[s]:'var(--c-text2)' }}>
+                        <div style={{ fontSize:12, fontWeight:600, color: side===s?sideColor[s]:'var(--t2)' }}>
                           {s.charAt(0).toUpperCase()+s.slice(1)} half
                         </div>
-                        <div style={{ fontSize:10, color:'var(--c-text3)', marginTop:2 }}>
+                        <div style={{ fontSize:10, color:'var(--t3)', marginTop:2 }}>
                           {count} topping{count!==1?'s':''}
                         </div>
                       </button>
@@ -244,12 +244,12 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
                     <button key={top.id} onClick={() => toggleTopping(top)} style={{
                       padding:'8px 6px', borderRadius:9, cursor:'pointer', textAlign:'center',
                       border:`1.5px solid ${active?stColor+'88':'var(--bdr)'}`,
-                      background: active?stColor+'18':'var(--c-raised)',
+                      background: active?stColor+'18':'var(--bg3)',
                       transition:'all .12s',
                     }}>
                       <div style={{ width:10,height:10,borderRadius:'50%',background:top.color,margin:'0 auto 4px' }}/>
-                      <div style={{ fontSize:10, fontWeight:500, color: active?stColor:'var(--c-text2)', lineHeight:1.2 }}>{top.name}</div>
-                      {top.price>0&&<div style={{ fontSize:9, color:'var(--c-text3)', marginTop:2 }}>+£{top.price}</div>}
+                      <div style={{ fontSize:10, fontWeight:500, color: active?stColor:'var(--t2)', lineHeight:1.2 }}>{top.name}</div>
+                      {top.price>0&&<div style={{ fontSize:9, color:'var(--t3)', marginTop:2 }}>+£{top.price}</div>}
                       {st!=='off'&&st!=='whole'&&<div style={{ fontSize:9, fontWeight:600, color:stColor, marginTop:2 }}>{st}</div>}
                     </button>
                   );
@@ -262,10 +262,10 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
           <div style={{ padding:'20px 16px', display:'flex', flexDirection:'column' }}>
             <div className="label-xs" style={{ marginBottom:12 }}>Your pizza</div>
 
-            <div style={{ fontSize:12, color:'var(--c-text2)', marginBottom:8 }}>
+            <div style={{ fontSize:12, color:'var(--t2)', marginBottom:8 }}>
               {size.name} · {crust.name}
             </div>
-            <div style={{ fontSize:12, color:'var(--c-text2)', marginBottom:12 }}>
+            <div style={{ fontSize:12, color:'var(--t2)', marginBottom:12 }}>
               {base.name}
             </div>
 
@@ -273,32 +273,32 @@ export default function PizzaBuilder({ item, onConfirm, onCancel }) {
               <>
                 <div style={{ background:'rgba(59,130,246,.08)', borderRadius:8, padding:'8px 10px', marginBottom:6 }}>
                   <div style={{ fontSize:10, fontWeight:600, color:sideColor.left, marginBottom:4 }}>LEFT HALF</div>
-                  {left.length ? left.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--c-text2)',marginBottom:2}}><div style={{width:8,height:8,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--c-text3)',fontStyle:'italic'}}>No toppings</div>}
+                  {left.length ? left.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--t2)',marginBottom:2}}><div style={{width:8,height:8,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--t3)',fontStyle:'italic'}}>No toppings</div>}
                 </div>
                 <div style={{ background:'rgba(34,197,94,.08)', borderRadius:8, padding:'8px 10px', marginBottom:12 }}>
                   <div style={{ fontSize:10, fontWeight:600, color:sideColor.right, marginBottom:4 }}>RIGHT HALF</div>
-                  {right.length ? right.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--c-text2)',marginBottom:2}}><div style={{width:8,height:8,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--c-text3)',fontStyle:'italic'}}>No toppings</div>}
+                  {right.length ? right.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--t2)',marginBottom:2}}><div style={{width:8,height:8,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--t3)',fontStyle:'italic'}}>No toppings</div>}
                 </div>
               </>
             ) : (
               <div style={{ background:'rgba(240,165,0,.08)', borderRadius:8, padding:'8px 10px', marginBottom:12 }}>
-                <div style={{ fontSize:10, fontWeight:600, color:'var(--c-acc)', marginBottom:4 }}>WHOLE PIZZA</div>
-                {left.length ? left.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--c-text2)',marginBottom:2}}><div style={{width:8,height:8,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--c-text3)',fontStyle:'italic'}}>Cheese only</div>}
+                <div style={{ fontSize:10, fontWeight:600, color:'var(--acc)', marginBottom:4 }}>WHOLE PIZZA</div>
+                {left.length ? left.map(t=><div key={t.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--t2)',marginBottom:2}}><div style={{width:8,height:8,borderRadius:'50%',background:t.color}}/>{t.name}</div>) : <div style={{fontSize:11,color:'var(--t3)',fontStyle:'italic'}}>Cheese only</div>}
               </div>
             )}
 
             <div style={{ marginTop:'auto' }}>
               <div style={{ borderTop:'1px solid var(--bdr)', paddingTop:12, marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--c-text3)', marginBottom:3 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', marginBottom:3 }}>
                   <span>Base</span><span>£{size.basePrice.toFixed(2)}</span>
                 </div>
-                {crust.extra>0&&<div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--c-text3)', marginBottom:3 }}>
+                {crust.extra>0&&<div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', marginBottom:3 }}>
                   <span>{crust.name}</span><span>+£{crust.extra.toFixed(2)}</span>
                 </div>}
-                {toppingCost>0&&<div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--c-text3)', marginBottom:3 }}>
+                {toppingCost>0&&<div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', marginBottom:3 }}>
                   <span>Toppings</span><span>+£{toppingCost.toFixed(2)}</span>
                 </div>}
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:16, fontWeight:600, marginTop:8, color:'var(--c-acc)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:16, fontWeight:600, marginTop:8, color:'var(--acc)' }}>
                   <span>Total</span><span>£{total.toFixed(2)}</span>
                 </div>
               </div>

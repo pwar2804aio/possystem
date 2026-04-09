@@ -33,18 +33,18 @@ export default function PINScreen() {
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', minHeight: '100vh', gap: 48,
-      background: 'var(--c-base)',
+      background: 'var(--bg)',
     }}>
       {/* Wordmark */}
       <div style={{ textAlign: 'center' }}>
         <div style={{
-          width: 56, height: 56, background: 'var(--c-acc)', borderRadius: 16,
+          width: 56, height: 56, background: 'var(--acc)', borderRadius: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 26, fontWeight: 700, color: 'var(--c-inverse)',
+          fontSize: 26, fontWeight: 700, color: '#0e0f14',
           margin: '0 auto 16px',
         }}>R</div>
         <div style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-.02em' }}>Restaurant OS</div>
-        <div style={{ fontSize: 14, color: 'var(--c-text2)', marginTop: 4 }}>Select your profile</div>
+        <div style={{ fontSize: 14, color: 'var(--t2)', marginTop: 4 }}>Select your profile</div>
       </div>
 
       {/* Staff cards */}
@@ -54,8 +54,8 @@ export default function PINScreen() {
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
               padding: '16px 20px', minWidth: 96,
-              background: sel?.id === s.id ? 'rgba(240,165,0,.08)' : 'var(--c-raised)',
-              border: `1px solid ${sel?.id === s.id ? 'var(--c-acc-bdr)' : 'var(--bdr)'}`,
+              background: sel?.id === s.id ? 'rgba(240,165,0,.08)' : 'var(--bg3)',
+              border: `1px solid ${sel?.id === s.id ? 'var(--acc-b)' : 'var(--bdr)'}`,
               borderRadius: 16, cursor: 'pointer', transition: 'all .15s',
             }}>
             <div style={{
@@ -64,8 +64,8 @@ export default function PINScreen() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 14, fontWeight: 600, color: s.color,
             }}>{s.initials}</div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--c-text)' }}>{s.name}</div>
-            <div style={{ fontSize: 11, color: 'var(--c-text3)' }}>{s.role}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--t1)' }}>{s.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--t3)' }}>{s.role}</div>
           </button>
         ))}
       </div>
@@ -73,8 +73,8 @@ export default function PINScreen() {
       {/* PIN entry */}
       {sel && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-          <div style={{ fontSize: 13, color: 'var(--c-text2)' }}>
-            PIN for <strong style={{ color: 'var(--c-text)' }}>{sel.name}</strong>
+          <div style={{ fontSize: 13, color: 'var(--t2)' }}>
+            PIN for <strong style={{ color: 'var(--t1)' }}>{sel.name}</strong>
           </div>
 
           {/* Dots */}
@@ -82,13 +82,13 @@ export default function PINScreen() {
             {[0,1,2,3].map(i => (
               <div key={i} style={{
                 width: 14, height: 14, borderRadius: '50%',
-                border: `2px solid ${shake ? 'var(--c-red)' : i < pin.length ? 'var(--c-acc)' : 'var(--bdr3)'}`,
-                background: i < pin.length ? (shake ? 'var(--c-red)' : 'var(--c-acc)') : 'transparent',
+                border: `2px solid ${shake ? 'var(--red)' : i < pin.length ? 'var(--acc)' : 'var(--bdr3)'}`,
+                background: i < pin.length ? (shake ? 'var(--red)' : 'var(--acc)') : 'transparent',
                 transition: 'all .12s',
               }}/>
             ))}
           </div>
-          {shake && <div style={{ fontSize: 12, color: 'var(--c-red)' }}>Incorrect PIN — try again</div>}
+          {shake && <div style={{ fontSize: 12, color: 'var(--red)' }}>Incorrect PIN — try again</div>}
 
           {/* Keypad */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: 10 }}>
@@ -96,10 +96,10 @@ export default function PINScreen() {
               <button key={i} onClick={() => k && tap(k)}
                 style={{
                   height: 56, borderRadius: 14,
-                  background: k === '⌫' ? 'transparent' : 'var(--c-raised)',
+                  background: k === '⌫' ? 'transparent' : 'var(--bg3)',
                   border: `1px solid ${k === '⌫' ? 'transparent' : 'var(--bdr)'}`,
                   fontSize: k === '⌫' ? 20 : 22, fontWeight: 400,
-                  color: 'var(--c-text)', cursor: k ? 'pointer' : 'default',
+                  color: 'var(--t1)', cursor: k ? 'pointer' : 'default',
                   visibility: k === '' ? 'hidden' : 'visible',
                   transition: 'all .1s', fontFamily: 'inherit',
                 }}
