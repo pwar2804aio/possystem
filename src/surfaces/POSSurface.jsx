@@ -290,7 +290,7 @@ export default function POSSurface() {
               )}
 
               {/* Action row — discount, print, void */}
-              <div style={{padding:'7px 12px 8px',display:'flex',gap:5,flexWrap:'wrap'}}>
+              <div style={{padding:'7px 12px 4px',display:'flex',gap:5,flexWrap:'wrap'}}>
                 <button onClick={()=>setShowDiscount(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>🏷 Discount</button>
                 <button onClick={()=>setShowReceipt(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>🖨 Print check</button>
                 {hasSent&&<button onClick={()=>setShowReprint(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>↻ Reprint</button>}
@@ -298,6 +298,15 @@ export default function POSSurface() {
               </div>
             </>
           )}
+
+          {/* Send / Pay — always at bottom of order panel */}
+          <div style={{padding:'8px 12px 12px',display:'flex',gap:6}}>
+            <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:34,height:34,borderRadius:8,border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:18,flexShrink:0}}>+</button>
+            <button className="btn btn-ghost" style={{flex:1,height:34,opacity:items.length===0?.4:1}} onClick={handleSend}>Send →</button>
+            <button className="btn btn-acc" style={{flex:1,height:34,opacity:items.length===0?.4:1}} onClick={()=>items.length>0&&setShowCheckout(true)}>
+              {items.length>0?`Pay £${total.toFixed(2)}`:'Pay'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -360,11 +369,6 @@ export default function POSSurface() {
                 {search&&<button onClick={()=>setSearch('')} style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:15,lineHeight:1}}>×</button>}
               </div>
             )}
-            <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:32,height:32,borderRadius:7,border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:17,flexShrink:0}}>+</button>
-            <button className="btn btn-ghost" style={{height:32,padding:'0 14px',fontSize:12,opacity:items.length===0?.4:1}} onClick={handleSend}>Send →</button>
-            <button className="btn btn-acc" style={{height:32,padding:'0 14px',fontSize:12,opacity:items.length===0?.4:1}} onClick={()=>items.length>0&&setShowCheckout(true)}>
-              {items.length>0 ? `Pay £${total.toFixed(2)}` : 'Pay'}
-            </button>
           </div>
         </div>
 
