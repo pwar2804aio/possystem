@@ -300,17 +300,30 @@ export const useStore = create((set, get) => ({
 
   getPOSTotals: () => {
     const { activeTableId, tables, walkInOrder, orderType } = get();
-    let items;
+    let items, checkDiscounts;
     if (activeTableId) {
-      items = tables.find(t=>t.id===activeTableId)?.session?.items || [];
-      const subtotal = items.reduce((s,i)=>s+i.price*i.qty,0);
-      const service  = orderType==='dine-in' ? subtotal*0.125 : 0;
-      return { subtotal, service, total:subtotal+service, itemCount:items.reduce((s,i)=>s+i.qty,0) };
+      const session = tables.find(t=>t.id===activeTableId)?.session;
+      items = session?.items || [];
+      checkDiscounts = session?.discounts || [];
+    } else {
+      items = walkInOrder?.items || [];
+      checkDiscounts = walkInOrder?.discounts || [];
     }
-    items = walkInOrder?.items || [];
-    const subtotal = items.reduce((s,i)=>s+i.price*i.qty,0);
-    const service  = orderType==='dine-in' ? subtotal*0.125 : 0;
-    return { subtotal, service, total:subtotal+service, itemCount:items.reduce((s,i)=>s+i.qty,0) };
+    // Subtotal — voided items excluded, item discounts applied
+    const subtotal = items.filter(i=>!i.voided).reduce((s,i)=>{
+      const base = i.price * i.qty;
+      if (!i.discount) return s + base;
+      return s + (i.discount.type==='percent' ? base*(1-i.discount.value/100) : Math.max(0,base-i.discount.value));
+    }, 0);
+    // Check-level discounts
+    const checkDiscount = checkDiscounts.reduce((s,d) => s + (d.type==='percent'?subtotal*d.value/100:d.value), 0);
+    const discountedSub = Math.max(0, subtotal - checkDiscount);
+    const service = orderType==='dine-in' ? discountedSub*0.125 : 0;
+    return {
+      subtotal, checkDiscount, discountedSub, service,
+      total: discountedSub+service,
+      itemCount: items.filter(i=>!i.voided).reduce((s,i)=>s+i.qty,0),
+    };
   },
 
   getPOSOrderNote: () => {
@@ -373,6 +386,114 @@ export const useStore = create((set, get) => ({
       rounds:[{ id:'r3', sentAt:new Date(Date.now()-40*60000), subtotal:28, note:'', items:[{uid:'ri4',name:'Old Fashioned',price:12,qty:2,mods:[{label:'Woodford Reserve',price:3}],notes:''}] }] },
   ] }),
 
+  // ── Void log ──────────────────────────────
+  voidLog: [],
+
+  voidItem: (tableId, itemUid, { manager, reason }) => {
+    const { tables, voidLog, showToast } = get();
+    const table = tables.find(t => t.id === tableId);
+    const item  = table?.session?.items?.find(i => i.uid === itemUid);
+    if (!item) return;
+
+    // Mark item as voided (keep visible with strikethrough)
+    set(s => ({
+      tables: s.tables.map(t => {
+        if (t.id !== tableId || !t.session) return t;
+        const items = t.session.items.map(i => i.uid === itemUid ? { ...i, status:'voided', voided:true } : i);
+        const subtotal = items.filter(i=>!i.voided).reduce((s,i)=>s+i.price*i.qty,0);
+        return { ...t, session:{ ...t.session, items, subtotal, total:subtotal*1.125 } };
+      }),
+      voidLog: [{
+        id:`void-${Date.now()}`, timestamp:new Date(), type:'item',
+        tableId, tableLabel:table.label,
+        items:[{ name:item.name, price:item.price, qty:item.qty }],
+        totalValue: item.price * item.qty,
+        reason, manager: manager.name, managerId: manager.id,
+      }, ...s.voidLog],
+    }));
+    showToast(`${item.name} voided — ${reason}`, 'warning');
+  },
+
+  voidCheck: (tableId, { manager, reason }) => {
+    const { tables, showToast } = get();
+    const table  = tables.find(t => t.id === tableId);
+    const session = table?.session;
+    if (!session) return;
+
+    const totalValue = session.items.reduce((s,i) => s+i.price*i.qty, 0);
+    set(s => ({
+      tables: s.tables.map(t => {
+        if (t.id !== tableId || !t.session) return t;
+        const items = t.session.items.map(i => ({ ...i, status:'voided', voided:true }));
+        return { ...t, status:'available', session:null };
+      }),
+      voidLog: [{
+        id:`void-${Date.now()}`, timestamp:new Date(), type:'check',
+        tableId, tableLabel:table.label,
+        items: session.items.map(i => ({ name:i.name, price:i.price, qty:i.qty })),
+        totalValue, reason, manager:manager.name, managerId:manager.id,
+      }, ...s.voidLog],
+      activeTableId: s.activeTableId === tableId ? null : s.activeTableId,
+    }));
+    showToast(`Check voided by ${manager.name} — ${reason}`, 'error');
+  },
+
+  // ── Discounts ──────────────────────────────
+  // Check-level discounts stored on the session
+  addCheckDiscount: (tableId, discount) => {
+    set(s => ({
+      tables: s.tables.map(t => {
+        if (t.id !== tableId || !t.session) return t;
+        const discounts = [...(t.session.discounts||[]), discount];
+        return { ...t, session:{ ...t.session, discounts } };
+      }),
+    }));
+  },
+
+  removeCheckDiscount: (tableId, discountId) => {
+    set(s => ({
+      tables: s.tables.map(t => {
+        if (t.id !== tableId || !t.session) return t;
+        const discounts = (t.session.discounts||[]).filter(d => d.id !== discountId);
+        return { ...t, session:{ ...t.session, discounts } };
+      }),
+    }));
+  },
+
+  addWalkInDiscount: (discount) => set(s => ({
+    walkInOrder: { ...s.walkInOrder, discounts:[...(s.walkInOrder?.discounts||[]), discount] },
+  })),
+
+  removeWalkInDiscount: (discountId) => set(s => ({
+    walkInOrder: { ...s.walkInOrder, discounts:(s.walkInOrder?.discounts||[]).filter(d=>d.id!==discountId) },
+  })),
+
+  // Item-level discount
+  addItemDiscount: (tableId, itemUid, discount) => {
+    if (tableId) {
+      set(s => ({ tables:s.tables.map(t => {
+        if (t.id!==tableId||!t.session) return t;
+        const items = t.session.items.map(i => i.uid===itemUid ? {...i, discount} : i);
+        const subtotal = items.filter(i=>!i.voided).reduce((s,i)=>s+(i.discount?i.price*(1-i.discount.value/100)*i.qty:i.price*i.qty),0);
+        return {...t, session:{...t.session, items, subtotal, total:subtotal*1.125}};
+      })}));
+    } else {
+      set(s => ({ walkInOrder:{ ...s.walkInOrder, items:(s.walkInOrder?.items||[]).map(i=>i.uid===itemUid?{...i,discount}:i) } }));
+    }
+  },
+
+  removeItemDiscount: (tableId, itemUid) => {
+    if (tableId) {
+      set(s => ({ tables:s.tables.map(t => {
+        if(t.id!==tableId||!t.session) return t;
+        const items=t.session.items.map(i=>i.uid===itemUid?{...i,discount:null}:i);
+        return {...t,session:{...t.session,items}};
+      })}));
+    } else {
+      set(s=>({walkInOrder:{...s.walkInOrder,items:(s.walkInOrder?.items||[]).map(i=>i.uid===itemUid?{...i,discount:null}:i)}}));
+    }
+  },
+
   // ── KDS ───────────────────────────────────
   kdsTickets: INITIAL_KDS,
   bumpTicket: id => set(s=>({ kdsTickets:s.kdsTickets.filter(t=>t.id!==id) })),
@@ -389,3 +510,4 @@ export const useStore = create((set, get) => ({
   setPendingItem: item => set({ pendingItem:item }),
   clearPendingItem: () => set({ pendingItem:null }),
 }));
+// NOTE: these are appended but the store is defined above — we patch via the create callback

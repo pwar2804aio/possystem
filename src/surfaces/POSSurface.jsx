@@ -4,7 +4,8 @@ import { CATEGORIES, MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart } from '../dat
 import ProductModal, { AllergenModal } from '../components/ProductModal';
 import CheckoutModal from './CheckoutModal';
 import CustomerModal from '../components/CustomerModal';
-import CollectionQueue from '../components/CollectionQueue';
+import VoidModal from '../components/VoidModal';
+import DiscountModal from '../components/DiscountModal';
 
 const CAT_META = {
   quick:    {icon:'⚡',color:'#e8a020'}, starters:{icon:'🥗',color:'#22c55e'},
@@ -32,6 +33,9 @@ export default function POSSurface() {
     pendingItem, setPendingItem, clearPendingItem,
     eightySixIds, toggle86,
     setSurface,
+    voidItem, voidCheck,
+    addCheckDiscount, removeCheckDiscount, addWalkInDiscount, removeWalkInDiscount,
+    addItemDiscount, removeItemDiscount,
   } = useStore();
 
   const [cat, setCat]             = useState('quick');
@@ -46,11 +50,13 @@ export default function POSSurface() {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [pendingOrderType, setPendingOrderType] = useState(null);
   const [showQueue, setShowQueue] = useState(false);
+  const [voidTarget, setVoidTarget]   = useState(null);  // { type:'item'|'check', item? }
+  const [discountTarget, setDiscountTarget] = useState(null);  // { scope:'item'|'check', item? }
 
   const activeTable = activeTableId ? tables.find(t=>t.id===activeTableId) : null;
   const session = activeTable?.session;
   const items = getPOSItems();
-  const { subtotal, service, total, itemCount } = getPOSTotals();
+  const { subtotal, service, total, itemCount, checkDiscount, discountedSub } = getPOSTotals();
   const orderNote = getPOSOrderNote();
   const firedCourses = session?.firedCourses || [];
   const covers = session?.covers || 2;
@@ -204,7 +210,11 @@ export default function POSSurface() {
                     onRemove={()=>removeItem(item.uid)}
                     onNote={n=>updateItemNote(item.uid,n)}
                     onSeat={s=>updateItemSeat(item.uid,s)}
-                    onCourse={c=>updateItemCourse(item.uid,c)}/>
+                    onCourse={c=>updateItemCourse(item.uid,c)}
+                    onVoid={()=>setVoidTarget({type:'item',item})}
+                    onDiscount={()=>setDiscountTarget({scope:'item',item})}
+                    onRemoveDiscount={()=>removeItemDiscount(activeTableId,item.uid)}
+                  />
                 ))}
               </div>
             );
@@ -225,16 +235,44 @@ export default function POSSurface() {
             <>
               <div style={{padding:'10px 12px 0'}}>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:3}}><span>Subtotal · {itemCount} item{itemCount!==1?'s':''}</span><span style={{fontFamily:'DM Mono,monospace'}}>£{subtotal.toFixed(2)}</span></div>
+                {checkDiscount>0&&<div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--grn)',marginBottom:3}}><span>Discount</span><span style={{fontFamily:'DM Mono,monospace'}}>−£{checkDiscount.toFixed(2)}</span></div>}
                 {service>0?<div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:3}}><span>Service (12.5%)</span><span style={{fontFamily:'DM Mono,monospace'}}>£{service.toFixed(2)}</span></div>:<div style={{fontSize:11,color:'var(--grn)',marginBottom:3}}>No service charge · {orderType}</div>}
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:20,fontWeight:800,marginTop:8,paddingTop:8,borderTop:'1px solid var(--bdr3)',marginBottom:2}}><span>Total</span><span style={{color:'var(--acc)',fontFamily:'DM Mono,monospace'}}>£{total.toFixed(2)}</span></div>
               </div>
+
+              {/* Check discounts list */}
+              {(() => {
+                const checkDiscounts = activeTableId
+                  ? (tables.find(t=>t.id===activeTableId)?.session?.discounts||[])
+                  : (useStore.getState().walkInOrder?.discounts||[]);
+                return checkDiscounts.length>0 ? (
+                  <div style={{padding:'0 12px 0'}}>
+                    {checkDiscounts.map(d=>(
+                      <div key={d.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:11,color:'var(--grn)',marginBottom:2}}>
+                        <span>🏷 {d.label}</span>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <span style={{fontFamily:'DM Mono,monospace'}}>−£{d.amount.toFixed(2)}</span>
+                          <button onClick={()=>activeTableId?removeCheckDiscount(activeTableId,d.id):removeWalkInDiscount(d.id)} style={{fontSize:10,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+
               {hasSent&&nextToFire&&(
                 <div style={{margin:'6px 12px 0',padding:'7px 12px',background:'rgba(232,160,32,.1)',border:'1px solid rgba(232,160,32,.25)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                   <span style={{fontSize:12,color:'var(--acc)',fontWeight:600}}>{COURSE_COLORS[nextToFire]?.label} ready to fire</span>
                   <button onClick={()=>fireCourse(nextToFire)} style={{fontSize:12,fontWeight:700,padding:'4px 12px',borderRadius:8,background:'var(--acc)',color:'#0e0f14',border:'none',cursor:'pointer',fontFamily:'inherit'}}>🔥 Fire</button>
                 </div>
               )}
-              <div style={{padding:'7px 12px 12px',display:'flex',gap:6}}>
+
+              {/* Action row */}
+              <div style={{padding:'7px 12px 4px',display:'flex',gap:5}}>
+                <button onClick={()=>setDiscountTarget({scope:'check'})} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600}}>🏷 Discount</button>
+                {activeTableId&&hasSent&&<button onClick={()=>setVoidTarget({type:'check',items:items.filter(i=>!i.voided)})} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:11,fontWeight:600}}>⊘ Void check</button>}
+              </div>
+              <div style={{padding:'0 12px 12px',display:'flex',gap:6}}>
                 <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:34,height:34,borderRadius:8,border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:18,flexShrink:0}}>+</button>
                 <button className="btn btn-ghost" style={{flex:1,height:34}} onClick={handleSend}>Send →</button>
                 <button className="btn btn-acc" style={{flex:1,height:34}} onClick={()=>setShowCheckout(true)}>Pay £{total.toFixed(2)}</button>
@@ -352,6 +390,41 @@ export default function POSSurface() {
       {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={activeTableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={handlePayComplete}/>}
       {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} onConfirm={c=>{setShowCustomerModal(false);setCustomer(c);setOrderType(pendingOrderType);setPendingOrderType(null);showToast(`${c.name} — ${pendingOrderType} order started`,'success');}} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
       {showQueue&&<CollectionQueue onClose={()=>setShowQueue(false)}/>}
+
+      {/* Void modal */}
+      {voidTarget&&(
+        <VoidModal
+          type={voidTarget.type}
+          items={voidTarget.type==='item'?[voidTarget.item]:items.filter(i=>!i.voided)}
+          totalValue={voidTarget.type==='item'?voidTarget.item.price*voidTarget.item.qty:subtotal}
+          onConfirm={(opts)=>{
+            if (voidTarget.type==='item') voidItem(activeTableId, voidTarget.item.uid, opts);
+            else voidCheck(activeTableId, opts);
+            setVoidTarget(null);
+          }}
+          onCancel={()=>setVoidTarget(null)}
+        />
+      )}
+
+      {/* Discount modal */}
+      {discountTarget&&(
+        <DiscountModal
+          scope={discountTarget.scope}
+          itemName={discountTarget.item?.name}
+          subtotal={discountTarget.scope==='item'?discountTarget.item?.price*discountTarget.item?.qty:subtotal}
+          onConfirm={(disc)=>{
+            if (discountTarget.scope==='item') {
+              addItemDiscount(activeTableId, discountTarget.item.uid, disc);
+            } else {
+              if (activeTableId) addCheckDiscount(activeTableId, disc);
+              else addWalkInDiscount(disc);
+            }
+            showToast(`${disc.label} applied`,'success');
+            setDiscountTarget(null);
+          }}
+          onCancel={()=>setDiscountTarget(null)}
+        />
+      )}
       {showCustom&&(
         <div className="modal-back"><div className="modal-box" style={{maxWidth:360}}>
           <div style={{fontSize:16,fontWeight:600,marginBottom:16,color:'var(--t1)'}}>Custom item</div>
@@ -368,17 +441,51 @@ export default function POSSurface() {
   );
 }
 
-function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote, onSeat, onCourse }) {
+function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote, onSeat, onCourse, onVoid, onDiscount, onRemoveDiscount }) {
   const [showMenu, setShowMenu] = useState(false);
   const [editNote, setEditNote] = useState(false);
   const [noteVal, setNoteVal]   = useState(item.notes||'');
+
+  const isCommitted = item.status === 'sent';
+  const isVoided    = item.voided || item.status === 'voided';
+
+  const discountedPrice = item.discount
+    ? (item.discount.type==='percent'
+        ? item.price * (1 - item.discount.value/100)
+        : Math.max(0, item.price - item.discount.value/item.qty))
+    : item.price;
+  const lineTotal = discountedPrice * item.qty;
+
   return (
-    <div style={{background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:10,padding:'9px 10px',marginBottom:6}}>
+    <div style={{
+      background: isVoided ? 'var(--bg3)' : 'var(--bg2)',
+      border:`1px solid ${isVoided?'var(--red-b)':'var(--bdr)'}`,
+      borderRadius:10, padding:'9px 10px', marginBottom:6,
+      opacity: isVoided ? .6 : 1,
+    }}>
       <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
         <div style={{flex:1}}>
-          <div style={{fontSize:13,fontWeight:600,lineHeight:1.3,color:'var(--t1)'}}>{item.name}</div>
+          <div style={{
+            fontSize:13, fontWeight:600, lineHeight:1.3,
+            color: isVoided ? 'var(--red)' : 'var(--t1)',
+            textDecoration: isVoided ? 'line-through' : 'none',
+          }}>
+            {item.name}
+            {isVoided && <span style={{fontSize:10,fontWeight:700,marginLeft:6,padding:'1px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>VOIDED</span>}
+          </div>
           {item.mods?.map((m,i)=><div key={i} style={{fontSize:11,color:'var(--t3)',display:'flex',justifyContent:'space-between',marginTop:1}}><span>{m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}</span>{m.price>0&&<span style={{color:'var(--acc)',fontFamily:'DM Mono,monospace'}}>+£{m.price.toFixed(2)}</span>}</div>)}
-          {editNote?(
+
+          {/* Item discount */}
+          {item.discount && !isVoided && (
+            <div style={{display:'flex',alignItems:'center',gap:6,marginTop:3}}>
+              <span style={{fontSize:11,color:'var(--grn)'}}>🏷 {item.discount.label}</span>
+              <span style={{fontSize:11,color:'var(--grn)',fontFamily:'DM Mono,monospace'}}>−£{(item.price*item.qty - lineTotal).toFixed(2)}</span>
+              <button onClick={onRemoveDiscount} style={{fontSize:10,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+            </div>
+          )}
+
+          {/* Note */}
+          {!isVoided && (editNote ? (
             <div style={{marginTop:5}}>
               <input autoFocus value={noteVal} onChange={e=>setNoteVal(e.target.value)}
                 onKeyDown={e=>{if(e.key==='Enter'){onNote(noteVal);setEditNote(false);}if(e.key==='Escape'){setNoteVal(item.notes||'');setEditNote(false);}}}
@@ -389,36 +496,57 @@ function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote,
                 <button onClick={()=>{setNoteVal(item.notes||'');setEditNote(false);}} style={{flex:1,padding:'3px',borderRadius:5,cursor:'pointer',fontFamily:'inherit',background:'var(--bg4)',border:'1px solid var(--bdr)',color:'var(--t2)',fontSize:11}}>Cancel</button>
               </div>
             </div>
-          ):(
+          ) : (
             <div onClick={()=>{setNoteVal(item.notes||'');setEditNote(true);}} style={{marginTop:5,padding:'4px 8px',borderRadius:6,cursor:'pointer',border:'1px dashed var(--bdr2)',fontSize:11,display:'flex',alignItems:'center',gap:5,color:item.notes?'#f97316':'var(--t4)'}}>
               <span>📝</span><span style={{fontStyle:item.notes?'italic':'normal'}}>{item.notes||'Add item note…'}</span>
             </div>
-          )}
+          ))}
+
           {item.allergens?.length>0&&<div style={{fontSize:10,color:'var(--red)',marginTop:3}}>⚠ {item.allergens.map(a=>ALLERGENS.find(x=>x.id===a)?.label).filter(Boolean).join(' · ')}</div>}
-          <div style={{display:'flex',gap:4,marginTop:5,flexWrap:'wrap'}}>
+
+          {!isVoided && <div style={{display:'flex',gap:4,marginTop:5,flexWrap:'wrap'}}>
             {orderType==='dine-in'&&covers>1&&<span onClick={()=>setShowMenu(s=>!s)} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)',cursor:'pointer'}}>{item.seat==='shared'?'Shared':`Seat ${item.seat}`}</span>}
             {item.course>0&&<span onClick={()=>setShowMenu(s=>!s)} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:COURSE_COLORS[item.course]?.bg||'var(--bg3)',border:`1px solid ${(COURSE_COLORS[item.course]?.color||'var(--t3)')+'44'}`,color:COURSE_COLORS[item.course]?.color||'var(--t3)',cursor:'pointer'}}>{COURSE_COLORS[item.course]?.label}</span>}
-            {item.status==='sent'&&<span style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'var(--grn-d)',border:'1px solid var(--grn-b)',color:'var(--grn)'}}>Sent</span>}
-          </div>
+            {isCommitted&&<span style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'var(--grn-d)',border:'1px solid var(--grn-b)',color:'var(--grn)'}}>Sent</span>}
+          </div>}
         </div>
-        <div style={{fontSize:14,fontWeight:800,color:'var(--acc)',whiteSpace:'nowrap',fontFamily:'DM Mono,monospace'}}>£{(item.price*item.qty).toFixed(2)}</div>
+
+        <div style={{textAlign:'right',flexShrink:0}}>
+          <div style={{fontSize:14,fontWeight:800,color:isVoided?'var(--red)':item.discount?'var(--grn)':'var(--acc)',fontFamily:'DM Mono,monospace',textDecoration:isVoided?'line-through':'none'}}>
+            £{lineTotal.toFixed(2)}
+          </div>
+          {item.discount&&!isVoided&&<div style={{fontSize:10,color:'var(--t4)',textDecoration:'line-through',fontFamily:'DM Mono,monospace'}}>£{(item.price*item.qty).toFixed(2)}</div>}
+        </div>
       </div>
-      {showMenu&&(
+
+      {/* Seat / course menu */}
+      {showMenu&&!isVoided&&(
         <div style={{marginTop:8,padding:'8px 10px',background:'var(--bg3)',borderRadius:8,border:'1px solid var(--bdr2)'}}>
           {orderType==='dine-in'&&covers>1&&<div style={{marginBottom:8}}><div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:5}}>Move to seat</div><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{seatList.map(s=><button key={s} onClick={()=>{onSeat(s);setShowMenu(false);}} style={{padding:'3px 9px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:600,background:item.seat===s?'var(--acc-d)':'var(--bg4)',border:`1px solid ${item.seat===s?'var(--acc-b)':'var(--bdr)'}`,color:item.seat===s?'var(--acc)':'var(--t3)'}}>{s==='shared'?'Shared':`S${s}`}</button>)}</div></div>}
           <div><div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:5}}>Move to course</div><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{Object.entries(COURSE_COLORS).map(([c,cc])=><button key={c} onClick={()=>{onCourse(parseInt(c));setShowMenu(false);}} style={{padding:'3px 9px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:600,background:item.course===parseInt(c)?cc.bg:'var(--bg4)',border:`1px solid ${item.course===parseInt(c)?cc.color+'55':'var(--bdr)'}`,color:item.course===parseInt(c)?cc.color:'var(--t3)'}}>{cc.label}</button>)}</div></div>
           <button onClick={()=>setShowMenu(false)} style={{marginTop:7,fontSize:11,color:'var(--t3)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>Done</button>
         </div>
       )}
-      <div style={{display:'flex',alignItems:'center',gap:8,marginTop:7}}>
-        <div style={{display:'flex',alignItems:'center',gap:1,background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:8,overflow:'hidden'}}>
-          <button onClick={()=>onQty(-1)} style={{width:26,height:24,background:'transparent',border:'none',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-          <div style={{width:26,height:24,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'var(--t1)'}}>{item.qty}</div>
-          <button onClick={()=>onQty(1)} style={{width:26,height:24,background:'transparent',border:'none',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+
+      {/* Qty controls — hidden for voided */}
+      {!isVoided && (
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:7}}>
+          <div style={{display:'flex',alignItems:'center',gap:1,background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:8,overflow:'hidden'}}>
+            <button onClick={()=>onQty(-1)} style={{width:26,height:24,background:'transparent',border:'none',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+            <div style={{width:26,height:24,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'var(--t1)'}}>{item.qty}</div>
+            <button onClick={()=>onQty(1)} style={{width:26,height:24,background:'transparent',border:'none',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+          </div>
+          {item.qty>1&&<span style={{fontSize:11,color:'var(--t3)',fontFamily:'DM Mono,monospace'}}>£{discountedPrice.toFixed(2)} ea</span>}
+          <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
+            {!item.discount&&<button onClick={onDiscount} style={{fontSize:11,color:'var(--grn)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',opacity:.8}}>🏷</button>}
+            {/* Pending items: Remove freely. Committed items: Void with manager PIN */}
+            {isCommitted
+              ? <button onClick={onVoid} style={{fontSize:11,color:'var(--red)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',fontWeight:600}}>Void</button>
+              : <button onClick={onRemove} style={{fontSize:11,color:'var(--red)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',opacity:.7}}>Remove</button>
+            }
+          </div>
         </div>
-        {item.qty>1&&<span style={{fontSize:11,color:'var(--t3)',fontFamily:'DM Mono,monospace'}}>£{item.price.toFixed(2)} ea</span>}
-        <button onClick={onRemove} style={{marginLeft:'auto',fontSize:11,color:'var(--red)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',opacity:.7}}>Remove</button>
-      </div>
+      )}
     </div>
   );
 }
