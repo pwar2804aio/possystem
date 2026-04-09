@@ -50,7 +50,7 @@ export default function POSSurface() {
   const [customNote, setCustomNote] = useState('');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [pendingOrderType, setPendingOrderType] = useState(null);
-  const [showQueue, setShowQueue] = useState(false);
+  const [rightTab, setRightTab] = useState('menu');  // 'menu' | 'orders'
   const [voidTarget, setVoidTarget]   = useState(null);
   const [showDiscount, setShowDiscount] = useState(false);
   const [showReceipt, setShowReceipt]   = useState(false);
@@ -303,14 +303,6 @@ export default function POSSurface() {
               </div>
             </>
           )}
-          {(orderType!=='dine-in'||activeQueueCount>0)&&(
-            <div style={{padding:items.length>0?'0 12px 10px':'10px 12px'}}>
-              <button onClick={()=>setShowQueue(true)} style={{width:'100%',padding:'9px 12px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:`1px solid ${activeQueueCount>0?'var(--acc-b)':'var(--bdr)'}`,color:activeQueueCount>0?'var(--acc)':'var(--t2)',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                <span>📦 Collection queue</span>
-                {activeQueueCount>0&&<span style={{background:'var(--acc)',color:'#0e0f14',borderRadius:20,padding:'2px 8px',fontSize:11,fontWeight:800}}>{activeQueueCount}</span>}
-              </button>
-            </div>
-          )}
           {items.length===0&&orderType==='dine-in'&&<div style={{height:10}}/>}
         </div>
       </div>
@@ -342,70 +334,92 @@ export default function POSSurface() {
         </div>
       </div>
 
-      {/* ══ PRODUCT GRID ══════════════════════════════════════════ */}
+      {/* ══ PRODUCT GRID / ORDERS HUB ═════════════════════════════ */}
       <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
-        <div style={{padding:'10px 14px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0,display:'flex',alignItems:'center',gap:12}}>
-          <div style={{position:'relative',flex:1,maxWidth:300}}>
-            <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--t3)',fontSize:14}}>🔍</span>
-            <input className="input" placeholder="Search…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:34,height:36,fontSize:13}}/>
-            {search&&<button onClick={()=>setSearch('')} style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:16,lineHeight:1}}>×</button>}
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontSize:20}}>{search?'🔍':catMeta.icon}</span>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:search?'var(--t1)':catMeta.color,lineHeight:1.2}}>{search?`"${search}"`:CATEGORIES.find(c=>c.id===cat)?.label}</div>
-              <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>{displayItems.length} items{cat==='quick'&&!search?` · ${daypart}`:''}</div>
+
+        {/* Tab bar */}
+        <div style={{padding:'0 14px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0,display:'flex',alignItems:'center',gap:0}}>
+          {[['menu','Menu'],['orders','Orders hub']].map(([t,l])=>{
+            const isActive = rightTab===t;
+            const badge = t==='orders' ? orderQueue.filter(o=>o.status!=='collected').length : 0;
+            return (
+              <button key={t} onClick={()=>setRightTab(t)} style={{
+                padding:'11px 16px',cursor:'pointer',fontFamily:'inherit',border:'none',
+                borderBottom:`2px solid ${isActive?'var(--acc)':'transparent'}`,
+                background:'transparent',
+                color:isActive?'var(--acc)':'var(--t3)',
+                fontSize:13,fontWeight:isActive?700:500,
+                display:'flex',alignItems:'center',gap:6,
+                transition:'all .12s',
+              }}>
+                {l}
+                {badge>0&&<span style={{background:'var(--acc)',color:'#0e0f14',borderRadius:20,padding:'1px 7px',fontSize:10,fontWeight:800}}>{badge}</span>}
+              </button>
+            );
+          })}
+          {rightTab==='menu'&&(
+            <div style={{position:'relative',flex:1,maxWidth:280,marginLeft:'auto',padding:'6px 0'}}>
+              <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--t3)',fontSize:13}}>🔍</span>
+              <input className="input" placeholder="Search…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:32,height:32,fontSize:12}}/>
+              {search&&<button onClick={()=>setSearch('')} style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:15,lineHeight:1}}>×</button>}
             </div>
-          </div>
+          )}
         </div>
 
-        {showAllergens&&(
-          <div style={{padding:'8px 14px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0}}>
-            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-              {allergens.length>0&&<button onClick={clearAllergens} style={{padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:600,background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t2)',cursor:'pointer',fontFamily:'inherit'}}>Clear all</button>}
-              {ALLERGENS.map(a=>{const on=allergens.includes(a.id);return(<button key={a.id} onClick={()=>toggleAllergen(a.id)} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',border:`1px solid ${on?'var(--red-b)':'var(--bdr)'}`,background:on?'var(--red-d)':'transparent',color:on?'var(--red)':'var(--t3)'}}><span style={{width:13,height:13,borderRadius:3,background:on?'var(--red)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,color:on?'#fff':'var(--t3)',flexShrink:0}}>{a.icon}</span>{a.label}</button>);})}
+        {/* ── Menu tab ── */}
+        {rightTab==='menu'&&(
+          <>
+            {showAllergens&&(
+              <div style={{padding:'8px 14px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0}}>
+                <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                  {allergens.length>0&&<button onClick={clearAllergens} style={{padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:600,background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t2)',cursor:'pointer',fontFamily:'inherit'}}>Clear all</button>}
+                  {ALLERGENS.map(a=>{const on=allergens.includes(a.id);return(<button key={a.id} onClick={()=>toggleAllergen(a.id)} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:20,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',border:`1px solid ${on?'var(--red-b)':'var(--bdr)'}`,background:on?'var(--red-d)':'transparent',color:on?'var(--red)':'var(--t3)'}}><span style={{width:13,height:13,borderRadius:3,background:on?'var(--red)':'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,color:on?'#fff':'var(--t3)',flexShrink:0}}>{a.icon}</span>{a.label}</button>);})}
+                </div>
+              </div>
+            )}
+            <div style={{flex:1,overflowY:'auto',padding:12}}>
+              {!search&&cat==='quick'&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={{fontSize:13,fontWeight:600,color:'var(--t2)'}}>AI-curated · {daypart}</div><span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)'}}>Updated nightly</span></div>}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(148px,1fr))',gap:9}}>
+                {displayItems.map(item=>{
+                  const m=CAT_META[item.cat]||CAT_META.quick;
+                  const flagged=allergens.some(a=>item.allergens?.includes(a));
+                  const is86=eightySixIds.includes(item.id);
+                  const rank=cat==='quick'?QUICK_IDS.indexOf(item.id):-1;
+                  const isHot=rank>=0&&rank<3;
+                  const fromPrice=item.type==='variants'?Math.min(...item.variants.map(v=>v.price)):item.price;
+                  return(
+                    <button key={item.id} onClick={()=>handleItemTap(item)} style={{display:'flex',flexDirection:'column',padding:0,overflow:'hidden',background:is86?'var(--bg3)':flagged?'rgba(232,64,64,.08)':'var(--bg2)',border:`1px solid ${is86?'var(--bdr)':flagged?'var(--red-b)':isHot?m.color+'33':'var(--bdr)'}`,borderRadius:12,cursor:is86?'not-allowed':'pointer',textAlign:'left',opacity:is86?.45:1,transition:'all .15s',fontFamily:'inherit'}}>
+                      <div style={{height:3,background:is86?'var(--bg5)':flagged?'var(--red)':isHot?m.color:m.color+'44',width:'100%',flexShrink:0}}/>
+                      <div style={{padding:'11px 10px 10px',flex:1,display:'flex',flexDirection:'column'}}>
+                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:7}}>
+                          <span style={{fontSize:22,lineHeight:1}}>{flagged?'⚠️':is86?'🚫':m.icon}</span>
+                          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2}}>
+                            {is86&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)',border:'1px solid var(--red-b)'}}>86'd</span>}
+                            {isHot&&!is86&&!flagged&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:m.color+'22',color:m.color}}>#{rank+1}</span>}
+                            {flagged&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>allergen</span>}
+                          </div>
+                        </div>
+                        <div style={{fontSize:12,fontWeight:700,color:is86?'var(--t3)':flagged?'var(--red)':'var(--t1)',lineHeight:1.3,marginBottom:4,flex:1}}>{item.name}</div>
+                        {item.description&&<div style={{fontSize:11,color:'var(--t3)',lineHeight:1.3,marginBottom:5,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{item.description}</div>}
+                        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginTop:'auto'}}>
+                          <div style={{fontSize:15,fontWeight:800,color:is86?'var(--t3)':flagged?'var(--red)':m.color,fontFamily:'DM Mono,monospace'}}>{item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}</div>
+                          <div style={{display:'flex',gap:3,alignItems:'center'}}>
+                            {item.type!=='simple'&&<span style={{fontSize:9,fontWeight:600,padding:'1px 4px',borderRadius:3,background:'var(--bg4)',color:'var(--t3)'}}>{item.type==='variants'?'sizes':item.type==='modifiers'?'opts':'build'}</span>}
+                            <button onClick={e=>{e.stopPropagation();toggle86(item.id);showToast(is86?`${item.name} un-86'd`:`${item.name} 86'd`,'warning');}} style={{width:18,height:18,borderRadius:4,border:`1px solid ${is86?'var(--red-b)':'var(--bdr2)'}`,background:is86?'var(--red-d)':'transparent',color:is86?'var(--red)':'var(--t4)',cursor:'pointer',fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'inherit'}}>{is86?'✕':'86'}</button>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {displayItems.length===0&&<div style={{textAlign:'center',padding:'80px 0',color:'var(--t3)'}}><div style={{fontSize:40,marginBottom:12}}>🔍</div><div style={{fontSize:15,fontWeight:600,color:'var(--t2)',marginBottom:6}}>No items found</div><button onClick={()=>setSearch('')} style={{fontSize:13,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>Clear search</button></div>}
             </div>
-          </div>
+          </>
         )}
 
-        <div style={{flex:1,overflowY:'auto',padding:12}}>
-          {cat==='quick'&&!search&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={{fontSize:13,fontWeight:600,color:'var(--t2)'}}>AI-curated · {daypart}</div><span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)'}}>Updated nightly</span></div>}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(148px,1fr))',gap:9}}>
-            {displayItems.map(item=>{
-              const m=CAT_META[item.cat]||CAT_META.quick;
-              const flagged=allergens.some(a=>item.allergens?.includes(a));
-              const is86=eightySixIds.includes(item.id);
-              const rank=cat==='quick'?QUICK_IDS.indexOf(item.id):-1;
-              const isHot=rank>=0&&rank<3;
-              const fromPrice=item.type==='variants'?Math.min(...item.variants.map(v=>v.price)):item.price;
-              return(
-                <button key={item.id} onClick={()=>handleItemTap(item)} style={{display:'flex',flexDirection:'column',padding:0,overflow:'hidden',background:is86?'var(--bg3)':flagged?'rgba(232,64,64,.08)':'var(--bg2)',border:`1px solid ${is86?'var(--bdr)':flagged?'var(--red-b)':isHot?m.color+'33':'var(--bdr)'}`,borderRadius:12,cursor:is86?'not-allowed':'pointer',textAlign:'left',opacity:is86?.45:1,transition:'all .15s',fontFamily:'inherit'}}>
-                  <div style={{height:3,background:is86?'var(--bg5)':flagged?'var(--red)':isHot?m.color:m.color+'44',width:'100%',flexShrink:0}}/>
-                  <div style={{padding:'11px 10px 10px',flex:1,display:'flex',flexDirection:'column'}}>
-                    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:7}}>
-                      <span style={{fontSize:22,lineHeight:1}}>{flagged?'⚠️':is86?'🚫':m.icon}</span>
-                      <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2}}>
-                        {is86&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)',border:'1px solid var(--red-b)'}}>86'd</span>}
-                        {isHot&&!is86&&!flagged&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:m.color+'22',color:m.color}}>#{rank+1}</span>}
-                        {flagged&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>allergen</span>}
-                      </div>
-                    </div>
-                    <div style={{fontSize:12,fontWeight:700,color:is86?'var(--t3)':flagged?'var(--red)':'var(--t1)',lineHeight:1.3,marginBottom:4,flex:1}}>{item.name}</div>
-                    {item.description&&<div style={{fontSize:11,color:'var(--t3)',lineHeight:1.3,marginBottom:5,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{item.description}</div>}
-                    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginTop:'auto'}}>
-                      <div style={{fontSize:15,fontWeight:800,color:is86?'var(--t3)':flagged?'var(--red)':m.color,fontFamily:'DM Mono,monospace'}}>{item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}</div>
-                      <div style={{display:'flex',gap:3,alignItems:'center'}}>
-                        {item.type!=='simple'&&<span style={{fontSize:9,fontWeight:600,padding:'1px 4px',borderRadius:3,background:'var(--bg4)',color:'var(--t3)'}}>{item.type==='variants'?'sizes':item.type==='modifiers'?'opts':'build'}</span>}
-                        <button onClick={e=>{e.stopPropagation();toggle86(item.id);showToast(is86?`${item.name} un-86'd`:`${item.name} 86'd`,'warning');}} style={{width:18,height:18,borderRadius:4,border:`1px solid ${is86?'var(--red-b)':'var(--bdr2)'}`,background:is86?'var(--red-d)':'transparent',color:is86?'var(--red)':'var(--t4)',cursor:'pointer',fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'inherit'}}>{is86?'✕':'86'}</button>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          {displayItems.length===0&&<div style={{textAlign:'center',padding:'80px 0',color:'var(--t3)'}}><div style={{fontSize:40,marginBottom:12}}>🔍</div><div style={{fontSize:15,fontWeight:600,color:'var(--t2)',marginBottom:6}}>No items found</div><button onClick={()=>setSearch('')} style={{fontSize:13,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>Clear search</button></div>}
-        </div>
+        {/* ── Orders hub tab ── */}
+        {rightTab==='orders'&&<OrdersHub orderQueue={orderQueue} updateQueueStatus={updateQueueStatus} removeFromQueue={removeFromQueue} showToast={showToast}/>}
       </div>
 
       {/* Modals */}
@@ -413,7 +427,6 @@ export default function POSSurface() {
       {modalItem&&<ProductModal item={modalItem} activeAllergens={allergens} onConfirm={(item,mods,cfg,opts)=>{addItem(item,mods,cfg,opts);setModalItem(null);showToast(`${opts.displayName||item.name} added`,'success');}} onCancel={()=>setModalItem(null)}/>}
       {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={activeTableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={handlePayComplete}/>}
       {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} onConfirm={c=>{setShowCustomerModal(false);setCustomer(c);setOrderType(pendingOrderType);setPendingOrderType(null);showToast(`${c.name} — ${pendingOrderType} order started`,'success');}} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
-      {showQueue&&<CollectionQueue onClose={()=>setShowQueue(false)}/>}
 
       {/* Void modal */}
       {voidTarget&&(
@@ -596,6 +609,136 @@ function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote,
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Inline Orders Hub ─────────────────────────────────────────────────────────
+const STATUS_FLOW = ['received','prep','ready','collected'];
+const STATUS_META = {
+  received: { label:'Received',  color:'#3b82f6', bg:'rgba(59,130,246,.1)',  next:'Start prep',  icon:'📥' },
+  prep:     { label:'In prep',   color:'#f97316', bg:'rgba(249,115,22,.1)',   next:'Mark ready',  icon:'👨‍🍳' },
+  ready:    { label:'Ready',     color:'#22c55e', bg:'rgba(34,197,94,.1)',    next:'Collected',   icon:'✅' },
+  collected:{ label:'Collected', color:'#5c5a64', bg:'rgba(92,90,100,.1)',    next:null,          icon:'👋' },
+};
+
+function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }) {
+  const [filter, setFilter] = useState('active');
+  const now = new Date();
+
+  const filtered = orderQueue
+    .filter(o => filter==='active' ? o.status!=='collected' : filter==='collected' ? o.status==='collected' : true)
+    .sort((a,b) => {
+      if (a.isASAP&&!b.isASAP) return -1;
+      if (!a.isASAP&&b.isASAP)  return 1;
+      return new Date(a.collectionISO||a.createdAt) - new Date(b.collectionISO||b.createdAt);
+    });
+
+  const urgency = (o) => {
+    if (o.status==='collected') return 'none';
+    if (!o.collectionISO) return 'normal';
+    const diff = (new Date(o.collectionISO)-now)/60000;
+    if (diff<0) return 'overdue';
+    if (diff<10) return 'urgent';
+    return 'normal';
+  };
+  const uc = { overdue:'var(--red)', urgent:'var(--acc)', normal:'var(--t3)', none:'var(--t4)' };
+
+  const advance = (o) => {
+    const idx = STATUS_FLOW.indexOf(o.status);
+    if (idx<STATUS_FLOW.length-1) {
+      const next = STATUS_FLOW[idx+1];
+      updateQueueStatus(o.ref, next);
+      if (next==='ready')     showToast(`${o.ref} ready — notifying ${o.customer.name}`, 'success');
+      else if (next==='collected') { showToast(`${o.ref} collected`, 'info'); setTimeout(()=>removeFromQueue(o.ref),5000); }
+      else showToast(`${o.ref} moved to ${STATUS_META[next].label}`, 'info');
+    }
+  };
+
+  const counts = {
+    received: orderQueue.filter(o=>o.status==='received').length,
+    prep:     orderQueue.filter(o=>o.status==='prep').length,
+    ready:    orderQueue.filter(o=>o.status==='ready').length,
+  };
+
+  return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      {/* Summary + filter */}
+      <div style={{padding:'10px 16px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0}}>
+        <div style={{display:'flex',gap:8,marginBottom:10}}>
+          {Object.entries(STATUS_META).filter(([k])=>k!=='collected').map(([s,m])=>(
+            <div key={s} style={{display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:20,background:m.bg,border:`1px solid ${m.color}44`}}>
+              <span style={{fontSize:13}}>{m.icon}</span>
+              <span style={{fontSize:11,fontWeight:600,color:m.color}}>{m.label}</span>
+              <span style={{fontSize:13,fontWeight:800,color:m.color}}>{counts[s]||0}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:4}}>
+          {[['active','Active'],['collected','Completed'],['all','All']].map(([f,l])=>(
+            <button key={f} onClick={()=>setFilter(f)} style={{padding:'4px 12px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',background:filter===f?'var(--acc-d)':'transparent',border:`1px solid ${filter===f?'var(--acc-b)':'var(--bdr)'}`,color:filter===f?'var(--acc)':'var(--t3)',fontSize:12,fontWeight:600}}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Orders list */}
+      <div style={{flex:1,overflowY:'auto',padding:'10px 14px'}}>
+        {filtered.length===0&&(
+          <div style={{textAlign:'center',padding:'60px 0',color:'var(--t3)'}}>
+            <div style={{fontSize:40,marginBottom:12}}>📦</div>
+            <div style={{fontSize:14,fontWeight:600,color:'var(--t2)',marginBottom:6}}>No orders here</div>
+            <div style={{fontSize:12}}>Takeaway and collection orders appear here after Send</div>
+          </div>
+        )}
+        {filtered.map(order=>{
+          const sm = STATUS_META[order.status];
+          const urg = urgency(order);
+          const waitMins = order.collectionISO ? Math.round((new Date(order.collectionISO)-now)/60000) : null;
+          return (
+            <div key={order.ref} style={{background:'var(--bg2)',border:`1px solid ${urg==='overdue'?'var(--red-b)':urg==='urgent'?'var(--acc-b)':'var(--bdr)'}`,borderRadius:12,marginBottom:10,overflow:'hidden',opacity:order.status==='collected'?.6:1}}>
+              {/* Header */}
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:'1px solid var(--bdr)'}}>
+                <span style={{fontSize:18}}>{order.type==='collection'?'📦':'🥡'}</span>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                    <span style={{fontSize:14,fontWeight:700,color:'var(--t1)'}}>{order.ref}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:'var(--t2)'}}>{order.customer.name}</span>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>{order.customer.phone}{order.customer.email?` · ${order.customer.email}`:''}</div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--acc)',fontFamily:'DM Mono,monospace'}}>£{order.total.toFixed(2)}</div>
+                  <div style={{fontSize:10,color:'var(--t3)'}}>{order.type}</div>
+                </div>
+              </div>
+              {/* Status + time + items */}
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px'}}>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+                    <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:20,background:sm.bg,color:sm.color}}>{sm.icon} {sm.label}</span>
+                    {order.type==='collection'&&(
+                      <span style={{fontSize:12,fontWeight:700,color:uc[urg]}}>
+                        {order.isASAP?'⚡ ASAP':`🕐 ${order.customer.collectionTime}`}
+                        {waitMins!==null&&order.status!=='collected'&&<span style={{marginLeft:5,fontSize:11}}>{waitMins<0?`${Math.abs(waitMins)}m overdue`:waitMins===0?'now':`in ${waitMins}m`}</span>}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',lineHeight:1.5}}>
+                    {order.items.slice(0,4).map((i,idx)=><span key={idx}>{i.qty>1?`${i.qty}× `:''}{i.name}{idx<Math.min(order.items.length,4)-1?', ':''}</span>)}
+                    {order.items.length>4&&<span> +{order.items.length-4} more</span>}
+                  </div>
+                  {order.customer.notes&&<div style={{fontSize:11,color:'#f97316',marginTop:3,fontStyle:'italic'}}>📝 {order.customer.notes}</div>}
+                </div>
+                {sm.next&&(
+                  <button onClick={()=>advance(order)} style={{padding:'7px 14px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:order.status==='prep'?'var(--grn-d)':'var(--bg3)',border:`1px solid ${order.status==='prep'?'var(--grn-b)':'var(--bdr2)'}`,color:order.status==='prep'?'var(--grn)':'var(--t2)',fontSize:12,fontWeight:700,whiteSpace:'nowrap'}}>
+                    {sm.next} →
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
