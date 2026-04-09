@@ -614,8 +614,7 @@ function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote,
 }
 
 // ── Inline Orders Hub ─────────────────────────────────────────────────────────
-const STATUS_FLOW = ['received','prep','ready','collected'];
-const STATUS_META = {
+const ORDER_STATUS = {
   received: { label:'Received',  color:'#3b82f6', bg:'rgba(59,130,246,.1)',  next:'Start prep',  icon:'📥' },
   prep:     { label:'In prep',   color:'#f97316', bg:'rgba(249,115,22,.1)',   next:'Mark ready',  icon:'👨‍🍳' },
   ready:    { label:'Ready',     color:'#22c55e', bg:'rgba(34,197,94,.1)',    next:'Collected',   icon:'✅' },
@@ -626,34 +625,10 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
   const [filter, setFilter] = useState('active');
   const now = new Date();
 
-  const filtered = orderQueue
-    .filter(o => filter==='active' ? o.status!=='collected' : filter==='collected' ? o.status==='collected' : true)
-    .sort((a,b) => {
-      if (a.isASAP&&!b.isASAP) return -1;
-      if (!a.isASAP&&b.isASAP)  return 1;
-      return new Date(a.collectionISO||a.createdAt) - new Date(b.collectionISO||b.createdAt);
-    });
-
-  const urgency = (o) => {
-    if (o.status==='collected') return 'none';
-    if (!o.collectionISO) return 'normal';
-    const diff = (new Date(o.collectionISO)-now)/60000;
-    if (diff<0) return 'overdue';
-    if (diff<10) return 'urgent';
-    return 'normal';
-  };
-  const uc = { overdue:'var(--red)', urgent:'var(--acc)', normal:'var(--t3)', none:'var(--t4)' };
-
-  const advance = (o) => {
-    const idx = STATUS_FLOW.indexOf(o.status);
-    if (idx<STATUS_FLOW.length-1) {
-      const next = STATUS_FLOW[idx+1];
-      updateQueueStatus(o.ref, next);
-      if (next==='ready')     showToast(`${o.ref} ready — notifying ${o.customer.name}`, 'success');
-      else if (next==='collected') { showToast(`${o.ref} collected`, 'info'); setTimeout(()=>removeFromQueue(o.ref),5000); }
-      else showToast(`${o.ref} moved to ${STATUS_META[next].label}`, 'info');
-    }
-  };
+  const filtered = [...(orderQueue||[])].filter(o =>
+    filter==='active' ? o.status!=='collected' :
+    filter==='collected' ? o.status==='collected' : true
+  );
 
   const counts = {
     received: orderQueue.filter(o=>o.status==='received').length,
@@ -661,12 +636,24 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
     ready:    orderQueue.filter(o=>o.status==='ready').length,
   };
 
+  const advance = (o) => {
+    const flow = ['received','prep','ready','collected'];
+    const idx = flow.indexOf(o.status);
+    if (idx < flow.length-1) {
+      const next = flow[idx+1];
+      updateQueueStatus(o.ref, next);
+      if (next==='ready') showToast(`${o.ref} ready for ${o.customer?.name}`, 'success');
+      else if (next==='collected') { showToast(`${o.ref} collected`, 'info'); setTimeout(()=>removeFromQueue(o.ref), 5000); }
+      else showToast(`${o.ref} in prep`, 'info');
+    }
+  };
+
   return (
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      {/* Summary + filter */}
-      <div style={{padding:'10px 16px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0}}>
-        <div style={{display:'flex',gap:8,marginBottom:10}}>
-          {Object.entries(STATUS_META).filter(([k])=>k!=='collected').map(([s,m])=>(
+      {/* Summary pills */}
+      <div style={{padding:'10px 14px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0}}>
+        <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
+          {Object.entries(ORDER_STATUS).filter(([k])=>k!=='collected').map(([s,m])=>(
             <div key={s} style={{display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:20,background:m.bg,border:`1px solid ${m.color}44`}}>
               <span style={{fontSize:13}}>{m.icon}</span>
               <span style={{fontSize:11,fontWeight:600,color:m.color}}>{m.label}</span>
@@ -685,52 +672,54 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
       <div style={{flex:1,overflowY:'auto',padding:'10px 14px'}}>
         {filtered.length===0&&(
           <div style={{textAlign:'center',padding:'60px 0',color:'var(--t3)'}}>
-            <div style={{fontSize:40,marginBottom:12}}>📦</div>
-            <div style={{fontSize:14,fontWeight:600,color:'var(--t2)',marginBottom:6}}>No orders here</div>
-            <div style={{fontSize:12}}>Takeaway and collection orders appear here after Send</div>
+            <div style={{fontSize:40,marginBottom:12,opacity:.4}}>📦</div>
+            <div style={{fontSize:14,fontWeight:600,color:'var(--t2)',marginBottom:6}}>No orders</div>
+            <div style={{fontSize:12,lineHeight:1.6}}>Takeaway and collection orders appear here after Send</div>
           </div>
         )}
         {filtered.map(order=>{
-          const sm = STATUS_META[order.status];
-          const urg = urgency(order);
-          const waitMins = order.collectionISO ? Math.round((new Date(order.collectionISO)-now)/60000) : null;
+          const sm = ORDER_STATUS[order.status] || ORDER_STATUS.received;
+          const isOverdue = order.status!=='collected' && !order.isASAP && order.collectionTime && false; // placeholder
           return (
-            <div key={order.ref} style={{background:'var(--bg2)',border:`1px solid ${urg==='overdue'?'var(--red-b)':urg==='urgent'?'var(--acc-b)':'var(--bdr)'}`,borderRadius:12,marginBottom:10,overflow:'hidden',opacity:order.status==='collected'?.6:1}}>
+            <div key={order.ref} style={{background:'var(--bg2)',border:'1px solid var(--bdr)',borderRadius:12,marginBottom:10,overflow:'hidden',opacity:order.status==='collected'?.55:1}}>
               {/* Header */}
               <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:'1px solid var(--bdr)'}}>
                 <span style={{fontSize:18}}>{order.type==='collection'?'📦':'🥡'}</span>
                 <div style={{flex:1}}>
                   <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-                    <span style={{fontSize:14,fontWeight:700,color:'var(--t1)'}}>{order.ref}</span>
-                    <span style={{fontSize:13,fontWeight:600,color:'var(--t2)'}}>{order.customer.name}</span>
+                    <span style={{fontSize:13,fontWeight:800,color:'var(--t1)',fontFamily:'DM Mono,monospace'}}>{order.ref}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:'var(--t2)'}}>{order.customer?.name}</span>
                   </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>{order.customer.phone}{order.customer.email?` · ${order.customer.email}`:''}</div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>{order.customer?.phone}</div>
                 </div>
                 <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:13,fontWeight:700,color:'var(--acc)',fontFamily:'DM Mono,monospace'}}>£{order.total.toFixed(2)}</div>
-                  <div style={{fontSize:10,color:'var(--t3)'}}>{order.type}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--acc)',fontFamily:'DM Mono,monospace'}}>£{(order.total||0).toFixed(2)}</div>
+                  <div style={{fontSize:10,color:'var(--t3)',textTransform:'capitalize'}}>{order.type}</div>
                 </div>
               </div>
-              {/* Status + time + items */}
-              <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px'}}>
+
+              {/* Body */}
+              <div style={{padding:'8px 12px',display:'flex',alignItems:'flex-start',gap:10}}>
                 <div style={{flex:1}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
                     <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:20,background:sm.bg,color:sm.color}}>{sm.icon} {sm.label}</span>
                     {order.type==='collection'&&(
-                      <span style={{fontSize:12,fontWeight:700,color:uc[urg]}}>
-                        {order.isASAP?'⚡ ASAP':`🕐 ${order.customer.collectionTime}`}
-                        {waitMins!==null&&order.status!=='collected'&&<span style={{marginLeft:5,fontSize:11}}>{waitMins<0?`${Math.abs(waitMins)}m overdue`:waitMins===0?'now':`in ${waitMins}m`}</span>}
+                      <span style={{fontSize:12,fontWeight:700,color:order.isASAP?'var(--acc)':'var(--t2)'}}>
+                        {order.isASAP ? '⚡ ASAP' : `🕐 ${order.collectionTime||'—'}`}
                       </span>
                     )}
+                    <span style={{fontSize:10,color:'var(--t4)'}}>by {order.staff}</span>
                   </div>
-                  <div style={{fontSize:11,color:'var(--t3)',lineHeight:1.5}}>
-                    {order.items.slice(0,4).map((i,idx)=><span key={idx}>{i.qty>1?`${i.qty}× `:''}{i.name}{idx<Math.min(order.items.length,4)-1?', ':''}</span>)}
-                    {order.items.length>4&&<span> +{order.items.length-4} more</span>}
+                  <div style={{fontSize:11,color:'var(--t3)',lineHeight:1.6}}>
+                    {(order.items||[]).slice(0,4).map((i,idx)=>(
+                      <span key={idx}>{i.qty>1?`${i.qty}× `:''}{i.name}{idx<Math.min((order.items||[]).length,4)-1?', ':''}</span>
+                    ))}
+                    {(order.items||[]).length>4&&<span style={{color:'var(--t4)'}}> +{(order.items||[]).length-4} more</span>}
                   </div>
-                  {order.customer.notes&&<div style={{fontSize:11,color:'#f97316',marginTop:3,fontStyle:'italic'}}>📝 {order.customer.notes}</div>}
+                  {order.customer?.notes&&<div style={{fontSize:11,color:'#f97316',marginTop:4,fontStyle:'italic'}}>📝 {order.customer.notes}</div>}
                 </div>
                 {sm.next&&(
-                  <button onClick={()=>advance(order)} style={{padding:'7px 14px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:order.status==='prep'?'var(--grn-d)':'var(--bg3)',border:`1px solid ${order.status==='prep'?'var(--grn-b)':'var(--bdr2)'}`,color:order.status==='prep'?'var(--grn)':'var(--t2)',fontSize:12,fontWeight:700,whiteSpace:'nowrap'}}>
+                  <button onClick={()=>advance(order)} style={{padding:'7px 14px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap',fontSize:12,fontWeight:700,background:order.status==='prep'?'var(--grn-d)':'var(--bg3)',border:`1px solid ${order.status==='prep'?'var(--grn-b)':'var(--bdr2)'}`,color:order.status==='prep'?'var(--grn)':'var(--t2)'}}>
                     {sm.next} →
                   </button>
                 )}
