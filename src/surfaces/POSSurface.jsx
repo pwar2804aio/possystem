@@ -30,7 +30,7 @@ export default function POSSurface() {
     getPOSItems, getPOSTotals, getPOSOrderNote,
     activeTableId, tables, clearTable, clearWalkIn, setActiveTableId,
     orderType, setOrderType, customer, setCustomer, clearCustomer,
-    orderQueue, showToast,
+    orderQueue, updateQueueStatus, removeFromQueue, showToast,
     pendingItem, setPendingItem, clearPendingItem,
     eightySixIds, toggle86,
     setSurface,
