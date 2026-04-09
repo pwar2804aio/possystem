@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { ALLERGENS } from '../data/seed';
 
-export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, onClose, onComplete }) {
-  const [step, setStep]       = useState('review');   // review | tip | method | card | cash | split
+export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
+  const [step, setStep]       = useState('review');
   const [tipPct, setTipPct]   = useState(orderType==='dine-in' ? 12.5 : 0);
   const [customTip, setCustomTip] = useState('');
   const [cash, setCash]       = useState('');
   const [splits, setSplits]   = useState(2);
+
+  const isBarTab = orderType === 'bar-tab';
 
   const tipAmt  = customTip !== '' ? (parseFloat(customTip)||0) : subtotal * tipPct / 100;
   const grand   = total + tipAmt;
@@ -26,7 +28,10 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
           <div>
             <div style={{ fontSize:18, fontWeight:700 }}>Checkout</div>
             <div style={{ fontSize:12, color:'var(--t3)', marginTop:2 }}>
-              {tableId ? `Table ${tableId.replace(/^[tbp]/,'')} · ` : ''}{orderType} {orderType==='dine-in'&&covers>1?`· ${covers} covers`:''}
+              {isBarTab
+                ? `Bar tab · ${tabName}`
+                : `${tableId ? `Table ${tableId.replace(/^[tbp]/,'')} · ` : ''}${orderType}${orderType==='dine-in'&&covers>1?` · ${covers} covers`:''}`
+              }
             </div>
           </div>
           <div style={{ display:'flex', gap:6, alignItems:'center' }}>

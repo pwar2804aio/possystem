@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../store';
 import { CATEGORIES, MENU_ITEMS, ALLERGENS, QUICK_IDS } from '../data/seed';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
+import CheckoutModal from './CheckoutModal';
 
 const CAT_META = {
   quick:    { icon:'⚡', color:'#e8a020' },
@@ -203,9 +204,15 @@ export default function BarSurface() {
     showToast(`${opts.name} tab opened`,'success');
   };
 
+  const [showTabCheckout, setShowTabCheckout] = useState(false);
+
   const handleCloseTab = (tab) => {
-    updateTabStatus(tab.id,'closing');
-    showToast(`${tab.name} — proceed to checkout`,'info');
+    if (tab.total === 0) {
+      closeTab(tab.id);
+      showToast(`${tab.name}'s tab closed`, 'info');
+      return;
+    }
+    setShowTabCheckout(true);
   };
 
   return (
@@ -405,9 +412,9 @@ export default function BarSurface() {
                     🔥 Send round {activeTab.rounds.length+1} · £{roundTotal.toFixed(2)}
                   </button>
                 )}
-                {roundItems.length===0 && activeTab.status!=='closed' && (
-                  <button onClick={()=>handleCloseTab(activeTab)} style={{ flex:2,height:38,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:13,fontWeight:700 }}>
-                    Close tab · £{activeTab.total.toFixed(2)}
+                {activeTab.status!=='closed' && activeTab.total > 0 && (
+                  <button onClick={()=>handleCloseTab(activeTab)} style={{ flex:roundItems.length>0?1:2,height:38,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:13,fontWeight:700 }}>
+                    {roundItems.length>0 ? 'Pay' : `Close tab · £${activeTab.total.toFixed(2)}`}
                   </button>
                 )}
                 <button onClick={()=>setActiveTab(null)} style={{ width:38,height:38,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:18 }}>←</button>
@@ -494,6 +501,31 @@ export default function BarSurface() {
           </div>
         </div>
       )}
+
+      {/* Tab checkout */}
+      {showTabCheckout && activeTab && (() => {
+        const allItems = activeTab.rounds.flatMap(r => r.items);
+        const subtotal = activeTab.total;
+        return (
+          <CheckoutModal
+            items={allItems}
+            subtotal={subtotal}
+            service={0}
+            total={subtotal}
+            orderType="bar-tab"
+            covers={1}
+            tableId={activeTab.tableId}
+            tabName={activeTab.name}
+            onClose={() => setShowTabCheckout(false)}
+            onComplete={() => {
+              setShowTabCheckout(false);
+              closeTab(activeTab.id);
+              setActiveTab(null);
+              showToast(`${activeTab.name}'s tab paid and closed`, 'success');
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
