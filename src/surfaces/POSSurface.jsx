@@ -6,6 +6,7 @@ import CheckoutModal from './CheckoutModal';
 import CustomerModal from '../components/CustomerModal';
 import VoidModal from '../components/VoidModal';
 import DiscountModal from '../components/DiscountModal';
+import { ReceiptModal, ReprintModal } from '../components/ReceiptModal';
 
 const CAT_META = {
   quick:    {icon:'⚡',color:'#e8a020'}, starters:{icon:'🥗',color:'#22c55e'},
@@ -50,8 +51,10 @@ export default function POSSurface() {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [pendingOrderType, setPendingOrderType] = useState(null);
   const [showQueue, setShowQueue] = useState(false);
-  const [voidTarget, setVoidTarget]   = useState(null);  // { type:'item'|'check', item? }
-  const [discountTarget, setDiscountTarget] = useState(null);  // { scope:'item'|'check', item? }
+  const [voidTarget, setVoidTarget]   = useState(null);
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [showReceipt, setShowReceipt]   = useState(false);
+  const [showReprint, setShowReprint]   = useState(false);
 
   const activeTable = activeTableId ? tables.find(t=>t.id===activeTableId) : null;
   const session = activeTable?.session;
@@ -268,9 +271,11 @@ export default function POSSurface() {
               )}
 
               {/* Action row */}
-              <div style={{padding:'7px 12px 4px',display:'flex',gap:5}}>
-                <button onClick={()=>setDiscountTarget({scope:'check'})} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600}}>🏷 Discount</button>
-                {activeTableId&&hasSent&&<button onClick={()=>setVoidTarget({type:'check',items:items.filter(i=>!i.voided)})} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:11,fontWeight:600}}>⊘ Void check</button>}
+              <div style={{padding:'7px 12px 4px',display:'flex',gap:5,flexWrap:'wrap'}}>
+                <button onClick={()=>setShowDiscount(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>🏷 Discount</button>
+                <button onClick={()=>setShowReceipt(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>🖨 Print check</button>
+                {hasSent&&<button onClick={()=>setShowReprint(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>↻ Reprint</button>}
+                {activeTableId&&hasSent&&<button onClick={()=>setVoidTarget({type:'check',items:items.filter(i=>!i.voided)})} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:11,fontWeight:600,minWidth:80}}>⊘ Void check</button>}
               </div>
               <div style={{padding:'0 12px 12px',display:'flex',gap:6}}>
                 <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:34,height:34,borderRadius:8,border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:18,flexShrink:0}}>+</button>
@@ -407,22 +412,48 @@ export default function POSSurface() {
       )}
 
       {/* Discount modal */}
-      {discountTarget&&(
+      {showDiscount&&(
         <DiscountModal
-          scope={discountTarget.scope}
-          itemName={discountTarget.item?.name}
-          subtotal={discountTarget.scope==='item'?discountTarget.item?.price*discountTarget.item?.qty:subtotal}
+          items={items}
+          subtotal={subtotal}
           onConfirm={(disc)=>{
-            if (discountTarget.scope==='item') {
-              addItemDiscount(activeTableId, discountTarget.item.uid, disc);
-            } else {
+            if (disc.scope==='check') {
               if (activeTableId) addCheckDiscount(activeTableId, disc);
               else addWalkInDiscount(disc);
+            } else {
+              // Item-level: apply to each selected item
+              disc.itemUids?.forEach(uid => {
+                const item = items.find(i=>i.uid===uid);
+                if (item) addItemDiscount(activeTableId, uid, { id:`disc-${uid}`, label:disc.label, type:disc.type, value:disc.value });
+              });
             }
-            showToast(`${disc.label} applied`,'success');
-            setDiscountTarget(null);
+            showToast(`${disc.label} applied`, 'success');
+            setShowDiscount(false);
           }}
-          onCancel={()=>setDiscountTarget(null)}
+          onCancel={()=>setShowDiscount(false)}
+        />
+      )}
+
+      {/* Receipt modal */}
+      {showReceipt&&(
+        <ReceiptModal
+          items={items} subtotal={subtotal} service={service} total={total}
+          checkDiscount={checkDiscount}
+          orderType={orderType}
+          tableLabel={activeTable?.label}
+          server={session?.server || staff?.name}
+          covers={covers}
+          onClose={()=>setShowReceipt(false)}
+        />
+      )}
+
+      {/* Reprint modal */}
+      {showReprint&&(
+        <ReprintModal
+          items={items.filter(i=>i.status==='sent')}
+          tableLabel={activeTable?.label || orderType}
+          onClose={()=>setShowReprint(false)}
+          onReprint={(uids)=>showToast(`Reprinted ${uids.length} ticket${uids.length!==1?'s':''} to kitchen`, 'success')}
         />
       )}
       {showCustom&&(
@@ -538,7 +569,6 @@ function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote,
           </div>
           {item.qty>1&&<span style={{fontSize:11,color:'var(--t3)',fontFamily:'DM Mono,monospace'}}>£{discountedPrice.toFixed(2)} ea</span>}
           <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
-            {!item.discount&&<button onClick={onDiscount} style={{fontSize:11,color:'var(--grn)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',opacity:.8}}>🏷</button>}
             {/* Pending items: Remove freely. Committed items: Void with manager PIN */}
             {isCommitted
               ? <button onClick={onVoid} style={{fontSize:11,color:'var(--red)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',fontWeight:600}}>Void</button>

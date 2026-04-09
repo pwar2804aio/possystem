@@ -1,171 +1,212 @@
 import { useState } from 'react';
 import { STAFF } from '../data/seed';
 
-const PRESET_DISCOUNTS = [
-  { id:'staff50',   label:'Staff meal',      type:'percent', value:50,  requiresManager:false },
-  { id:'staff_drk', label:'Staff drinks',    type:'percent', value:50,  requiresManager:false },
-  { id:'loyalty',   label:'Loyalty 10%',     type:'percent', value:10,  requiresManager:false },
-  { id:'nhs',       label:'NHS / Blue Light',type:'percent', value:10,  requiresManager:false },
-  { id:'happy',     label:'Happy hour 20%',  type:'percent', value:20,  requiresManager:false },
-  { id:'comp',      label:'Comp (100%)',      type:'percent', value:100, requiresManager:true  },
+const PRESETS = [
+  { id:'staff50',  label:'Staff meal',       type:'percent', value:50,  requiresManager:false },
+  { id:'staff_d',  label:'Staff drinks',      type:'percent', value:50,  requiresManager:false },
+  { id:'loyalty',  label:'Loyalty 10%',       type:'percent', value:10,  requiresManager:false },
+  { id:'nhs',      label:'NHS / Blue Light',  type:'percent', value:10,  requiresManager:false },
+  { id:'happy',    label:'Happy hour 20%',    type:'percent', value:20,  requiresManager:false },
+  { id:'comp',     label:'Comp (100%)',        type:'percent', value:100, requiresManager:true  },
 ];
 
-const managerPins = STAFF.filter(s => s.role === 'Manager').map(s => ({ pin: s.pin, name: s.name, id: s.id }));
+const mgrs = STAFF.filter(s=>s.role==='Manager').map(s=>({pin:s.pin,name:s.name,id:s.id}));
 
-export default function DiscountModal({ scope, itemName, subtotal, onConfirm, onCancel }) {
-  // scope: 'item' | 'check'
-  const [selected, setSelected]   = useState(null);   // preset id or 'custom'
-  const [customType, setCustomType] = useState('percent');
-  const [customVal, setCustomVal]   = useState('');
-  const [step, setStep]             = useState('pick');  // pick | pin
-  const [pin, setPin]               = useState('');
-  const [pinError, setPinError]     = useState('');
-  const [manager, setManager]       = useState(null);
+export default function DiscountModal({ items, subtotal, onConfirm, onCancel }) {
+  const [step, setStep]         = useState('amount');  // amount | apply | pin
+  const [selected, setSelected] = useState(null);       // preset id or 'custom'
+  const [customType, setCT]     = useState('percent');
+  const [customVal, setCV]      = useState('');
+  const [scope, setScope]       = useState('check');    // 'check' | 'items'
+  const [itemSel, setItemSel]   = useState([]);         // selected item uids
+  const [pin, setPin]           = useState('');
+  const [pinErr, setPinErr]     = useState('');
+  const [manager, setManager]   = useState(null);
 
-  const preset   = PRESET_DISCOUNTS.find(p => p.id === selected);
-  const needsPin = preset?.requiresManager && !manager;
+  const preset  = PRESETS.find(p=>p.id===selected);
+  const needPin = preset?.requiresManager && !manager;
 
-  const discountAmount = () => {
-    if (selected === 'custom') {
-      const v = parseFloat(customVal) || 0;
-      return customType === 'percent' ? subtotal * v / 100 : v;
+  const calcAmount = (base) => {
+    if (selected==='custom') {
+      const v = parseFloat(customVal)||0;
+      return customType==='percent' ? base*v/100 : Math.min(v, base);
     }
-    if (preset) return subtotal * preset.value / 100;
+    if (preset) return base * preset.value / 100;
     return 0;
   };
 
-  const handlePick = () => {
-    if (!selected) return;
-    if (needsPin) { setStep('pin'); return; }
-    finalise();
+  const canAdvance = selected && (selected!=='custom' || (parseFloat(customVal)>0));
+
+  const handleAdvance = () => {
+    if (needPin) { setStep('pin'); return; }
+    setStep('apply');
   };
 
-  const finalise = (mgr) => {
-    const isPreset = selected !== 'custom';
-    const disc = {
-      id: `disc-${Date.now()}`,
-      label: isPreset ? preset.label : `Custom ${customType==='percent'?customVal+'%':'£'+customVal}`,
-      type: isPreset ? preset.type : customType,
-      value: isPreset ? preset.value : parseFloat(customVal)||0,
-      scope,
-      amount: discountAmount(),
-      manager: mgr || manager,
-    };
-    onConfirm(disc);
+  const handleApply = () => {
+    const activeItems = scope==='check'
+      ? items.filter(i=>!i.voided)
+      : items.filter(i=>itemSel.includes(i.uid)&&!i.voided);
+
+    const base = scope==='check'
+      ? subtotal
+      : activeItems.reduce((s,i)=>s+i.price*i.qty, 0);
+
+    const amount  = calcAmount(base);
+    const label   = selected==='custom'
+      ? `Custom ${customType==='percent'?customVal+'%':'£'+parseFloat(customVal).toFixed(2)}`
+      : preset.label;
+    const type    = selected==='custom' ? customType : preset.type;
+    const value   = selected==='custom' ? parseFloat(customVal)||0 : preset.value;
+
+    onConfirm({
+      id:`disc-${Date.now()}`, label, type, value, scope,
+      itemUids: scope==='items' ? activeItems.map(i=>i.uid) : null,
+      amount, manager,
+    });
   };
+
+  const toggleItem = (uid) =>
+    setItemSel(s => s.includes(uid) ? s.filter(x=>x!==uid) : [...s, uid]);
 
   const handleDigit = (d) => {
-    if (pin.length >= 4) return;
-    const next = pin + d;
+    if (pin.length>=4) return;
+    const next = pin+d;
     setPin(next);
-    if (next.length === 4) {
-      const match = managerPins.find(m => m.pin === next);
-      if (match) { setManager(match); setPinError(''); setTimeout(() => finalise(match), 200); }
-      else { setPinError('Incorrect manager PIN'); setTimeout(() => setPin(''), 600); }
+    if (next.length===4) {
+      const m = mgrs.find(x=>x.pin===next);
+      if (m) { setManager(m); setPinErr(''); setTimeout(()=>setStep('apply'),200); }
+      else   { setPinErr('Incorrect manager PIN'); setTimeout(()=>setPin(''),600); }
     }
   };
 
+  const visibleItems = items.filter(i=>!i.voided);
+
   return (
     <div className="modal-back">
-      <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:20, width:'100%', maxWidth:420, boxShadow:'var(--sh3)', overflow:'hidden' }}>
+      <div style={{background:'var(--bg2)',border:'1px solid var(--bdr2)',borderRadius:20,width:'100%',maxWidth:420,boxShadow:'var(--sh3)',overflow:'hidden'}}>
 
-        <div style={{ padding:'18px 22px 14px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        {/* Header */}
+        <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--bdr)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div>
-            <div style={{ fontSize:16, fontWeight:700, color:'var(--t1)' }}>
-              {scope === 'item' ? `Discount — ${itemName}` : 'Check discount'}
-            </div>
-            <div style={{ fontSize:12, color:'var(--t3)', marginTop:2 }}>
-              {scope === 'check' ? `£${subtotal.toFixed(2)} before discount` : 'Applied to this item only'}
+            <div style={{fontSize:16,fontWeight:700,color:'var(--t1)'}}>Apply discount</div>
+            <div style={{fontSize:11,color:'var(--t3)',marginTop:2}}>
+              {step==='amount'?'Step 1 of 2 — choose amount':step==='apply'?'Step 2 of 2 — what does it apply to?':'Manager authorisation'}
             </div>
           </div>
-          <button onClick={onCancel} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:22 }}>×</button>
+          <button onClick={onCancel} style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:22}}>×</button>
         </div>
 
-        <div style={{ padding:'18px 22px' }}>
+        <div style={{padding:'16px 20px'}}>
 
-          {step === 'pick' && (
+          {/* ── Step 1: Amount ── */}
+          {step==='amount'&&(
             <>
-              {/* Presets */}
-              <div style={{ fontSize:11, fontWeight:700, color:'var(--t2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Quick discounts</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, marginBottom:16 }}>
-                {PRESET_DISCOUNTS.map(p => (
-                  <button key={p.id} onClick={() => setSelected(p.id)} style={{
-                    padding:'10px 8px', borderRadius:10, cursor:'pointer', textAlign:'center', fontFamily:'inherit',
-                    border:`1.5px solid ${selected===p.id?'var(--acc)':'var(--bdr)'}`,
-                    background:selected===p.id?'var(--acc-d)':'var(--bg3)',
-                    position:'relative',
-                  }}>
-                    {p.requiresManager && <div style={{ position:'absolute', top:4, right:4, width:6, height:6, borderRadius:'50%', background:'var(--acc)' }}/>}
-                    <div style={{ fontSize:11, fontWeight:700, color:selected===p.id?'var(--acc)':'var(--t1)', lineHeight:1.3 }}>{p.label}</div>
-                    <div style={{ fontSize:13, fontWeight:800, color:selected===p.id?'var(--acc)':'var(--t2)', marginTop:3, fontFamily:'DM Mono, monospace' }}>
-                      {p.value}%
-                    </div>
-                    {selected===p.id && scope==='check' && (
-                      <div style={{ fontSize:10, color:'var(--acc)', marginTop:2 }}>−£{(subtotal*p.value/100).toFixed(2)}</div>
-                    )}
+              <div style={{fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Quick discounts</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginBottom:16}}>
+                {PRESETS.map(p=>(
+                  <button key={p.id} onClick={()=>setSelected(p.id)} style={{padding:'10px 6px',borderRadius:10,cursor:'pointer',textAlign:'center',fontFamily:'inherit',border:`1.5px solid ${selected===p.id?'var(--acc)':'var(--bdr)'}`,background:selected===p.id?'var(--acc-d)':'var(--bg3)',position:'relative'}}>
+                    {p.requiresManager&&<div style={{position:'absolute',top:4,right:4,width:6,height:6,borderRadius:'50%',background:'var(--acc)'}}/>}
+                    <div style={{fontSize:11,fontWeight:700,color:selected===p.id?'var(--acc)':'var(--t1)',lineHeight:1.3}}>{p.label}</div>
+                    <div style={{fontSize:14,fontWeight:800,color:selected===p.id?'var(--acc)':'var(--t2)',marginTop:3,fontFamily:'DM Mono,monospace'}}>{p.value}%</div>
                   </button>
                 ))}
               </div>
 
-              {/* Custom */}
-              <div style={{ fontSize:11, fontWeight:700, color:'var(--t2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Custom amount</div>
-              <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-                <button onClick={()=>{setSelected('custom');setCustomType('percent');}} style={{ flex:1, padding:'8px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', border:`1.5px solid ${selected==='custom'&&customType==='percent'?'var(--acc)':'var(--bdr)'}`, background:selected==='custom'&&customType==='percent'?'var(--acc-d)':'var(--bg3)', color:selected==='custom'&&customType==='percent'?'var(--acc)':'var(--t2)', fontSize:12, fontWeight:700 }}>% off</button>
-                <button onClick={()=>{setSelected('custom');setCustomType('amount');}} style={{ flex:1, padding:'8px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', border:`1.5px solid ${selected==='custom'&&customType==='amount'?'var(--acc)':'var(--bdr)'}`, background:selected==='custom'&&customType==='amount'?'var(--acc-d)':'var(--bg3)', color:selected==='custom'&&customType==='amount'?'var(--acc)':'var(--t2)', fontSize:12, fontWeight:700 }}>£ off</button>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Custom</div>
+              <div style={{display:'flex',gap:6,marginBottom:8}}>
+                {[['percent','% off'],['amount','£ off']].map(([t,l])=>(
+                  <button key={t} onClick={()=>{setSelected('custom');setCT(t);}} style={{flex:1,padding:'8px',borderRadius:8,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${selected==='custom'&&customType===t?'var(--acc)':'var(--bdr)'}`,background:selected==='custom'&&customType===t?'var(--acc-d)':'var(--bg3)',color:selected==='custom'&&customType===t?'var(--acc)':'var(--t2)',fontSize:12,fontWeight:700}}>{l}</button>
+                ))}
               </div>
-              {selected === 'custom' && (
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
-                  <span style={{ fontSize:18, color:'var(--t3)' }}>{customType==='percent'?'%':'£'}</span>
-                  <input className="input" type="number" min="0" max={customType==='percent'?100:undefined} placeholder={customType==='percent'?'10':'5.00'} value={customVal} onChange={e=>setCustomVal(e.target.value)} autoFocus style={{ fontSize:18 }}/>
-                  {customVal && scope==='check' && (
-                    <span style={{ fontSize:13, color:'var(--acc)', whiteSpace:'nowrap', fontFamily:'DM Mono,monospace' }}>
-                      −£{discountAmount().toFixed(2)}
-                    </span>
-                  )}
+              {selected==='custom'&&(
+                <input className="input" type="number" min="0" placeholder={customType==='percent'?'e.g. 15':'e.g. 5.00'} value={customVal} onChange={e=>setCV(e.target.value)} autoFocus style={{marginBottom:14,fontSize:18}}/>
+              )}
+              {selected&&preset?.requiresManager&&(
+                <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderRadius:8,background:'rgba(232,160,32,.1)',border:'1px solid var(--acc-b)',marginBottom:12}}>
+                  <span>🔑</span><span style={{fontSize:12,color:'var(--acc)'}}>Requires manager PIN</span>
                 </div>
               )}
-
-              {/* Manager note */}
-              {selected && PRESET_DISCOUNTS.find(p=>p.id===selected)?.requiresManager && (
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:8, background:'rgba(232,160,32,.1)', border:'1px solid var(--acc-b)', marginBottom:14 }}>
-                  <span>🔑</span>
-                  <span style={{ fontSize:12, color:'var(--acc)' }}>Requires manager PIN</span>
-                </div>
-              )}
-
-              <div style={{ display:'flex', gap:8, marginTop:4 }}>
-                <button className="btn btn-ghost" style={{ flex:1 }} onClick={onCancel}>Cancel</button>
-                <button
-                  className="btn btn-acc" style={{ flex:2, height:46 }}
-                  disabled={!selected || (selected==='custom'&&(!customVal||parseFloat(customVal)<=0))}
-                  onClick={handlePick}
-                >
-                  Apply discount {selected && discountAmount()>0 ? `· −£${discountAmount().toFixed(2)}` : ''}
+              <div style={{display:'flex',gap:8}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={onCancel}>Cancel</button>
+                <button className="btn btn-acc" style={{flex:2,height:44}} disabled={!canAdvance} onClick={handleAdvance}>
+                  Next — choose items →
                 </button>
               </div>
             </>
           )}
 
-          {step === 'pin' && (
+          {/* ── Step 2: What does it apply to ── */}
+          {step==='apply'&&(
             <>
-              <div style={{ fontSize:13, color:'var(--t2)', marginBottom:16, lineHeight:1.5 }}>
+              {manager&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderRadius:8,background:'var(--grn-d)',border:'1px solid var(--grn-b)',marginBottom:12}}><span>✓</span><span style={{fontSize:12,fontWeight:600,color:'var(--grn)'}}>Authorised by {manager.name}</span></div>}
+
+              {/* Whole check */}
+              <button onClick={()=>setScope('check')} style={{width:'100%',padding:'12px 14px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,border:`1.5px solid ${scope==='check'?'var(--acc)':'var(--bdr)'}`,background:scope==='check'?'var(--acc-d)':'var(--bg3)'}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:scope==='check'?'var(--acc)':'var(--t1)'}}>Whole check</div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>Apply to all {visibleItems.length} items</div>
+                </div>
+                <div style={{fontSize:15,fontWeight:800,color:scope==='check'?'var(--acc)':'var(--t2)',fontFamily:'DM Mono,monospace'}}>
+                  −£{calcAmount(subtotal).toFixed(2)}
+                </div>
+              </button>
+
+              {/* Specific items */}
+              <button onClick={()=>setScope('items')} style={{width:'100%',padding:'10px 14px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',textAlign:'left',marginBottom:scope==='items'?8:0,border:`1.5px solid ${scope==='items'?'var(--acc)':'var(--bdr)'}`,background:scope==='items'?'var(--acc-d)':'var(--bg3)',color:scope==='items'?'var(--acc)':'var(--t2)',fontSize:13,fontWeight:700}}>
+                Specific items →
+              </button>
+
+              {scope==='items'&&(
+                <div style={{background:'var(--bg3)',borderRadius:10,border:'1px solid var(--bdr)',padding:10,marginBottom:8}}>
+                  {visibleItems.map(item=>{
+                    const on = itemSel.includes(item.uid);
+                    const base = item.price*item.qty;
+                    return(
+                      <div key={item.uid} onClick={()=>toggleItem(item.uid)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 8px',borderRadius:8,cursor:'pointer',background:on?'var(--acc-d)':'transparent',marginBottom:4,border:`1px solid ${on?'var(--acc-b)':'transparent'}`}}>
+                        <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${on?'var(--acc)':'var(--bdr2)'}`,background:on?'var(--acc)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          {on&&<div style={{width:8,height:8,background:'#0e0f14',borderRadius:2}}/>}
+                        </div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:12,fontWeight:600,color:on?'var(--acc)':'var(--t1)'}}>{item.qty>1?`${item.qty}× `:''}{item.name}</div>
+                          {item.mods?.length>0&&<div style={{fontSize:10,color:'var(--t3)'}}>{item.mods.map(m=>m.label).join(', ')}</div>}
+                        </div>
+                        <div style={{textAlign:'right',flexShrink:0}}>
+                          <div style={{fontSize:12,fontWeight:700,color:on?'var(--acc)':'var(--t2)',fontFamily:'DM Mono,monospace'}}>£{base.toFixed(2)}</div>
+                          {on&&<div style={{fontSize:10,color:'var(--grn)'}}>−£{calcAmount(base).toFixed(2)}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{display:'flex',gap:8,marginTop:4}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStep('amount')}>← Back</button>
+                <button className="btn btn-acc" style={{flex:2,height:44}}
+                  disabled={scope==='items'&&itemSel.length===0}
+                  onClick={handleApply}>
+                  Apply {selected&&`— −£${calcAmount(scope==='check'?subtotal:items.filter(i=>itemSel.includes(i.uid)).reduce((s,i)=>s+i.price*i.qty,0)).toFixed(2)}`}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── PIN step ── */}
+          {step==='pin'&&(
+            <>
+              <div style={{fontSize:13,color:'var(--t2)',marginBottom:16,lineHeight:1.5}}>
                 <strong style={{color:'var(--t1)'}}>{preset?.label}</strong> requires manager authorisation.
               </div>
-
-              <div style={{ display:'flex', justifyContent:'center', gap:12, marginBottom:pinError?8:20 }}>
-                {[0,1,2,3].map(i => (
-                  <div key={i} style={{ width:14, height:14, borderRadius:'50%', background:i<pin.length?'var(--acc)':'var(--bg4)', border:`2px solid ${i<pin.length?'var(--acc)':'var(--bdr2)'}`, transition:'all .15s' }}/>
-                ))}
+              <div style={{display:'flex',justifyContent:'center',gap:12,marginBottom:pinErr?8:20}}>
+                {[0,1,2,3].map(i=><div key={i} style={{width:14,height:14,borderRadius:'50%',background:i<pin.length?'var(--acc)':'var(--bg4)',border:`2px solid ${i<pin.length?'var(--acc)':'var(--bdr2)'}`,transition:'all .15s'}}/>)}
               </div>
-              {pinError && <div style={{ textAlign:'center', fontSize:12, color:'var(--red)', marginBottom:16, fontWeight:600 }}>{pinError}</div>}
-
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, maxWidth:240, margin:'0 auto 16px' }}>
+              {pinErr&&<div style={{textAlign:'center',fontSize:12,color:'var(--red)',marginBottom:16,fontWeight:600}}>{pinErr}</div>}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,maxWidth:240,margin:'0 auto 16px'}}>
                 {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((d,i)=>(
-                  <button key={i} onClick={()=>d==='⌫'?setPin(p=>p.slice(0,-1)):d!==''?handleDigit(String(d)):null} style={{ height:52, borderRadius:12, cursor:d===''?'default':'pointer', background:d===''?'transparent':'var(--bg3)', border:d===''?'none':'1px solid var(--bdr2)', color:d==='⌫'?'var(--t3)':'var(--t1)', fontSize:d==='⌫'?18:20, fontWeight:700, fontFamily:'inherit', opacity:d===''?0:1 }}>{d}</button>
+                  <button key={i} onClick={()=>d==='⌫'?setPin(p=>p.slice(0,-1)):d!==''?handleDigit(String(d)):null} style={{height:52,borderRadius:12,cursor:d===''?'default':'pointer',background:d===''?'transparent':'var(--bg3)',border:d===''?'none':'1px solid var(--bdr2)',color:d==='⌫'?'var(--t3)':'var(--t1)',fontSize:d==='⌫'?18:20,fontWeight:700,fontFamily:'inherit',opacity:d===''?0:1}}>{d}</button>
                 ))}
               </div>
-
-              <button className="btn btn-ghost btn-full" onClick={()=>setStep('pick')}>← Back</button>
+              <button className="btn btn-ghost btn-full" onClick={()=>setStep('amount')}>← Back</button>
             </>
           )}
         </div>
