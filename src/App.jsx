@@ -5,30 +5,32 @@ import PINScreen from './surfaces/PINScreen';
 import POSSurface from './surfaces/POSSurface';
 import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
-import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
+import { KDSSurface } from './surfaces/OtherSurfaces';
+import BackOfficeApp from './backoffice/BackOfficeApp';
 
-const VERSION = '0.6.8';
+const VERSION = '0.7.0';
 
 const CHANGELOG = [
   {
-    version: '0.6.8', date: 'Apr 2026', label: 'Allergens on bill + printer routing + item animation',
+    version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
     changes: [
-      'Allergens shown in checkout review: every item with declared allergens shows a red ⚠ line with allergen names',
-      'Allergens printed on receipt: both the in-app preview and the print-to-browser output now include allergen lines per item',
-      'Printer routing active: sendToKitchen now fans print jobs to the correct station printer (Hot kitchen, Cold section, Pizza oven, Bar) — logged in Back Office → Printers as a live job feed',
-      'BOPrinters rebuilt: shows recent print jobs with timestamps, production centre → printer routing map, online/offline status with toggle, test print per device',
-      'Item add animation: product cards pulse when an item is successfully added to the order',
-      'Search results header: shows count and search term when filtering (e.g. "3 results for \'steak\'") with a clear button',
-      'Named order customer: shows on receipt header in place of order type',
+      'Back Office is now a fully separate portal — click ⚙ Office in the sidebar to enter, or ← Back to POS to return',
+      'Menu Manager: view all items by category, edit name/price/description/allergens, toggle 86 status, set daily counts, add new items. Active/86\'d filter and live search',
+      'Floor Plan Builder: drag tables to reposition (snap to 8px grid), edit label/covers/shape/section, resize, add new tables, remove tables',
+      'Device Profiles: create named profiles (e.g. "Bar terminal") with full config — default screen, order types, section filter, hidden features, table service on/off. Edit, push to terminals',
+      'Device Registry: register Sunmi hardware via pairing code flow, assign profiles, toggle online/offline, configure per-device settings',
+      'Staff Manager: add/edit/remove staff, set roles (Manager/Server/Bartender/Cashier/Kitchen), granular permissions, change PIN with confirmation numpad',
+      'Print Routing: production centre → printer mapping, live print job log, test print, online/offline toggle',
+      'Reports: full shift reporting with period filter (today/week/all time) and closed check log',
     ],
   },
   {
+    version: '0.6.8', date: 'Apr 2026', label: 'Allergens on bill + printer routing + item animation',
+    changes: ['Allergens on checkout review and receipt', 'Printer routing fires per production centre', 'Item add animation, search result count'],
+  },
+  {
     version: '0.6.7', date: 'Apr 2026', label: 'POS function fixes',
-    changes: [
-      'Qty stepper removes pending items at 0, allergen gate before checkout',
-      'Edit covers + table transfer from POS header, bar void modal',
-      'Named dine-in order shown in order panel header',
-    ],
+    changes: ['Qty removes at 0, allergen gate, covers edit, table transfer, bar void modal, named order display'],
   },
   {
     version: '0.6.6', date: 'Apr 2026', label: 'Split check polish',
@@ -36,21 +38,15 @@ const CHANGELOG = [
   },
   {
     version: '0.6.5', date: 'Apr 2026', label: 'Send routing + split checks',
-    changes: ['Send without table modal, merge/split, check selector, floor plan badge'],
+    changes: ['Send without table modal, merge/split, check selector'],
   },
   { version:'0.6.4', date:'Apr 2026', label:'AI assistant + KDS', changes:['Claude-powered shift assistant, KDS wired to real orders'] },
   { version:'0.6.3', date:'Apr 2026', label:'KDS + reservations', changes:['Live KDS timers, full reservations modal'] },
-  { version:'0.6.2', date:'Apr 2026', label:'Item info + daily count', changes:['Long press recipe/allergens, daily count, order review'] },
+  { version:'0.6.2', date:'Apr 2026', label:'Item info + daily count', changes:['Long press, recipe, daily count, order review'] },
   { version:'0.6.1', date:'Apr 2026', label:'Light mode', changes:['☀️/🌙 toggle, checkout redesign'] },
   { version:'0.6.0', date:'Apr 2026', label:'Operator Dark UI', changes:['Cards, nav, order items rebuilt'] },
-  { version:'0.5.3', date:'Apr 2026', label:'Orders list', changes:['My orders / All open, urgency colours'] },
   { version:'0.5.2', date:'Apr 2026', label:'Split bill', changes:['4 modes, independently tendered'] },
   { version:'0.5.0', date:'Apr 2026', label:'Voids, discounts & history', changes:['Manager PIN, discounts, refund'] },
-  { version:'0.4.1', date:'Apr 2026', label:'Table sessions', changes:['Sessions, floor plan, seat guests'] },
-  { version:'0.4.0', date:'Apr 2026', label:'Bar tabs', changes:['Rounds, pre-auth, roaming tabs'] },
-  { version:'0.3.0', date:'Mar 2026', label:'Takeaway & collection', changes:['Customer capture, Orders hub'] },
-  { version:'0.2.0', date:'Mar 2026', label:'POS core ordering', changes:['Variants, modifiers, courses, seat'] },
-  { version:'0.1.0', date:'Mar 2026', label:'Foundation', changes:['POS, Quick Screen, allergens, KDS, floor plan'] },
 ];
 
 
@@ -63,15 +59,19 @@ const CHANGELOG = [
 
 
 
+
 export default function App() {
-  const { staff, surface, setSurface, toast, shift, theme, setTheme } = useStore();
+  const { staff, surface, setSurface, toast, shift, theme, setTheme, appMode } = useStore();
   const [showWhatsNew, setShowWhatsNew] = useState(false);
 
-  // Apply theme on mount and when it changes
   useState(() => {
     document.documentElement.setAttribute('data-theme', theme);
   });
   if (!staff) return <PINScreen />;
+
+  // Back Office Portal — full screen, replaces everything
+  if (appMode === 'backoffice') return <BackOfficeApp />;
+
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
       <ShiftBar shift={shift} version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} />
@@ -82,7 +82,6 @@ export default function App() {
           {surface==='pos'        && <POSSurface />}
           {surface==='bar'        && <BarSurface />}
           {surface==='kds'        && <KDSSurface />}
-          {surface==='backoffice' && <BackOfficeSurface />}
         </div>
       </div>
       {toast && <Toast toast={toast} />}
@@ -96,7 +95,6 @@ const NAV = [
   { id:'pos',        label:'POS',   icon:'⊞' },
   { id:'bar',        label:'Bar',   icon:'🍸' },
   { id:'kds',        label:'KDS',   icon:'▣' },
-  { id:'backoffice', label:'Office',icon:'⚙' },
 ];
 
 function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme }) {
@@ -205,6 +203,7 @@ function WhatsNewModal({ onClose }) {
 }
 
 function Sidebar({ surface, setSurface }) {
+  const { setAppMode } = useStore();
   return (
     <nav style={{ width:'var(--nav)', background:'var(--bg1)', borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', alignItems:'center', padding:'10px 0', gap:2, flexShrink:0 }}>
       {NAV.map(n=>{
@@ -214,6 +213,14 @@ function Sidebar({ surface, setSurface }) {
           <span style={{ fontSize:9, fontWeight:700, letterSpacing:'.04em', color:active?'var(--acc)':'var(--t3)' }}>{n.label}</span>
         </button>);
       })}
+      {/* Divider + Back Office button */}
+      <div style={{ width:32, height:1, background:'var(--bdr)', margin:'6px 0' }}/>
+      <button onClick={() => setAppMode('backoffice')} title="Back Office" style={{ width:46, height:46, borderRadius:10, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, background:'transparent', border:'1px solid transparent', color:'var(--t3)', transition:'all .15s', fontFamily:'inherit' }}
+        onMouseEnter={e=>{e.currentTarget.style.background='var(--bg3)';e.currentTarget.style.color='var(--t1)';}}
+        onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='var(--t3)';}}>
+        <span style={{ fontSize:18, lineHeight:1 }}>⚙</span>
+        <span style={{ fontSize:9, fontWeight:700, letterSpacing:'.04em' }}>Office</span>
+      </button>
       <div style={{ marginTop:'auto' }}><StaffAvatar /></div>
     </nav>
   );

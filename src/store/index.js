@@ -78,6 +78,67 @@ export const useStore = create((set, get) => ({
   surface: 'tables',
   setSurface: s => set({ surface:s }),
 
+  // ── App mode — 'pos' (terminal) | 'backoffice' (management portal) ─────────
+  appMode: 'pos',
+  setAppMode: mode => set({ appMode: mode }),
+
+  // ── Device config (profile applied to this terminal) ─────────────────────
+  // Loaded from localStorage on startup, updated via Realtime in Phase 2
+  deviceConfig: (() => {
+    try {
+      const saved = localStorage.getItem('rpos-device-config');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  })(),
+  setDeviceConfig: (config) => {
+    try { localStorage.setItem('rpos-device-config', JSON.stringify(config)); } catch {}
+    set({ deviceConfig: config });
+    // If profile sets a defaultSurface, switch to it
+    if (config?.defaultSurface) set({ surface: config.defaultSurface });
+  },
+  clearDeviceConfig: () => {
+    try { localStorage.removeItem('rpos-device-config'); } catch {}
+    set({ deviceConfig: null });
+  },
+
+  // ── Registered POS terminals ───────────────────────────────────────────────
+  devices: [
+    { id:'dev-1', label:'Counter 1', type:'counter', section:'main', status:'online', hardwareModel:'Sunmi T2s', ipAddress:'192.168.1.10' },
+    { id:'dev-2', label:'Counter 2', type:'counter', section:'bar',  status:'offline',hardwareModel:'Sunmi T2s', ipAddress:'192.168.1.11' },
+    { id:'dev-3', label:'Handheld 1',type:'handheld',section:'main', status:'online', hardwareModel:'Sunmi V2s', ipAddress:'192.168.1.20' },
+  ],
+  addDevice: (device) => set(s => ({ devices:[...s.devices, { id:`dev-${Date.now()}`, status:'offline', ...device }] })),
+  updateDevice: (id, patch) => set(s => ({ devices:s.devices.map(d=>d.id===id?{...d,...patch}:d) })),
+  removeDevice: (id) => set(s => ({ devices:s.devices.filter(d=>d.id!==id) })),
+
+  // ── Editable menu items (live copy from seed, editable in back office) ─────
+  menuItems: null, // null means "use MENU_ITEMS from seed" — populated on first edit
+  menuCategories: null,
+  updateMenuItem: (id, patch) => {
+    const { menuItems } = get();
+    const base = menuItems || (typeof window !== 'undefined' ? [] : []);
+    set({ menuItems: base.map(item => item.id===id ? { ...item, ...patch } : item) });
+  },
+  addMenuItem: (item) => set(s => ({
+    menuItems: [...(s.menuItems||[]), { id:`m-${Date.now()}`, ...item }]
+  })),
+  archive86Item: (id) => {
+    get().updateMenuItem(id, { archived: true });
+    set(s => ({ eightySixIds: [...s.eightySixIds, id] }));
+  },
+
+  // ── Editable floor plan ────────────────────────────────────────────────────
+  // Tables state already exists in `tables` — floor plan builder just edits positions
+  updateTableLayout: (id, patch) => set(s => ({
+    tables: s.tables.map(t => t.id===id ? { ...t, ...patch } : t)
+  })),
+  addTableToLayout: (table) => set(s => ({
+    tables: [...s.tables, { id:`t-${Date.now()}`, status:'available', session:null, ...table }]
+  })),
+  removeTableFromLayout: (id) => set(s => ({
+    tables: s.tables.filter(t => t.id!==id && t.parentId!==id)
+  })),
+
   // ── Tables (source of truth for all orders) ──────────
   tables: buildInitialTables(),
 

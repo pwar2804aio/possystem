@@ -39,7 +39,13 @@ export default function POSSurface() {
     voidItem, voidCheck,
     addCheckDiscount, removeCheckDiscount, addWalkInDiscount, removeWalkInDiscount,
     addItemDiscount, removeItemDiscount,
+    deviceConfig,
   } = useStore();
+
+  // Order types this terminal is allowed to show (from device profile)
+  const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];
+  const ALL_ORDER_TYPES = [['dine-in','🍽','Dine in'],['takeaway','🥡','Takeaway'],['collection','📦','Collect']];
+  const visibleOrderTypes = ALL_ORDER_TYPES.filter(([t]) => allowedOrderTypes.includes(t));
 
   const [cat, setCat]             = useState('quick');
   const [modalItem, setModalItem] = useState(null);
@@ -184,7 +190,7 @@ export default function POSSurface() {
           ) : (
             <>
               <div style={{display:'flex',gap:4,marginBottom:orderType==='dine-in'?0:8}}>
-                {[['dine-in','🍽','Dine in'],['takeaway','🥡','Takeaway'],['collection','📦','Collect']].map(([t,ic,l])=>(
+                {visibleOrderTypes.map(([t,ic,l])=>(
                   <button key={t} onClick={()=>handleTypeChange(t)} style={{flex:1,padding:'7px 3px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${orderType===t?'var(--acc-b)':'var(--bdr)'}`,background:orderType===t?'var(--acc-d)':'transparent',color:orderType===t?'var(--acc)':'var(--t3)',fontSize:10,fontWeight:800,display:'flex',flexDirection:'column',alignItems:'center',gap:1,letterSpacing:.01,transition:'all .14s'}}>
                     <span style={{fontSize:16}}>{ic}</span><span>{l}</span>
                   </button>
