@@ -62,6 +62,7 @@ export default function POSSurface() {
   const [showSendModal, setShowSendModal] = useState(false);
   const [showAllergenGate, setShowAllergenGate] = useState(false);
   const [showTableActions, setShowTableActions] = useState(false);
+  const [lastAddedUid, setLastAddedUid] = useState(null);
   const longPressTimer = useRef(null);
 
   const activeTable = activeTableId ? tables.find(t=>t.id===activeTableId) : null;
@@ -104,7 +105,13 @@ export default function POSSurface() {
     openFlow(item);
   };
   const openFlow = (item) => {
-    if (item.type==='simple') { addItem(item,[],null,{displayName:item.name,qty:1,linePrice:item.price}); showToast(`${item.name} added`,'success'); }
+    if (item.type==='simple') {
+      addItem(item,[],null,{displayName:item.name,qty:1,linePrice:item.price});
+      showToast(`${item.name} added`,'success');
+      setLastAddedUid(item.id);
+      setTimeout(()=>setLastAddedUid(null), 300);
+      return;
+    }
     else setModalItem(item);
   };
 
@@ -460,6 +467,14 @@ export default function POSSurface() {
                   <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)'}}>✦ Live</span>
                 </div>
               )}
+              {search&&displayItems.length>0&&(
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,paddingBottom:8,borderBottom:'1px solid var(--bdr)'}}>
+                  <div style={{fontSize:12,color:'var(--t3)'}}>
+                    <span style={{fontWeight:700,color:'var(--t1)'}}>{displayItems.length}</span> result{displayItems.length!==1?'s':''} for <span style={{color:'var(--acc)',fontWeight:600}}>"{search}"</span>
+                  </div>
+                  <button onClick={()=>setSearch('')} style={{fontSize:11,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:600,padding:0}}>✕ Clear</button>
+                </div>
+              )}
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
                 {displayItems.map(item=>{
                   const m=CAT_META[item.cat]||CAT_META.quick;
@@ -491,7 +506,7 @@ export default function POSSurface() {
                       onMouseLeave={handlePressEnd}
                       onTouchStart={handlePressStart}
                       onTouchEnd={handlePressEnd}
-                      className={`prod-card${is86?' prod-card--disabled':''}`}
+                      className={`prod-card${is86?' prod-card--disabled':''}${lastAddedUid===item.id?' add-pulse':''}`}
                       style={{minHeight:108}}>
                       {/* Left colour bar */}
                       <div style={{
@@ -614,6 +629,7 @@ export default function POSSurface() {
           tableLabel={activeTable?.label}
           server={session?.server || staff?.name}
           covers={covers}
+          customer={customer}
           onClose={()=>setShowReceipt(false)}
         />
       )}

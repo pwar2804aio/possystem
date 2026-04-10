@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PRODUCTION_CENTRES } from '../data/seed';
 
 // ── Receipt display & print ───────────────────────────────────────────────────
-export function ReceiptModal({ items, subtotal, service, total, checkDiscount, orderType, tableLabel, server, covers, onClose }) {
+export function ReceiptModal({ items, subtotal, service, total, checkDiscount, orderType, tableLabel, server, covers, customer, onClose }) {
   const now = new Date();
   const nonVoided = items.filter(i => !i.voided);
 
@@ -19,13 +19,14 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
         .line { border-top:1px dashed #000; margin:8px 0; }
         .row { display:flex; justify-content:space-between; margin:3px 0; }
         .muted { color:#666; font-size:11px; }
+        .allergen { color:#cc0000; font-size:10px; padding-left:12px; }
         .total-row { font-size:14px; font-weight:bold; border-top:2px solid #000; padding-top:6px; margin-top:4px; }
         .void { text-decoration:line-through; color:#999; }
       </style>
       </head><body>
       <div class="center bold big">Restaurant OS</div>
       <div class="center muted" style="margin:4px 0 8px">
-        ${tableLabel ? tableLabel : orderType}<br>
+        ${tableLabel ? tableLabel : customer?.name ? customer.name : orderType}<br>
         ${server ? `Server: ${server}` : ''}${covers>1 ? ` · ${covers} covers` : ''}<br>
         ${now.toLocaleString('en-GB')}
       </div>
@@ -41,8 +42,9 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
             <span>£${(price*item.qty).toFixed(2)}</span>
           </div>
           ${item.mods?.length ? `<div class="muted" style="padding-left:12px">${item.mods.map(m=>m.label).join(', ')}</div>` : ''}
-          ${item.notes ? `<div class="muted" style="padding-left:12px">Note: ${item.notes}</div>` : ''}
+          ${item.notes ? `<div class="muted" style="padding-left:12px">📝 ${item.notes}</div>` : ''}
           ${disc ? `<div class="muted" style="padding-left:12px">🏷 ${disc.label} (−£${(item.price*item.qty - price*item.qty).toFixed(2)})</div>` : ''}
+          ${item.allergens?.length ? `<div class="allergen">⚠ ALLERGENS: ${item.allergens.map(a=>a.toUpperCase()).join(', ')}</div>` : ''}
         `;
       }).join('')}
       <div class="line"></div>
@@ -96,8 +98,9 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
                   <span>£{(price*item.qty).toFixed(2)}</span>
                 </div>
                 {item.mods?.length>0&&<div style={{fontSize:10,color:'var(--t3)',paddingLeft:12}}>{item.mods.map(m=>m.label).join(', ')}</div>}
-                {item.notes&&<div style={{fontSize:10,color:'#f97316',paddingLeft:12}}>Note: {item.notes}</div>}
+                {item.notes&&<div style={{fontSize:10,color:'#f97316',paddingLeft:12}}>📝 {item.notes}</div>}
                 {disc&&<div style={{fontSize:10,color:'var(--grn)',paddingLeft:12}}>🏷 {disc.label} −£{(item.price*item.qty-price*item.qty).toFixed(2)}</div>}
+                {item.allergens?.length>0&&<div style={{fontSize:10,color:'var(--red)',paddingLeft:12,fontWeight:600}}>⚠ {item.allergens.map(a=>a.toUpperCase()).join(' · ')}</div>}
               </div>
             );
           })}

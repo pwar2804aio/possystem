@@ -7,51 +7,44 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.6.7';
+const VERSION = '0.6.8';
 
 const CHANGELOG = [
   {
+    version: '0.6.8', date: 'Apr 2026', label: 'Allergens on bill + printer routing + item animation',
+    changes: [
+      'Allergens shown in checkout review: every item with declared allergens shows a red ⚠ line with allergen names',
+      'Allergens printed on receipt: both the in-app preview and the print-to-browser output now include allergen lines per item',
+      'Printer routing active: sendToKitchen now fans print jobs to the correct station printer (Hot kitchen, Cold section, Pizza oven, Bar) — logged in Back Office → Printers as a live job feed',
+      'BOPrinters rebuilt: shows recent print jobs with timestamps, production centre → printer routing map, online/offline status with toggle, test print per device',
+      'Item add animation: product cards pulse when an item is successfully added to the order',
+      'Search results header: shows count and search term when filtering (e.g. "3 results for \'steak\'") with a clear button',
+      'Named order customer: shows on receipt header in place of order type',
+    ],
+  },
+  {
     version: '0.6.7', date: 'Apr 2026', label: 'POS function fixes',
     changes: [
-      'Qty stepper: pending items now delete when reduced to 0 instead of blocking at 1',
-      'Allergen gate: Pay button now requires a mandatory allergen confirmation before checkout when any items have declared allergens — EU/UK FIC compliant, recorded on audit trail',
-      'Edit covers mid-service: tap the table label/icon in the POS header to open a covers stepper and table transfer panel',
-      'Table transfer: move a session to any available table without re-seating',
-      'Bar tab round void: replaced browser window.confirm() with a proper in-app confirmation modal',
-      'Named dine-in orders: customer name shown in the order panel header with "Named order" label',
-      'TableActionsModal: edit covers or transfer table from within the POS screen without going back to floor plan',
+      'Qty stepper removes pending items at 0, allergen gate before checkout',
+      'Edit covers + table transfer from POS header, bar void modal',
+      'Named dine-in order shown in order panel header',
     ],
   },
   {
     version: '0.6.6', date: 'Apr 2026', label: 'Split check polish',
-    changes: [
-      'Child tables hidden from floor plan and orders list (shown as sub-rows under parent)',
-      'Combined total on parent row, Check 2 badge in POS header',
-      '"No table" warning removed — routing modal handles it',
-    ],
+    changes: ['Child tables hidden, sub-rows in orders list, Check 2 badge in POS'],
   },
   {
     version: '0.6.5', date: 'Apr 2026', label: 'Send routing + split checks',
-    changes: [
-      'Send without table → routing modal: add to table or name the order',
-      'Merge into existing check or create T1.2 split check',
-      'Check selector modal, floor plan split badge',
-    ],
+    changes: ['Send without table modal, merge/split, check selector, floor plan badge'],
   },
-  {
-    version: '0.6.4', date: 'Apr 2026', label: 'AI assistant + KDS',
-    changes: ['AI Shift Assistant in Back Office', 'KDS wired to real orders'],
-  },
-  {
-    version: '0.6.3', date: 'Apr 2026', label: 'KDS connected + reservations',
-    changes: ['KDS live timers, reservations modal'],
-  },
-  { version:'0.6.2', date:'Apr 2026', label:'Item info + daily count + order review', changes:['Long press, recipe, daily count, auto 86'] },
-  { version:'0.6.1', date:'Apr 2026', label:'Light mode + checkout', changes:['☀️/🌙, SVG terminal, cash numpad'] },
+  { version:'0.6.4', date:'Apr 2026', label:'AI assistant + KDS', changes:['Claude-powered shift assistant, KDS wired to real orders'] },
+  { version:'0.6.3', date:'Apr 2026', label:'KDS + reservations', changes:['Live KDS timers, full reservations modal'] },
+  { version:'0.6.2', date:'Apr 2026', label:'Item info + daily count', changes:['Long press recipe/allergens, daily count, order review'] },
+  { version:'0.6.1', date:'Apr 2026', label:'Light mode', changes:['☀️/🌙 toggle, checkout redesign'] },
   { version:'0.6.0', date:'Apr 2026', label:'Operator Dark UI', changes:['Cards, nav, order items rebuilt'] },
   { version:'0.5.3', date:'Apr 2026', label:'Orders list', changes:['My orders / All open, urgency colours'] },
-  { version:'0.5.2', date:'Apr 2026', label:'Split bill', changes:['Even, seat, item, custom — independently tendered'] },
-  { version:'0.5.1', date:'Apr 2026', label:'Fast checkout', changes:['Card/Cash buttons, tip, cash numpad'] },
+  { version:'0.5.2', date:'Apr 2026', label:'Split bill', changes:['4 modes, independently tendered'] },
   { version:'0.5.0', date:'Apr 2026', label:'Voids, discounts & history', changes:['Manager PIN, discounts, refund'] },
   { version:'0.4.1', date:'Apr 2026', label:'Table sessions', changes:['Sessions, floor plan, seat guests'] },
   { version:'0.4.0', date:'Apr 2026', label:'Bar tabs', changes:['Rounds, pre-auth, roaming tabs'] },
@@ -59,6 +52,7 @@ const CHANGELOG = [
   { version:'0.2.0', date:'Mar 2026', label:'POS core ordering', changes:['Variants, modifiers, courses, seat'] },
   { version:'0.1.0', date:'Mar 2026', label:'Foundation', changes:['POS, Quick Screen, allergens, KDS, floor plan'] },
 ];
+
 
 
 

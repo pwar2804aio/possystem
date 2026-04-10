@@ -342,6 +342,11 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                         ))}
                         {item.notes && <div style={{ fontSize:11, color:'var(--orn)', marginTop:2 }}>📝 {item.notes}</div>}
                         {disc && <div style={{ fontSize:11, color:'var(--grn)', marginTop:2, fontWeight:600 }}>🏷 {disc.label}</div>}
+                        {item.allergens?.length>0 && (
+                          <div style={{ fontSize:10, color:'var(--red)', marginTop:2, fontWeight:600 }}>
+                            ⚠ {item.allergens.map(a=>ALLERGENS.find(x=>x.id===a)?.label).filter(Boolean).join(' · ')}
+                          </div>
+                        )}
                       </div>
                       <div style={{ textAlign:'right', flexShrink:0 }}>
                         <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>£{(price*item.qty).toFixed(2)}</div>

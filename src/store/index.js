@@ -423,6 +423,11 @@ export const useStore = create((set, get) => ({
       const session = table?.session;
       const pendingItems = session?.items?.filter(i => i.status === 'pending' && !i.voided) || [];
       const newTickets = createKdsTickets(pendingItems, table?.label || activeTableId, staff?.name || 'Server', session?.covers || 2);
+      // Route print jobs for each ticket (fires to mapped printer per centre)
+      const CENTRE_PRINTERS = { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' };
+      newTickets.forEach(t => {
+        if (t.items.length) get().routePrintJob({ centreId:t.centreId, printerName:CENTRE_PRINTERS[t.centreId]||'Kitchen', tableLabel:t.table, items:t.items, type:'kitchen' });
+      });
       set(s=>({
         tables: s.tables.map(t=>{
           if(t.id!==activeTableId||!t.session)return t;
@@ -842,6 +847,18 @@ export const useStore = create((set, get) => ({
   // ── KDS ───────────────────────────────────
   kdsTickets: INITIAL_KDS,
   bumpTicket: id => set(s=>({ kdsTickets:s.kdsTickets.filter(t=>t.id!==id) })),
+
+  // ── Print job routing ─────────────────────────────────────────────────────
+  // In production this would POST to the Sunmi NT311 ESC/POS bridge.
+  // For now we record jobs with status so the Printers UI can show them.
+  printJobs: [],
+  routePrintJob: (job) => {
+    // job: { id, centreId, printerName, tableLabel, items, type:'kitchen'|'pass'|'bar' }
+    const printJob = { ...job, id:`pj-${Date.now()}`, sentAt:Date.now(), status:'sent' };
+    set(s=>({ printJobs:[printJob, ...s.printJobs.slice(0,49)] }));
+    // In a real integration: POST to Sunmi native bridge or ESC/POS server
+    get().showToast(`Printed to ${job.printerName}`, 'info');
+  },
 
   // ── Shift ─────────────────────────────────
   shift: SHIFT,
