@@ -5,10 +5,15 @@ import { ALLERGENS, PIZZA_TOPPINGS, PIZZA_BASES, PIZZA_CRUSTS, PIZZA_SIZES } fro
 // ── Main product modal dispatcher ─────────────────────────────────────────────
 export default function ProductModal({ item, activeAllergens = [], onConfirm, onCancel }) {
   if (!item) return null;
-  if (item.type === 'pizza')      return <PizzaModal     item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
-  if (item.type === 'variants')   return <VariantsModal  item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
-  // Both 'modifiers' (legacy) and 'modifiable' (new auto type) show the ModifiersModal
-  if (item.type === 'modifiers' || item.type === 'modifiable') return <ModifiersModal item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
+  if (item.type === 'pizza')    return <PizzaModal    item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
+  if (item.type === 'variants') return <VariantsModal item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
+
+  // Items with assigned modifier/instruction groups (new system) or legacy modifierGroups
+  const hasAssigned = (item.assignedModifierGroups?.length > 0) || (item.assignedInstructionGroups?.length > 0);
+  const hasLegacy   = item.modifierGroups?.length > 0;
+  if (item.type === 'modifiers' || item.type === 'modifiable' || hasAssigned || hasLegacy) {
+    return <ModifiersModal item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
+  }
   return null;
 }
 
@@ -206,42 +211,74 @@ function VariantsModal({ item, activeAllergens, onConfirm, onCancel }) {
 
 // ── Modifiers modal (steak cooking, cocktail base, etc.) ──────────────────────
 function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
-  const { modifierLibrary, menuItems } = useStore.getState();
-  const [selections, setSelections] = useState({});
-  const [qty, setQty] = useState(1);
+  const { modifierLibrary, menuItems, modifierGroupDefs, instructionGroupDefs } = useStore.getState();
+  const [selections, setSelections]     = useState({});
+  const [instSelections, setInstSel]    = useState({});
+  const [qty, setQty]   = useState(1);
   const [notes, setNotes] = useState('');
 
-  // Resolve options for a group — supports both old inline options and new modifierIds system
-  const resolveOptions = (group) => {
-    // New system: modifierIds array referencing subitems or library
-    if (group.modifierIds?.length) {
-      return group.modifierIds.map(id => {
-        const subitem = menuItems.find(i => i.id === id && i.type === 'subitem');
-        if (subitem) return { id: subitem.id, label: subitem.menuName || subitem.name, price: subitem.pricing?.base ?? subitem.price ?? 0 };
-        const libMod = modifierLibrary.find(m => m.id === id);
-        if (libMod) return { id: libMod.id, label: libMod.name, price: libMod.price || 0 };
-        return null;
-      }).filter(Boolean);
+  // ── Build the list of all groups to show ──────────────────────────────────
+  // Priority: new assigned system > legacy inline modifierGroups
+  const buildGroups = () => {
+    const all = [];
+
+    // 1. New system: assigned modifier groups (from Product Builder)
+    if (item.assignedModifierGroups?.length) {
+      item.assignedModifierGroups.forEach(assignment => {
+        const def = modifierGroupDefs?.find(g => g.id === assignment.groupId);
+        if (def) all.push({
+          id: def.id,
+          label: def.name,
+          selectionType: def.max > 1 ? 'multiple' : 'single',
+          min: assignment.min ?? def.min ?? 0,
+          max: assignment.max ?? def.max ?? 1,
+          options: def.options || [],
+          _type: 'modifier',
+        });
+      });
     }
-    // Old system: inline options array
-    return group.options || [];
+
+    // 2. Legacy inline modifier groups
+    if (item.modifierGroups?.length) {
+      item.modifierGroups.forEach(g => {
+        const options = g.modifierIds?.length
+          ? g.modifierIds.map(id => {
+              const sub = menuItems.find(i => i.id === id && i.type === 'subitem');
+              if (sub) return { id: sub.id, label: sub.menuName || sub.name, price: sub.pricing?.base ?? sub.price ?? 0 };
+              const lib = modifierLibrary?.find(m => m.id === id);
+              if (lib) return { id: lib.id, label: lib.name, price: lib.price || 0 };
+              return null;
+            }).filter(Boolean)
+          : (g.options || []);
+        if (options.length) all.push({ ...g, options, _type: 'modifier' });
+      });
+    }
+
+    return all;
   };
 
-  // Determine selection type: new system uses selectionType, old uses group.multi/required
-  const getSelType = (group) => group.selectionType || (group.multi ? 'multiple' : 'single');
+  // Instruction groups (no price, separate state)
+  const instrGroups = (item.assignedInstructionGroups || [])
+    .map(gid => instructionGroupDefs?.find(g => g.id === gid))
+    .filter(Boolean);
+
+  const allModGroups = buildGroups();
+
+  const getSelType = (group) => group.selectionType || (group.max > 1 ? 'multiple' : 'single');
   const isRequired = (group) => group.min > 0 || group.required;
 
   const toggleSingle = (groupId, opt) => setSelections(s => ({ ...s, [groupId]: s[groupId]?.id === opt.id ? null : opt }));
   const toggleMulti  = (groupId, opt) => setSelections(s => {
     const cur = s[groupId] || [];
     const has = cur.find(o => o.id === opt.id);
-    const group = (item.modifierGroups || []).find(g => g.id === groupId);
+    const group = allModGroups.find(g => g.id === groupId);
     const maxSel = group?.max || 99;
-    if (!has && cur.length >= maxSel) return s; // at max
+    if (!has && cur.length >= maxSel) return s;
     return { ...s, [groupId]: has ? cur.filter(o => o.id !== opt.id) : [...cur, opt] };
   });
+  const toggleInst = (groupId, opt) => setInstSel(s => ({ ...s, [groupId]: s[groupId] === opt ? null : opt }));
 
-  const allRequired = (item.modifierGroups || [])
+  const allRequired = allModGroups
     .filter(g => isRequired(g))
     .every(g => {
       const selType = getSelType(g);
@@ -254,16 +291,25 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
   const price = (basePrice + extraCost) * qty;
 
   const buildDisplayName = () => {
-    const parts = Object.values(selections).flat().filter(Boolean).map(m => m.label);
-    return parts.length ? `${item.menuName || item.name} — ${parts.join(', ')}` : (item.menuName || item.name);
+    const modParts  = Object.values(selections).flat().filter(Boolean).map(m => m.label);
+    const instParts = Object.values(instSelections).filter(Boolean);
+    const all = [...modParts, ...instParts];
+    return all.length ? `${item.menuName || item.name} — ${all.join(', ')}` : (item.menuName || item.name);
   };
 
   const handleAdd = () => {
     const mods = Object.entries(selections).flatMap(([gid, val]) => {
       if (!val) return [];
-      const group = (item.modifierGroups || []).find(g => g.id === gid);
+      const group = allModGroups.find(g => g.id === gid);
       const arr = Array.isArray(val) ? val : [val];
       return arr.filter(Boolean).map(m => ({ groupLabel: group?.label, label: m.label, price: m.price || 0 }));
+    });
+    // Add instructions as zero-price mods for kitchen printing
+    Object.entries(instSelections).forEach(([gid, val]) => {
+      if (val) {
+        const g = instrGroups.find(ig => ig.id === gid);
+        mods.push({ groupLabel: g?.name, label: val, price: 0, _instruction: true });
+      }
     });
     onConfirm(item, mods, null, {
       notes: notes.trim(), qty, linePrice: price,
@@ -273,8 +319,8 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
 
   return (
     <ModalShellWrapper item={item} price={price} canAdd={allRequired} onAdd={handleAdd} onCancel={onCancel} activeAllergens={activeAllergens}>
-      {(item.modifierGroups || []).map(group => {
-        const options = resolveOptions(group);
+      {allModGroups.map(group => {
+        const options = group.options || [];
         const selType = getSelType(group);
         const required = isRequired(group);
         const maxSel = group.max || (selType === 'single' ? 1 : 99);
@@ -335,6 +381,33 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
                   No options configured — add sub items to this modifier group in the Menu Manager
                 </div>
               )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Instruction groups (no price change) */}
+      {instrGroups.map(g => {
+        const sel = instSelections[g.id];
+        return (
+          <div key={g.id} style={{ marginBottom:20 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+              <span className="label-xs">{g.name}</span>
+              <span style={{ fontSize:11, color:'var(--t4)' }}>Preparation · no charge</span>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {(g.options || []).map(opt => (
+                <button key={opt} onClick={() => toggleInst(g.id, opt)}
+                  style={{ padding:'11px 14px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                    border:`1.5px solid ${sel===opt?'var(--grn)':'var(--bdr)'}`,
+                    background:sel===opt?'var(--grn-d)':'var(--bg3)', transition:'all .12s',
+                    display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ width:18, height:18, borderRadius:'50%', border:`2px solid ${sel===opt?'var(--grn)':'var(--bdr2)'}`, background:sel===opt?'var(--grn)':'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {sel===opt && <div style={{ width:6, height:6, borderRadius:'50%', background:'#0b0c10' }}/>}
+                  </div>
+                  <span style={{ fontSize:14, fontWeight:500, color:sel===opt?'var(--grn)':'var(--t1)' }}>{opt}</span>
+                </button>
+              ))}
             </div>
           </div>
         );

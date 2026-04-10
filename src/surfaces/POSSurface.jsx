@@ -164,7 +164,7 @@ export default function POSSurface() {
       // Fall through to modal if no children (old variants[] array style)
     }
 
-    if (item.type === 'simple' && !item.modifierGroups?.length) {
+    if (item.type === 'simple' && !item.modifierGroups?.length && !item.assignedModifierGroups?.length && !item.assignedInstructionGroups?.length) {
       addItem(item, [], null, { displayName: item.menuName || item.name, qty:1, linePrice: item.pricing?.base ?? item.price ?? 0 });
       showToast(`${item.menuName || item.name} added`, 'success');
       setLastAddedUid(item.id);
@@ -178,6 +178,7 @@ export default function POSSurface() {
     if (!items.length) { showToast('No items on order', 'error'); return; }
     // If already sitting at a table, send directly
     if (activeTableId) {
+      setShowCheckout(false);
       sendToKitchen();
       showToast(`Table ${activeTable?.label} order sent`, 'success');
       return;
