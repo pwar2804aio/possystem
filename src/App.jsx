@@ -7,7 +7,66 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.5.2';
+const VERSION = '0.5.3';
+
+const CHANGELOG = [
+  {
+    version: '0.5.3', date: 'Apr 2026', label: 'Orders list view',
+    changes: [
+      'Floor plan now has three tabs: Floor plan, My orders, All open orders',
+      'My orders filters to the current logged-in server\'s tables only',
+      'Each row shows: table, covers, server (all orders), time seated, last activity, running total',
+      'Urgency colour coding: green = active, amber = 10+ mins idle, red = 20+ mins idle',
+      'Urgency dot pulses and border changes colour — visible at a glance across the shift',
+      'Tap any row to open that table directly in POS',
+      'Timer refreshes every 30 seconds so colours stay live without a page reload',
+    ],
+  },
+  {
+    version: '0.5.2', date: 'Apr 2026', label: 'Full split bill system',
+    changes: [
+      '4 split modes: Even, By seat, By item, Custom amounts',
+      'Each split portion tendered independently with card or cash',
+      'Progress bar shows X of N portions paid',
+    ],
+  },
+  {
+    version: '0.5.1', date: 'Apr 2026', label: 'Fast checkout',
+    changes: [
+      'Card and Cash primary buttons at bottom of checkout',
+      'Card: tip picker → Stripe Terminal screen',
+      'Cash: 12-key numpad, quick cash buttons, live change display',
+    ],
+  },
+  {
+    version: '0.5.0', date: 'Apr 2026', label: 'Voids, discounts & history',
+    changes: [
+      'Void items and checks with manager PIN + reason',
+      'Discounts — by amount then select items or whole check',
+      'History tab with refund flow (card or cash tender)',
+    ],
+  },
+  {
+    version: '0.4.1', date: 'Apr 2026', label: 'Table sessions',
+    changes: ['Tables own sessions, floor plan, seat guests modal, live status'],
+  },
+  {
+    version: '0.4.0', date: 'Apr 2026', label: 'Bar tabs',
+    changes: ['Full bar tab system with rounds, pre-auth, checkout'],
+  },
+  {
+    version: '0.3.0', date: 'Mar 2026', label: 'Takeaway & collection',
+    changes: ['Customer capture, Orders hub, collection slots'],
+  },
+  {
+    version: '0.2.0', date: 'Mar 2026', label: 'POS core ordering',
+    changes: ['Variants, modifiers, courses, seat assignment, 86'],
+  },
+  {
+    version: '0.1.0', date: 'Mar 2026', label: 'Foundation',
+    changes: ['POS, Quick Screen, allergens, KDS, floor plan, PIN login'],
+  },
+];
 
 const CHANGELOG = [
   {

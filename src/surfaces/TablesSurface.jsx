@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 
 const STATUS = {
@@ -131,10 +131,18 @@ function TableNode({ table, onClick }) {
 
 // ─── Main Tables Surface ─────────────────────────────────────────────────────
 export default function TablesSurface() {
-  const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast } = useStore();
+  const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff } = useStore();
   const [selected, setSelected]   = useState(null);
   const [showSeat, setShowSeat]   = useState(false);
   const [section, setSection]     = useState('all');
+  const [view, setView]           = useState('floor');  // floor | mine | all
+  const [, setTick] = useState(0);
+
+  // Re-render every 30s so urgency colours stay live
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t+1), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   const selectedTable = tables.find(t => t.id === selected);
 
@@ -198,30 +206,170 @@ export default function TablesSurface() {
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
         {/* Header */}
-        <div style={{ padding:'12px 18px', borderBottom:'1px solid var(--bdr2)', background:'var(--bg1)', display:'flex', alignItems:'center', gap:16, flexShrink:0 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:'var(--t1)' }}>Floor plan</div>
-          <div style={{ display:'flex', gap:12, marginLeft:8 }}>
-            {Object.entries(STATUS).map(([s,m])=>(
-              <div key={s} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--t3)' }}>
-                <div style={{ width:8, height:8, borderRadius:'50%', background:m.color }}/>
-                <span style={{ color:'var(--t2)' }}>{counts[s]}</span> {m.label}
+        <div style={{ padding:'0 18px', borderBottom:'1px solid var(--bdr2)', background:'var(--bg1)', display:'flex', alignItems:'center', gap:0, flexShrink:0 }}>
+          {/* View tabs */}
+          {[
+            { id:'floor', label:'Floor plan' },
+            { id:'mine',  label:`My orders${staff?.name?' ('+staff.name+')':''}` },
+            { id:'all',   label:'All open orders' },
+          ].map(v => (
+            <button key={v.id} onClick={()=>setView(v.id)} style={{
+              padding:'12px 16px', cursor:'pointer', fontFamily:'inherit', border:'none',
+              borderBottom:`2px solid ${view===v.id?'var(--acc)':'transparent'}`,
+              background:'transparent', color:view===v.id?'var(--acc)':'var(--t3)',
+              fontSize:13, fontWeight:view===v.id?700:500, whiteSpace:'nowrap',
+            }}>{v.label}</button>
+          ))}
+
+          {/* Status legend + section filter — only on floor view */}
+          {view==='floor' && (
+            <>
+              <div style={{ display:'flex', gap:10, marginLeft:16 }}>
+                {Object.entries(STATUS).map(([s,m])=>(
+                  <div key={s} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--t3)' }}>
+                    <div style={{ width:8, height:8, borderRadius:'50%', background:m.color }}/>
+                    <span style={{ color:'var(--t2)' }}>{counts[s]}</span> {m.label}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
-            {sections.map(s=>(
-              <button key={s.id} onClick={()=>setSection(s.id)} style={{
-                padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
-                border:`1px solid ${section===s.id?'var(--acc-b)':'var(--bdr)'}`,
-                background:section===s.id?'var(--acc-d)':'transparent',
-                color:section===s.id?'var(--acc)':'var(--t3)',
-              }}>{s.label}</button>
-            ))}
-          </div>
+              <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
+                {sections.map(s=>(
+                  <button key={s.id} onClick={()=>setSection(s.id)} style={{
+                    padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                    border:`1px solid ${section===s.id?'var(--acc-b)':'var(--bdr)'}`,
+                    background:section===s.id?'var(--acc-d)':'transparent',
+                    color:section===s.id?'var(--acc)':'var(--t3)',
+                  }}>{s.label}</button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Canvas */}
-        <div style={{ flex:1, overflow:'auto', padding:24 }}>
+        {/* ── Orders list view ─────────────────────────────── */}
+        {(view==='mine' || view==='all') && (() => {
+          const now = Date.now();
+          const activeTables = tables.filter(t =>
+            (t.status==='open'||t.status==='occupied') && t.session
+          ).filter(t =>
+            view==='all' || t.session.server===staff?.name
+          ).sort((a,b) => (b.session.seatedAt||0) - (a.session.seatedAt||0));
+
+          const urgency = (session) => {
+            // Use sentAt if order has been sent, else seatedAt
+            const lastActivity = session.sentAt ? new Date(session.sentAt).getTime() : (session.seatedAt||now);
+            const idleMins = (now - lastActivity) / 60000;
+            if (idleMins >= 20) return 'red';
+            if (idleMins >= 10) return 'amber';
+            return 'green';
+          };
+          const urgencyStyle = {
+            green: { border:'1px solid var(--grn-b)', bg:'var(--bg2)', dot:'var(--grn)' },
+            amber: { border:'1px solid var(--acc-b)', bg:'rgba(232,160,32,.06)', dot:'var(--acc)' },
+            red:   { border:'1px solid var(--red-b)', bg:'rgba(220,40,40,.06)',  dot:'var(--red)' },
+          };
+
+          return (
+            <div style={{ flex:1, overflowY:'auto', padding:16 }}>
+              {activeTables.length === 0 && (
+                <div style={{ textAlign:'center', padding:'60px 0', color:'var(--t3)' }}>
+                  <div style={{ fontSize:40, marginBottom:12, opacity:.4 }}>⬚</div>
+                  <div style={{ fontSize:14, fontWeight:600, color:'var(--t2)', marginBottom:6 }}>
+                    {view==='mine' ? 'No open tables assigned to you' : 'No open tables'}
+                  </div>
+                </div>
+              )}
+
+              {/* Urgency legend */}
+              {activeTables.length > 0 && (
+                <div style={{ display:'flex', gap:12, marginBottom:14, fontSize:11, color:'var(--t3)' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                    <div style={{ width:8,height:8,borderRadius:'50%',background:'var(--grn)' }}/>Active
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                    <div style={{ width:8,height:8,borderRadius:'50%',background:'var(--acc)' }}/>10+ mins idle
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                    <div style={{ width:8,height:8,borderRadius:'50%',background:'var(--red)' }}/>20+ mins idle
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {activeTables.map(table => {
+                  const session = table.session;
+                  const urg = urgency(session);
+                  const us = urgencyStyle[urg];
+                  const seatedMins = Math.floor((now - (session.seatedAt||now)) / 60000);
+                  const lastActivity = session.sentAt ? new Date(session.sentAt).getTime() : (session.seatedAt||now);
+                  const idleMins = Math.floor((now - lastActivity) / 60000);
+
+                  return (
+                    <div key={table.id} onClick={()=>openTableInPOS(table.id)} style={{
+                      display:'flex', alignItems:'center', gap:16, padding:'14px 18px',
+                      borderRadius:14, cursor:'pointer', border:us.border, background:us.bg,
+                      transition:'all .15s',
+                    }}>
+                      {/* Urgency dot */}
+                      <div style={{ width:10, height:10, borderRadius:'50%', background:us.dot, flexShrink:0, boxShadow:`0 0 6px ${us.dot}` }}/>
+
+                      {/* Table label */}
+                      <div style={{ width:80, flexShrink:0 }}>
+                        <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)' }}>{table.label}</div>
+                        <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>{table.section}</div>
+                      </div>
+
+                      {/* Covers */}
+                      <div style={{ width:70, flexShrink:0 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:'var(--t2)' }}>🪑 {session.covers}</div>
+                        <div style={{ fontSize:11, color:'var(--t3)' }}>covers</div>
+                      </div>
+
+                      {/* Server */}
+                      {view==='all' && (
+                        <div style={{ width:90, flexShrink:0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:'var(--t2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{session.server}</div>
+                          <div style={{ fontSize:11, color:'var(--t3)' }}>server</div>
+                        </div>
+                      )}
+
+                      {/* Time seated */}
+                      <div style={{ width:70, flexShrink:0 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:'var(--t2)' }}>⏱ {seatedMins < 60 ? `${seatedMins}m` : `${Math.floor(seatedMins/60)}h${seatedMins%60}m`}</div>
+                        <div style={{ fontSize:11, color:'var(--t3)' }}>seated</div>
+                      </div>
+
+                      {/* Idle time */}
+                      <div style={{ width:80, flexShrink:0 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color:urg==='green'?'var(--t2)':urg==='amber'?'var(--acc)':'var(--red)' }}>
+                          {idleMins < 1 ? 'Just now' : `${idleMins}m ago`}
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--t3)' }}>last activity</div>
+                      </div>
+
+                      {/* Check total */}
+                      <div style={{ marginLeft:'auto', textAlign:'right', flexShrink:0 }}>
+                        <div style={{ fontSize:20, fontWeight:800, color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>
+                          £{(session.subtotal||0).toFixed(2)}
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--t3)' }}>
+                          {session.items?.filter(i=>!i.voided).length||0} items
+                        </div>
+                      </div>
+
+                      {/* Arrow */}
+                      <div style={{ color:'var(--t4)', fontSize:18, flexShrink:0 }}>›</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Floor plan canvas ─────────────────────────────── */}
+        {view==='floor' && (
+          <div style={{ flex:1, overflow:'auto', padding:24 }}>
           <div style={{ position:'relative', width:canvasW, height:canvasH, minWidth:'100%', minHeight:'100%' }}>
             {/* Section labels */}
             <div style={{ position:'absolute', top:8, left:8, fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>Main dining</div>
@@ -247,7 +395,8 @@ export default function TablesSurface() {
               </div>
             ))}
           </div>
-        </div>
+          </div>  /* scroll wrapper */
+        )}  {/* end floor view */}
       </div>
 
       {/* ── Detail panel ───────────────────────────── */}
