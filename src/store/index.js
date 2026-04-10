@@ -284,14 +284,28 @@ export const useStore = create((set, get) => ({
   })),
 
   updateMenuItem: (id, patch) => {
-    set(s => ({ menuItems: s.menuItems.map(item => item.id===id ? { ...item, ...patch } : item) }));
+    set(s => ({
+      menuItems: s.menuItems.map(item => {
+        if (item.id !== id) return item;
+        const updated = { ...item, ...patch };
+        // Auto-set type: simple↔modifiable based on whether modifier groups exist
+        if (patch.modifierGroups !== undefined && updated.type !== 'subitem' && updated.type !== 'variants' && updated.type !== 'combo' && updated.type !== 'pizza') {
+          updated.type = (patch.modifierGroups?.length > 0) ? 'modifiable' : 'simple';
+        }
+        return updated;
+      })
+    }));
     import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem({ id, ...patch }));
   },
   addMenuItem: item => {
     const base = item.price || item.basePrice || 0;
+    const isSubitem = item.type === 'subitem';
     const newItem = {
       id:`m-${Date.now()}`, scope:'local', instructions:'', image:null, tags:[],
-      visibility:{pos:true,kiosk:true,online:true,onlineDelivery:true},
+      // Subitems are hidden from POS/kiosk/online by default - they only appear in modifier groups
+      visibility: isSubitem
+        ? { pos:false, kiosk:false, online:false, onlineDelivery:false }
+        : (item.visibility || { pos:true, kiosk:true, online:true, onlineDelivery:true }),
       sortOrder: useStore.getState().menuItems.length,
       ...item,
       menuName:    item.menuName    || item.name || 'New item',
@@ -730,16 +744,28 @@ export const useStore = create((set, get) => ({
       const pendingItems = order.items.filter(i => i.status === 'pending' && !i.voided);
       const label = customer?.name ? `${orderType.charAt(0).toUpperCase()+orderType.slice(1)} · ${customer.name}` : orderType;
       const newTickets = createKdsTickets(pendingItems, label, staff?.name || 'Server', 1);
-      if (orderType!=='dine-in' && customer) {
-        const ref = `#${++_orderNum}`;
-        addToQueue({ ref, type:orderType, customer:{...customer}, items:order.items, total:order.items.reduce((s,i)=>s+i.price*i.qty,0), status:'received', createdAt:new Date(), collectionTime:customer.collectionTime, isASAP:customer.isASAP, staff:staff?.name });
+      // Always add walk-in orders to queue so they appear in Orders Hub
+      const ref = order.ref || `#${++_orderNum}`;
+      const queueEntry = {
+        ref, type: orderType,
+        customer: customer ? { ...customer } : { name: customer?.name || label },
+        items: order.items.filter(i => !i.voided),
+        total: order.items.reduce((s, i) => s + i.price * i.qty, 0),
+        status: 'received', createdAt: order.createdAt || new Date(), sentAt: new Date(),
+        collectionTime: customer?.collectionTime, isASAP: customer?.isASAP, staff: staff?.name,
+      };
+      const alreadyQueued = get().orderQueue.find(o => o.ref === ref);
+      if (alreadyQueued) {
+        set(s => ({ orderQueue: s.orderQueue.map(o => o.ref === ref ? { ...o, ...queueEntry } : o) }));
+      } else {
+        addToQueue(queueEntry);
       }
-      set(s=>({
-        walkInOrder:{ ...(s.walkInOrder||{}), sentAt:new Date(), items:(s.walkInOrder?.items||[]).map(i=>[0,1].includes(i.course)?{...i,fired:true,status:'sent'}:i) },
+      set(s => ({
+        walkInOrder: { ...(s.walkInOrder||{}), ref, sentAt: new Date(), items: (s.walkInOrder?.items||[]).map(i => [0,1].includes(i.course) ? {...i, fired:true, status:'sent'} : i) },
         kdsTickets: [...s.kdsTickets, ...newTickets],
       }));
       import('../lib/db.js').then(({ insertKDSTicket }) => newTickets.forEach(t => insertKDSTicket(t)));
-      get().showToast(orderType==='dine-in'?'Sent to kitchen':`Order for ${customer?.name} sent`,'success');
+      get().showToast(customer?.name ? `Order sent — ${customer.name}` : 'Sent to kitchen', 'success');
     }
   },
 
@@ -856,9 +882,10 @@ export const useStore = create((set, get) => ({
 
   // ── Collection queue ──────────────────────
   orderQueue: [],
-  addToQueue: o => set(s=>({ orderQueue:[o,...s.orderQueue] })),
-  updateQueueStatus: (ref,status) => set(s=>({ orderQueue:s.orderQueue.map(o=>o.ref===ref?{...o,status}:o) })),
-  removeFromQueue: ref => set(s=>({ orderQueue:s.orderQueue.filter(o=>o.ref!==ref) })),
+  addToQueue: o => set(s => ({ orderQueue: [o, ...s.orderQueue] })),
+  updateQueueStatus: (ref, status) => set(s => ({ orderQueue: s.orderQueue.map(o => o.ref===ref ? {...o, status} : o) })),
+  updateQueueItem: (ref, patch) => set(s => ({ orderQueue: s.orderQueue.map(o => o.ref===ref ? {...o,...patch} : o) })),
+  removeFromQueue: ref => set(s => ({ orderQueue: s.orderQueue.filter(o => o.ref!==ref) })),
 
   // ── 86 ────────────────────────────────────
   eightySixIds: [],

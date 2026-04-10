@@ -11,9 +11,10 @@ import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
 import KioskSurface from './surfaces/KioskSurface';
+import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '0.8.6';
+const VERSION = '0.8.7';
 
 const CHANGELOG = [
   {
@@ -113,6 +114,7 @@ export default function App() {
           {surface==='tables'     && <TablesSurface />}
           {surface==='pos'        && <POSSurface />}
           {surface==='bar'        && <BarSurface />}
+          {surface==='orders'     && <OrdersHub />}
           {surface==='kds'        && <KDSSurface />}
         </div>
       </div>
@@ -123,10 +125,11 @@ export default function App() {
 }
 
 const NAV = [
-  { id:'tables',     label:'Floor', icon:'⬚' },
-  { id:'pos',        label:'POS',   icon:'⊞' },
-  { id:'bar',        label:'Bar',   icon:'🍸' },
-  { id:'kds',        label:'KDS',   icon:'▣' },
+  { id:'tables',  label:'Floor',  icon:'⬚' },
+  { id:'pos',     label:'POS',    icon:'⊞' },
+  { id:'bar',     label:'Bar',    icon:'🍸' },
+  { id:'orders',  label:'Orders', icon:'📋' },
+  { id:'kds',     label:'KDS',    icon:'▣' },
 ];
 
 function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme, syncPulse }) {

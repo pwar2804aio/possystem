@@ -23,11 +23,11 @@ const ORDER_TYPES = [
 ];
 
 const ITEM_TYPES = [
-  { id:'simple',    label:'Simple',   icon:'⬛', desc:'Fixed price, no choices' },
-  { id:'modifiers', label:'With modifiers', icon:'⊕', desc:'Has options & extras' },
-  { id:'variants',  label:'Variants', icon:'▾', desc:'Multiple sizes' },
-  { id:'pizza',     label:'Pizza',    icon:'🍕', desc:'Custom builder' },
-  { id:'bundle',    label:'Bundle',   icon:'📦', desc:'Set menu / meal deal' },
+  { id:'simple',    label:'Simple',    icon:'⬛', desc:'Fixed price — no choices', auto:true },
+  { id:'modifiable',label:'Modifiable',icon:'⊕',  desc:'Auto-set when modifier groups are added', auto:true },
+  { id:'variants',  label:'Variants',  icon:'▾',  desc:'Parent product with linked size/type children', auto:false },
+  { id:'combo',     label:'Combo',     icon:'📦', desc:'Meal deal — build from other items', auto:false },
+  { id:'subitem',   label:'Sub item',  icon:'⬡',  desc:'Can be added to modifier groups only — not shown on POS', auto:false },
 ];
 
 const MOD_TYPES = [
@@ -120,8 +120,12 @@ function ItemsMode() {
     [menuCategories]
   );
 
+  const [showSubitems, setShowSubitems] = useState(false);
+
   const displayItems = useMemo(() => {
     let items = menuItems.filter(i => !i.archived);
+    // Subitems are shown separately
+    if (!showSubitems) items = items.filter(i => i.type !== 'subitem');
     if (search) {
       const q = search.toLowerCase();
       return items.filter(i =>
@@ -134,7 +138,9 @@ function ItemsMode() {
       items = items.filter(i => i.cat === selCatId || childIds.includes(i.cat));
     }
     return items.sort((a, b) => (a.sortOrder||0) - (b.sortOrder||0));
-  }, [menuItems, selCatId, search, menuCategories]);
+  }, [menuItems, selCatId, search, menuCategories, showSubitems]);
+
+  const subitemCount = menuItems.filter(i => !i.archived && i.type === 'subitem').length;
 
   const selItem = menuItems.find(i => i.id === selItemId);
 
@@ -216,7 +222,15 @@ function ItemsMode() {
             const cat = menuCategories.find(c => c.id === selCatId);
             return cat ? <span style={{ fontSize:12, color:'var(--t3)', paddingLeft:4 }}>{cat.icon} {cat.label}</span> : null;
           })()}
-          <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
+          <div style={{ marginLeft:'auto', display:'flex', gap:6, alignItems:'center' }}>
+            <button onClick={() => setShowSubitems(s => !s)} style={{
+              padding:'5px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+              background: showSubitems ? 'var(--acc-d)' : 'var(--bg3)',
+              border: `1px solid ${showSubitems ? 'var(--acc-b)' : 'var(--bdr2)'}`,
+              color: showSubitems ? 'var(--acc)' : 'var(--t3)', fontSize:11, fontWeight:600,
+            }}>
+              ⬡ Sub items {subitemCount > 0 ? `(${subitemCount})` : ''}
+            </button>
             <button onClick={() => setCatModal({})}
               style={{ padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600 }}>
               + Category
@@ -446,7 +460,9 @@ function CatTreeRow({ cat, idx, selCatId, menuCategories, menuItems, onSelect, o
 
 // ── Item editor (right panel) ─────────────────────────────────────────────────
 function ItemEditor({ item, categories, onUpdate, onArchive, onClose, is86, onToggle86 }) {
-  const { modifierLibrary } = useStore();
+  const { modifierLibrary, menuItems: allItems } = useStore();
+  // Subitems are the source for modifier groups
+  const subitems = allItems.filter(i => i.type === 'subitem' && !i.archived);
   const [tab, setTab] = useState('details');
   const TABS = [
     { id:'details',   label:'Details' },
@@ -494,7 +510,7 @@ function ItemEditor({ item, categories, onUpdate, onArchive, onClose, is86, onTo
       <div style={{ flex:1, overflowY:'auto', padding:'14px 14px' }}>
         {tab === 'details'   && <DetailsTab   item={item} categories={categories} onUpdate={onUpdate} />}
         {tab === 'pricing'   && <PricingTab   item={item} pricing={p} onUpdate={onUpdate} />}
-        {tab === 'modifiers' && <ModifiersTab item={item} onUpdate={onUpdate} library={modifierLibrary} />}
+        {tab === 'modifiers' && <ModifiersTab item={item} onUpdate={onUpdate} library={modifierLibrary} subitems={subitems} />}
         {tab === 'allergens' && <AllergensTab item={item} onUpdate={onUpdate} />}
         {tab === 'routing'   && <RoutingTab   item={item} categories={categories} onUpdate={onUpdate} />}
       </div>
@@ -514,30 +530,115 @@ function DetailsTab({ item, categories, onUpdate }) {
   const f = (k, v) => onUpdate({ [k]: v });
   const rootCats = categories.filter(c => !c.parentId && !c.isSpecial);
   const subCats  = categories.filter(c => c.parentId);
+  const { menuItems } = useStore.getState();
+  const isSubitem = item.type === 'subitem';
+  const isVariants = item.type === 'variants';
+
+  // For variants: find linked children
+  const variantChildren = menuItems.filter(i => i.parentId === item.id && !i.archived);
+  // For variant children: find parent
+  const variantParent = item.parentId ? menuItems.find(i => i.id === item.parentId) : null;
+  // All items that could be a variant parent
+  const variantParents = menuItems.filter(i => i.type === 'variants' && i.id !== item.id && !i.archived);
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:13 }}>
+      {/* Type selector */}
       <div>
         <div style={t.lbl}>Item type</div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-          {ITEM_TYPES.map(tt => (
-            <button key={tt.id} onClick={() => f('type', tt.id)} style={pill((item.type||'simple')===tt.id)} title={tt.desc}>
-              {tt.icon} {tt.label}
-            </button>
-          ))}
+        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+          {ITEM_TYPES.filter(tt => !tt.auto || tt.id === (item.type||'simple')).map(tt => {
+            const active = (item.type||'simple') === tt.id;
+            // Auto types (simple/modifiable) can't be manually set
+            if (tt.auto && tt.id !== 'simple') return null;
+            return (
+              <button key={tt.id} onClick={() => {
+                if (tt.auto) return; // simple is set by clearing modifier groups
+                f('type', tt.id);
+              }} style={{
+                padding:'8px 12px', borderRadius:9, cursor: tt.auto ? 'default' : 'pointer',
+                fontFamily:'inherit', textAlign:'left', display:'flex', alignItems:'center', gap:10,
+                border:`1.5px solid ${active?'var(--acc)':'var(--bdr)'}`,
+                background: active ? 'var(--acc-d)' : 'var(--bg3)',
+              }}>
+                <span style={{ fontSize:18 }}>{tt.icon}</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:active?'var(--acc)':'var(--t1)' }}>
+                    {tt.label}
+                    {tt.auto && <span style={{ fontSize:9, fontWeight:500, color:'var(--t4)', marginLeft:6 }}>auto</span>}
+                  </div>
+                  <div style={{ fontSize:10, color:'var(--t4)' }}>{tt.desc}</div>
+                </div>
+                {active && <span style={{ color:'var(--acc)', fontSize:14 }}>✓</span>}
+              </button>
+            );
+          })}
+          {/* Current auto type if modifiable */}
+          {(item.type === 'modifiable') && (
+            <div style={{ padding:'8px 12px', borderRadius:9, border:'1.5px solid var(--acc)', background:'var(--acc-d)', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:18 }}>⊕</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--acc)' }}>Modifiable <span style={{ fontSize:9, fontWeight:500, color:'var(--acc)', opacity:.7 }}>auto</span></div>
+                <div style={{ fontSize:10, color:'var(--t4)' }}>Remove all modifier groups to revert to Simple</div>
+              </div>
+              <span style={{ color:'var(--acc)', fontSize:14 }}>✓</span>
+            </div>
+          )}
         </div>
       </div>
-      <Field label="Menu name" hint="Shown on POS button & menus">
+
+      {/* Sub item note */}
+      {isSubitem && (
+        <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:9, border:'1px solid var(--bdr)', fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>
+          ⬡ <strong>Sub item</strong> — this item is hidden from POS, kiosk, and online menus. It can only be used as an option within modifier groups on other items.
+        </div>
+      )}
+
+      {/* Variant parent link */}
+      {!isSubitem && !isVariants && (
+        <div>
+          <div style={t.lbl}>Variant group <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0, color:'var(--t4)' }}>(optional — link as a size/type of another item)</span></div>
+          <select value={item.parentId||''} onChange={e => f('parentId', e.target.value||null)} style={{ ...t.inp, cursor:'pointer' }}>
+            <option value="">— standalone item —</option>
+            {variantParents.map(p => <option key={p.id} value={p.id}>{p.menuName||p.name}</option>)}
+          </select>
+          {variantParent && (
+            <div style={{ fontSize:11, color:'var(--t3)', marginTop:4 }}>Linked to: {variantParent.menuName||variantParent.name}</div>
+          )}
+        </div>
+      )}
+
+      {/* Variant children (shown on parent) */}
+      {isVariants && (
+        <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:9, border:'1px solid var(--bdr)' }}>
+          <div style={t.lbl}>Linked variants</div>
+          {variantChildren.length === 0 ? (
+            <div style={{ fontSize:11, color:'var(--t4)' }}>No variants linked yet. Create items and link them to this as a variant group.</div>
+          ) : (
+            variantChildren.map(c => (
+              <div key={c.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                <span style={{ fontSize:12, color:'var(--t1)', flex:1 }}>{c.menuName||c.name}</span>
+                <span style={{ fontSize:12, fontFamily:'var(--font-mono)', color:'var(--acc)' }}>£{(c.pricing?.base||c.price||0).toFixed(2)}</span>
+              </div>
+            ))
+          )}
+          <div style={{ fontSize:10, color:'var(--t4)', marginTop:6 }}>Tip: Create child items (e.g. "Coke Small") and set their variant group to this item.</div>
+        </div>
+      )}
+
+      <Field label={isSubitem ? 'Name' : 'Menu name'} hint={isSubitem ? 'Shown in modifier group picker' : 'Shown on POS button & menus'}>
         <input style={t.inp} value={item.menuName||item.name||''} onChange={e => f('menuName', e.target.value)} />
       </Field>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-        <Field label="Receipt name" hint="On printed receipt">
-          <input style={t.inp} value={item.receiptName||''} onChange={e => f('receiptName', e.target.value)} placeholder="Same as menu name" />
-        </Field>
-        <Field label="KDS / kitchen name" hint="On kitchen display">
-          <input style={t.inp} value={item.kitchenName||''} onChange={e => f('kitchenName', e.target.value)} placeholder="Same as menu name" />
-        </Field>
-      </div>
+      {!isSubitem && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          <Field label="Receipt name" hint="On printed receipt">
+            <input style={t.inp} value={item.receiptName||''} onChange={e => f('receiptName', e.target.value)} placeholder="Same as menu name" />
+          </Field>
+          <Field label="KDS / kitchen name" hint="On kitchen display">
+            <input style={t.inp} value={item.kitchenName||''} onChange={e => f('kitchenName', e.target.value)} placeholder="Same as menu name" />
+          </Field>
+        </div>
+      )}
       <Field label="Description" hint="Shown on kiosk & online ordering">
         <textarea style={{ ...t.inp, resize:'none', height:54 }} value={item.description||''} onChange={e => f('description', e.target.value)} placeholder="What makes this dish special?" />
       </Field>
@@ -659,7 +760,7 @@ function PricingTab({ item, pricing, onUpdate }) {
 }
 
 // ── Modifiers tab ─────────────────────────────────────────────────────────────
-function ModifiersTab({ item, onUpdate, library }) {
+function ModifiersTab({ item, onUpdate, library, subitems = [] }) {
   const groups    = item.modifierGroups || [];
   const [openIdx, setOpenIdx] = useState(null);
   const [modQ, setModQ]       = useState('');
@@ -677,21 +778,39 @@ function ModifiersTab({ item, onUpdate, library }) {
   const addMod    = (gi, id) => { const g=groups[gi]; if(!g.modifierIds?.includes(id)) updGroup(gi,{ modifierIds:[...(g.modifierIds||[]),id] }); };
   const removeMod = (gi, id) => updGroup(gi,{ modifierIds:(groups[gi].modifierIds||[]).filter(x=>x!==id) });
 
-  const libFiltered = library.filter(m =>
+  // Modifier sources: subitems take priority, fall back to modifier library
+  const allModSources = [
+    ...subitems.map(s => ({ id:s.id, name:s.menuName||s.name, price:(s.pricing?.base||s.price||0), category:'Sub items', _isSubitem:true })),
+    ...library.map(m => ({ ...m, _isSubitem:false })),
+  ];
+  const libFiltered = allModSources.filter(m =>
     !modQ || m.name.toLowerCase().includes(modQ.toLowerCase()) || (m.category||'').toLowerCase().includes(modQ.toLowerCase())
   );
+  const resolveMod = (id) => allModSources.find(m => m.id === id);
 
   if (item.type === 'variants') return <VariantsTab item={item} onUpdate={onUpdate} />;
+  if (item.type === 'subitem') return (
+    <div style={{ padding:'16px', textAlign:'center', color:'var(--t4)' }}>
+      <div style={{ fontSize:24, marginBottom:8, opacity:.3 }}>⬡</div>
+      <div style={{ fontSize:12, fontWeight:600, color:'var(--t2)' }}>Sub items cannot have modifier groups</div>
+      <div style={{ fontSize:11, marginTop:4 }}>They are used as options within other items' modifier groups</div>
+    </div>
+  );
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {subitems.length === 0 && (
+        <div style={{ padding:'10px 12px', background:'var(--acc-d)', border:'1px solid var(--acc-b)', borderRadius:9, fontSize:11, color:'var(--acc)' }}>
+          💡 Create <strong>Sub items</strong> first (use the ⬡ Sub items toggle in the toolbar), then add them to modifier groups here.
+        </div>
+      )}
       <div style={{ fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>
-        Build modifier groups from your modifier library. Groups define what choices the customer makes when ordering this item.
+        Modifier groups define what choices the customer makes. Only <strong>sub items</strong> (⬡) can be added to groups — create them in the Items tab first.
       </div>
 
       {/* Existing groups */}
       {groups.map((g, gi) => {
-        const mods = (g.modifierIds||[]).map(id => library.find(m=>m.id===id)).filter(Boolean);
+        const mods = (g.modifierIds||[]).map(id => resolveMod(id)).filter(Boolean);
         const open = openIdx === gi;
         return (
           <div key={g.id} style={{ borderRadius:11, border:`1.5px solid ${open?'var(--acc)':'var(--bdr)'}`, overflow:'hidden' }}>
