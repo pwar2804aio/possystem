@@ -1,115 +1,109 @@
 /**
- * OrdersHub — unified view of ALL active orders
+ * OrdersHub — unified live view of ALL active orders
  * Tables · Bar tabs · Walk-in (dine-in named / takeaway / collection / delivery)
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../store';
 
 const CHANNELS = [
-  { id:'all',        label:'All orders',   icon:'⊞' },
-  { id:'dine-in',    label:'Dine-in',      icon:'🍽', color:'#3b82f6' },
-  { id:'table',      label:'Tables',       icon:'⬚', color:'#3b82f6' },
-  { id:'bar',        label:'Bar tabs',     icon:'🍸', color:'#a855f7' },
-  { id:'takeaway',   label:'Takeaway',     icon:'🥡', color:'#e8a020' },
-  { id:'collection', label:'Collection',   icon:'📦', color:'#22c55e' },
-  { id:'delivery',   label:'Delivery',     icon:'🛵', color:'#ef4444' },
+  { id:'all',        label:'All',        icon:'⊞',  color:'var(--acc)' },
+  { id:'table',      label:'Tables',     icon:'⬚',  color:'#3b82f6' },
+  { id:'bar',        label:'Bar tabs',   icon:'🍸',  color:'#a855f7' },
+  { id:'dine-in',    label:'Dine-in',    icon:'🍽',  color:'#22d3ee' },
+  { id:'takeaway',   label:'Takeaway',   icon:'🥡',  color:'#e8a020' },
+  { id:'collection', label:'Collection', icon:'📦',  color:'#22c55e' },
+  { id:'delivery',   label:'Delivery',   icon:'🛵',  color:'#ef4444' },
 ];
 
 const Q_STATUS = {
-  received: { label:'Received',   color:'#3b82f6', bg:'rgba(59,130,246,.1)',  icon:'⏳' },
-  prep:     { label:'In prep',    color:'#e8a020', bg:'rgba(232,160,32,.1)',  icon:'👨‍🍳' },
-  ready:    { label:'Ready',      color:'#22c55e', bg:'rgba(34,197,94,.1)',   icon:'✓' },
-  collected:{ label:'Collected',  color:'#888780', bg:'rgba(136,135,128,.1)', icon:'✓✓' },
-  paid:     { label:'Paid',       color:'#888780', bg:'rgba(136,135,128,.1)', icon:'💳' },
+  received:  { label:'Received',  color:'#3b82f6', dot:'#3b82f6' },
+  prep:      { label:'In prep',   color:'#e8a020', dot:'#e8a020' },
+  ready:     { label:'Ready ✓',  color:'#22c55e', dot:'#22c55e' },
+  collected: { label:'Collected', color:'#888780', dot:'#888780' },
+  paid:      { label:'Paid',      color:'#888780', dot:'#888780' },
 };
 
-const T_STATUS = {
-  available: { label:'Available',  color:'#888780' },
-  occupied:  { label:'Occupied',   color:'#e8a020' },
-  bill:      { label:'Bill req.',  color:'#ef4444' },
-};
-
-function elapsed(date) {
+function timeAgo(date) {
   if (!date) return '';
-  const mins = Math.floor((Date.now() - new Date(date)) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  return `${Math.floor(mins/60)}h ${mins%60}m ago`;
+  const s = Math.floor((Date.now() - new Date(date)) / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s/60)}m`;
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
 }
 
 function moneyFmt(n) { return `£${(n||0).toFixed(2)}`; }
 
 export default function OrdersHub() {
   const {
-    tables, tabs,
-    orderQueue, updateQueueStatus, updateQueueItem, removeFromQueue,
+    tables, tabs, orderQueue,
+    updateQueueStatus, updateQueueItem, removeFromQueue,
     showToast, setSurface, setActiveTableId,
   } = useStore();
 
-  const [filter, setFilter]   = useState('all');
-  const [search, setSearch]   = useState('');
-  const [showDone, setDone]   = useState(false);
+  const [channel, setChannel]   = useState('all');
+  const [search, setSearch]     = useState('');
+  const [showDone, setShowDone] = useState(false);
+  const [tick, setTick]         = useState(0);
 
-  // Build a unified orders list
+  // Refresh elapsed times every 30s
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── Unified order list ──────────────────────────────────────────────────
   const allOrders = useMemo(() => {
-    const result = [];
+    const out = [];
 
-    // Table orders
-    tables
-      .filter(t => t.status !== 'available' && t.session)
-      .forEach(t => {
-        const s = t.session;
-        result.push({
-          _kind: 'table',
-          id: `table-${t.id}`,
-          ref: `Table ${t.label}`,
-          type: 'table',
-          channel: 'table',
-          label: `Table ${t.label}`,
-          server: s.server,
-          covers: s.covers,
-          items: s.items?.filter(i=>!i.voided) || [],
-          total: s.total || 0,
-          subtotal: s.subtotal || 0,
-          status: t.status === 'bill' ? 'bill' : s.sentAt ? 'active' : 'ordering',
-          createdAt: s.createdAt || s.sentAt,
-          sentAt: s.sentAt,
-          section: t.section,
-          tableId: t.id,
-          _table: t,
-        });
+    // Active table sessions
+    tables.filter(t => t.status !== 'available' && t.session).forEach(t => {
+      const s = t.session;
+      const items = s.items?.filter(i => !i.voided) || [];
+      out.push({
+        _kind: 'table', id: `tbl-${t.id}`,
+        ref: `Table ${t.label}`,
+        channel: 'table',
+        displayName: `Table ${t.label}`,
+        section: t.section,
+        server: s.server,
+        covers: s.covers,
+        items,
+        total: s.total || 0,
+        subtotal: s.subtotal || 0,
+        status: t.status === 'bill' ? 'bill_req' : s.sentAt ? 'active' : 'ordering',
+        createdAt: s.createdAt || s.sentAt,
+        sentAt: s.sentAt,
+        tableId: t.id,
+        _raw: t,
       });
+    });
 
     // Bar tabs
-    tabs
-      ?.filter(tab => !tab.closed)
-      .forEach(tab => {
-        result.push({
-          _kind: 'tab',
-          id: `tab-${tab.id}`,
-          ref: tab.name || tab.id,
-          type: 'bar',
-          channel: 'bar',
-          label: tab.name || 'Bar tab',
-          server: tab.server,
-          items: tab.items?.filter(i=>!i.voided) || [],
-          total: tab.total || 0,
-          status: 'active',
-          createdAt: tab.createdAt,
-          sentAt: tab.sentAt,
-          _tab: tab,
-        });
+    tabs?.filter(tab => tab.status !== 'closed').forEach(tab => {
+      const rounds = tab.rounds || [];
+      const items  = rounds.flatMap(r => r.items || []).filter(i => !i.voided);
+      out.push({
+        _kind: 'tab', id: `tab-${tab.id}`,
+        ref: tab.name || tab.id,
+        channel: 'bar',
+        displayName: tab.name || 'Bar tab',
+        server: tab.openedBy || tab.server,
+        items,
+        total: tab.total || 0,
+        status: 'active',
+        createdAt: tab.openedAt || tab.createdAt,
+        sentAt: tab.openedAt,
+        _raw: tab,
       });
+    });
 
-    // Walk-in / queue orders
+    // Queue orders (walk-in, collection, delivery, named dine-in)
     orderQueue.forEach(o => {
-      result.push({
-        _kind: 'queue',
-        id: `q-${o.ref}`,
+      out.push({
+        _kind: 'queue', id: `q-${o.ref}`,
         ref: o.ref,
-        type: o.type || 'dine-in',
         channel: o.type || 'dine-in',
-        label: o.customer?.name || o.ref,
+        displayName: o.customer?.name || o.ref,
         server: o.staff,
         customer: o.customer,
         items: o.items || [],
@@ -119,129 +113,143 @@ export default function OrdersHub() {
         sentAt: o.sentAt,
         collectionTime: o.collectionTime,
         isASAP: o.isASAP,
-        _queue: o,
+        _raw: o,
       });
     });
 
-    return result;
-  }, [tables, tabs, orderQueue]);
+    return out.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [tables, tabs, orderQueue, tick]);
 
-  const filtered = useMemo(() => {
+  // ── Filtered view ────────────────────────────────────────────────────────
+  const display = useMemo(() => {
     let list = allOrders;
-
-    // Channel filter
-    if (filter !== 'all') {
-      list = list.filter(o => o.channel === filter);
-    }
-
-    // Search
+    if (channel !== 'all') list = list.filter(o => o.channel === channel);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(o =>
-        (o.label||'').toLowerCase().includes(q) ||
+        (o.displayName||'').toLowerCase().includes(q) ||
         (o.ref||'').toLowerCase().includes(q) ||
         (o.server||'').toLowerCase().includes(q)
       );
     }
+    if (!showDone) list = list.filter(o => !['collected','paid'].includes(o.status));
+    return list;
+  }, [allOrders, channel, search, showDone]);
 
-    // Hide done
-    if (!showDone) {
-      list = list.filter(o => !['collected','paid'].includes(o.status));
-    }
+  // ── Per-channel counts ────────────────────────────────────────────────────
+  const counts = useMemo(() => {
+    const active = allOrders.filter(o => !['collected','paid'].includes(o.status));
+    return {
+      all:        active.length,
+      table:      active.filter(o => o.channel === 'table').length,
+      bar:        active.filter(o => o.channel === 'bar').length,
+      'dine-in':  active.filter(o => o.channel === 'dine-in').length,
+      takeaway:   active.filter(o => o.channel === 'takeaway').length,
+      collection: active.filter(o => o.channel === 'collection').length,
+      delivery:   active.filter(o => o.channel === 'delivery').length,
+    };
+  }, [allOrders]);
 
-    return list.sort((a, b) => new Date(b.createdAt||0) - new Date(a.createdAt||0));
-  }, [allOrders, filter, search, showDone]);
-
-  // Summary counts
-  const counts = useMemo(() => ({
-    total:  allOrders.filter(o => !['collected','paid'].includes(o.status)).length,
-    tables: allOrders.filter(o => o.channel==='table').length,
-    bar:    allOrders.filter(o => o.channel==='bar').length,
-    queue:  orderQueue.filter(o => !['collected','paid'].includes(o.status)).length,
-  }), [allOrders, orderQueue]);
-
-  const advanceStatus = (o) => {
+  // ── Actions ───────────────────────────────────────────────────────────────
+  const advance = (o) => {
     if (o._kind !== 'queue') return;
-    const flow = ['received','prep','ready','collected'];
+    const flow = ['received', 'prep', 'ready', 'collected'];
     const idx  = flow.indexOf(o.status);
-    if (idx < flow.length - 1) {
-      const next = flow[idx + 1];
-      updateQueueStatus(o.ref, next);
-      if (next === 'ready')     showToast(`${o.ref} ready for ${o.label}`, 'success');
-      if (next === 'collected') { showToast(`${o.ref} collected`, 'info'); setTimeout(() => removeFromQueue(o.ref), 8000); }
+    if (idx < 0 || idx >= flow.length - 1) return;
+    const next = flow[idx + 1];
+    updateQueueStatus(o.ref, next);
+    if (next === 'ready')     showToast(`${o.displayName} — ready!`, 'success');
+    if (next === 'collected') {
+      showToast(`${o.ref} collected`, 'info');
+      setTimeout(() => removeFromQueue(o.ref), 10000);
     }
   };
 
+  const openOrder = (o) => {
+    if (o._kind === 'table') {
+      setActiveTableId(o.tableId);
+      setSurface('tables');
+    } else if (o._kind === 'tab') {
+      setSurface('bar');
+    } else {
+      setSurface('pos');
+    }
+  };
+
+  const totalActive = counts.all;
+
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
-      {/* Header */}
-      <div style={{ padding:'12px 18px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:'var(--bg)' }}>
+
+      {/* ── Header ────────────────────────────────────────── */}
+      <div style={{ padding:'12px 18px 0', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:10 }}>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)' }}>Orders Hub</div>
-            <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>
-              {counts.total} active · {counts.tables} tables · {counts.bar} bar tabs · {counts.queue} in queue
+            <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)', display:'flex', alignItems:'center', gap:10 }}>
+              Orders Hub
+              {totalActive > 0 && (
+                <span style={{ fontSize:12, fontWeight:800, padding:'2px 9px', borderRadius:20, background:'var(--acc)', color:'#0b0c10' }}>
+                  {totalActive} active
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>
+              All live orders — tables, bar tabs, walk-in, collection & delivery
             </div>
           </div>
           <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:12, color:'var(--t3)' }}>
-            <input type="checkbox" checked={showDone} onChange={e=>setDone(e.target.checked)} style={{ accentColor:'var(--acc)' }}/>
+            <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)}
+              style={{ accentColor:'var(--acc)', width:14, height:14 }} />
             Show completed
           </label>
           <div style={{ position:'relative' }}>
-            <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t4)', fontSize:12 }}>🔍</span>
+            <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t4)', fontSize:12, pointerEvents:'none' }}>🔍</span>
             <input
-              style={{ background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:9, padding:'6px 10px 6px 28px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', width:200 }}
-              placeholder="Search by name, ref…"
-              value={search} onChange={e=>setSearch(e.target.value)}
+              style={{ background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:9, padding:'7px 10px 7px 28px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', width:200 }}
+              placeholder="Name, ref, server…"
+              value={search} onChange={e => setSearch(e.target.value)}
             />
           </div>
         </div>
 
-        {/* Channel filter tabs */}
-        <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
+        {/* Channel filter */}
+        <div style={{ display:'flex', gap:4, overflowX:'auto', paddingBottom:1 }}>
           {CHANNELS.map(ch => {
-            const count = ch.id === 'all' ? counts.total : allOrders.filter(o => o.channel===ch.id && !['collected','paid'].includes(o.status)).length;
+            const n = counts[ch.id] || 0;
+            const active = channel === ch.id;
             return (
-              <button key={ch.id} onClick={() => setFilter(ch.id)} style={{
-                padding:'5px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
-                fontSize:11, fontWeight:filter===ch.id?800:500, whiteSpace:'nowrap',
-                border:`1.5px solid ${filter===ch.id?(ch.color||'var(--acc)'):'var(--bdr)'}`,
-                background:filter===ch.id?`${ch.color||'var(--acc)'}18`:'var(--bg3)',
-                color:filter===ch.id?(ch.color||'var(--acc)'):'var(--t3)',
+              <button key={ch.id} onClick={() => setChannel(ch.id)} style={{
+                padding:'6px 13px', borderRadius:'10px 10px 0 0', cursor:'pointer', fontFamily:'inherit',
+                fontSize:12, fontWeight:active ? 800 : 500, whiteSpace:'nowrap', border:'none',
+                borderBottom: active ? `3px solid ${ch.color}` : '3px solid transparent',
+                background: active ? `${ch.color}15` : 'transparent',
+                color: active ? ch.color : 'var(--t3)',
+                transition:'all .12s',
               }}>
                 {ch.icon} {ch.label}
-                {count > 0 && <span style={{ marginLeft:6, fontFamily:'var(--font-mono)', fontWeight:800 }}>{count}</span>}
+                {n > 0 && (
+                  <span style={{ marginLeft:6, fontSize:10, fontWeight:800, padding:'1px 6px', borderRadius:10, background:active?ch.color:'var(--bg3)', color:active?'#0b0c10':'var(--t4)' }}>
+                    {n}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Orders grid */}
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 18px' }}>
-        {filtered.length === 0 ? (
-          <div style={{ textAlign:'center', padding:'60px 20px', color:'var(--t4)' }}>
-            <div style={{ fontSize:40, marginBottom:14, opacity:.2 }}>⊞</div>
-            <div style={{ fontSize:14, fontWeight:600, color:'var(--t2)', marginBottom:4 }}>No orders</div>
-            <div style={{ fontSize:12 }}>
-              {search ? `No results for "${search}"` : filter==='all' ? 'All active orders will appear here' : `No active ${filter} orders`}
-            </div>
-          </div>
+      {/* ── Order cards ──────────────────────────────────────────────────── */}
+      <div style={{ flex:1, overflowY:'auto', padding:'16px 18px' }}>
+        {display.length === 0 ? (
+          <EmptyState channel={channel} search={search} counts={counts} />
         ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:12 }}>
-            {filtered.map(order => (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:12 }}>
+            {display.map(order => (
               <OrderCard
                 key={order.id}
                 order={order}
-                onAdvance={() => advanceStatus(order)}
-                onNavigate={() => {
-                  if (order._kind === 'table' && order.tableId) {
-                    setActiveTableId(order.tableId);
-                    setSurface('tables');
-                  } else if (order._kind === 'queue') {
-                    setSurface('pos');
-                  }
-                }}
+                onAdvance={() => advance(order)}
+                onOpen={() => openOrder(order)}
               />
             ))}
           </div>
@@ -251,108 +259,157 @@ export default function OrdersHub() {
   );
 }
 
-function OrderCard({ order, onAdvance, onNavigate }) {
-  const ch = CHANNELS.find(c => c.id === order.channel) || CHANNELS[0];
-  const qs = Q_STATUS[order.status] || Q_STATUS.received;
-  const itemCount = order.items?.length || 0;
+// ── Order card ────────────────────────────────────────────────────────────────
+function OrderCard({ order, onAdvance, onOpen }) {
+  const ch  = CHANNELS.find(c => c.id === order.channel) || CHANNELS[0];
+  const qs  = Q_STATUS[order.status] || Q_STATUS.received;
+  const elapsed = timeAgo(order.sentAt || order.createdAt);
 
-  // For table/bar orders, compute a simple status label
-  const statusLabel =
-    order._kind === 'queue' ? qs.label :
-    order.status === 'bill' ? 'Bill requested' :
-    order.status === 'ordering' ? 'Building order' :
-    order.sentAt ? 'In kitchen' : 'Ordering';
+  // Compute status display
+  let statusText = qs.label;
+  let statusColor = qs.color;
+  if (order.status === 'bill_req') { statusText = 'Bill requested'; statusColor = '#ef4444'; }
+  if (order.status === 'ordering') { statusText = 'Building order'; statusColor = '#888780'; }
+  if (order.status === 'active' && order._kind === 'table') { statusText = 'In kitchen'; statusColor = '#e8a020'; }
+  if (order.status === 'active' && order._kind === 'tab')   { statusText = 'Open tab'; statusColor = '#a855f7'; }
 
-  const statusColor =
-    order.status === 'bill'     ? '#ef4444' :
-    order.status === 'ready'    ? '#22c55e' :
-    order.status === 'ordering' ? '#888780' :
-    ch.color || '#3b82f6';
+  const NEXT_ACTION = { received:'Mark in prep →', prep:'Mark ready →', ready:'Mark collected →' };
+  const canAdvance = order._kind === 'queue' && !!NEXT_ACTION[order.status];
+
+  const items = order.items || [];
 
   return (
     <div style={{
-      background:'var(--bg1)', border:`1.5px solid ${statusColor}33`,
+      background:'var(--bg1)', border:`1.5px solid ${statusColor}30`,
       borderRadius:14, overflow:'hidden', display:'flex', flexDirection:'column',
-    }}>
-      {/* Card header */}
-      <div style={{ padding:'11px 14px', background:`${statusColor}08`, borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'flex-start', gap:10 }}>
-        <div style={{ fontSize:22 }}>{ch.icon}</div>
+      transition:'border-color .15s',
+    }}
+    onMouseEnter={e=>e.currentTarget.style.borderColor=statusColor+'80'}
+    onMouseLeave={e=>e.currentTarget.style.borderColor=statusColor+'30'}>
+
+      {/* Card top strip */}
+      <div style={{ height:3, background:`linear-gradient(90deg, ${statusColor}, ${ch.color})` }} />
+
+      {/* Header */}
+      <div style={{ padding:'11px 14px', display:'flex', alignItems:'flex-start', gap:10 }}>
+        <div style={{ fontSize:24, lineHeight:1, flexShrink:0 }}>{ch.icon}</div>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ fontSize:14, fontWeight:800, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              {order.label}
+          <div style={{ display:'flex', alignItems:'baseline', gap:6, flexWrap:'wrap' }}>
+            <span style={{ fontSize:14, fontWeight:800, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:160 }}>
+              {order.displayName}
             </span>
-            <span style={{ fontSize:10, fontFamily:'var(--font-mono)', color:'var(--t4)', flexShrink:0 }}>{order.ref}</span>
+            <span style={{ fontSize:10, color:'var(--t4)', fontFamily:'var(--font-mono)', flexShrink:0 }}>{order.ref}</span>
           </div>
-          <div style={{ display:'flex', gap:8, marginTop:3, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:4 }}>
             {order.server && <span style={{ fontSize:10, color:'var(--t3)' }}>👤 {order.server}</span>}
-            {order.covers && <span style={{ fontSize:10, color:'var(--t3)' }}>🧑 {order.covers} covers</span>}
-            <span style={{ fontSize:10, color:'var(--t4)' }}>{elapsed(order.sentAt || order.createdAt)}</span>
+            {order.covers && <span style={{ fontSize:10, color:'var(--t3)' }}>🧑 {order.covers}</span>}
+            {order.section && <span style={{ fontSize:10, color:'var(--t4)' }}>📍 {order.section}</span>}
+            {elapsed && <span style={{ fontSize:10, color:'var(--t4)' }}>⏱ {elapsed}</span>}
           </div>
+          {/* Collection time */}
+          {order.collectionTime && (
+            <div style={{ marginTop:4, fontSize:11, fontWeight:700, color:'var(--acc)' }}>
+              {order.isASAP ? '⚡ ASAP' : `⏰ ${order.collectionTime}`}
+            </div>
+          )}
         </div>
+        {/* Status badge */}
         <div style={{
-          fontSize:10, fontWeight:800, padding:'3px 9px', borderRadius:20, flexShrink:0,
-          background:qs.bg || `${statusColor}18`, color:statusColor, border:`1px solid ${statusColor}44`,
+          flexShrink:0, fontSize:10, fontWeight:800, padding:'3px 9px', borderRadius:20,
+          background:`${statusColor}18`, color:statusColor, border:`1px solid ${statusColor}40`,
+          whiteSpace:'nowrap',
         }}>
-          {statusLabel}
+          <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:statusColor, marginRight:5, verticalAlign:'middle' }}/>
+          {statusText}
         </div>
       </div>
 
-      {/* Items */}
-      <div style={{ padding:'10px 14px', flex:1 }}>
-        {order.items.slice(0, 4).map((item, i) => (
-          <div key={i} style={{ display:'flex', alignItems:'baseline', gap:6, marginBottom:3 }}>
-            <span style={{ fontSize:12, fontWeight:700, color:'var(--t3)', fontFamily:'var(--font-mono)', minWidth:20 }}>{item.qty}×</span>
-            <span style={{ fontSize:12, color:'var(--t1)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              {item.kitchenName || item.receiptName || item.name}
-            </span>
-            <span style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
-              {moneyFmt(item.price * item.qty)}
-            </span>
-          </div>
-        ))}
-        {itemCount > 4 && (
-          <div style={{ fontSize:11, color:'var(--t4)', marginTop:4 }}>+ {itemCount - 4} more items…</div>
-        )}
-        {itemCount === 0 && (
-          <div style={{ fontSize:12, color:'var(--t4)', fontStyle:'italic' }}>No items yet</div>
+      {/* Item list */}
+      <div style={{ padding:'0 14px 10px', flex:1 }}>
+        {items.length === 0 ? (
+          <div style={{ fontSize:11, color:'var(--t4)', fontStyle:'italic' }}>No items yet</div>
+        ) : (
+          <>
+            {items.slice(0, 5).map((item, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'baseline', gap:6, marginBottom:2 }}>
+                <span style={{ fontSize:11, fontWeight:800, color:'var(--t3)', fontFamily:'var(--font-mono)', minWidth:18, textAlign:'right' }}>
+                  {item.qty}×
+                </span>
+                <span style={{ fontSize:12, color:'var(--t1)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {item.kitchenName || item.receiptName || item.name}
+                  {item.mods && typeof item.mods === 'string' && item.mods && (
+                    <span style={{ color:'var(--t4)', fontSize:10 }}> · {item.mods.substring(0,40)}</span>
+                  )}
+                </span>
+                <span style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
+                  {moneyFmt(item.price * item.qty)}
+                </span>
+              </div>
+            ))}
+            {items.length > 5 && (
+              <div style={{ fontSize:10, color:'var(--t4)', marginTop:3 }}>
+                +{items.length - 5} more item{items.length - 5 !== 1 ? 's' : ''}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Footer */}
-      <div style={{ padding:'8px 14px', borderTop:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:8 }}>
-        <span style={{ fontSize:14, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>
+      <div style={{ padding:'8px 14px', borderTop:'1px solid var(--bdr)', background:'var(--bg2)', display:'flex', alignItems:'center', gap:8 }}>
+        <span style={{ fontSize:15, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>
           {moneyFmt(order.total)}
         </span>
-        <span style={{ fontSize:10, color:'var(--t4)' }}>{itemCount} item{itemCount!==1?'s':''}</span>
-
-        {/* Collection time */}
-        {order.collectionTime && (
-          <span style={{ fontSize:10, fontWeight:700, color:'var(--t2)', marginLeft:4 }}>
-            {order.isASAP ? '⚡ ASAP' : `⏰ ${order.collectionTime}`}
-          </span>
-        )}
-
+        <span style={{ fontSize:10, color:'var(--t4)' }}>
+          {items.length} item{items.length !== 1 ? 's' : ''}
+        </span>
         <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
-          {/* Navigate to order */}
-          <button onClick={onNavigate}
-            style={{ padding:'4px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:11, fontWeight:600 }}>
+          <button onClick={onOpen} style={{
+            padding:'5px 11px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+            background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:11, fontWeight:600,
+          }}>
             Open →
           </button>
-
-          {/* Advance queue status */}
-          {order._kind === 'queue' && !['collected','paid'].includes(order.status) && (() => {
-            const NEXT_LABEL = { received:'Mark in prep', prep:'Mark ready', ready:'Mark collected' };
-            const label = NEXT_LABEL[order.status];
-            if (!label) return null;
-            return (
-              <button onClick={onAdvance}
-                style={{ padding:'4px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:11, fontWeight:700 }}>
-                {label}
-              </button>
-            );
-          })()}
+          {canAdvance && (
+            <button onClick={onAdvance} style={{
+              padding:'5px 13px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+              background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:11, fontWeight:700,
+            }}>
+              {NEXT_ACTION[order.status]}
+            </button>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+function EmptyState({ channel, search, counts }) {
+  const ch = CHANNELS.find(c => c.id === channel);
+  if (search) {
+    return (
+      <div style={{ textAlign:'center', padding:'60px 20px', color:'var(--t4)' }}>
+        <div style={{ fontSize:32, marginBottom:12, opacity:.2 }}>🔍</div>
+        <div style={{ fontSize:14, fontWeight:600, color:'var(--t2)' }}>No results for "{search}"</div>
+        <div style={{ fontSize:12, marginTop:4 }}>Try a different name or order reference</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ textAlign:'center', padding:'70px 20px', color:'var(--t4)' }}>
+      <div style={{ fontSize:40, marginBottom:14, opacity:.15 }}>{ch?.icon || '⊞'}</div>
+      <div style={{ fontSize:15, fontWeight:700, color:'var(--t2)', marginBottom:6 }}>
+        No active {channel === 'all' ? '' : ch?.label} orders
+      </div>
+      <div style={{ fontSize:12, lineHeight:1.7 }}>
+        {channel === 'all' && 'All orders will appear here once sent from any terminal'}
+        {channel === 'table' && 'Seat guests at a table from the Floor plan and send their order to kitchen'}
+        {channel === 'bar' && 'Open bar tabs from the Bar surface'}
+        {channel === 'collection' && 'Named collection orders appear here after being sent to kitchen'}
+        {channel === 'delivery' && 'Delivery orders from Deliverect will appear here once configured'}
+        {channel === 'takeaway' && 'Named takeaway orders appear here after being sent to kitchen'}
+        {channel === 'dine-in' && 'Named walk-in dine-in orders appear here after being sent to kitchen'}
       </div>
     </div>
   );

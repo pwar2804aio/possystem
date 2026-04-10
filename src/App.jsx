@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '0.8.7';
+const VERSION = '0.8.8';
 
 const CHANGELOG = [
   {
@@ -259,13 +259,17 @@ function WhatsNewModal({ onClose }) {
 }
 
 function Sidebar({ surface, setSurface }) {
-  const { setAppMode, syncStatus, deviceConfig } = useStore();
+  const { setAppMode, syncStatus, deviceConfig, orderQueue, tables, tabs } = useStore();
   const [showStatus, setShowStatus] = useState(false);
 
   const hidden = deviceConfig?.hiddenFeatures || [];
   const allOk = syncStatus.printerOnline && syncStatus.paymentTerminalOnline && !syncStatus.pendingChanges;
 
-  // Filter nav items based on device profile hiddenFeatures
+  // Active order counts for badge
+  const activeOrderCount = (orderQueue?.filter(o => !['collected','paid'].includes(o.status)).length || 0)
+    + (tables?.filter(t => t.status !== 'available').length || 0)
+    + (tabs?.filter(t => t.status !== 'closed').length || 0);
+
   const FEATURE_MAP = { kds:'kds', reports:'backoffice' };
   const visibleNav = NAV.filter(n => {
     const featureKey = Object.entries(FEATURE_MAP).find(([,v]) => v === n.id)?.[0];
@@ -277,9 +281,14 @@ function Sidebar({ surface, setSurface }) {
     <nav style={{ width:'var(--nav)', background:'var(--bg1)', borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', alignItems:'center', padding:'10px 0', gap:2, flexShrink:0 }}>
       {visibleNav.map(n=>{
         const active=surface===n.id;
-        return(<button key={n.id} onClick={()=>setSurface(n.id)} style={{ width:46, height:46, borderRadius:10, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, background:active?'var(--acc-d)':'transparent', border:`1px solid ${active?'var(--acc-b)':'transparent'}`, color:active?'var(--acc)':'var(--t3)', transition:'all .15s', fontFamily:'inherit' }}>
+        return(<button key={n.id} onClick={()=>setSurface(n.id)} style={{ width:46, height:46, borderRadius:10, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, background:active?'var(--acc-d)':'transparent', border:`1px solid ${active?'var(--acc-b)':'transparent'}`, color:active?'var(--acc)':'var(--t3)', transition:'all .15s', fontFamily:'inherit', position:'relative' }}>
           <span style={{ fontSize:18, lineHeight:1 }}>{n.icon}</span>
           <span style={{ fontSize:9, fontWeight:700, letterSpacing:'.04em', color:active?'var(--acc)':'var(--t3)' }}>{n.label}</span>
+          {n.id==='orders' && activeOrderCount > 0 && (
+            <div style={{ position:'absolute', top:5, right:5, minWidth:16, height:16, borderRadius:8, background:'var(--acc)', color:'#0b0c10', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', lineHeight:1 }}>
+              {activeOrderCount > 99 ? '99+' : activeOrderCount}
+            </div>
+          )}
         </button>);
       })}
 
