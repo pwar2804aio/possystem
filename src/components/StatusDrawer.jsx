@@ -91,12 +91,15 @@ export default function StatusDrawer({ onClose }) {
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
                 <div style={{ width:8, height:8, borderRadius:'50%', background: syncOk ? 'var(--grn)' : 'var(--acc)', animation: syncOk ? 'none' : 'pulse 1.5s ease-in-out infinite' }}/>
                 <span style={{ fontSize:13, fontWeight:700, color: syncOk ? 'var(--grn)' : 'var(--acc)' }}>
-                  {syncOk ? 'In sync' : 'Changes pending'}
+                  {syncOk ? 'Synced via BroadcastChannel' : 'Changes pending'}
                 </span>
               </div>
               <div style={{ fontSize:11, color:'var(--t3)' }}>
                 Last sync: {timeSince(syncStatus.lastTerminalSync)}
                 {syncStatus.lastConfigChange && <span style={{ marginLeft:8, color:'var(--t4)' }}>· Config changed: {timeSince(syncStatus.lastConfigChange)}</span>}
+              </div>
+              <div style={{ fontSize:11, color:'var(--t4)', marginTop:4 }}>
+                Cross-tab sync is live — tables, orders, KDS tickets, 86 list and menu changes sync instantly across all open terminals
               </div>
             </div>
             {syncStatus.pendingChanges && (

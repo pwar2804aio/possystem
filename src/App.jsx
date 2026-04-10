@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import './styles/globals.css';
 import { useStore } from './store';
 import PINScreen from './surfaces/PINScreen';
@@ -8,25 +8,30 @@ import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface } from './surfaces/OtherSurfaces';
 import BackOfficeApp from './backoffice/BackOfficeApp';
 import StatusDrawer from './components/StatusDrawer';
+import SyncBridge from './sync/SyncBridge';
 
-const VERSION = '0.7.3';
+const VERSION = '0.7.4';
 
 const CHANGELOG = [
   {
-    version: '0.7.3', date: 'Apr 2026', label: 'Terminal identity + multi-terminal testing',
+    version: '0.7.4', date: 'Apr 2026', label: 'Cross-tab sync via BroadcastChannel',
     changes: [
-      'Terminal name now shown prominently in the shift bar — "Counter 1", "Bar", "Handheld 1" etc. Profile name shown below it in amber',
-      'URL params for terminal profiles — ?t=counter, ?t=bar, ?t=handheld, ?t=kiosk, ?t=kds each load a different device config',
-      'Switched to sessionStorage (tab-isolated) instead of localStorage — each browser tab is now an independent terminal with its own profile',
-      'Back Office overview panel: "Open terminals for testing" section with one-click links to open each terminal type in a new tab',
-      'Bar terminal (?t=bar): opens to bar tabs, hides takeaway/collection, no table service, bar section filtered',
-      'Handheld (?t=handheld): opens to POS ordering, dine-in only, no reports',
-      'KDS terminal (?t=kds): opens directly to kitchen display',
+      'Real-time cross-tab sync — open the bar tab and the counter tab, order something on one, it appears on the other instantly',
+      'BroadcastChannel API syncs: tables, KDS tickets, 86 list, daily counts, closed checks, bar tabs, order queue, floor plan sections',
+      'localStorage persistence — new tabs get the current shared state from localStorage immediately on open',
+      'PING/PONG handshake — when a new tab opens, it asks existing tabs for their current state to ensure freshness',
+      '80ms debounce on broadcasts to avoid flooding — fast enough for KDS tickets, not spammy',
+      'Sync pulse — amber dot flashes in the shift bar whenever data arrives from another terminal',
+      'Per-terminal state stays isolated: device profile, active table, which surface is showing, who is logged in',
     ],
   },
   {
+    version: '0.7.3', date: 'Apr 2026', label: 'Terminal identity + multi-terminal testing',
+    changes: ['Terminal name in shift bar, URL param profiles ?t=bar/counter/handheld/kds, sessionStorage isolation, BO terminal launch panel'],
+  },
+  {
     version: '0.7.2', date: 'Apr 2026', label: 'Status drawer + section management',
-    changes: ['Terminal status drawer, editable floor plan sections, sections from store'],
+    changes: ['Terminal status drawer, editable floor plan sections'],
   },
   {
     version: '0.7.1', date: 'Apr 2026', label: 'Back Office polish',
@@ -52,21 +57,28 @@ const CHANGELOG = [
 
 
 
+
 export default function App() {
   const { staff, surface, setSurface, toast, shift, theme, setTheme, appMode } = useStore();
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [syncPulse, setSyncPulse] = useState(false);
+
+  const handleSyncPulse = useCallback(() => {
+    setSyncPulse(true);
+    setTimeout(() => setSyncPulse(false), 600);
+  }, []);
 
   useState(() => {
     document.documentElement.setAttribute('data-theme', theme);
   });
-  if (!staff) return <PINScreen />;
 
-  // Back Office Portal — full screen, replaces everything
-  if (appMode === 'backoffice') return <BackOfficeApp />;
+  if (!staff) return <><SyncBridge onSyncPulse={handleSyncPulse}/><PINScreen /></>;
+  if (appMode === 'backoffice') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
-      <ShiftBar shift={shift} version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} />
+      <SyncBridge onSyncPulse={handleSyncPulse}/>
+      <ShiftBar shift={shift} version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} syncPulse={syncPulse}/>
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
         <Sidebar surface={surface} setSurface={setSurface} />
         <div style={{ display:'flex', flex:1, overflow:'hidden', minWidth:0 }}>
@@ -89,7 +101,7 @@ const NAV = [
   { id:'kds',        label:'KDS',   icon:'▣' },
 ];
 
-function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme }) {
+function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme, syncPulse }) {
   const { deviceConfig } = useStore();
   const terminalName = deviceConfig?.terminalName || 'POS';
   const profileName  = deviceConfig?.profileName;
@@ -116,6 +128,10 @@ function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme }) {
         <div style={{ display:'flex', alignItems:'center', gap:6, marginRight:20 }}>
           <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--grn)', boxShadow:'0 0 6px var(--grn)' }}/>
           <span style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>{shift.name}</span>
+          {/* Sync pulse — flashes amber when data syncs from another terminal */}
+          {syncPulse && (
+            <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--acc)', boxShadow:'0 0 8px var(--acc)', animation:'pulse .6s ease-out', opacity:1 }}/>
+          )}
         </div>
         {[{label:'Covers',val:shift.covers},{label:'Sales',val:`£${shift.sales.toLocaleString()}`},{label:'Avg',val:`£${shift.avgCheck.toFixed(2)}`}].map(s=>(
           <div key={s.label} style={{ marginRight:20, display:'flex', alignItems:'baseline', gap:5 }}>
