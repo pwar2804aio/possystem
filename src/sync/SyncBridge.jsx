@@ -1,14 +1,23 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 
-const CHANNEL_NAME = 'rpos-sync';
-const STORAGE_KEY  = 'rpos-shared-state';
-const TAB_ID       = Math.random().toString(36).slice(2, 10);
+export const CHANNEL_NAME = 'rpos-sync';
+export const STORAGE_KEY  = 'rpos-shared-state';
+export const TAB_ID       = Math.random().toString(36).slice(2, 10);
 
-const SHARED_KEYS = [
-  'tables', 'kdsTickets', 'eightySixIds', 'dailyCounts',
-  'closedChecks', 'orderQueue', 'tabs', 'locationSections', 'printJobs',
+// Operational state — syncs in real-time across all terminals
+const OPERATIONAL_KEYS = [
+  'kdsTickets', 'eightySixIds', 'dailyCounts',
+  'closedChecks', 'orderQueue', 'tabs', 'printJobs',
 ];
+
+// Table status/session sync (operational part only — layout comes via CONFIG_PUSH)
+// We sync the whole tables array but the POS only applies non-layout fields from broadcasts
+// Layout (x,y,w,h,label,section,shape) only changes via CONFIG_PUSH
+const SHARED_KEYS = [...OPERATIONAL_KEYS, 'tables'];
+
+let channelInstance = null;
+export function getChannel() { return channelInstance; }
 
 function getSharedState() {
   const s = useStore.getState();
@@ -19,10 +28,9 @@ function getSharedState() {
 
 export default function SyncBridge({ onSyncPulse }) {
   const isApplyingRef = useRef(false);
-  const channelRef    = useRef(null);
 
   useEffect(() => {
-    // Load shared state from localStorage on mount
+    // Load persisted operational state on mount
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -32,21 +40,42 @@ export default function SyncBridge({ onSyncPulse }) {
       }
     } catch {}
 
+    // Check if there's a pending config snapshot (for tabs that open after a push)
+    try {
+      const snap = localStorage.getItem('rpos-config-snapshot');
+      const currentVersion = parseInt(sessionStorage.getItem('rpos-config-version') || '0');
+      if (snap) {
+        const parsed = JSON.parse(snap);
+        if (parsed.version > currentVersion) {
+          // This tab hasn't applied this config yet — show the banner
+          useStore.getState().setConfigUpdate(parsed);
+        }
+      }
+    } catch {}
+
     if (!('BroadcastChannel' in window)) return;
 
-    channelRef.current = new BroadcastChannel(CHANNEL_NAME);
+    channelInstance = new BroadcastChannel(CHANNEL_NAME);
 
-    channelRef.current.onmessage = ({ data: msg }) => {
+    channelInstance.onmessage = ({ data: msg }) => {
       if (msg.from === TAB_ID) return;
 
       if (msg.type === 'STATE_UPDATE') {
+        // Real-time operational sync
         isApplyingRef.current = true;
         useStore.setState(msg.data);
         isApplyingRef.current = false;
         onSyncPulse?.();
       }
+
+      if (msg.type === 'CONFIG_PUSH') {
+        // Back Office pushed a config update — store snapshot, show banner on POS
+        useStore.getState().setConfigUpdate(msg.snapshot);
+        onSyncPulse?.();
+      }
+
       if (msg.type === 'PING') {
-        channelRef.current.postMessage({ from:TAB_ID, type:'PONG', data:getSharedState() });
+        channelInstance.postMessage({ from:TAB_ID, type:'PONG', data:getSharedState() });
       }
       if (msg.type === 'PONG') {
         isApplyingRef.current = true;
@@ -55,10 +84,8 @@ export default function SyncBridge({ onSyncPulse }) {
       }
     };
 
-    // Ask existing tabs for current state
-    channelRef.current.postMessage({ from:TAB_ID, type:'PING' });
+    channelInstance.postMessage({ from:TAB_ID, type:'PING' });
 
-    // Subscribe to store and broadcast + persist shared key changes
     let timer = null;
     let pending = {};
 
@@ -75,7 +102,7 @@ export default function SyncBridge({ onSyncPulse }) {
       timer = setTimeout(() => {
         const toSend = pending;
         pending = {};
-        channelRef.current?.postMessage({ from:TAB_ID, type:'STATE_UPDATE', data:toSend });
+        channelInstance?.postMessage({ from:TAB_ID, type:'STATE_UPDATE', data:toSend });
         try {
           const cur = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
           localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...cur, ...toSend }));
@@ -84,8 +111,14 @@ export default function SyncBridge({ onSyncPulse }) {
       }, 80);
     });
 
-    return () => { clearTimeout(timer); channelRef.current?.close(); unsub(); };
+    return () => { clearTimeout(timer); channelInstance?.close(); channelInstance = null; unsub(); };
   }, []);
 
   return null;
+}
+
+// Call this from Back Office to push a config snapshot to all POS terminals
+export function broadcastConfigPush(snapshot) {
+  if (!channelInstance) return;
+  channelInstance.postMessage({ from:TAB_ID, type:'CONFIG_PUSH', snapshot });
 }

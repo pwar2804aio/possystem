@@ -22,15 +22,18 @@ export default function FloorPlanBuilder() {
   const saveTimer = useRef(null);
   const canvasRef  = useRef(null);
 
-  // Called on every floor plan mutation — shows save status
+  const { markBOChange } = useStore();
+
+  // Called on every floor plan mutation — shows save status + marks BO as having pending changes
   const markChanged = useCallback(() => {
     setSaveStatus('saving');
+    markBOChange();
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       setSaveStatus('pushed');
       setTimeout(() => setSaveStatus('saved'), 2500);
     }, 300);
-  }, []);
+  }, [markBOChange]);
 
   const displayTables = tables.filter(t =>
     !t.parentId && (viewSection === 'all' || t.section === viewSection)

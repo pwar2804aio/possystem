@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
+import { broadcastConfigPush } from '../sync/SyncBridge';
 import MenuManager from './sections/MenuManager';
 import FloorPlanBuilder from './sections/FloorPlanBuilder';
 import DeviceProfiles from './sections/DeviceProfiles';
@@ -126,14 +127,15 @@ export default function BackOfficeApp() {
           <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)' }}>
             {NAV.find(n => n.id === section)?.label}
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:14, fontSize:12, color:'var(--t3)' }}>
-            <div style={{
-              width:7, height:7, borderRadius:'50%',
-              background:'var(--grn)', boxShadow:'0 0 6px var(--grn)',
-            }}/>
-            <span>Live</span>
-            <span style={{ color:'var(--bdr2)' }}>·</span>
-            <span>{new Date().toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })}</span>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            {/* Push to POS button */}
+            <PushToPOSButton />
+            <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'var(--t3)' }}>
+              <div style={{ width:7, height:7, borderRadius:'50%', background:'var(--grn)', boxShadow:'0 0 6px var(--grn)' }}/>
+              <span>Live</span>
+              <span style={{ color:'var(--bdr2)' }}>·</span>
+              <span>{new Date().toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })}</span>
+            </div>
           </div>
         </div>
 
@@ -153,7 +155,76 @@ export default function BackOfficeApp() {
   );
 }
 
-// ── Overview dashboard ────────────────────────────────────────────────────────
+// ── Push to POS button ────────────────────────────────────────────────────────
+function PushToPOSButton() {
+  const { pendingBOChanges, clearBOChanges, tables, locationSections, staff } = useStore();
+  const [pushing, setPushing] = useState(false);
+  const [justPushed, setJustPushed] = useState(false);
+
+  const handlePush = () => {
+    setPushing(true);
+
+    // Build config snapshot — layout data only (not operational/session state)
+    const snapshot = {
+      version: Date.now(),
+      pushedAt: new Date().toISOString(),
+      pushedBy: staff?.name || 'Manager',
+      tables: tables.map(t => ({
+        id:t.id, label:t.label, x:t.x, y:t.y, w:t.w, h:t.h,
+        shape:t.shape, maxCovers:t.maxCovers, section:t.section,
+      })),
+      locationSections,
+      changeCount: pendingBOChanges,
+    };
+
+    // Persist snapshot so POS tabs that open later can still receive it
+    try {
+      localStorage.setItem('rpos-config-snapshot', JSON.stringify(snapshot));
+    } catch {}
+
+    // Broadcast to all open POS terminals
+    broadcastConfigPush(snapshot);
+
+    clearBOChanges();
+    setPushing(false);
+    setJustPushed(true);
+    setTimeout(() => setJustPushed(false), 3000);
+  };
+
+  if (justPushed) {
+    return (
+      <div style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 14px', borderRadius:10, background:'var(--grn-d)', border:'1px solid var(--grn-b)' }}>
+        <div style={{ width:7, height:7, borderRadius:'50%', background:'var(--grn)' }}/>
+        <span style={{ fontSize:12, fontWeight:700, color:'var(--grn)' }}>Pushed to all terminals</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={handlePush}
+      disabled={pushing}
+      style={{
+        display:'flex', alignItems:'center', gap:8,
+        padding:'7px 16px', borderRadius:10, cursor:'pointer',
+        fontFamily:'inherit', fontSize:13, fontWeight:700, border:'none',
+        background: pendingBOChanges > 0 ? 'var(--acc)' : 'var(--bg3)',
+        color: pendingBOChanges > 0 ? '#0b0c10' : 'var(--t3)',
+        transition:'all .15s',
+        boxShadow: pendingBOChanges > 0 ? '0 0 12px var(--acc-b)' : 'none',
+      }}
+    >
+      {pendingBOChanges > 0 && (
+        <span style={{
+          fontSize:10, fontWeight:800, padding:'1px 6px', borderRadius:20,
+          background:'rgba(0,0,0,.2)', color:'inherit',
+        }}>{pendingBOChanges}</span>
+      )}
+      <span>Push to POS</span>
+      <span style={{ fontSize:15 }}>→</span>
+    </button>
+  );
+}
 function BOOverview({ setSection }) {
   const { closedChecks, tables, devices, staff: currentStaff } = useStore();
 

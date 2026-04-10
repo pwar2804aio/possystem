@@ -9,7 +9,7 @@ const inp = {
 };
 
 export default function MenuManager() {
-  const { eightySixIds, toggle86, showToast, dailyCounts, setDailyCount } = useStore();
+  const { eightySixIds, toggle86, showToast, dailyCounts, setDailyCount, markBOChange } = useStore();
   const [activeCat, setActiveCat] = useState('starters');
   const [search, setSearch] = useState('');
   const [editItem, setEditItem] = useState(null);
@@ -200,7 +200,7 @@ export default function MenuManager() {
                             fontFamily:'inherit', background:'var(--bg3)',
                             border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:11, fontWeight:600,
                           }}>Edit</button>
-                          <button onClick={() => { toggle86(item.id); showToast(is86 ? `${item.name} reinstated` : `${item.name} 86'd`, 'warning'); }} style={{
+                          <button onClick={() => { toggle86(item.id); markBOChange(); showToast(is86 ? `${item.name} reinstated` : `${item.name} 86'd`, 'warning'); }} style={{
                             padding:'4px 10px', borderRadius:7, cursor:'pointer',
                             fontFamily:'inherit',
                             background: is86 ? 'var(--grn-d)' : 'var(--red-d)',

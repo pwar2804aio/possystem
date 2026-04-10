@@ -78,7 +78,40 @@ export const useStore = create((set, get) => ({
   surface: 'tables',
   setSurface: s => set({ surface:s }),
 
-  // ── Location sections (editable, replaces hardcoded array) ──────────────
+  // ── Back Office config push workflow ────────────────────────────────────────
+  // pendingBOChanges: count of BO changes not yet pushed to POS
+  // configVersion: incremented on each push — POS compares this to know if it's stale
+  // configUpdateAvailable: true on POS when a push has been received but not applied
+  // configUpdateSnapshot: the incoming config snapshot waiting to be applied
+  pendingBOChanges: 0,
+  configVersion: 0,
+  configUpdateAvailable: false,
+  configUpdateSnapshot: null,
+  markBOChange: () => set(s => ({ pendingBOChanges: s.pendingBOChanges + 1 })),
+  clearBOChanges: () => set({ pendingBOChanges: 0 }),
+  setConfigUpdate: (snapshot) => set({ configUpdateAvailable: true, configUpdateSnapshot: snapshot }),
+  applyConfigUpdate: () => {
+    const snap = useStore.getState().configUpdateSnapshot;
+    if (!snap) return;
+    // Apply layout and section config from snapshot, preserve live operational state
+    set({
+      tables: snap.tables
+        ? useStore.getState().tables.map(t => {
+            const snapTable = snap.tables.find(st => st.id === t.id);
+            if (!snapTable) return t;
+            // Merge: keep operational state (status, session, items), apply layout changes
+            return { ...t, label: snapTable.label, x: snapTable.x, y: snapTable.y, w: snapTable.w, h: snapTable.h, shape: snapTable.shape, maxCovers: snapTable.maxCovers, section: snapTable.section };
+          })
+        : useStore.getState().tables,
+      locationSections: snap.locationSections || useStore.getState().locationSections,
+      configVersion: snap.version,
+      configUpdateAvailable: false,
+      configUpdateSnapshot: null,
+    });
+    try {
+      sessionStorage.setItem('rpos-config-version', String(snap.version));
+    } catch {}
+  },
   locationSections: [
     { id:'main',  label:'Main dining', color:'#3b82f6', icon:'🍽' },
     { id:'bar',   label:'Bar',         color:'#e8a020', icon:'🍸' },

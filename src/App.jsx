@@ -9,39 +9,42 @@ import { KDSSurface } from './surfaces/OtherSurfaces';
 import BackOfficeApp from './backoffice/BackOfficeApp';
 import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
+import ConfigSyncBanner from './components/ConfigSyncBanner';
 
-const VERSION = '0.7.4';
+const VERSION = '0.7.5';
 
 const CHANGELOG = [
   {
-    version: '0.7.4', date: 'Apr 2026', label: 'Cross-tab sync via BroadcastChannel',
+    version: '0.7.5', date: 'Apr 2026', label: 'Back Office publish workflow',
     changes: [
-      'Real-time cross-tab sync — open the bar tab and the counter tab, order something on one, it appears on the other instantly',
-      'BroadcastChannel API syncs: tables, KDS tickets, 86 list, daily counts, closed checks, bar tabs, order queue, floor plan sections',
-      'localStorage persistence — new tabs get the current shared state from localStorage immediately on open',
-      'PING/PONG handshake — when a new tab opens, it asks existing tabs for their current state to ensure freshness',
-      '80ms debounce on broadcasts to avoid flooding — fast enough for KDS tickets, not spammy',
-      'Sync pulse — amber dot flashes in the shift bar whenever data arrives from another terminal',
-      'Per-terminal state stays isolated: device profile, active table, which surface is showing, who is logged in',
+      'Back Office changes no longer push to POS automatically — they stage as drafts',
+      '"Push to POS →" button in the Back Office header — shows a change counter badge when there are unpublished edits. Glows amber when changes are pending',
+      'POS sync banner — slides down below the shift bar when the Back Office has pushed an update. Shows who pushed it, when, and what changed',
+      '"Sync now" button on the banner applies the config update immediately — merges layout changes with live operational state (tables keep their sessions/orders)',
+      '"Later" dismisses the banner without applying — useful during busy service',
+      'Tabs that open after a push still see the pending update (config snapshot persisted in localStorage)',
+      'Floor plan, sections, and future menu changes go through this publish workflow',
+      '86 list and daily counts still sync instantly (operational) — only config goes through publish',
     ],
   },
   {
+    version: '0.7.4', date: 'Apr 2026', label: 'Cross-tab sync via BroadcastChannel',
+    changes: ['Real-time cross-tab sync for orders, KDS, 86 list, tables. Sync pulse in shift bar'],
+  },
+  {
     version: '0.7.3', date: 'Apr 2026', label: 'Terminal identity + multi-terminal testing',
-    changes: ['Terminal name in shift bar, URL param profiles ?t=bar/counter/handheld/kds, sessionStorage isolation, BO terminal launch panel'],
+    changes: ['Terminal name in shift bar, URL param profiles, sessionStorage isolation'],
   },
   {
     version: '0.7.2', date: 'Apr 2026', label: 'Status drawer + section management',
     changes: ['Terminal status drawer, editable floor plan sections'],
   },
   {
-    version: '0.7.1', date: 'Apr 2026', label: 'Back Office polish',
-    changes: ['Print routing reassign, profile badge, apply profile to terminal'],
-  },
-  {
     version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
     changes: ['Menu manager, floor plan, device profiles, devices, staff, print routing'],
   },
 ];
+
 
 
 
@@ -79,6 +82,7 @@ export default function App() {
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
       <SyncBridge onSyncPulse={handleSyncPulse}/>
       <ShiftBar shift={shift} version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} syncPulse={syncPulse}/>
+      <ConfigSyncBanner />
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
         <Sidebar surface={surface} setSurface={setSurface} />
         <div style={{ display:'flex', flex:1, overflow:'hidden', minWidth:0 }}>
