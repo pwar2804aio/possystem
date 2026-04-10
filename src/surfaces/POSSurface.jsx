@@ -375,7 +375,7 @@ export default function POSSurface() {
                 </div>}
                 {service>0
                   ? <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:3}}>
-                      <span>Service (12.5%)</span><span style={{fontFamily:'var(--font-mono)'}}>£{service.toFixed(2)}</span>
+                      <span>Service ({useStore.getState().locations?.find(l=>l.id===useStore.getState().currentLocationId)?.serviceCharge??12.5}%)</span><span style={{fontFamily:'var(--font-mono)'}}>£{service.toFixed(2)}</span>
                     </div>
                   : <div style={{fontSize:11,color:'var(--grn)',marginBottom:3,fontWeight:600}}>No service charge</div>
                 }
@@ -599,17 +599,25 @@ export default function POSSurface() {
             )}
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
                 {displayItems.map(item=>{
-                  const m=CAT_META[item.cat]||CAT_META.quick;
+                  // Resolve category colour/icon from store (Menu Manager categories)
+                  const storeCat = menuCategories.find(c => c.id === item.cat);
+                  const legacyMeta = CAT_META[item.cat] || CAT_META.quick;
+                  const catColor = storeCat?.color || legacyMeta.color || 'var(--acc)';
+                  const catIcon  = storeCat?.icon  || legacyMeta.icon  || '🍽';
                   const flagged=allergens.some(a=>item.allergens?.includes(a));
                   const is86=eightySixIds.includes(item.id);
                   const rank=cat==='quick'?QUICK_IDS.indexOf(item.id):-1;
                   const isHot=rank>=0&&rank<3;
+                  const variantKids=MENU_ITEMS.filter(c=>c.parentId===item.id&&!c.archived);
+                  const isVariantParent=variantKids.length>0||item.type==='variants';
                   const fromPrice=isVariantParent&&variantKids.length>0
                     ? Math.min(...variantKids.map(c=>c.pricing?.base??c.price??0))
                     : (item.pricing?.base??item.price??0);
-                  const accentColor = is86?'var(--t4)':flagged?'var(--red)':m.color;
+                  const hasOptions=(item.assignedModifierGroups?.length>0)||(item.assignedInstructionGroups?.length>0)||(item.modifierGroups?.length>0);
+                  const accentColor = is86?'var(--t4)':flagged?'var(--red)':catColor;
                   const count = dailyCounts[item.id];
                   const isLow = count && count.remaining <= 3 && count.remaining > 0;
+                  const displayName = item.menuName || item.name || 'Item';
 
                   // Long-press handlers — 600ms hold opens item info sheet
                   const handlePressStart = (e) => {
@@ -635,13 +643,13 @@ export default function POSSurface() {
                       {/* Left colour bar */}
                       <div style={{
                         position:'absolute',left:0,top:0,bottom:0,width:4,
-                        background:is86?'var(--bg5)':flagged?'var(--red)':isHot?m.color:`${m.color}60`,
+                        background:is86?'var(--bg5)':flagged?'var(--red)':isHot?catColor:`${catColor}60`,
                         borderRadius:'14px 0 0 14px',
                       }}/>
                       <div style={{padding:'12px 12px 11px 16px',flex:1,display:'flex',flexDirection:'column'}}>
                         {/* Top row: emoji + badges */}
                         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
-                          <span style={{fontSize:24,lineHeight:1}}>{is86?'🚫':flagged?'⚠️':m.icon}</span>
+                          <span style={{fontSize:24,lineHeight:1}}>{is86?'🚫':flagged?'⚠️':catIcon}</span>
                           <div style={{display:'flex',gap:3,flexDirection:'column',alignItems:'flex-end'}}>
                             {/* Daily count badge */}
                             {count&&!is86&&(
@@ -654,7 +662,7 @@ export default function POSSurface() {
                               </span>
                             )}
                             {isHot&&!is86&&!flagged&&!count&&(
-                              <span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:`${m.color}25`,color:m.color,letterSpacing:.02}}>#{rank+1}</span>
+                              <span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:`${catColor}25`,color:catColor,letterSpacing:.02}}>#{rank+1}</span>
                             )}
                             {flagged&&<span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>⚠ allergen</span>}
                             {is86&&<span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)',border:'1px solid var(--red-b)'}}>86'd</span>}

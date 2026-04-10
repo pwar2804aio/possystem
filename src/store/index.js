@@ -931,7 +931,9 @@ export const useStore = create((set, get) => ({
     // Check-level discounts
     const checkDiscount = checkDiscounts.reduce((s,d) => s + (d.type==='percent'?subtotal*d.value/100:d.value), 0);
     const discountedSub = Math.max(0, subtotal - checkDiscount);
-    const service = orderType==='dine-in' ? discountedSub*0.125 : 0;
+    const loc = get().locations?.find(l => l.id === get().currentLocationId);
+    const serviceRate = (loc?.serviceCharge ?? 12.5) / 100;
+    const service = orderType==='dine-in' ? discountedSub * serviceRate : 0;
     return {
       subtotal, checkDiscount, discountedSub, service,
       total: discountedSub+service,
