@@ -18,12 +18,15 @@ const VERSION = '0.9.5';
 
 const CHANGELOG = [
   {
-    version: '0.9.5', date: 'Apr 2026', label: 'Table send clears POS, Orders tab restored',
+    version: '0.9.5', date: 'Apr 2026', label: 'Unified Orders screen — sectioned by type',
     changes: [
-      'Table orders (including split checks T1.2, T1.3): clicking Send now clears the POS panel immediately — table stays occupied in the floor plan, POS resets ready for the next order.',
-      'Walk-in orders: clicking Send through OrderTypeModal always clears POS (fixed in v0.9.4).',
-      'Orders tab restored to sidebar nav: Bar → Floor → POS → Orders → KDS.',
-      'Orders Hub: filter by order type (All / Tables / Bar / Dine-in / Takeaway / Collection / Delivery), "👤 My orders" quick filter, search by name/ref/server, show completed toggle.',
+      'Orders tab restored to sidebar (Bar → Floor → POS → Orders → KDS).',
+      'Orders screen now shows three clear sections: Tables, Bar tabs, Walk-in/Takeaway/Delivery — each collapsible.',
+      'Filter tabs: All / Tables / Bar / Counter / Takeaway / Collection / Delivery — each with live count badge.',
+      '👤 My orders quick filter: shows only current server\'s orders across all types.',
+      'Search by name, ref, or server. Show completed toggle.',
+      'Table send clears POS immediately — table stays occupied in floor plan, POS resets for next order.',
+      'Split checks (T1.2) show a "split" badge in the Orders screen.',
     ],
   },
   {
