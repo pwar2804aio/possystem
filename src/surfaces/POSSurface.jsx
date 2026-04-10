@@ -10,6 +10,7 @@ import { ReceiptModal, ReprintModal } from '../components/ReceiptModal';
 import CheckHistory from '../components/CheckHistory';
 import ItemInfoModal from '../components/ItemInfoModal';
 import OrderReviewModal from '../components/OrderReviewModal';
+import SendWithoutTableModal from '../components/SendWithoutTableModal';
 
 const COURSE_COLORS = {
   0:{label:'Immediate',color:'#22d3ee',bg:'rgba(34,211,238,.1)'},
@@ -32,6 +33,7 @@ export default function POSSurface() {
     eightySixIds, toggle86,
     dailyCounts, setDailyCount, clearDailyCount,
     setSurface,
+    seatTableWithItems, mergeItemsToTable, splitTableCheck,
     voidItem, voidCheck,
     addCheckDiscount, removeCheckDiscount, addWalkInDiscount, removeWalkInDiscount,
     addItemDiscount, removeItemDiscount,
@@ -54,7 +56,8 @@ export default function POSSurface() {
   const [showReceipt, setShowReceipt]   = useState(false);
   const [showReprint, setShowReprint]   = useState(false);
   const [infoItem, setInfoItem]         = useState(null);  // long-press item info
-  const [showReview, setShowReview]     = useState(false); // order review modal
+  const [showReview, setShowReview]     = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
   const longPressTimer = useRef(null);
 
   const activeTable = activeTableId ? tables.find(t=>t.id===activeTableId) : null;
@@ -104,10 +107,9 @@ export default function POSSurface() {
   const handleSend = () => {
     if (!items.length) { showToast('No items on order', 'error'); return; }
 
-    // Dine-in must have a table
+    // Dine-in with no table → show the routing modal
     if (orderType === 'dine-in' && !activeTableId) {
-      showToast('Select a table from the Floor plan first', 'error');
-      setSurface('tables');
+      setShowSendModal(true);
       return;
     }
 
@@ -631,6 +633,21 @@ export default function POSSurface() {
             <button className="btn btn-acc" style={{flex:1}} disabled={!customName.trim()||!customPrice} onClick={()=>{addCustomItem(customName.trim(),customPrice,customNote);showToast(`${customName} added`,'success');setShowCustom(false);setCustomName('');setCustomPrice('');setCustomNote('');}}>Add to order</button>
           </div>
         </div></div>
+      )}
+
+      {/* Send without table modal */}
+      {showSendModal && (
+        <SendWithoutTableModal
+          items={items}
+          onClose={()=>setShowSendModal(false)}
+          onNameOrder={(name)=>{
+            // Set a named order — send as walk-in with the name as customer
+            setCustomer({ name, phone:'', isASAP:true });
+            setShowSendModal(false);
+            setTimeout(()=>{ sendToKitchen(); clearWalkIn(); }, 50);
+          }}
+          onSendToKitchen={()=>{ sendToKitchen(); }}
+        />
       )}
 
       {/* Item info modal — long press */}

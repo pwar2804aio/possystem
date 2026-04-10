@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import CheckSelectorModal from '../components/CheckSelectorModal';
 
 const STATUS = {
   available: { color:'#22c55e', bg:'rgba(34,197,94,.12)',  border:'rgba(34,197,94,.35)', label:'Available' },
@@ -167,10 +168,12 @@ function ReservationModal({ table, existing, onConfirm, onCancel }) {
 
 // ─── Table Node ───────────────────────────────────────────────────────────────
 function TableNode({ table, onClick }) {
+  const { tables } = useStore();
   const sm = STATUS[table.status] || STATUS.available;
   const session = table.session;
   const timeSeated = session?.seatedAt ? fmt(session.seatedAt) : null;
   const isRound = table.shape === 'rd';
+  const childCount = tables.filter(t => t.parentId === table.id).length;
 
   return (
     <div onClick={onClick} style={{
@@ -226,6 +229,12 @@ function TableNode({ table, onClick }) {
 
       {/* Status dot */}
       <div style={{ width:6, height:6, borderRadius:'50%', background:sm.color, position:'absolute', top:5, right:5 }}/>
+      {/* Split checks badge */}
+      {childCount > 0 && (
+        <div style={{ position:'absolute', top:4, left:5, fontSize:9, fontWeight:800, padding:'1px 5px', borderRadius:8, background:'var(--acc)', color:'#0b0c10', lineHeight:1.4 }}>
+          {childCount+1} checks
+        </div>
+      )}
     </div>
   );
 }
@@ -236,6 +245,8 @@ export default function TablesSurface() {
   const [selected, setSelected]   = useState(null);
   const [showSeat, setShowSeat]   = useState(false);
   const [showReservation, setShowReservation] = useState(false);
+  const [showCheckSelector, setShowCheckSelector] = useState(false);
+  const [checkSelectorTable, setCheckSelectorTable] = useState(null);
   const [section, setSection]     = useState('all');
   const [view, setView]           = useState('floor');  // floor | mine | all
   const [, setTick] = useState(0);
@@ -262,6 +273,17 @@ export default function TablesSurface() {
     reserved:  tables.filter(t=>t.status==='reserved').length,
   };
 
+  // Helper — open a table, showing check selector if it has splits
+  const openTable = (table) => {
+    const hasChildren = tables.some(t => t.parentId === table.id);
+    if (hasChildren) {
+      setCheckSelectorTable(table);
+      setShowCheckSelector(true);
+    } else {
+      openTableInPOS(table.id);
+    }
+  };
+
   const handleTableClick = (table) => {
     setSelected(table.id);
   };
@@ -273,7 +295,7 @@ export default function TablesSurface() {
         setShowSeat(true);
         break;
       case 'open_pos':
-        openTableInPOS(selectedTable.id);
+        openTable(selectedTable);
         break;
       case 'close':
         clearTable(selectedTable.id);
@@ -402,7 +424,7 @@ export default function TablesSurface() {
                   const idleMins = Math.floor((now - lastActivity) / 60000);
 
                   return (
-                    <div key={table.id} onClick={()=>openTableInPOS(table.id)} style={{
+                    <div key={table.id} onClick={()=>openTable(table)} style={{
                       display:'flex', alignItems:'center', gap:16, padding:'14px 18px',
                       borderRadius:14, cursor:'pointer', border:us.border, background:us.bg,
                       transition:'all .15s',
@@ -615,13 +637,27 @@ export default function TablesSurface() {
                   <button className="btn btn-ghost btn-full" onClick={()=>handleAction('close')}>Close table</button>
                 </>
               )}
-              {selectedTable.status==='occupied' && (
-                <>
-                  <button className="btn btn-acc btn-full" onClick={()=>handleAction('open_pos')} style={{ height:44, fontSize:14 }}>Add to order →</button>
-                  <button className="btn btn-ghost btn-full" onClick={()=>handleAction('open_pos')} style={{ borderColor:'var(--grn-b)', color:'var(--grn)' }}>Take payment</button>
-                  <button className="btn btn-ghost btn-full" onClick={()=>handleAction('close')}>Force close</button>
-                </>
-              )}
+              {selectedTable.status==='occupied' && (() => {
+                const childChecks = tables.filter(t => t.parentId === selectedTable.id);
+                const hasChildren = childChecks.length > 0;
+                return (
+                  <>
+                    {hasChildren ? (
+                      <button className="btn btn-acc btn-full" onClick={()=>{
+                        setCheckSelectorTable(selectedTable);
+                        setShowCheckSelector(true);
+                      }} style={{ height:44, fontSize:14 }}>
+                        Select check ({childChecks.length+1} open) →
+                      </button>
+                    ) : (
+                      <button className="btn btn-acc btn-full" onClick={()=>handleAction('open_pos')} style={{ height:44, fontSize:14 }}>Add to order →</button>
+                    )}
+                    <button className="btn btn-ghost btn-full" style={{ borderColor:'var(--grn-b)', color:'var(--grn)' }}
+                      onClick={()=>handleAction('open_pos')}>Take payment</button>
+                    <button className="btn btn-ghost btn-full" onClick={()=>handleAction('close')}>Force close</button>
+                  </>
+                );
+              })()}
             </div>
           </>
         )}
@@ -633,6 +669,18 @@ export default function TablesSurface() {
           table={selectedTable}
           onConfirm={(opts)=>{ seatTable(selectedTable.id, opts); setShowSeat(false); setSelected(null); showToast(`${selectedTable.label} seated — ${opts.covers} covers`,'success'); }}
           onCancel={()=>setShowSeat(false)}
+        />
+      )}
+
+      {showCheckSelector && checkSelectorTable && (
+        <CheckSelectorModal
+          parentTable={checkSelectorTable}
+          onSelect={(tableId)=>{
+            openTableInPOS(tableId);
+            setShowCheckSelector(false);
+            setCheckSelectorTable(null);
+          }}
+          onClose={()=>{ setShowCheckSelector(false); setCheckSelectorTable(null); }}
         />
       )}
 

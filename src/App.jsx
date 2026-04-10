@@ -7,45 +7,48 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.6.4';
+const VERSION = '0.6.5';
 
 const CHANGELOG = [
   {
+    version: '0.6.5', date: 'Apr 2026', label: 'Send routing + split checks',
+    changes: [
+      'Dine-in Send without a table now opens a routing modal instead of just refusing',
+      'Two options: "Add to a table" (shows floor map of available + open tables) or "Name the order" (bar stool, patio, named group)',
+      'If adding to an open table with items: "Merge" (add to existing check) or "Create check 2" (split into T1.2)',
+      'Split creates a child table labelled T1.2 — items assigned to it, remainder stay on T1',
+      'Clicking a table with split checks shows a Check Selector: numbered cards showing each check\'s items, totals and status',
+      'Floor plan table nodes show "N checks" amber badge when splits exist',
+      'Detail panel "Select check (N open)" button when occupied table has children',
+      'Orders list rows also respect the check selector for split tables',
+      'fireCourse properly sends KDS tickets for courses 2 and 3',
+    ],
+  },
+  {
     version: '0.6.4', date: 'Apr 2026', label: 'AI assistant + KDS fixes',
     changes: [
-      'AI Shift Assistant in Back Office — powered by Claude, has full shift context: revenue, covers, avg check, tips, refunds, top items, by-server breakdown',
-      '6 quick prompt buttons for common shift questions (performance, upsells, 86 suggestions, concerns)',
-      'Proper chat UI with user/assistant bubbles, typing indicator, live input with ↑ to send',
-      'KDS station filter now shows human labels (Hot kitchen, Cold section, Pizza oven, Bar) not centreId codes',
-      'fireCourse (course 2/3) now sends real KDS tickets grouped by production centre — complete kitchen integration',
-      'Back office layout fixed — all sub-views now scroll correctly within their own container',
+      'AI Shift Assistant in Back Office — Claude-powered with full shift context',
+      '6 quick prompts, live chat UI, typing indicator',
+      'KDS station filter shows human labels, fireCourse sends real tickets',
     ],
   },
   {
     version: '0.6.3', date: 'Apr 2026', label: 'KDS connected + proper reservations',
     changes: [
-      'KDS wired to real orders — Send creates tickets grouped by production centre',
-      'KDS timers live from sentAt timestamp, not hardcoded',
+      'KDS wired to real orders grouped by production centre, live timers',
       'Reservations: full modal with date, time slots, party size, phone, notes',
-      'Fixed OtherSurfaces.jsx imports (useEffect, removed require())',
     ],
   },
   {
     version: '0.6.2', date: 'Apr 2026', label: 'Item info, daily count & order review',
     changes: [
-      'Long press product card → info sheet with recipe, allergens, daily count setter',
-      'Daily count badge on cards, auto 86 at zero',
-      '📋 Order review modal with compact/detailed toggle',
+      'Long press → item info (recipe, allergens, daily count)',
+      'Auto 86 when daily count hits zero, count badge on cards',
+      'Order review modal: compact / detailed toggle',
     ],
   },
-  {
-    version: '0.6.1', date: 'Apr 2026', label: 'Light mode + checkout redesign',
-    changes: ['Light mode ☀️/🌙, theme-aware checkout, SVG card terminal, 56px cash numpad'],
-  },
-  {
-    version: '0.6.0', date: 'Apr 2026', label: 'Operator Dark UI revamp',
-    changes: ['Product cards, category nav, order items — all rebuilt for speed and touch'],
-  },
+  { version:'0.6.1', date:'Apr 2026', label:'Light mode + checkout redesign', changes:['☀️/🌙 toggle, theme-aware checkout, SVG card terminal'] },
+  { version:'0.6.0', date:'Apr 2026', label:'Operator Dark UI revamp', changes:['Cards, category nav, order items — rebuilt for speed'] },
   { version:'0.5.3', date:'Apr 2026', label:'Orders list view', changes:['My orders / All open, urgency colours'] },
   { version:'0.5.2', date:'Apr 2026', label:'Full split bill', changes:['Even, seat, item, custom — each tendered independently'] },
   { version:'0.5.1', date:'Apr 2026', label:'Fast checkout', changes:['Card/Cash buttons, tip picker, cash numpad'] },
@@ -56,6 +59,7 @@ const CHANGELOG = [
   { version:'0.2.0', date:'Mar 2026', label:'POS core ordering', changes:['Variants, modifiers, courses, seat, 86'] },
   { version:'0.1.0', date:'Mar 2026', label:'Foundation', changes:['POS, Quick Screen, allergens, KDS, floor plan'] },
 ];
+
 
 
 

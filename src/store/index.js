@@ -97,6 +97,91 @@ export const useStore = create((set, get) => ({
     set({ activeTableId:tableId, surface:'pos', orderType:'dine-in' });
   },
 
+  // Seat a table AND pre-populate its session with walk-in items
+  seatTableWithItems: (tableId, items, { covers, server }) => {
+    const now = Date.now();
+    const session = {
+      id: `ORD-${++_orderNum}`,
+      items: items.map(i => ({ ...i, status:'pending' })),
+      firedCourses: [], sentAt: null, covers, server,
+      seatedAt: now, note: '', orderNote: '',
+      subtotal: items.reduce((s,i)=>s+i.price*i.qty, 0),
+      total: items.reduce((s,i)=>s+i.price*i.qty, 0) * 1.125,
+    };
+    get()._updateTable(tableId, { status:'open', session, reservation:null });
+    set({ activeTableId:tableId, surface:'pos', orderType:'dine-in', walkInOrder:null, customer:null });
+    get().showToast(`Items moved to ${get().tables.find(t=>t.id===tableId)?.label}`, 'success');
+  },
+
+  // Merge walk-in items into an already-occupied table
+  mergeItemsToTable: (tableId, newItems) => {
+    set(s => ({
+      tables: s.tables.map(t => {
+        if (t.id !== tableId || !t.session) return t;
+        const items = [...t.session.items, ...newItems.map(i=>({...i, status:'pending'}))];
+        const subtotal = items.reduce((s,i)=>s+i.price*i.qty, 0);
+        return { ...t, session: { ...t.session, items, subtotal, total: subtotal*1.125 } };
+      }),
+      walkInOrder: null, customer: null,
+    }));
+    set({ activeTableId:tableId, surface:'pos', orderType:'dine-in' });
+    get().showToast(`Items merged into ${get().tables.find(t=>t.id===tableId)?.label}`, 'success');
+  },
+
+  // Split a table — create a child table (T1.2) with the given items
+  splitTableCheck: (parentTableId, splitItems, staffName) => {
+    const parent = get().tables.find(t => t.id === parentTableId);
+    if (!parent) return;
+
+    // Determine child label: T1 → T1.2, T1.2 → T1.3, etc.
+    const existingChildren = get().tables.filter(t => t.parentId === parentTableId);
+    const checkNum = existingChildren.length + 2;
+    const childLabel = `${parent.label}.${checkNum}`;
+    const childId = `${parentTableId}-${checkNum}`;
+
+    const childSession = {
+      id: `ORD-${++_orderNum}`,
+      items: splitItems.map(i => ({...i, status:'pending'})),
+      firedCourses: [], sentAt: null,
+      covers: parent.session?.covers || 2,
+      server: staffName || parent.session?.server || 'Server',
+      seatedAt: Date.now(), note: '', orderNote: '',
+      subtotal: splitItems.reduce((s,i)=>s+i.price*i.qty, 0),
+      total: splitItems.reduce((s,i)=>s+i.price*i.qty, 0) * 1.125,
+    };
+
+    // Remove split items from parent
+    const parentItems = (parent.session?.items || []).filter(
+      pi => !splitItems.some(si => si.uid === pi.uid)
+    );
+    const parentSub = parentItems.reduce((s,i)=>s+i.price*i.qty, 0);
+
+    // Child table — same position as parent, flagged virtual
+    const childTable = {
+      ...parent,
+      id: childId,
+      label: childLabel,
+      parentId: parentTableId,
+      status: 'open',
+      session: childSession,
+      reservation: null,
+    };
+
+    set(s => ({
+      tables: [
+        ...s.tables.map(t => {
+          if (t.id !== parentTableId) return t;
+          const session = { ...t.session, items: parentItems, subtotal: parentSub, total: parentSub*1.125 };
+          return { ...t, session, childIds: [...(t.childIds||[]), childId] };
+        }),
+        childTable,
+      ],
+      walkInOrder: null, customer: null,
+      activeTableId: childId, surface: 'pos', orderType: 'dine-in',
+    }));
+    get().showToast(`Check 2 created — ${childLabel}`, 'success');
+  },
+
   // Open an already-seated table (go to its POS)
   openTableInPOS: (tableId) => {
     set({ activeTableId:tableId, surface:'pos', orderType:'dine-in' });
@@ -105,7 +190,26 @@ export const useStore = create((set, get) => ({
   // Close / clear a table after payment
   clearTable: (tableId, paymentInfo = {}) => {
     get().recordClosedCheck(tableId, paymentInfo);
-    get()._updateTable(tableId, { status:'available', session:null });
+    const table = get().tables.find(t => t.id === tableId);
+    // If this is a child table, also clean up the parent's childIds list
+    if (table?.parentId) {
+      set(s => ({
+        tables: s.tables
+          .filter(t => t.id !== tableId)
+          .map(t => t.id === table.parentId
+            ? { ...t, childIds: (t.childIds||[]).filter(id => id !== tableId) }
+            : t
+          ),
+      }));
+    } else {
+      // If parent, clear children too
+      const childIds = table?.childIds || [];
+      set(s => ({
+        tables: s.tables
+          .filter(t => !childIds.includes(t.id))
+          .map(t => t.id === tableId ? { ...t, status:'available', session:null, childIds:[] } : t),
+      }));
+    }
     set(s => ({ activeTableId: s.activeTableId===tableId ? null : s.activeTableId }));
   },
 
