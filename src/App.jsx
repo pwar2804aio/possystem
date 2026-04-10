@@ -14,41 +14,157 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '0.8.9';
+const VERSION = '0.9.4';
 
 const CHANGELOG = [
   {
-    version: '0.7.9', date: 'Apr 2026', label: 'Modifier groups, kiosk surface',
+    version: '0.9.4', date: 'Apr 2026', label: 'Send flow fixes & split check restored',
     changes: [
-      'Menu Manager: full modifier groups editor — add groups (name, required/optional, single/multi-select), add options with prices, remove groups and options. Edit modal now has a Modifiers tab alongside Details, Allergens, Daily count',
-      'Modifier groups save to store and push via Push to POS — POS ordering modal already handles them',
-      'Kiosk surface (?t=kiosk) — full customer-facing UI: category/popular tabs, search, large product grid, cart panel, modifier picker modal, order confirmation with order number',
-      'Kiosk renders full-screen with no staff sidebar, shift bar, or management features',
-      'Kiosk sends order to kitchen via sendToKitchen on Place order — appears in KDS immediately',
-      'EOD Close: full shift summary, EOD checklist with cash variance, manager notes, two-step confirm',
-      'Quick screen profile-aware: bar terminal shows bar/drinks items first, 86\'d items removed and padded with available alternatives',
-      'KDS auto-filters to bar station (pc4) when terminal profile has assignedSection=bar',
+      'Send always clears the order — removed async setTimeout, now uses direct store calls so customer/orderType are set before sendToKitchen reads them. No more orders stuck in checkout.',
+      'Occupied table: both "Add to existing check" and "New separate check (T1.2)" options restored in the OrderTypeModal table picker.',
+      'Table send now also closes the checkout modal before sending.',
+      'Split check creates a child table (T1.2, T1.3 etc.) with its own independent session and bill.',
     ],
   },
   {
-    version: '0.7.8', date: 'Apr 2026', label: 'Quick screen, EOD close, KDS centre filter',
-    changes: ['Profile-aware quick screen, EOD close flow, KDS production centre filter'],
+    version: '0.9.3', date: 'Apr 2026', label: 'Modifier & instruction groups end-to-end',
+    changes: [
+      'Modifier groups and instruction groups from the Product Builder are now fully wired into the POS ordering modal.',
+      'Instruction groups (cooking temp, bread, spice level etc.) show with green radio UI, no price shown — printed on kitchen ticket.',
+      'Modifier groups (paid options: sauce, extras) show with radio/checkbox UI enforcing min/max.',
+      'POS openFlow now triggers modal for items with assignedModifierGroups or assignedInstructionGroups.',
+      'All send paths (table, counter, takeaway, collection, delivery, bar) close checkout on send.',
+    ],
   },
   {
-    version: '0.7.7', date: 'Apr 2026', label: 'Live shift stats + full BO reports',
-    changes: ['Live shift stats from closedChecks, BOReports with top items and hourly chart'],
+    version: '0.9.2', date: 'Apr 2026', label: 'Nav restructure & Orders Hub in shift bar',
+    changes: [
+      'Orders Hub removed from sidebar nav — now lives as 📋 Orders button in the top shift bar, always visible with live active order count badge.',
+      'Bar moved above Floor in sidebar nav: Bar → Floor → POS → KDS.',
+      'Checkout modal closes on send in all paths.',
+    ],
   },
   {
-    version: '0.7.6', date: 'Apr 2026', label: 'Menu edits live end-to-end',
-    changes: ['Menu items editable in BO, POS reads store, push snapshot includes menu'],
+    version: '0.9.1', date: 'Apr 2026', label: 'Menu Manager complete rebuild',
+    changes: [
+      'Five focused screens: Categories, Items, Modifier groups, Instruction groups, Product builder.',
+      'Categories: drag one category onto another to nest it as a subcategory. Items in subcategory also count in the parent.',
+      'Items: all items and sub items in one list. Drag an item onto another to link it as a variant child. The parent becomes a picker button on POS.',
+      'Modifier groups: define reusable paid option groups (options that change price). Set min/max per group.',
+      'Instruction groups: preparation instructions with no price change (cooking temp, bread preference, spice level etc.).',
+      'Product builder: assign modifier groups and instruction groups to any item. Set per-item min/max overrides.',
+      'Store: modifierGroupDefs and instructionGroupDefs state added.',
+    ],
   },
   {
-    version: '0.7.5', date: 'Apr 2026', label: 'Back Office publish workflow',
-    changes: ['"Push to POS", POS sync banner, config snapshot'],
+    version: '0.9.0', date: 'Apr 2026', label: 'Multi-location & Stripe Terminal scaffold',
+    changes: [
+      'Multi-location Back Office section: manage locations, switch active location, configure per-location VAT/currency/timezone/service charge.',
+      'Locations store state: currentLocationId, locations[], setCurrentLocation, addLocation, updateLocation.',
+      'Stripe Terminal scaffold (src/lib/stripe.js): initStripeTerminal, discoverReaders, connectReader, collectPayment, cancelPayment — mock mode simulates card tap with 5% decline rate.',
+    ],
   },
   {
-    version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
-    changes: ['Menu manager, floor plan, device profiles, devices, staff, print routing'],
+    version: '0.8.9', date: 'Apr 2026', label: 'OrderTypeModal — complete send flow redesign',
+    changes: [
+      'Send button with no table assigned now shows OrderTypeModal — six clear paths: Counter/named, Seat at table, Bar tab, Takeaway, Collection, Delivery.',
+      'Counter/named: enter optional name, sends to kitchen immediately, appears in Orders Hub, POS clears.',
+      'Seat at table: picks available table from floor plan, seats items, navigates to floor plan.',
+      'Bar tab: open a new named tab or add to an existing open tab.',
+      'Takeaway/Collection: name + phone + time (or ASAP), sends to kitchen + order queue.',
+      'Delivery: name + phone + address, sends to queue.',
+    ],
+  },
+  {
+    version: '0.8.8', date: 'Apr 2026', label: 'Orders Hub rebuild + live badge',
+    changes: [
+      'Orders Hub rebuilt with live elapsed timers, channel filter tabs (All / Tables / Bar / Dine-in / Takeaway / Collection / Delivery), colour-coded status strips.',
+      'My orders filter: tap "👤 My orders" to see only the current server\'s active orders.',
+      'Orders Hub shows table sessions, bar tabs, and walk-in queue orders unified.',
+      'Active order count badge on Orders button in shift bar.',
+    ],
+  },
+  {
+    version: '0.8.7', date: 'Apr 2026', label: 'Orders Hub + walk-in routing fix + menu type system',
+    changes: [
+      'Orders Hub added as a full-screen surface: unified view of all active orders across tables, bar tabs, and walk-in queue.',
+      'Walk-in order routing fixed: all orders sent without a table (including named dine-in) now always appear in the Orders Hub.',
+      'Sub item type: first-class item type, hidden from POS/kiosk/online, used only as options within modifier groups.',
+      'Modifiable type: auto-set the moment modifier groups are added to an item, reverts to Simple when all groups are removed.',
+      'Variants: parent item with children linked via parentId. Each child is a full item with its own price.',
+      'Combo (renamed from Bundle).',
+    ],
+  },
+  {
+    version: '0.8.6', date: 'Apr 2026', label: 'Menu Manager v2: order-type pricing, modifier library, builder',
+    changes: [
+      'Pricing changed from per-menu to per-order-type: Base, Dine-in, Takeaway, Collection, Delivery.',
+      'Modifier library: create modifiers centrally, add to groups on items.',
+      'Interactive full-page builder: POS/Kiosk/Handheld preview, drag to reorder categories and items.',
+      'Items tab: inline price editing for all order types in table rows.',
+      'Modifiers tab: modifier library with category grouping and global overview.',
+    ],
+  },
+  {
+    version: '0.8.5', date: 'Apr 2026', label: 'Menu Manager fixes & Supabase init',
+    changes: [
+      'Fixed illegal useState inside .map() in CategoryRow — extracted to proper component.',
+      'KDS uses kitchenName, receipts use receiptName, POS buttons use menuName.',
+      'useSupabaseInit hook called from App on mount — loads menu, floor plan, 86 list, KDS, closed checks from DB.',
+    ],
+  },
+  {
+    version: '0.8.3', date: 'Apr 2026', label: 'Menu Manager rebuild: multiple menus, full item model',
+    changes: [
+      'Complete menu manager rebuild: multiple menus, hierarchical category tree with subcategories.',
+      'Triple naming per item: Menu name (POS button), Receipt name, Kitchen name (KDS).',
+      'Per-menu price overrides, modifier groups with min/max, pizza builder, scope (local/shared/global).',
+      'Routing tab: production centre per item or inherited from category, course assignment.',
+      'Visibility tab: toggle per channel (POS, Kiosk, Online, Delivery apps).',
+    ],
+  },
+  {
+    version: '0.8.2', date: 'Apr 2026', label: 'Inventory management + full Supabase write path',
+    changes: [
+      'Inventory section in Back Office: portion tracking, par counts, low/critical/out status bars.',
+      '86 all out-of-stock quick action, bulk count modal.',
+      'All store mutations wired to Supabase: menu items, floor tables, KDS tickets, closed checks, config pushes.',
+    ],
+  },
+  {
+    version: '0.8.0', date: 'Apr 2026', label: 'Supabase Phase 2: schema, DB layer, Realtime',
+    changes: [
+      '293-line Postgres schema: organisations, locations, menus, items, modifiers, floor plan, staff, orders, KDS, 86 list.',
+      'db.js data access layer: fetchMenuItems, upsertMenuItem, fetch86List, fetchKDSTickets, insertClosedCheck, insertConfigPush.',
+      'realtime.js: Postgres change subscriptions for KDS tickets, 86 list, and config pushes.',
+      'toggle86 and bumpTicket wired to Supabase. Mock mode falls back to BroadcastChannel.',
+    ],
+  },
+  {
+    version: '0.7.9', date: 'Apr 2026', label: 'Modifier groups, kiosk surface, EOD close',
+    changes: [
+      'Modifier groups editor on items: name, required/optional, single/multi-select, options with prices.',
+      'Kiosk surface (?t=kiosk): full customer-facing UI with category tabs, search, modifier picker, order confirmation.',
+      'EOD Close: full shift summary, checklist, cash variance, manager notes, two-step confirm.',
+      'Quick screen profile-aware: bar terminal prioritises bar/drinks items.',
+    ],
+  },
+  {
+    version: '0.7.5', date: 'Apr 2026', label: 'Back Office: Push to POS & config snapshot',
+    changes: [
+      '"Push to POS →" button in Back Office header — broadcasts config snapshot to all POS terminals.',
+      'POS sync banner shown when BO pushes an update.',
+      'Config snapshot persisted to localStorage and written to Supabase config_pushes table.',
+    ],
+  },
+  {
+    version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal launched',
+    changes: [
+      'Full Back Office portal: Menu manager, Floor plan builder, Device profiles, Device registry, Staff & access, Print routing, Reports, EOD close.',
+      'Device profiles: configure surface, order types, sections, features per terminal type.',
+      'URL-based terminal selection (?t=counter/bar/handheld/kds/kiosk).',
+      'BroadcastChannel cross-tab sync for operational data.',
+    ],
   },
 ];
 
