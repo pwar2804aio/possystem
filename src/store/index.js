@@ -225,36 +225,62 @@ export const useStore = create((set, get) => ({
   updateCategory: (id, patch) => set(s => ({ menuCategories: s.menuCategories.map(c => c.id===id ? { ...c, ...patch } : c) })),
   removeCategory: id => set(s => ({ menuCategories: s.menuCategories.filter(c => c.id!==id) })),
 
+  // ── Modifier library — create modifiers here, add to groups ─────────────────
+  modifierLibrary: [
+    { id:'ml-1',  name:'Rare',           price:0,    category:'Cooking',   allergens:[] },
+    { id:'ml-2',  name:'Medium rare',    price:0,    category:'Cooking',   allergens:[] },
+    { id:'ml-3',  name:'Medium',         price:0,    category:'Cooking',   allergens:[] },
+    { id:'ml-4',  name:'Medium well',    price:0,    category:'Cooking',   allergens:[] },
+    { id:'ml-5',  name:'Well done',      price:0,    category:'Cooking',   allergens:[] },
+    { id:'ml-6',  name:'Peppercorn',     price:0,    category:'Sauce',     allergens:['milk'] },
+    { id:'ml-7',  name:'Béarnaise',      price:0,    category:'Sauce',     allergens:['eggs','milk'] },
+    { id:'ml-8',  name:'Chimichurri',    price:0,    category:'Sauce',     allergens:[] },
+    { id:'ml-9',  name:'No sauce',       price:0,    category:'Sauce',     allergens:[] },
+    { id:'ml-10', name:'Truffle oil',    price:3.50, category:'Extra',     allergens:[] },
+    { id:'ml-11', name:'Extra pancetta', price:2.50, category:'Extra',     allergens:[] },
+    { id:'ml-12', name:'Side salad',     price:0,    category:'Side swap', allergens:[] },
+    { id:'ml-13', name:'Mac & cheese',   price:3.00, category:'Side swap', allergens:['gluten','milk','eggs'] },
+    { id:'ml-14', name:'Chips',          price:0,    category:'Side swap', allergens:['gluten'] },
+    { id:'ml-15', name:'Gluten-free base',price:2.00,category:'Pizza base', allergens:[] },
+    { id:'ml-16', name:'Sourdough base', price:0,    category:'Pizza base', allergens:['gluten'] },
+    { id:'ml-17', name:'With bread',     price:0,    category:'Bread',     allergens:['gluten'] },
+    { id:'ml-18', name:'No bread',       price:0,    category:'Bread',     allergens:[] },
+  ],
+  addModifier: mod => set(s => ({ modifierLibrary: [...s.modifierLibrary, { id:`ml-${Date.now()}`, ...mod }] })),
+  updateModifier: (id, patch) => set(s => ({ modifierLibrary: s.modifierLibrary.map(m => m.id===id ? {...m,...patch} : m) })),
+  removeModifier: id => set(s => ({ modifierLibrary: s.modifierLibrary.filter(m => m.id!==id) })),
+
   // ── Menu items — full enhanced model ─────────────────────────────────────────
   //
-  // Triple naming:  menuName (POS button) | receiptName | kitchenName
-  // Pricing:        basePrice + priceOverrides{menuId→price} + locationPriceOverrides{locId→price}
-  // Scope:          local | shared (name shared, price per-location) | global (all shared)
-  // Routing:        productionCentreId (null = inherit from category), course (null = inherit)
+  // Triple naming:  menuName | receiptName | kitchenName
+  // Pricing:        per order type (dineIn / takeaway / collection / delivery)
+  //                 null = use base price for that channel
+  // Scope:          local | shared | global
+  // Routing:        productionCentreId (null = inherit from category), course
   // Type:           simple | modifiers | variants | pizza | bundle
   // Visibility:     { pos, kiosk, online, onlineDelivery }
   //
   menuItems: MENU_ITEMS.map(item => ({
-    // Backward-compat: existing fields stay
     ...item,
-    // Triple naming — defaults to existing name
     menuName:    item.menuName    || item.name,
     receiptName: item.receiptName || item.name,
     kitchenName: item.kitchenName || item.name,
-    // Multi-site scope
     scope: item.scope || 'local',
-    // Per-menu price overrides
-    priceOverrides: item.priceOverrides || {},
-    locationPriceOverrides: item.locationPriceOverrides || {},
-    // Routing (null = inherit from category)
+    // Per-order-type pricing (replaces per-menu pricing)
+    pricing: item.pricing || {
+      base:       item.price || 0,
+      dineIn:     null,   // null = use base
+      takeaway:   null,
+      collection: null,
+      delivery:   null,
+    },
     productionCentreId: item.centreId || null,
     course: item.course || null,
-    // Content
     instructions: item.instructions || '',
     image: item.image || null,
     tags: item.tags || [],
-    // Visibility
     visibility: item.visibility || { pos:true, kiosk:true, online:true, onlineDelivery:true },
+    sortOrder: item.sortOrder || 0,
   })),
 
   updateMenuItem: (id, patch) => {
@@ -262,9 +288,53 @@ export const useStore = create((set, get) => ({
     import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem({ id, ...patch }));
   },
   addMenuItem: item => {
-    const newItem = { id:`m-${Date.now()}`, scope:'local', priceOverrides:{}, locationPriceOverrides:{}, instructions:'', image:null, tags:[], visibility:{pos:true,kiosk:true,online:true,onlineDelivery:true}, ...item, menuName:item.menuName||item.name, receiptName:item.receiptName||item.name, kitchenName:item.kitchenName||item.name };
+    const base = item.price || item.basePrice || 0;
+    const newItem = {
+      id:`m-${Date.now()}`, scope:'local', instructions:'', image:null, tags:[],
+      visibility:{pos:true,kiosk:true,online:true,onlineDelivery:true},
+      sortOrder: useStore.getState().menuItems.length,
+      ...item,
+      menuName:    item.menuName    || item.name || 'New item',
+      receiptName: item.receiptName || item.name || 'New item',
+      kitchenName: item.kitchenName || item.name || 'New item',
+      pricing: item.pricing || { base, dineIn:null, takeaway:null, collection:null, delivery:null },
+    };
     set(s => ({ menuItems: [...s.menuItems, newItem] }));
     import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem(newItem));
+    return newItem;
+  },
+
+  // Get effective price for an order type
+  getItemPrice: (item, orderType = 'dineIn') => {
+    const p = item?.pricing;
+    if (!p) return item?.price || 0;
+    const MAP = { 'dine-in':'dineIn', 'takeaway':'takeaway', 'collection':'collection', 'delivery':'delivery', 'dineIn':'dineIn' };
+    const key = MAP[orderType] || 'dineIn';
+    return (p[key] !== null && p[key] !== undefined) ? p[key] : (p.base || 0);
+  },
+
+  // Reorder items within a category
+  reorderMenuItems: (catId, fromIdx, toIdx) => {
+    set(s => {
+      const catItems = s.menuItems.filter(i => i.cat === catId).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+      const others   = s.menuItems.filter(i => i.cat !== catId);
+      const moved    = [...catItems];
+      const [item]   = moved.splice(fromIdx, 1);
+      moved.splice(toIdx, 0, item);
+      const reindexed = moved.map((it, idx) => ({ ...it, sortOrder: idx }));
+      return { menuItems: [...others, ...reindexed] };
+    });
+  },
+
+  // Reorder categories
+  reorderCategories: (fromIdx, toIdx) => {
+    set(s => {
+      const cats = [...s.menuCategories];
+      const [cat] = cats.splice(fromIdx, 1);
+      cats.splice(toIdx, 0, cat);
+      const reindexed = cats.map((c, idx) => ({ ...c, sortOrder: idx }));
+      return { menuCategories: reindexed };
+    });
   },
   duplicateMenuItem: id => {
     const source = useStore.getState().menuItems.find(i => i.id === id);
