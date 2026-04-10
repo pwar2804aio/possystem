@@ -996,7 +996,30 @@ export const useStore = create((set, get) => ({
   },
 
   // ── Shift ─────────────────────────────────
-  shift: SHIFT,
+  // Shift stats — computed live from closed checks
+  get shift() {
+    const checks = useStore.getState().closedChecks;
+    const seed = SHIFT;
+    if (!checks.length) return seed; // show seed values on first load before any checks
+    const revenue  = checks.reduce((s,c) => s + c.total, 0);
+    const covers   = checks.reduce((s,c) => s + (c.covers || 1), 0);
+    const tips     = checks.reduce((s,c) => s + (c.tip || 0), 0);
+    const voids    = checks.reduce((s,c) => s + c.voids?.length || 0, 0);
+    const card     = checks.filter(c => c.method !== 'cash').reduce((s,c) => s + c.total, 0);
+    const cash     = checks.filter(c => c.method === 'cash').reduce((s,c) => s + c.total, 0);
+    return {
+      name: seed.name,
+      opened: seed.opened,
+      covers,
+      sales: revenue,
+      avgCheck: covers > 0 ? revenue / covers : 0,
+      cashSales: cash,
+      cardSales: card,
+      tips,
+      voids,
+      voidValue: 0,
+    };
+  },
 
   // ── Toast ─────────────────────────────────
   toast: null,

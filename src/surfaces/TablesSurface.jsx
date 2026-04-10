@@ -241,13 +241,14 @@ function TableNode({ table, onClick }) {
 
 // ─── Main Tables Surface ─────────────────────────────────────────────────────
 export default function TablesSurface() {
-  const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff, locationSections } = useStore();
+  const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff, locationSections, deviceConfig } = useStore();
   const [selected, setSelected]   = useState(null);
   const [showSeat, setShowSeat]   = useState(false);
   const [showReservation, setShowReservation] = useState(false);
   const [showCheckSelector, setShowCheckSelector] = useState(false);
   const [checkSelectorTable, setCheckSelectorTable] = useState(null);
-  const [section, setSection]     = useState('all');
+  // Auto-filter to assigned section from device profile (e.g. bar terminal shows bar section by default)
+  const [section, setSection] = useState(deviceConfig?.assignedSection || 'all');
   const [view, setView]           = useState('floor');  // floor | mine | all
   const [, setTick] = useState(0);
 
