@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ALLERGENS } from '../data/seed';
+import SplitModal from '../components/SplitModal';
 
 // ─── Tip selector ─────────────────────────────────────────────────────────────
 function TipPicker({ total, onSelect }) {
@@ -233,12 +234,12 @@ function SplitCheck({ grand, covers, onComplete, onBack }) {
 
 // ─── Main CheckoutModal ───────────────────────────────────────────────────────
 export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
-  const [screen, setScreen] = useState('review'); // review|card_tip|card_terminal|cash|split
+  const [screen, setScreen] = useState('review');
   const [tipAmt, setTipAmt] = useState(0);
   const [payMethod, setPayMethod] = useState('card');
+  const [showSplit, setShowSplit] = useState(false);
 
   const isBarTab = orderType==='bar-tab';
-  // Bar tabs and takeaway: no tip prompt on card, go straight to terminal
   const skipTip  = isBarTab || orderType==='takeaway' || orderType==='collection';
 
   const grand = total + tipAmt;
@@ -379,7 +380,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
               </div>
 
               {/* Split — secondary */}
-              <button onClick={()=>setScreen('split')} style={{
+              <button onClick={()=>setShowSplit(true)} style={{
                 width:'100%', padding:'12px', borderRadius:12, cursor:'pointer', fontFamily:'inherit',
                 background:'transparent', border:'1px solid var(--bdr2)',
                 display:'flex', alignItems:'center', justifyContent:'center', gap:10, color:'var(--t3)', fontSize:13, fontWeight:500,
@@ -412,17 +413,23 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
             />
           )}
 
-          {/* ══ SPLIT ═══════════════════════════════════════════════ */}
-          {screen==='split'&&(
-            <SplitCheck
-              grand={total}
-              covers={covers}
-              onComplete={()=>complete('split')}
-              onBack={()=>setScreen('review')}
-            />
-          )}
+
         </div>
       </div>
+
+      {/* Split modal — full-featured, separate overlay */}
+      {showSplit && (
+        <SplitModal
+          items={items}
+          total={total}
+          covers={covers}
+          onComplete={(portions) => {
+            setShowSplit(false);
+            onComplete({ method:'split', tip:0, grand:total, portions });
+          }}
+          onClose={() => setShowSplit(false)}
+        />
+      )}
     </div>
   );
 }
