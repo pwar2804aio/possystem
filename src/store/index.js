@@ -574,6 +574,7 @@ export const useStore = create((set, get) => ({
         }),
         kdsTickets: [...s.kdsTickets, ...newTickets],
       }));
+      import('../lib/db.js').then(({ insertKDSTicket }) => newTickets.forEach(t => insertKDSTicket(t)));
       get().showToast('Sent to kitchen','success');
     } else {
       const order = get().walkInOrder;
@@ -589,6 +590,7 @@ export const useStore = create((set, get) => ({
         walkInOrder:{ ...(s.walkInOrder||{}), sentAt:new Date(), items:(s.walkInOrder?.items||[]).map(i=>[0,1].includes(i.course)?{...i,fired:true,status:'sent'}:i) },
         kdsTickets: [...s.kdsTickets, ...newTickets],
       }));
+      import('../lib/db.js').then(({ insertKDSTicket }) => newTickets.forEach(t => insertKDSTicket(t)));
       get().showToast(orderType==='dine-in'?'Sent to kitchen':`Order for ${customer?.name} sent`,'success');
     }
   },
@@ -822,6 +824,7 @@ export const useStore = create((set, get) => ({
       refunds:    [],
     };
     set(s => ({ closedChecks: [record, ...s.closedChecks] }));
+    import('../lib/db.js').then(({ insertClosedCheck }) => insertClosedCheck(record));
     return record;
   },
 
@@ -850,6 +853,7 @@ export const useStore = create((set, get) => ({
       refunds: [],
     };
     set(s => ({ closedChecks: [record, ...s.closedChecks] }));
+    import('../lib/db.js').then(({ insertClosedCheck }) => insertClosedCheck(record));
     return record;
   },
 

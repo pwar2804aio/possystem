@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './styles/globals.css';
 import { useStore } from './store';
 import PINScreen from './surfaces/PINScreen';
@@ -11,6 +11,7 @@ import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
 import KioskSurface from './surfaces/KioskSurface';
+import useSupabaseInit from './lib/useSupabaseInit';
 
 const VERSION = '0.7.9';
 
@@ -70,18 +71,31 @@ const CHANGELOG = [
 
 
 export default function App() {
-  const { staff, surface, setSurface, toast, shift, theme, setTheme, appMode } = useStore();
+  const { staff, surface, setSurface, toast, shift, theme, setTheme, appMode, deviceConfig } = useStore();
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [syncPulse, setSyncPulse] = useState(false);
+
+  useSupabaseInit(); // Load state from Supabase on mount (no-op in mock mode)
 
   const handleSyncPulse = useCallback(() => {
     setSyncPulse(true);
     setTimeout(() => setSyncPulse(false), 600);
   }, []);
 
-  useState(() => {
+  // Start Supabase Realtime on mount (no-op in mock mode)
+  useEffect(() => {
+    let cleanup;
+    import('./lib/realtime.js').then(({ startRealtime }) => {
+      import('./store/index.js').then(({ useStore: storeModule }) => {
+        cleanup = startRealtime(storeModule);
+      });
+    }).catch(() => {});
+    return () => cleanup?.();
+  }, []);
+
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-  });
+  }, [theme]);
 
   if (!staff) return <><SyncBridge onSyncPulse={handleSyncPulse}/><PINScreen /></>;
   if (appMode === 'backoffice') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;

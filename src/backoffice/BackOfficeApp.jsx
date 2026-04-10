@@ -9,6 +9,7 @@ import StaffManager from './sections/StaffManager';
 import PrintRouting from './sections/PrintRouting';
 import BOReports from './sections/BOReports';
 import EODClose from './sections/EODClose';
+import SupabaseSetup from '../lib/SupabaseSetup';
 
 const NAV = [
   { id:'overview',  label:'Overview',       icon:'◈',  group:'Dashboard' },
@@ -186,7 +187,14 @@ function PushToPOSButton() {
       localStorage.setItem('rpos-config-snapshot', JSON.stringify(snapshot));
     } catch {}
 
-    // Broadcast to all open POS terminals
+    // Write to Supabase so physical devices on other machines receive it
+    import('../lib/db.js').then(({ insertConfigPush }) => insertConfigPush({
+      pushed_by: staff?.name || 'Manager',
+      snapshot,
+      change_count: pendingBOChanges,
+    }));
+
+    // Broadcast to all open POS terminals in this browser session
     broadcastConfigPush(snapshot);
 
     clearBOChanges();
@@ -255,6 +263,7 @@ function BOOverview({ setSection }) {
 
   return (
     <div style={{ flex:1, overflowY:'auto', padding:28 }}>
+      <SupabaseSetup />
       <div style={{ marginBottom:28 }}>
         <div style={{ fontSize:24, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em', marginBottom:4 }}>
           Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}
