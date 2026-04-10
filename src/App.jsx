@@ -7,56 +7,64 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.5.3';
+const VERSION = '0.6.0';
 
 const CHANGELOG = [
   {
-    version: '0.5.3', date: 'Apr 2026', label: 'Orders list view',
+    version: '0.6.0', date: 'Apr 2026', label: 'UI revamp — Operator Dark',
     changes: [
-      'Floor plan now has three tabs: Floor plan, My orders, All open orders',
-      'My orders filters to the current logged-in server\'s tables only',
-      'Each row shows: table, covers, server (all orders), time seated, last activity, running total',
-      'Urgency colour coding: green = active, amber = 10+ mins idle, red = 20+ mins idle',
-      'Urgency dot pulses and border changes colour — visible at a glance across the shift',
-      'Tap any row to open that table directly in POS',
-      'Timer refreshes every 30 seconds so colours stay live without a page reload',
+      'Product cards: larger (110px min), price is the hero at 18px bold in category colour, coloured left border per category for instant visual navigation',
+      'Category nav: 60px tap targets with coloured left bar indicator, active glow dot, animated allergen pulse',
+      'Order items: left status border (green = sent, red = voided), Remove/Void as proper pill buttons, cleaner tags row',
+      'Qty steppers: 30×28px buttons with hover states — properly tappable at speed',
+      'Order panel: richer empty state, better totals typography, total at 22px bold',
+      'Send/Pay: 40px height, Pay wider than Send for visual hierarchy',
+      'Shift bar: green live dot, mono stats, slimmer at 42px',
+      'Sidebar: 22px icons with glow on active state',
+      'CSS system: richer backgrounds, better shadows, --font-mono throughout, btn hover scale effect',
+      'Modals: backdrop blur, slide-up animation',
+      'Quick Screen: "AI-curated" header with live indicator',
+      'All borders on --bdr (not --bdr2) — more consistent depth',
     ],
   },
   {
-    version: '0.5.2', date: 'Apr 2026', label: 'Full split bill system',
+    version: '0.5.3', date: 'Apr 2026', label: 'Orders list view',
     changes: [
-      '4 split modes: Even, By seat, By item, Custom amounts',
-      'Each split portion tendered independently with card or cash',
-      'Progress bar shows X of N portions paid',
+      'Floor plan: three tabs — Floor plan, My orders, All open orders',
+      'My orders filters to the logged-in server, urgency colours green/amber/red by idle time',
+      'Tap any row to open that table in POS',
+    ],
+  },
+  {
+    version: '0.5.2', date: 'Apr 2026', label: 'Full split bill',
+    changes: [
+      '4 modes: Even, By seat, By item, Custom amounts',
+      'Each portion tendered independently with card or cash',
     ],
   },
   {
     version: '0.5.1', date: 'Apr 2026', label: 'Fast checkout',
     changes: [
-      'Card and Cash primary buttons at bottom of checkout',
-      'Card: tip picker → Stripe Terminal screen',
-      'Cash: 12-key numpad, quick cash buttons, live change display',
+      'Card and Cash primary buttons, tip picker, 12-key cash numpad with live change',
     ],
   },
   {
     version: '0.5.0', date: 'Apr 2026', label: 'Voids, discounts & history',
     changes: [
-      'Void items and checks with manager PIN + reason',
-      'Discounts — by amount then select items or whole check',
-      'History tab with refund flow (card or cash tender)',
+      'Void items/checks with manager PIN, discounts, print, 4-step refund with tender',
     ],
   },
   {
     version: '0.4.1', date: 'Apr 2026', label: 'Table sessions',
-    changes: ['Tables own sessions, floor plan, seat guests modal, live status'],
+    changes: ['Tables own sessions, floor plan, seat guests, live table status'],
   },
   {
     version: '0.4.0', date: 'Apr 2026', label: 'Bar tabs',
-    changes: ['Full bar tab system with rounds, pre-auth, checkout'],
+    changes: ['Rounds, pre-auth, roaming tabs, checkout per tab'],
   },
   {
     version: '0.3.0', date: 'Mar 2026', label: 'Takeaway & collection',
-    changes: ['Customer capture, Orders hub, collection slots'],
+    changes: ['Customer capture, collection slots, Orders hub'],
   },
   {
     version: '0.2.0', date: 'Mar 2026', label: 'POS core ordering',
@@ -67,6 +75,7 @@ const CHANGELOG = [
     changes: ['POS, Quick Screen, allergens, KDS, floor plan, PIN login'],
   },
 ];
+
 
 
 export default function App() {
@@ -102,29 +111,31 @@ const NAV = [
 
 function ShiftBar({ shift, version, onWhatsNew }) {
   return (
-    <div style={{ height:40, display:'flex', alignItems:'center', background:'var(--bg1)', borderBottom:'1px solid var(--bdr2)', flexShrink:0 }}>
-      <div style={{ width:'var(--nav)', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', borderRight:'1px solid var(--bdr2)', flexShrink:0 }}>
-        <div style={{ width:28, height:28, background:'var(--acc)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, color:'#0e0f14' }}>R</div>
+    <div style={{ height:42, display:'flex', alignItems:'center', background:'var(--bg1)', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
+      <div style={{ width:'var(--nav)', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', borderRight:'1px solid var(--bdr)', flexShrink:0 }}>
+        <div style={{ width:30, height:30, background:'var(--acc)', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:900, color:'#0b0c10', fontFamily:'var(--font-mono)' }}>R</div>
       </div>
-      <div style={{ display:'flex', alignItems:'center', gap:20, padding:'0 20px', flex:1 }}>
-        <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:'var(--grn-d)', border:'1px solid var(--grn-b)', color:'var(--grn)' }}>● {shift.name}</span>
-        <span style={{ fontSize:12, color:'var(--t3)' }}>Covers <strong style={{ color:'var(--t1)', fontWeight:600 }}>{shift.covers}</strong></span>
-        <span style={{ fontSize:12, color:'var(--t3)' }}>Sales <strong style={{ color:'var(--t1)', fontWeight:600 }}>£{shift.sales.toLocaleString()}</strong></span>
-        <span style={{ fontSize:12, color:'var(--t3)' }}>Avg <strong style={{ color:'var(--t1)', fontWeight:600 }}>£{shift.avgCheck.toFixed(2)}</strong></span>
+      <div style={{ display:'flex', alignItems:'center', padding:'0 16px', flex:1, gap:0, overflow:'hidden' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, marginRight:20 }}>
+          <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--grn)', boxShadow:'0 0 6px var(--grn)' }}/>
+          <span style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>{shift.name}</span>
+        </div>
+        {[{label:'Covers',val:shift.covers},{label:'Sales',val:`£${shift.sales.toLocaleString()}`},{label:'Avg',val:`£${shift.avgCheck.toFixed(2)}`}].map(s=>(
+          <div key={s.label} style={{ marginRight:20, display:'flex', alignItems:'baseline', gap:5 }}>
+            <span style={{ fontSize:10, color:'var(--t4)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em' }}>{s.label}</span>
+            <span style={{ fontSize:13, fontWeight:700, color:'var(--t2)', fontFamily:typeof s.val==='string'&&s.val.includes('£')?'var(--font-mono)':'inherit' }}>{s.val}</span>
+          </div>
+        ))}
       </div>
-      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 16px' }}>
-        <div style={{ fontSize:12, color:'var(--t3)', fontFamily:'DM Mono, monospace' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 14px', flexShrink:0 }}>
+        <div style={{ fontSize:11, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>
           {new Date().toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
         </div>
-        <button onClick={onWhatsNew} style={{
-          display:'flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:20, cursor:'pointer',
-          background:'var(--bg3)', border:'1px solid var(--bdr2)', fontFamily:'inherit',
-          fontSize:11, fontWeight:700, color:'var(--t3)', transition:'all .15s',
-        }}
-        onMouseEnter={e=>{ e.currentTarget.style.borderColor='var(--acc-b)'; e.currentTarget.style.color='var(--acc)'; }}
-        onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--bdr2)'; e.currentTarget.style.color='var(--t3)'; }}>
-          <span style={{ fontFamily:'DM Mono, monospace' }}>v{version}</span>
-          <span style={{ color:'var(--t4)' }}>·</span>
+        <button onClick={onWhatsNew} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, cursor:'pointer', background:'var(--bg3)', border:'1px solid var(--bdr)', fontFamily:'inherit', fontSize:11, fontWeight:700, color:'var(--t3)', transition:'all .14s' }}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--acc-b)';e.currentTarget.style.color='var(--acc)';}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr)';e.currentTarget.style.color='var(--t3)';}}>
+          <span style={{ fontFamily:'var(--font-mono)', fontSize:10 }}>v{version}</span>
+          <span style={{ color:'var(--bdr3)' }}>·</span>
           <span>What's new</span>
         </button>
       </div>
@@ -195,7 +206,7 @@ function WhatsNewModal({ onClose }) {
 
 function Sidebar({ surface, setSurface }) {
   return (
-    <nav style={{ width:'var(--nav)', background:'var(--bg1)', borderRight:'1px solid var(--bdr2)', display:'flex', flexDirection:'column', alignItems:'center', padding:'12px 0', gap:2, flexShrink:0 }}>
+    <nav style={{ width:'var(--nav)', background:'var(--bg1)', borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', alignItems:'center', padding:'10px 0', gap:2, flexShrink:0 }}>
       {NAV.map(n=>{
         const active=surface===n.id;
         return(<button key={n.id} onClick={()=>setSurface(n.id)} style={{ width:46, height:46, borderRadius:10, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, background:active?'var(--acc-d)':'transparent', border:`1px solid ${active?'var(--acc-b)':'transparent'}`, color:active?'var(--acc)':'var(--t3)', transition:'all .15s', fontFamily:'inherit' }}>

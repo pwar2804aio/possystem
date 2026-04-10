@@ -144,44 +144,47 @@ export default function POSSurface() {
     <div style={{display:'flex',flex:1,overflow:'hidden',minWidth:0}}>
 
       {/* ══ ORDER PANEL ════════════════════════════════════════ */}
-      <div style={{width:'var(--ord)',flexShrink:0,display:'flex',flexDirection:'column',background:'var(--bg1)',borderRight:'1px solid var(--bdr2)',overflow:'hidden'}}>
+      <div style={{width:'var(--ord)',flexShrink:0,display:'flex',flexDirection:'column',background:'var(--bg1)',borderRight:'1px solid var(--bdr)',overflow:'hidden'}}>
 
         {/* Context header */}
         <div style={{padding:'10px 12px 8px',borderBottom:'1px solid var(--bdr)',flexShrink:0}}>
           {activeTable ? (
-            /* Table context */
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:38,height:38,borderRadius:activeTable.shape==='rd'?'50%':8,background:'var(--acc-d)',border:'1px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:'var(--acc)',flexShrink:0}}>
+              <div style={{width:40,height:40,borderRadius:activeTable.shape==='rd'?'50%':10,background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'var(--acc)',flexShrink:0,letterSpacing:'-.01em'}}>
                 {activeTable.label}
               </div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:14,fontWeight:700,color:'var(--t1)'}}>{activeTable.label}</div>
-                <div style={{fontSize:11,color:'var(--t3)'}}>{session?.covers} covers · {session?.server} · {session?.seatedAt?`${Math.floor((Date.now()-session.seatedAt)/60000)}m`:''}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:800,color:'var(--t1)',letterSpacing:'-.01em'}}>{activeTable.label}</div>
+                <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>
+                  {session?.covers} covers · {session?.server}
+                  {session?.seatedAt?<span style={{color:'var(--t4)'}}> · {Math.floor((Date.now()-session.seatedAt)/60000)}m</span>:''}
+                </div>
               </div>
-              <button onClick={()=>setSurface('tables')} style={{fontSize:11,color:'var(--t3)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>← Floor</button>
+              <button onClick={()=>setSurface('tables')} style={{fontSize:12,fontWeight:700,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:'4px 0',flexShrink:0}}>← Floor</button>
             </div>
           ) : (
-            /* Walk-in context with order type */
             <>
               <div style={{display:'flex',gap:4,marginBottom:orderType==='dine-in'?0:8}}>
                 {[['dine-in','🍽','Dine in'],['takeaway','🥡','Takeaway'],['collection','📦','Collect']].map(([t,ic,l])=>(
-                  <button key={t} onClick={()=>handleTypeChange(t)} style={{flex:1,padding:'7px 3px',borderRadius:8,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${orderType===t?'var(--acc-b)':'var(--bdr)'}`,background:orderType===t?'var(--acc-d)':'transparent',color:orderType===t?'var(--acc)':'var(--t3)',fontSize:11,fontWeight:700,display:'flex',flexDirection:'column',alignItems:'center',gap:1}}>
-                    <span style={{fontSize:15}}>{ic}</span><span>{l}</span>
+                  <button key={t} onClick={()=>handleTypeChange(t)} style={{flex:1,padding:'7px 3px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${orderType===t?'var(--acc-b)':'var(--bdr)'}`,background:orderType===t?'var(--acc-d)':'transparent',color:orderType===t?'var(--acc)':'var(--t3)',fontSize:10,fontWeight:800,display:'flex',flexDirection:'column',alignItems:'center',gap:1,letterSpacing:.01,transition:'all .14s'}}>
+                    <span style={{fontSize:16}}>{ic}</span><span>{l}</span>
                   </button>
                 ))}
               </div>
               {orderType!=='dine-in'&&customer&&(
-                <div style={{background:'var(--bg3)',borderRadius:10,padding:'8px 12px',marginTop:8,display:'flex',alignItems:'center',gap:10}}>
-                  <div style={{width:32,height:32,borderRadius:'50%',background:'var(--acc-d)',border:'1px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'var(--acc)',flexShrink:0}}>{customer.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:700,color:'var(--t1)'}}>{customer.name}</div>
+                <div style={{background:'var(--bg3)',borderRadius:10,padding:'8px 12px',marginTop:8,display:'flex',alignItems:'center',gap:10,border:'1px solid var(--bdr)'}}>
+                  <div style={{width:32,height:32,borderRadius:'50%',background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'var(--acc)',flexShrink:0}}>{customer.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'var(--t1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{customer.name}</div>
                     <div style={{fontSize:11,color:'var(--t3)'}}>{customer.phone}{orderType==='collection'?` · ${customer.isASAP?'⚡ ASAP':`🕐 ${customer.collectionTime}`}`:''}</div>
                   </div>
-                  <button onClick={()=>{setShowCustomerModal(true);setPendingOrderType(orderType);}} style={{fontSize:11,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0}}>Edit</button>
+                  <button onClick={()=>{setShowCustomerModal(true);setPendingOrderType(orderType);}} style={{fontSize:11,fontWeight:700,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0,flexShrink:0}}>Edit</button>
                 </div>
               )}
               {orderType!=='dine-in'&&!customer&&(
-                <button onClick={()=>{setShowCustomerModal(true);setPendingOrderType(orderType);}} style={{width:'100%',padding:'9px 12px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px dashed var(--bdr2)',color:'var(--t3)',fontSize:13,fontWeight:500,display:'flex',alignItems:'center',gap:8,justifyContent:'center',marginTop:8}}>
+                <button onClick={()=>{setShowCustomerModal(true);setPendingOrderType(orderType);}} style={{width:'100%',padding:'9px 12px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1.5px dashed var(--bdr2)',color:'var(--t3)',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:8,justifyContent:'center',marginTop:8,transition:'all .14s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--acc-b)';e.currentTarget.style.color='var(--acc)';}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr2)';e.currentTarget.style.color='var(--t3)';}}>
                   <span>👤</span> Add customer details
                 </button>
               )}
@@ -189,17 +192,29 @@ export default function POSSurface() {
           )}
         </div>
 
-        {/* Order label */}
-        <div style={{padding:'7px 12px 3px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
-          <span style={{fontSize:11,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em'}}>
-            {activeTable?`${activeTable.label} order`:orderType} · {staff?.name}
+        {/* Order label row */}
+        <div style={{padding:'6px 12px 3px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+          <span style={{fontSize:10,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'.08em'}}>
+            {activeTable?`${activeTable.label}`:orderType} · {staff?.name}
           </span>
-          {items.length>0&&<button onClick={()=>activeTableId?clearTable(activeTableId):clearWalkIn()} style={{fontSize:11,color:'var(--t3)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit'}}>Clear</button>}
+          {items.length>0&&(
+            <button onClick={()=>activeTableId?clearTable(activeTableId):clearWalkIn()} style={{fontSize:11,fontWeight:700,color:'var(--t4)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',padding:0,transition:'color .12s'}}
+              onMouseEnter={e=>e.currentTarget.style.color='var(--red)'}
+              onMouseLeave={e=>e.currentTarget.style.color='var(--t4)'}>Clear</button>
+          )}
         </div>
 
         {/* Items by course */}
-        <div style={{flex:1,overflowY:'auto',padding:'3px 10px'}}>
-          {items.length===0&&<div style={{textAlign:'center',padding:'44px 0',color:'var(--t3)'}}><div style={{fontSize:34,marginBottom:8,opacity:.4}}>🧾</div><div style={{fontSize:13,fontWeight:600,color:'var(--t3)',marginBottom:3}}>Order is empty</div><div style={{fontSize:12}}>Tap items from the menu →</div></div>}
+        <div style={{flex:1,overflowY:'auto',padding:'4px 10px'}}>
+
+          {/* Empty state */}
+          {items.length===0&&(
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'52px 20px',textAlign:'center'}}>
+              <div style={{width:56,height:56,borderRadius:16,background:'var(--bg3)',border:'1px solid var(--bdr)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,marginBottom:14,opacity:.6}}>🧾</div>
+              <div style={{fontSize:14,fontWeight:700,color:'var(--t3)',marginBottom:4}}>Order is empty</div>
+              <div style={{fontSize:12,color:'var(--t4)'}}>Tap items from the menu →</div>
+            </div>
+          )}
 
           {courseNums.map(courseNum=>{
             const cc=COURSE_COLORS[courseNum]||COURSE_COLORS[1];
@@ -211,8 +226,8 @@ export default function POSSurface() {
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5,marginTop:3}}>
                     <div style={{height:1,flex:1,background:'var(--bdr)'}}/>
                     <div style={{display:'flex',alignItems:'center',gap:5}}>
-                      <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,background:isFired?'var(--grn-d)':cc.bg,border:`1px solid ${isFired?'var(--grn-b)':cc.color+'44'}`,color:isFired?'var(--grn)':cc.color}}>{isFired?'✓ ':''}{cc.label}</span>
-                      {canFire&&<button onClick={()=>fireCourse(courseNum)} style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,background:'var(--acc)',color:'#0e0f14',border:'none',cursor:'pointer',fontFamily:'inherit'}}>🔥 Fire</button>}
+                      <span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:20,background:isFired?'var(--grn-d)':cc.bg,border:`1px solid ${isFired?'var(--grn-b)':cc.color+'44'}`,color:isFired?'var(--grn)':cc.color,letterSpacing:.03}}>{isFired?'✓ ':''}{cc.label}</span>
+                      {canFire&&<button onClick={()=>fireCourse(courseNum)} style={{fontSize:10,fontWeight:800,padding:'2px 10px',borderRadius:20,background:'var(--acc)',color:'#0b0c10',border:'none',cursor:'pointer',fontFamily:'inherit'}}>🔥 Fire</button>}
                     </div>
                     <div style={{height:1,flex:1,background:'var(--bdr)'}}/>
                   </div>
@@ -234,12 +249,12 @@ export default function POSSurface() {
           })}
         </div>
 
-        {/* No table warning for dine-in */}
+        {/* No table warning */}
         {orderType === 'dine-in' && !activeTableId && items.length > 0 && (
-          <div onClick={() => setSurface('tables')} style={{ margin:'0 10px 6px', padding:'8px 12px', borderRadius:8, background:'var(--red-d)', border:'1px solid var(--red-b)', cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ fontSize:14 }}>⚠</span>
+          <div onClick={() => setSurface('tables')} style={{ margin:'0 10px 6px', padding:'9px 12px', borderRadius:10, background:'var(--red-d)', border:'1px solid var(--red-b)', cursor:'pointer', display:'flex', alignItems:'center', gap:8, transition:'all .14s' }}>
+            <span style={{ fontSize:16 }}>⚠</span>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:'var(--red)' }}>No table selected</div>
+              <div style={{ fontSize:12, fontWeight:800, color:'var(--red)' }}>No table selected</div>
               <div style={{ fontSize:11, color:'var(--red)', opacity:.8 }}>Tap to go to Floor plan →</div>
             </div>
           </div>
@@ -247,65 +262,82 @@ export default function POSSurface() {
 
         {/* Order note */}
         {items.length>0&&(
-          <div style={{padding:'6px 12px 0',flexShrink:0}}>
+          <div style={{padding:'5px 10px 0',flexShrink:0}}>
             <textarea value={orderNote} onChange={e=>setOrderNote(e.target.value)} placeholder="Order note for kitchen…" rows={orderNote?2:1}
-              style={{width:'100%',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:8,padding:'7px 10px',color:'var(--t1)',fontSize:12,fontFamily:'inherit',resize:'none',outline:'none',lineHeight:1.5,display:'block'}}/>
+              style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--bdr)',borderRadius:10,padding:'7px 11px',color:'var(--t1)',fontSize:12,fontFamily:'inherit',resize:'none',outline:'none',lineHeight:1.5,display:'block',transition:'border-color .15s'}}
+              onFocus={e=>e.target.style.borderColor='var(--acc-b)'}
+              onBlur={e=>e.target.style.borderColor='var(--bdr)'}/>
           </div>
         )}
 
-        {/* Footer */}
+        {/* Footer — totals + actions */}
         <div style={{flexShrink:0,borderTop:'1px solid var(--bdr)',background:'var(--bg2)'}}>
           {items.length>0&&(
             <>
-              <div style={{padding:'10px 12px 0'}}>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:3}}><span>Subtotal · {itemCount} item{itemCount!==1?'s':''}</span><span style={{fontFamily:'DM Mono,monospace'}}>£{subtotal.toFixed(2)}</span></div>
-                {checkDiscount>0&&<div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--grn)',marginBottom:3}}><span>Discount</span><span style={{fontFamily:'DM Mono,monospace'}}>−£{checkDiscount.toFixed(2)}</span></div>}
-                {service>0?<div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:3}}><span>Service (12.5%)</span><span style={{fontFamily:'DM Mono,monospace'}}>£{service.toFixed(2)}</span></div>:<div style={{fontSize:11,color:'var(--grn)',marginBottom:3}}>No service charge · {orderType}</div>}
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:20,fontWeight:800,marginTop:8,paddingTop:8,borderTop:'1px solid var(--bdr3)',marginBottom:2}}><span>Total</span><span style={{color:'var(--acc)',fontFamily:'DM Mono,monospace'}}>£{total.toFixed(2)}</span></div>
+              {/* Totals */}
+              <div style={{padding:'10px 12px 6px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:3}}>
+                  <span>{itemCount} item{itemCount!==1?'s':''}</span>
+                  <span style={{fontFamily:'var(--font-mono)'}}>£{subtotal.toFixed(2)}</span>
+                </div>
+                {checkDiscount>0&&<div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--grn)',marginBottom:3}}>
+                  <span>Discount</span><span style={{fontFamily:'var(--font-mono)'}}>−£{checkDiscount.toFixed(2)}</span>
+                </div>}
+                {service>0
+                  ? <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:3}}>
+                      <span>Service (12.5%)</span><span style={{fontFamily:'var(--font-mono)'}}>£{service.toFixed(2)}</span>
+                    </div>
+                  : <div style={{fontSize:11,color:'var(--grn)',marginBottom:3,fontWeight:600}}>No service charge</div>
+                }
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:22,fontWeight:800,marginTop:8,paddingTop:8,borderTop:'1px solid var(--bdr)'}}>
+                  <span>Total</span>
+                  <span style={{color:'var(--acc)',fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>£{total.toFixed(2)}</span>
+                </div>
               </div>
 
-              {/* Check discounts list */}
-              {(() => {
-                const checkDiscounts = activeTableId
-                  ? (tables.find(t=>t.id===activeTableId)?.session?.discounts||[])
-                  : (useStore.getState().walkInOrder?.discounts||[]);
-                return checkDiscounts.length>0 ? (
-                  <div style={{padding:'0 12px 0'}}>
+              {/* Check discounts */}
+              {(()=>{
+                const checkDiscounts=activeTableId?(tables.find(t=>t.id===activeTableId)?.session?.discounts||[]):(useStore.getState().walkInOrder?.discounts||[]);
+                return checkDiscounts.length>0?(
+                  <div style={{padding:'0 12px 4px'}}>
                     {checkDiscounts.map(d=>(
                       <div key={d.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:11,color:'var(--grn)',marginBottom:2}}>
                         <span>🏷 {d.label}</span>
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{fontFamily:'DM Mono,monospace'}}>−£{d.amount.toFixed(2)}</span>
-                          <button onClick={()=>activeTableId?removeCheckDiscount(activeTableId,d.id):removeWalkInDiscount(d.id)} style={{fontSize:10,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+                          <span style={{fontFamily:'var(--font-mono)'}}>−£{d.amount.toFixed(2)}</span>
+                          <button onClick={()=>activeTableId?removeCheckDiscount(activeTableId,d.id):removeWalkInDiscount(d.id)} style={{fontSize:11,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
                         </div>
                       </div>
                     ))}
                   </div>
-                ) : null;
+                ):null;
               })()}
 
+              {/* Fire course banner */}
               {hasSent&&nextToFire&&(
-                <div style={{margin:'6px 12px 0',padding:'7px 12px',background:'rgba(232,160,32,.1)',border:'1px solid rgba(232,160,32,.25)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                  <span style={{fontSize:12,color:'var(--acc)',fontWeight:600}}>{COURSE_COLORS[nextToFire]?.label} ready to fire</span>
-                  <button onClick={()=>fireCourse(nextToFire)} style={{fontSize:12,fontWeight:700,padding:'4px 12px',borderRadius:8,background:'var(--acc)',color:'#0e0f14',border:'none',cursor:'pointer',fontFamily:'inherit'}}>🔥 Fire</button>
+                <div style={{margin:'4px 10px 0',padding:'8px 12px',background:'rgba(232,160,32,.1)',border:'1px solid rgba(232,160,32,.25)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <span style={{fontSize:12,color:'var(--acc)',fontWeight:700}}>{COURSE_COLORS[nextToFire]?.label} ready to fire</span>
+                  <button onClick={()=>fireCourse(nextToFire)} style={{fontSize:12,fontWeight:800,padding:'4px 12px',borderRadius:8,background:'var(--acc)',color:'#0b0c10',border:'none',cursor:'pointer',fontFamily:'inherit'}}>🔥 Fire</button>
                 </div>
               )}
 
-              {/* Action row — discount, print, void */}
-              <div style={{padding:'7px 12px 4px',display:'flex',gap:5,flexWrap:'wrap'}}>
-                <button onClick={()=>setShowDiscount(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>🏷 Discount</button>
-                <button onClick={()=>setShowReceipt(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>🖨 Print check</button>
-                {hasSent&&<button onClick={()=>setShowReprint(true)} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:11,fontWeight:600,minWidth:80}}>↻ Reprint</button>}
-                {activeTableId&&hasSent&&<button onClick={()=>setVoidTarget({type:'check',items:items.filter(i=>!i.voided)})} style={{flex:1,height:30,borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:11,fontWeight:600,minWidth:80}}>⊘ Void check</button>}
+              {/* Action row */}
+              <div style={{padding:'6px 10px 4px',display:'flex',gap:4,flexWrap:'wrap'}}>
+                <button onClick={()=>setShowDiscount(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>🏷 Discount</button>
+                <button onClick={()=>setShowReceipt(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>🖨 Print</button>
+                {hasSent&&<button onClick={()=>setShowReprint(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>↻ Reprint</button>}
+                {activeTableId&&hasSent&&<button onClick={()=>setVoidTarget({type:'check',items:items.filter(i=>!i.voided)})} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:11,fontWeight:700,minWidth:60}}>⊘ Void</button>}
               </div>
             </>
           )}
 
-          {/* Send / Pay — always at bottom of order panel */}
-          <div style={{padding:'8px 12px 12px',display:'flex',gap:6}}>
-            <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:34,height:34,borderRadius:8,border:'1px solid var(--bdr2)',background:'transparent',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:18,flexShrink:0}}>+</button>
-            <button className="btn btn-ghost" style={{flex:1,height:34,opacity:items.length===0?.4:1}} onClick={handleSend}>Send →</button>
-            <button className="btn btn-acc" style={{flex:1,height:34,opacity:items.length===0?.4:1}} onClick={()=>items.length>0&&setShowCheckout(true)}>
+          {/* Send / Pay */}
+          <div style={{padding:'6px 10px 12px',display:'flex',gap:6}}>
+            <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:40,height:40,borderRadius:11,border:'1px solid var(--bdr2)',background:'var(--bg3)',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:20,flexShrink:0,transition:'all .14s'}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--bdr3)';e.currentTarget.style.color='var(--t2)';}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr2)';e.currentTarget.style.color='var(--t3)';}}>+</button>
+            <button className="btn btn-ghost" style={{flex:1,height:40,opacity:items.length===0?.3:1,fontSize:13,fontWeight:700,letterSpacing:.01}} onClick={handleSend}>Send →</button>
+            <button className="btn btn-acc" style={{flex:1.4,height:40,opacity:items.length===0?.3:1,fontSize:14,fontWeight:800,letterSpacing:.01}} onClick={()=>items.length>0&&setShowCheckout(true)}>
               {items.length>0?`Pay £${total.toFixed(2)}`:'Pay'}
             </button>
           </div>
@@ -313,28 +345,53 @@ export default function POSSurface() {
       </div>
 
       {/* ══ CATEGORY NAV ══════════════════════════════════════════ */}
-      <div style={{width:'var(--cat)',flexShrink:0,background:'var(--bg1)',borderRight:'1px solid var(--bdr2)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-        <div style={{padding:'14px 10px 10px',borderBottom:'1px solid var(--bdr)'}}><div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.1em',paddingLeft:4}}>Menu</div></div>
-        <div style={{flex:1,overflowY:'auto',padding:'8px 8px'}}>
+      <div style={{width:'var(--cat)',flexShrink:0,background:'var(--bg1)',borderRight:'1px solid var(--bdr)',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{padding:'12px 10px 8px',borderBottom:'1px solid var(--bdr)',flexShrink:0}}>
+          <div style={{fontSize:9,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'.12em',paddingLeft:2}}>Menu</div>
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:'6px 7px'}}>
           {CATEGORIES.map(c=>{
             const m=CAT_META[c.id]||{};
             const isActive=cat===c.id&&!search;
             const count=c.id==='quick'?QUICK_IDS.length:MENU_ITEMS.filter(i=>i.cat===c.id).length;
             const e86=MENU_ITEMS.filter(i=>i.cat===c.id&&eightySixIds.includes(i.id)).length;
             return(
-              <button key={c.id} onClick={()=>{setCat(c.id);setSearch('');}} style={{width:'100%',padding:'10px',borderRadius:10,cursor:'pointer',marginBottom:4,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:2,background:isActive?(m.color+'18'):'transparent',border:`1px solid ${isActive?(m.color+'44'):'transparent'}`,transition:'all .15s',fontFamily:'inherit',textAlign:'left'}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,width:'100%'}}>
-                  <span style={{fontSize:18,lineHeight:1}}>{m.icon||'•'}</span>
-                  <span style={{fontSize:13,fontWeight:600,color:isActive?m.color:'var(--t2)',flex:1}}>{c.label}</span>
+              <button key={c.id} onClick={()=>{setCat(c.id);setSearch('');}} className="cat-btn" style={{
+                marginBottom:3,
+                background:isActive?`${m.color}15`:'transparent',
+                borderColor:isActive?`${m.color}40`:'transparent',
+              }}>
+                {/* Left colour bar */}
+                <div style={{width:3,height:32,borderRadius:2,background:isActive?m.color:'var(--bg5)',flexShrink:0,transition:'all .14s'}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:1}}>
+                    <span style={{fontSize:20,lineHeight:1,flexShrink:0}}>{m.icon||'•'}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:isActive?m.color:'var(--t2)',letterSpacing:.01,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.label}</span>
+                  </div>
+                  <div style={{fontSize:9,color:'var(--t4)',paddingLeft:26,display:'flex',gap:6}}>
+                    <span>{count}</span>
+                    {e86>0&&<span style={{color:'var(--red)',fontWeight:700}}>{e86} 86'd</span>}
+                  </div>
                 </div>
-                <div style={{fontSize:10,color:'var(--t3)',paddingLeft:26}}>{count} items{e86>0&&<span style={{color:'var(--red)',marginLeft:4}}>· {e86} 86'd</span>}</div>
+                {isActive&&<div style={{width:5,height:5,borderRadius:'50%',background:m.color,flexShrink:0,boxShadow:`0 0 6px ${m.color}`}}/>}
               </button>
             );
           })}
         </div>
-        <div style={{padding:'10px 8px',borderTop:'1px solid var(--bdr)'}}>
-          <button onClick={()=>setShowAllergens(s=>!s)} style={{width:'100%',padding:'8px 10px',borderRadius:8,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:6,background:allergens.length>0?'var(--red-d)':'var(--bg3)',border:`1px solid ${allergens.length>0?'var(--red-b)':'var(--bdr)'}`,color:allergens.length>0?'var(--red)':'var(--t3)',fontSize:11,fontWeight:600}}>
-            <span>⚠</span><span>{allergens.length>0?`${allergens.length} allergen filter${allergens.length>1?'s':''}`:'Allergen filter'}</span>
+        <div style={{padding:'8px 7px 10px',borderTop:'1px solid var(--bdr)'}}>
+          <button onClick={()=>setShowAllergens(s=>!s)} style={{
+            width:'100%',padding:'9px 10px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',
+            display:'flex',alignItems:'center',gap:7,
+            background:allergens.length>0?'var(--red-d)':'var(--bg3)',
+            border:`1.5px solid ${allergens.length>0?'var(--red-b)':'var(--bdr)'}`,
+            color:allergens.length>0?'var(--red)':'var(--t3)',fontSize:11,fontWeight:700,
+            transition:'all .14s',
+          }}>
+            <span style={{fontSize:14}}>⚠</span>
+            <span style={{flex:1,textAlign:'left'}}>
+              {allergens.length>0?`${allergens.length} filter${allergens.length>1?'s':''} active`:'Allergen filter'}
+            </span>
+            {allergens.length>0&&<div style={{width:7,height:7,borderRadius:'50%',background:'var(--red)',animation:'pulse 1.5s ease-in-out infinite'}}/>}
           </button>
         </div>
       </div>
@@ -385,9 +442,17 @@ export default function POSSurface() {
                 </div>
               </div>
             )}
-            <div style={{flex:1,overflowY:'auto',padding:12}}>
-              {!search&&cat==='quick'&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={{fontSize:13,fontWeight:600,color:'var(--t2)'}}>AI-curated · {daypart}</div><span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)'}}>Updated nightly</span></div>}
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(148px,1fr))',gap:9}}>
+            <div style={{flex:1,overflowY:'auto',padding:'10px 12px'}}>
+              {!search&&cat==='quick'&&(
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,paddingBottom:10,borderBottom:'1px solid var(--bdr)'}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:700,color:'var(--t1)'}}>Quick picks</div>
+                    <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>AI-curated · {daypart}</div>
+                  </div>
+                  <span style={{fontSize:11,fontWeight:700,padding:'3px 10px',borderRadius:20,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)'}}>✦ Live</span>
+                </div>
+              )}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
                 {displayItems.map(item=>{
                   const m=CAT_META[item.cat]||CAT_META.quick;
                   const flagged=allergens.some(a=>item.allergens?.includes(a));
@@ -395,25 +460,44 @@ export default function POSSurface() {
                   const rank=cat==='quick'?QUICK_IDS.indexOf(item.id):-1;
                   const isHot=rank>=0&&rank<3;
                   const fromPrice=item.type==='variants'?Math.min(...item.variants.map(v=>v.price)):item.price;
+                  const accentColor = is86?'var(--t4)':flagged?'var(--red)':m.color;
                   return(
-                    <button key={item.id} onClick={()=>handleItemTap(item)} style={{display:'flex',flexDirection:'column',padding:0,overflow:'hidden',background:is86?'var(--bg3)':flagged?'rgba(232,64,64,.08)':'var(--bg2)',border:`1px solid ${is86?'var(--bdr)':flagged?'var(--red-b)':isHot?m.color+'33':'var(--bdr)'}`,borderRadius:12,cursor:is86?'not-allowed':'pointer',textAlign:'left',opacity:is86?.45:1,transition:'all .15s',fontFamily:'inherit'}}>
-                      <div style={{height:3,background:is86?'var(--bg5)':flagged?'var(--red)':isHot?m.color:m.color+'44',width:'100%',flexShrink:0}}/>
-                      <div style={{padding:'11px 10px 10px',flex:1,display:'flex',flexDirection:'column'}}>
-                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:7}}>
-                          <span style={{fontSize:22,lineHeight:1}}>{flagged?'⚠️':is86?'🚫':m.icon}</span>
-                          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2}}>
-                            {is86&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)',border:'1px solid var(--red-b)'}}>86'd</span>}
-                            {isHot&&!is86&&!flagged&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:m.color+'22',color:m.color}}>#{rank+1}</span>}
-                            {flagged&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>allergen</span>}
+                    <button key={item.id} onClick={()=>handleItemTap(item)}
+                      className={`prod-card${is86?' prod-card--disabled':''}`}
+                      style={{minHeight:108}}>
+                      {/* Left colour bar — the fastest visual category cue */}
+                      <div style={{
+                        position:'absolute',left:0,top:0,bottom:0,width:4,
+                        background:is86?'var(--bg5)':flagged?'var(--red)':isHot?m.color:`${m.color}60`,
+                        borderRadius:'14px 0 0 14px',
+                      }}/>
+                      <div style={{padding:'12px 12px 11px 16px',flex:1,display:'flex',flexDirection:'column'}}>
+                        {/* Top row: emoji + badges */}
+                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
+                          <span style={{fontSize:24,lineHeight:1}}>{is86?'🚫':flagged?'⚠️':m.icon}</span>
+                          <div style={{display:'flex',gap:3,flexDirection:'column',alignItems:'flex-end'}}>
+                            {isHot&&!is86&&!flagged&&(
+                              <span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:`${m.color}25`,color:m.color,letterSpacing:.02}}>#{rank+1}</span>
+                            )}
+                            {flagged&&<span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>⚠ allergen</span>}
+                            {is86&&<span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)',border:'1px solid var(--red-b)'}}>86'd</span>}
                           </div>
                         </div>
-                        <div style={{fontSize:12,fontWeight:700,color:is86?'var(--t3)':flagged?'var(--red)':'var(--t1)',lineHeight:1.3,marginBottom:4,flex:1}}>{item.name}</div>
-                        {item.description&&<div style={{fontSize:11,color:'var(--t3)',lineHeight:1.3,marginBottom:5,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{item.description}</div>}
-                        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginTop:'auto'}}>
-                          <div style={{fontSize:15,fontWeight:800,color:is86?'var(--t3)':flagged?'var(--red)':m.color,fontFamily:'DM Mono,monospace'}}>{item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}</div>
-                          <div style={{display:'flex',gap:3,alignItems:'center'}}>
-                            {item.type!=='simple'&&<span style={{fontSize:9,fontWeight:600,padding:'1px 4px',borderRadius:3,background:'var(--bg4)',color:'var(--t3)'}}>{item.type==='variants'?'sizes':item.type==='modifiers'?'opts':'build'}</span>}
-                            <button onClick={e=>{e.stopPropagation();toggle86(item.id);showToast(is86?`${item.name} un-86'd`:`${item.name} 86'd`,'warning');}} style={{width:18,height:18,borderRadius:4,border:`1px solid ${is86?'var(--red-b)':'var(--bdr2)'}`,background:is86?'var(--red-d)':'transparent',color:is86?'var(--red)':'var(--t4)',cursor:'pointer',fontSize:9,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'inherit'}}>{is86?'✕':'86'}</button>
+                        {/* Name */}
+                        <div style={{fontSize:13,fontWeight:700,color:is86?'var(--t4)':flagged?'var(--red)':'var(--t1)',lineHeight:1.3,flex:1,marginBottom:8}}>{item.name}</div>
+                        {/* Bottom: price + type indicator */}
+                        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:4}}>
+                          <div style={{fontSize:18,fontWeight:800,color:accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>
+                            {item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}
+                          </div>
+                          <div style={{display:'flex',gap:3,alignItems:'center',flexShrink:0}}>
+                            {item.type!=='simple'&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:5,background:'var(--bg4)',color:'var(--t3)',letterSpacing:.02}}>
+                              {item.type==='variants'?'▾ sizes':item.type==='modifiers'?'⊕ opts':'⬛ build'}
+                            </span>}
+                            <button
+                              onClick={e=>{e.stopPropagation();toggle86(item.id);showToast(is86?`${item.name} un-86'd`:`${item.name} 86'd`,'warning');}}
+                              style={{width:22,height:22,borderRadius:5,border:`1px solid ${is86?'var(--red-b)':'var(--bdr)'}`,background:is86?'var(--red-d)':'var(--bg4)',color:is86?'var(--red)':'var(--t4)',cursor:'pointer',fontSize:9,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'inherit',flexShrink:0}}
+                            >{is86?'✕':'86'}</button>
                           </div>
                         </div>
                       </div>
@@ -421,7 +505,13 @@ export default function POSSurface() {
                   );
                 })}
               </div>
-              {displayItems.length===0&&<div style={{textAlign:'center',padding:'80px 0',color:'var(--t3)'}}><div style={{fontSize:40,marginBottom:12}}>🔍</div><div style={{fontSize:15,fontWeight:600,color:'var(--t2)',marginBottom:6}}>No items found</div><button onClick={()=>setSearch('')} style={{fontSize:13,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>Clear search</button></div>}
+              {displayItems.length===0&&(
+                <div style={{textAlign:'center',padding:'80px 0',color:'var(--t3)'}}>
+                  <div style={{fontSize:40,marginBottom:12,opacity:.4}}>🔍</div>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--t2)',marginBottom:6}}>No items found</div>
+                  <button onClick={()=>setSearch('')} style={{fontSize:13,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>Clear search →</button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -532,94 +622,154 @@ function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote,
 
   return (
     <div style={{
-      background: isVoided ? 'var(--bg3)' : 'var(--bg2)',
-      border:`1px solid ${isVoided?'var(--red-b)':'var(--bdr)'}`,
-      borderRadius:10, padding:'9px 10px', marginBottom:6,
-      opacity: isVoided ? .6 : 1,
+      background: isVoided ? 'rgba(239,68,68,.04)' : isCommitted ? 'var(--bg2)' : 'var(--bg2)',
+      border:`1.5px solid ${isVoided?'var(--red-b)':isCommitted?'rgba(34,197,94,.2)':'var(--bdr)'}`,
+      borderRadius:12,
+      marginBottom:5,
+      opacity: isVoided ? .55 : 1,
+      overflow:'hidden',
+      position:'relative',
     }}>
-      <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
-        <div style={{flex:1}}>
-          <div style={{
-            fontSize:13, fontWeight:600, lineHeight:1.3,
-            color: isVoided ? 'var(--red)' : 'var(--t1)',
-            textDecoration: isVoided ? 'line-through' : 'none',
-          }}>
-            {item.name}
-            {isVoided && <span style={{fontSize:10,fontWeight:700,marginLeft:6,padding:'1px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>VOIDED</span>}
-          </div>
-          {item.mods?.map((m,i)=><div key={i} style={{fontSize:11,color:'var(--t3)',display:'flex',justifyContent:'space-between',marginTop:1}}><span>{m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}</span>{m.price>0&&<span style={{color:'var(--acc)',fontFamily:'DM Mono,monospace'}}>+£{m.price.toFixed(2)}</span>}</div>)}
+      {/* Left status bar */}
+      <div style={{
+        position:'absolute',left:0,top:0,bottom:0,width:3,
+        background:isVoided?'var(--red)':isCommitted?'var(--grn)':'var(--bg5)',
+        borderRadius:'12px 0 0 12px',
+      }}/>
 
-          {/* Item discount */}
-          {item.discount && !isVoided && (
-            <div style={{display:'flex',alignItems:'center',gap:6,marginTop:3}}>
-              <span style={{fontSize:11,color:'var(--grn)'}}>🏷 {item.discount.label}</span>
-              <span style={{fontSize:11,color:'var(--grn)',fontFamily:'DM Mono,monospace'}}>−£{(item.price*item.qty - lineTotal).toFixed(2)}</span>
-              <button onClick={onRemoveDiscount} style={{fontSize:10,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+      <div style={{padding:'9px 10px 9px 14px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'flex-start'}}>
+          <div style={{flex:1}}>
+            <div style={{
+              fontSize:13, fontWeight:700, lineHeight:1.3,
+              color: isVoided ? 'var(--red)' : 'var(--t1)',
+              textDecoration: isVoided ? 'line-through' : 'none',
+              display:'flex',alignItems:'center',gap:6,
+            }}>
+              {item.name}
+              {isVoided && <span style={{fontSize:9,fontWeight:800,padding:'1px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)',letterSpacing:.04}}>VOIDED</span>}
             </div>
-          )}
+            {item.mods?.map((m,i)=>(
+              <div key={i} style={{fontSize:11,color:'var(--t4)',marginTop:1,display:'flex',justifyContent:'space-between'}}>
+                <span>{m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}</span>
+                {m.price>0&&<span style={{color:'var(--acc)',fontFamily:'var(--font-mono)'}}>+£{m.price.toFixed(2)}</span>}
+              </div>
+            ))}
 
-          {/* Note */}
-          {!isVoided && (editNote ? (
-            <div style={{marginTop:5}}>
-              <input autoFocus value={noteVal} onChange={e=>setNoteVal(e.target.value)}
-                onKeyDown={e=>{if(e.key==='Enter'){onNote(noteVal);setEditNote(false);}if(e.key==='Escape'){setNoteVal(item.notes||'');setEditNote(false);}}}
-                placeholder="No ice, well done, allergy note…"
-                style={{width:'100%',background:'var(--bg3)',border:'1px solid var(--acc-b)',borderRadius:6,padding:'5px 8px',color:'var(--t1)',fontSize:11,fontFamily:'inherit',outline:'none'}}/>
-              <div style={{display:'flex',gap:5,marginTop:4}}>
-                <button onClick={()=>{onNote(noteVal);setEditNote(false);}} style={{flex:1,padding:'3px',borderRadius:5,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0e0f14',fontSize:11,fontWeight:700}}>Save</button>
-                <button onClick={()=>{setNoteVal(item.notes||'');setEditNote(false);}} style={{flex:1,padding:'3px',borderRadius:5,cursor:'pointer',fontFamily:'inherit',background:'var(--bg4)',border:'1px solid var(--bdr)',color:'var(--t2)',fontSize:11}}>Cancel</button>
+            {/* Item discount */}
+            {item.discount && !isVoided && (
+              <div style={{display:'flex',alignItems:'center',gap:5,marginTop:3}}>
+                <span style={{fontSize:11,color:'var(--grn)',fontWeight:600}}>🏷 {item.discount.label}</span>
+                <span style={{fontSize:11,color:'var(--grn)',fontFamily:'var(--font-mono)'}}>−£{(item.price*item.qty - lineTotal).toFixed(2)}</span>
+                <button onClick={onRemoveDiscount} style={{fontSize:11,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',lineHeight:1}}>✕</button>
+              </div>
+            )}
+
+            {/* Inline note editor */}
+            {!isVoided && (editNote ? (
+              <div style={{marginTop:6}}>
+                <input autoFocus value={noteVal} onChange={e=>setNoteVal(e.target.value)}
+                  onKeyDown={e=>{if(e.key==='Enter'){onNote(noteVal);setEditNote(false);}if(e.key==='Escape'){setNoteVal(item.notes||'');setEditNote(false);}}}
+                  placeholder="No ice, well done, allergy note…"
+                  style={{width:'100%',background:'var(--bg4)',border:'1.5px solid var(--acc-b)',borderRadius:7,padding:'5px 9px',color:'var(--t1)',fontSize:12,fontFamily:'inherit',outline:'none'}}/>
+                <div style={{display:'flex',gap:5,marginTop:4}}>
+                  <button onClick={()=>{onNote(noteVal);setEditNote(false);}} style={{flex:1,height:26,borderRadius:6,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0b0c10',fontSize:11,fontWeight:800}}>Save</button>
+                  <button onClick={()=>{setNoteVal(item.notes||'');setEditNote(false);}} style={{flex:1,height:26,borderRadius:6,cursor:'pointer',fontFamily:'inherit',background:'var(--bg4)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11}}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div onClick={()=>{setNoteVal(item.notes||'');setEditNote(true);}} style={{marginTop:5,padding:'4px 8px',borderRadius:7,cursor:'pointer',border:`1px dashed ${item.notes?'rgba(249,115,22,.4)':'var(--bdr)'}`,fontSize:11,display:'flex',alignItems:'center',gap:5,color:item.notes?'#f97316':'var(--t4)',transition:'all .12s'}}>
+                <span style={{fontSize:12}}>📝</span>
+                <span style={{fontStyle:item.notes?'italic':'normal'}}>{item.notes||'Add note…'}</span>
+              </div>
+            ))}
+
+            {item.allergens?.length>0&&!isVoided&&(
+              <div style={{fontSize:10,color:'var(--red)',marginTop:3,fontWeight:600}}>⚠ {item.allergens.map(a=>ALLERGENS.find(x=>x.id===a)?.label).filter(Boolean).join(' · ')}</div>
+            )}
+
+            {/* Tags row */}
+            {!isVoided && (
+              <div style={{display:'flex',gap:4,marginTop:6,flexWrap:'wrap'}}>
+                {orderType==='dine-in'&&covers>1&&(
+                  <button onClick={()=>setShowMenu(s=>!s)} style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:5,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)',cursor:'pointer',fontFamily:'inherit'}}>
+                    {item.seat==='shared'?'Shared':`Seat ${item.seat}`}
+                  </button>
+                )}
+                {item.course>0&&(
+                  <button onClick={()=>setShowMenu(s=>!s)} style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:5,background:COURSE_COLORS[item.course]?.bg||'var(--bg3)',border:`1px solid ${(COURSE_COLORS[item.course]?.color||'var(--t3)')+'44'}`,color:COURSE_COLORS[item.course]?.color||'var(--t3)',cursor:'pointer',fontFamily:'inherit'}}>
+                    {COURSE_COLORS[item.course]?.label}
+                  </button>
+                )}
+                {isCommitted&&<span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:5,background:'var(--grn-d)',border:'1px solid var(--grn-b)',color:'var(--grn)'}}>✓ Sent</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Price column */}
+          <div style={{textAlign:'right',flexShrink:0}}>
+            <div style={{fontSize:15,fontWeight:800,color:isVoided?'var(--red)':item.discount?'var(--grn)':'var(--t1)',fontFamily:'var(--font-mono)',textDecoration:isVoided?'line-through':'none'}}>
+              £{lineTotal.toFixed(2)}
+            </div>
+            {item.discount&&!isVoided&&<div style={{fontSize:10,color:'var(--t4)',textDecoration:'line-through',fontFamily:'var(--font-mono)'}}>£{(item.price*item.qty).toFixed(2)}</div>}
+            {item.qty>1&&!item.discount&&!isVoided&&<div style={{fontSize:10,color:'var(--t4)',fontFamily:'var(--font-mono)'}}>£{item.price.toFixed(2)} ea</div>}
+          </div>
+        </div>
+
+        {/* Seat/course drawer */}
+        {showMenu&&!isVoided&&(
+          <div style={{marginTop:8,padding:'10px',background:'var(--bg3)',borderRadius:10,border:'1px solid var(--bdr)'}}>
+            {orderType==='dine-in'&&covers>1&&(
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:9,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Move to seat</div>
+                <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                  {seatList.map(s=>(
+                    <button key={s} onClick={()=>{onSeat(s);setShowMenu(false);}} style={{padding:'4px 10px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:700,background:item.seat===s?'var(--acc-d)':'var(--bg4)',border:`1.5px solid ${item.seat===s?'var(--acc)':'var(--bdr)'}`,color:item.seat===s?'var(--acc)':'var(--t3)'}}>
+                      {s==='shared'?'Shared':`S${s}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <div style={{fontSize:9,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Move to course</div>
+              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                {Object.entries(COURSE_COLORS).map(([c,cc])=>(
+                  <button key={c} onClick={()=>{onCourse(parseInt(c));setShowMenu(false);}} style={{padding:'4px 10px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:700,background:item.course===parseInt(c)?cc.bg:'var(--bg4)',border:`1.5px solid ${item.course===parseInt(c)?cc.color:'var(--bdr)'}`,color:item.course===parseInt(c)?cc.color:'var(--t3)'}}>
+                    {cc.label}
+                  </button>
+                ))}
               </div>
             </div>
-          ) : (
-            <div onClick={()=>{setNoteVal(item.notes||'');setEditNote(true);}} style={{marginTop:5,padding:'4px 8px',borderRadius:6,cursor:'pointer',border:'1px dashed var(--bdr2)',fontSize:11,display:'flex',alignItems:'center',gap:5,color:item.notes?'#f97316':'var(--t4)'}}>
-              <span>📝</span><span style={{fontStyle:item.notes?'italic':'normal'}}>{item.notes||'Add item note…'}</span>
+            <button onClick={()=>setShowMenu(false)} style={{marginTop:8,fontSize:11,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>Done</button>
+          </div>
+        )}
+
+        {/* Bottom controls */}
+        {!isVoided && (
+          <div style={{display:'flex',alignItems:'center',gap:8,marginTop:8}}>
+            {/* Qty stepper — bigger touch targets */}
+            <div style={{display:'flex',alignItems:'center',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:9,overflow:'hidden'}}>
+              <button onClick={()=>onQty(-1)} style={{width:30,height:28,background:'transparent',border:'none',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .1s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--bg4)'}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>−</button>
+              <div style={{width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:800,color:'var(--t1)',fontFamily:'var(--font-mono)'}}>{item.qty}</div>
+              <button onClick={()=>onQty(1)} style={{width:30,height:28,background:'transparent',border:'none',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',transition:'background .1s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--bg4)'}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>+</button>
             </div>
-          ))}
 
-          {item.allergens?.length>0&&<div style={{fontSize:10,color:'var(--red)',marginTop:3}}>⚠ {item.allergens.map(a=>ALLERGENS.find(x=>x.id===a)?.label).filter(Boolean).join(' · ')}</div>}
-
-          {!isVoided && <div style={{display:'flex',gap:4,marginTop:5,flexWrap:'wrap'}}>
-            {orderType==='dine-in'&&covers>1&&<span onClick={()=>setShowMenu(s=>!s)} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'var(--acc-d)',border:'1px solid var(--acc-b)',color:'var(--acc)',cursor:'pointer'}}>{item.seat==='shared'?'Shared':`Seat ${item.seat}`}</span>}
-            {item.course>0&&<span onClick={()=>setShowMenu(s=>!s)} style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:COURSE_COLORS[item.course]?.bg||'var(--bg3)',border:`1px solid ${(COURSE_COLORS[item.course]?.color||'var(--t3)')+'44'}`,color:COURSE_COLORS[item.course]?.color||'var(--t3)',cursor:'pointer'}}>{COURSE_COLORS[item.course]?.label}</span>}
-            {isCommitted&&<span style={{fontSize:10,fontWeight:600,padding:'1px 6px',borderRadius:4,background:'var(--grn-d)',border:'1px solid var(--grn-b)',color:'var(--grn)'}}>Sent</span>}
-          </div>}
-        </div>
-
-        <div style={{textAlign:'right',flexShrink:0}}>
-          <div style={{fontSize:14,fontWeight:800,color:isVoided?'var(--red)':item.discount?'var(--grn)':'var(--acc)',fontFamily:'DM Mono,monospace',textDecoration:isVoided?'line-through':'none'}}>
-            £{lineTotal.toFixed(2)}
+            <div style={{marginLeft:'auto',display:'flex',gap:6}}>
+              {/* Pending: Remove. Committed: Void (requires PIN) */}
+              {isCommitted ? (
+                <button onClick={onVoid} style={{height:28,padding:'0 10px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:700,background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)'}}>Void</button>
+              ) : (
+                <button onClick={onRemove} style={{height:28,padding:'0 10px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:700,background:'var(--bg4)',border:'1px solid var(--bdr)',color:'var(--t3)'}}>Remove</button>
+              )}
+            </div>
           </div>
-          {item.discount&&!isVoided&&<div style={{fontSize:10,color:'var(--t4)',textDecoration:'line-through',fontFamily:'DM Mono,monospace'}}>£{(item.price*item.qty).toFixed(2)}</div>}
-        </div>
+        )}
       </div>
-
-      {/* Seat / course menu */}
-      {showMenu&&!isVoided&&(
-        <div style={{marginTop:8,padding:'8px 10px',background:'var(--bg3)',borderRadius:8,border:'1px solid var(--bdr2)'}}>
-          {orderType==='dine-in'&&covers>1&&<div style={{marginBottom:8}}><div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:5}}>Move to seat</div><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{seatList.map(s=><button key={s} onClick={()=>{onSeat(s);setShowMenu(false);}} style={{padding:'3px 9px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:600,background:item.seat===s?'var(--acc-d)':'var(--bg4)',border:`1px solid ${item.seat===s?'var(--acc-b)':'var(--bdr)'}`,color:item.seat===s?'var(--acc)':'var(--t3)'}}>{s==='shared'?'Shared':`S${s}`}</button>)}</div></div>}
-          <div><div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:5}}>Move to course</div><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{Object.entries(COURSE_COLORS).map(([c,cc])=><button key={c} onClick={()=>{onCourse(parseInt(c));setShowMenu(false);}} style={{padding:'3px 9px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:600,background:item.course===parseInt(c)?cc.bg:'var(--bg4)',border:`1px solid ${item.course===parseInt(c)?cc.color+'55':'var(--bdr)'}`,color:item.course===parseInt(c)?cc.color:'var(--t3)'}}>{cc.label}</button>)}</div></div>
-          <button onClick={()=>setShowMenu(false)} style={{marginTop:7,fontSize:11,color:'var(--t3)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>Done</button>
-        </div>
-      )}
-
-      {/* Qty controls — hidden for voided */}
-      {!isVoided && (
-        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:7}}>
-          <div style={{display:'flex',alignItems:'center',gap:1,background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:8,overflow:'hidden'}}>
-            <button onClick={()=>onQty(-1)} style={{width:26,height:24,background:'transparent',border:'none',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-            <div style={{width:26,height:24,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'var(--t1)'}}>{item.qty}</div>
-            <button onClick={()=>onQty(1)} style={{width:26,height:24,background:'transparent',border:'none',color:'var(--t2)',fontSize:16,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
-          </div>
-          {item.qty>1&&<span style={{fontSize:11,color:'var(--t3)',fontFamily:'DM Mono,monospace'}}>£{discountedPrice.toFixed(2)} ea</span>}
-          <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
-            {/* Pending items: Remove freely. Committed items: Void with manager PIN */}
-            {isCommitted
-              ? <button onClick={onVoid} style={{fontSize:11,color:'var(--red)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',fontWeight:600}}>Void</button>
-              : <button onClick={onRemove} style={{fontSize:11,color:'var(--red)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',opacity:.7}}>Remove</button>
-            }
-          </div>
-        </div>
-      )}
     </div>
   );
 }
