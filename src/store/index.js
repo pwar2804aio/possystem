@@ -35,13 +35,15 @@ const TABLES_CONFIG = [
 function buildInitialTables() {
   return TABLES_CONFIG.map(t => {
     const base = { ...t, status:'available', session:null, reservation:null };
-    if (t.id==='t2') return { ...base, status:'occupied', session:{ id:`ORD-DEMO1`, items:[
-      { uid:'d1', itemId:'m6',  name:'Carbonara pasta',  price:14.5,  qty:2, mods:[{label:'Regular',price:0}],   notes:'', allergens:['gluten','eggs','milk'], course:2, fired:true, status:'sent', seat:'shared' },
-      { uid:'d2', itemId:'m28', name:'House red wine — 250ml', price:10.5, qty:1, mods:[],            notes:'', allergens:['sulphites'],             course:0, fired:true, status:'sent', seat:'shared' },
-    ], firedCourses:[0,2], sentAt:new Date(Date.now()-18*60000), server:'Sarah', covers:2, seatedAt:Date.now()-22*60000, note:'', orderNote:'' } };
-    if (t.id==='t5') return { ...base, status:'occupied', session:{ id:`ORD-DEMO2`, items:[
-      { uid:'d3', itemId:'m7',  name:'Ribeye steak 8oz', price:32,    qty:1, mods:[{label:'Cooking: Medium rare',price:0},{label:'Sauce: Peppercorn',price:0}], notes:'', allergens:[], course:2, fired:true, status:'sent', seat:'shared' },
-      { uid:'d4', itemId:'m10', name:'Chicken supreme',  price:22,    qty:1, mods:[],            notes:'', allergens:['milk'],                    course:2, fired:true, status:'sent', seat:'shared' },
+    if (t.id==='t2') return { ...base, status:'occupied', session:{ id:'ORD-DEMO1', items:[
+      { uid:'d1', itemId:'m-soup',    name:'Soup of the day',  price:6.5,  qty:2, mods:[], notes:'', allergens:['gluten','milk'], course:1, fired:true, status:'sent', seat:'shared' },
+      { uid:'d2', itemId:'m-salmon',  name:'Grilled salmon',   price:19.0, qty:2, mods:[], notes:'', allergens:['fish','milk'],   course:2, fired:true, status:'sent', seat:'shared' },
+      { uid:'d3', itemId:'m-hwine-250',name:'House white 250ml',price:8.5, qty:1, mods:[], notes:'', allergens:['sulphites'],    course:0, fired:true, status:'sent', seat:'shared' },
+    ], firedCourses:[0,1], sentAt:new Date(Date.now()-18*60000), server:'Sarah', covers:2, seatedAt:Date.now()-22*60000, note:'', orderNote:'' } };
+    if (t.id==='t5') return { ...base, status:'occupied', session:{ id:'ORD-DEMO2', items:[
+      { uid:'d4', itemId:'m-rib8',    name:'8oz Ribeye',       price:28.0, qty:1, mods:[{label:'Side: Chips',price:0},{label:'Sauce: Peppercorn',price:0}], notes:'', allergens:['milk'], course:2, fired:true, status:'sent', seat:'shared' },
+      { uid:'d5', itemId:'m-sir6',    name:'6oz Sirloin',      price:22.0, qty:1, mods:[{label:'Side: Side salad',price:0},{label:'Cooking: Medium rare',price:0}], notes:'', allergens:['milk'], course:2, fired:true, status:'sent', seat:'shared' },
+      { uid:'d6', itemId:'m-hrwine-175',name:'House red 175ml',price:6.5,  qty:2, mods:[], notes:'', allergens:['sulphites'], course:0, fired:true, status:'sent', seat:'shared' },
     ], firedCourses:[0,2], sentAt:new Date(Date.now()-35*60000), server:'Tom', covers:2, seatedAt:Date.now()-40*60000, note:'', orderNote:'' } };
     if (t.id==='t3') return { ...base, status:'reserved', reservation:{ name:'Johnson party', phone:'07700 900111', time:'7:30 PM', partySize:2 } };
     if (t.id==='p2') return { ...base, status:'reserved', reservation:{ name:'Chen table',   phone:'07700 900222', time:'8:00 PM', partySize:4 } };
@@ -1030,10 +1032,29 @@ export const useStore = create((set, get) => ({
   closeTab: tabId => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status:'closed'}:t), activeTabId:s.activeTabId===tabId?null:s.activeTabId })),
   voidTabRound: (tabId,roundId) => set(s=>({ tabs:s.tabs.map(t=>{ if(t.id!==tabId)return t; const rounds=t.rounds.filter(r=>r.id!==roundId); return{...t,rounds,total:rounds.reduce((s,r)=>s+r.subtotal,0)}; }) })),
   seedTabs: () => set({ tabs:[
-    { id:'t-demo1', ref:'TAB-001', name:'Maria G.', seatId:'B1', tableId:null, openedBy:'Maria', openedAt:new Date(Date.now()-22*60000), status:'running', preAuth:true, preAuthAmount:50, note:'Birthday', total:45.50,
-      rounds:[{ id:'r1', sentAt:new Date(Date.now()-20*60000), subtotal:22, note:'', items:[{uid:'ri1',name:'Negroni',price:11,qty:2,mods:[{label:"Hendrick's",price:3}],notes:''}] },{ id:'r2', sentAt:new Date(Date.now()-8*60000), subtotal:23.50, note:'', items:[{uid:'ri2',name:'Espresso Martini',price:12.50,qty:1,mods:[],notes:''},{uid:'ri3',name:'Peroni — Pint',price:6.50,qty:1,mods:[],notes:'No glass'}] }] },
-    { id:'t-demo2', ref:'TAB-002', name:'Tom & Sarah', seatId:null, tableId:'t4', openedBy:'Tom', openedAt:new Date(Date.now()-45*60000), status:'running', preAuth:false, preAuthAmount:0, note:'', total:56,
-      rounds:[{ id:'r3', sentAt:new Date(Date.now()-40*60000), subtotal:28, note:'', items:[{uid:'ri4',name:'Old Fashioned',price:12,qty:2,mods:[{label:'Woodford Reserve',price:3}],notes:''}] }] },
+    { id:'t-demo1', ref:'TAB-001', name:'Maria G.', seatId:'B1', tableId:null, openedBy:'Maria', openedAt:new Date(Date.now()-22*60000), status:'running', preAuth:false, preAuthAmount:0, note:'Birthday drinks', total:29.8,
+      rounds:[
+        { id:'r1', sentAt:new Date(Date.now()-20*60000), subtotal:17.4, note:'', items:[
+          {uid:'ri1',name:'Lager — Pint',price:5.8,qty:2,mods:[],notes:''},
+          {uid:'ri2',name:'Sparkling water',price:2.8,qty:1,mods:[],notes:'No ice'},
+        ]},
+        { id:'r2', sentAt:new Date(Date.now()-8*60000), subtotal:12.4, note:'', items:[
+          {uid:'ri3',name:'Stout — Pint',price:6.2,qty:1,mods:[],notes:''},
+          {uid:'ri4',name:'House white 250ml',price:8.5,qty:1,mods:[],notes:'Extra cold'},
+        ]},
+      ]},
+    { id:'t-demo2', ref:'TAB-002', name:'Table 4 bar', seatId:null, tableId:'t4', openedBy:'Tom', openedAt:new Date(Date.now()-45*60000), status:'running', preAuth:false, preAuthAmount:0, note:'', total:35.2,
+      rounds:[
+        { id:'r3', sentAt:new Date(Date.now()-40*60000), subtotal:20.7, note:'', items:[
+          {uid:'ri5',name:'Lager — Pint',price:5.8,qty:2,mods:[],notes:''},
+          {uid:'ri6',name:'House red 175ml',price:6.5,qty:1,mods:[],notes:''},
+          {uid:'ri7',name:'Coke',price:3.5,qty:1,mods:[],notes:''},
+        ]},
+        { id:'r4', sentAt:new Date(Date.now()-15*60000), subtotal:14.5, note:'', items:[
+          {uid:'ri8',name:'Stout — Pint',price:6.2,qty:1,mods:[],notes:''},
+          {uid:'ri9',name:'House white 250ml',price:8.5,qty:1,mods:[],notes:''},
+        ]},
+      ]},
   ] }),
 
   // ── Closed check history ──────────────────

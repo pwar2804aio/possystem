@@ -604,7 +604,9 @@ export default function POSSurface() {
                   const is86=eightySixIds.includes(item.id);
                   const rank=cat==='quick'?QUICK_IDS.indexOf(item.id):-1;
                   const isHot=rank>=0&&rank<3;
-                  const fromPrice=item.type==='variants'?Math.min(...item.variants.map(v=>v.price)):item.price;
+                  const fromPrice=isVariantParent&&variantKids.length>0
+                    ? Math.min(...variantKids.map(c=>c.pricing?.base??c.price??0))
+                    : (item.pricing?.base??item.price??0);
                   const accentColor = is86?'var(--t4)':flagged?'var(--red)':m.color;
                   const count = dailyCounts[item.id];
                   const isLow = count && count.remaining <= 3 && count.remaining > 0;
