@@ -312,15 +312,47 @@ export const useStore = create((set, get) => ({
   },
 
   fireCourse: (courseNum) => {
-    const { activeTableId } = get();
+    const { activeTableId, tables, staff } = get();
     if (activeTableId) {
-      set(s=>({ tables:s.tables.map(t=>{
-        if(t.id!==activeTableId||!t.session)return t;
-        const firedCourses=[...new Set([...(t.session.firedCourses||[]),courseNum])];
-        const items=t.session.items.map(i=>i.course===courseNum?{...i,fired:true,status:'sent'}:i);
-        return {...t,session:{...t.session,items,firedCourses}};
-      })}) );
-      get().showToast(`Course ${courseNum} fired`,'success');
+      const table = tables.find(t => t.id === activeTableId);
+      const session = table?.session;
+      // Items in this course that haven't been sent yet
+      const courseItems = session?.items?.filter(i => i.course === courseNum && i.status === 'pending' && !i.voided) || [];
+
+      // Group by production centre and create KDS tickets
+      const byCenter = {};
+      courseItems.forEach(item => {
+        const cid = item.centreId || 'pc1';
+        if (!byCenter[cid]) byCenter[cid] = [];
+        byCenter[cid].push(item);
+      });
+      const newTickets = Object.entries(byCenter).map(([centreId, centreItems]) => ({
+        id: `kds-${Date.now()}-${centreId}-c${courseNum}`,
+        table: table?.label || activeTableId,
+        server: staff?.name || session?.server || 'Server',
+        covers: session?.covers || 2,
+        centreId, sentAt: Date.now(), minutes: 0,
+        items: centreItems.map(i => ({
+          qty: i.qty, name: i.name,
+          mods: [
+            ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
+            ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
+            ...(i.notes ? [`📝 ${i.notes}`] : []),
+          ].join(' · '),
+          course: i.course, centreId, uid: i.uid,
+        })),
+      }));
+
+      set(s=>({
+        tables: s.tables.map(t => {
+          if(t.id!==activeTableId||!t.session) return t;
+          const firedCourses=[...new Set([...(t.session.firedCourses||[]),courseNum])];
+          const items=t.session.items.map(i=>i.course===courseNum?{...i,fired:true,status:'sent'}:i);
+          return {...t,session:{...t.session,items,firedCourses}};
+        }),
+        kdsTickets: [...s.kdsTickets, ...newTickets],
+      }));
+      get().showToast(`Course ${courseNum} fired to kitchen`,'success');
     }
   },
 
