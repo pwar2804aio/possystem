@@ -143,6 +143,16 @@ export const useStore = create((set, get) => ({
   appMode: 'pos',
   setAppMode: mode => set({ appMode: mode }),
 
+  // ── Organisations & Locations ──────────────────────────────────────────────
+  currentLocationId: 'loc-demo',
+  locations: [
+    { id:'loc-demo', name:'The Anchor — High Street', address:'1 High Street, London EC1A 1BB', timezone:'Europe/London', currency:'GBP', vat:20, serviceCharge:12.5, plan:'standard', isActive:true, receiptHeader:'', receiptFooter:'Thank you for dining with us!', createdAt:new Date() },
+  ],
+  setCurrentLocation: id => set({ currentLocationId: id }),
+  addLocation: loc => set(s => ({ locations: [...s.locations, loc] })),
+  updateLocation: (id, patch) => set(s => ({ locations: s.locations.map(l => l.id===id ? { ...l,...patch } : l) })),
+  removeLocation: id => set(s => ({ locations: s.locations.filter(l => l.id!==id) })),
+
   // ── Device config — uses sessionStorage so each browser tab is a separate terminal
   // URL param ?t=bar or ?t=counter2 overrides on load (for testing)
   // In Phase 2: loaded from Supabase by device ID on pairing

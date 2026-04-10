@@ -9,6 +9,7 @@ import StaffManager from './sections/StaffManager';
 import PrintRouting from './sections/PrintRouting';
 import BOReports from './sections/BOReports';
 import EODClose from './sections/EODClose';
+import MultiLocation from './sections/MultiLocation';
 import Inventory from './sections/Inventory';
 import SupabaseSetup from '../lib/SupabaseSetup';
 
@@ -23,6 +24,7 @@ const NAV = [
   { id:'printing',   label:'Print routing',   icon:'🖨',  group:'Configuration' },
   { id:'reports',    label:'Reports',         icon:'📊',  group:'Analytics' },
   { id:'eod',        label:'End of day',      icon:'🔒',  group:'Analytics' },
+  { id:'locations',   label:'Locations',       icon:'📍',  group:'Organisation' },
 ];
 
 export default function BackOfficeApp() {
@@ -156,6 +158,7 @@ export default function BackOfficeApp() {
           {section === 'printing'   && <PrintRouting />}
           {section === 'reports'    && <BOReports />}
           {section === 'eod'        && <EODClose />}
+          {section === 'locations'   && <MultiLocation />}
         </div>
       </div>
     </div>
