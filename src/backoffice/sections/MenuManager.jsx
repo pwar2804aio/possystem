@@ -238,18 +238,23 @@ export default function MenuManager() {
 function EditItemModal({ item, onClose }) {
   const { showToast, setDailyCount, toggle86, eightySixIds, updateMenuItem, markBOChange } = useStore();
   const [tab, setTab] = useState(item._countMode ? 'count' : 'details');
-  const [name, setName]     = useState(item.name);
-  const [price, setPrice]   = useState(String(item.price || ''));
-  const [desc, setDesc]     = useState(item.description || '');
+  const [name, setName]         = useState(item.name);
+  const [price, setPrice]       = useState(String(item.price || ''));
+  const [desc, setDesc]         = useState(item.description || '');
   const [allergens, setAllergens] = useState([...(item.allergens || [])]);
+  const [modGroups, setModGroups] = useState(
+    item.modifierGroups ? JSON.parse(JSON.stringify(item.modifierGroups)) : []
+  );
   const is86 = eightySixIds.includes(item.id);
 
   const toggleA = (id) => setAllergens(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id]);
 
   const handleSave = () => {
-    const patch = { name: name.trim(), description: desc };
+    const patch = { name: name.trim(), description: desc, allergens, modifierGroups: modGroups };
     if (item.type !== 'variants' && price) patch.price = parseFloat(price);
-    patch.allergens = allergens;
+    // If has modifier groups and was simple, upgrade type
+    if (modGroups.length > 0 && item.type === 'simple') patch.type = 'modifiers';
+    if (modGroups.length === 0 && item.type === 'modifiers') patch.type = 'simple';
     updateMenuItem(item.id, patch);
     markBOChange();
     showToast(`${name} updated — push to POS to go live`, 'success');
@@ -260,18 +265,18 @@ function EditItemModal({ item, onClose }) {
     <div className="modal-back" onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{
         background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:20,
-        width:'100%', maxWidth:520, maxHeight:'88vh',
+        width:'100%', maxWidth:560, maxHeight:'90vh',
         display:'flex', flexDirection:'column',
         boxShadow:'var(--sh3)', overflow:'hidden',
       }}>
         {/* Header */}
         <div style={{ padding:'16px 20px 0', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-            <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)' }}>Edit item</div>
+            <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)' }}>Edit — {item.name}</div>
             <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:20 }}>×</button>
           </div>
           <div style={{ display:'flex', gap:0 }}>
-            {[['details','Details'], ['allergens','Allergens'], ['count','Daily count']].map(([t, l]) => (
+            {[['details','Details'], ['modifiers',`Modifiers${modGroups.length ? ` (${modGroups.length})` : ''}`], ['allergens','Allergens'], ['count','Daily count']].map(([t, l]) => (
               <button key={t} onClick={() => setTab(t)} style={{
                 padding:'8px 14px', cursor:'pointer', fontFamily:'inherit',
                 border:'none', borderBottom:`2.5px solid ${tab === t ? 'var(--acc)' : 'transparent'}`,
@@ -288,26 +293,21 @@ function EditItemModal({ item, onClose }) {
             <>
               <div style={{ marginBottom:14 }}>
                 <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Name</label>
-                <input style={inp} value={name} onChange={e => setName(e.target.value)}/>
+                <input style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--bdr2)',borderRadius:10,padding:'9px 12px',color:'var(--t1)',fontSize:13,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}} value={name} onChange={e=>setName(e.target.value)}/>
               </div>
               {item.type !== 'variants' && (
                 <div style={{ marginBottom:14 }}>
                   <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Price (£)</label>
-                  <input style={inp} type="number" step="0.01" min="0" value={price} onChange={e => setPrice(e.target.value)}/>
-                </div>
-              )}
-              {item.type === 'variants' && (
-                <div style={{ marginBottom:14, padding:'12px 14px', background:'var(--bg3)', borderRadius:10, border:'1px solid var(--bdr)', fontSize:12, color:'var(--t3)' }}>
-                  This item has size variants. Price editing per-variant coming in the full variant editor.
+                  <input style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--bdr2)',borderRadius:10,padding:'9px 12px',color:'var(--t1)',fontSize:13,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}} type="number" step="0.01" min="0" value={price} onChange={e=>setPrice(e.target.value)}/>
                 </div>
               )}
               <div style={{ marginBottom:14 }}>
                 <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Description</label>
-                <textarea style={{ ...inp, resize:'none', height:72 }} value={desc} onChange={e => setDesc(e.target.value)}/>
+                <textarea style={{width:'100%',background:'var(--bg3)',border:'1.5px solid var(--bdr2)',borderRadius:10,padding:'9px 12px',color:'var(--t1)',fontSize:13,fontFamily:'inherit',outline:'none',resize:'none',height:72,boxSizing:'border-box'}} value={desc} onChange={e=>setDesc(e.target.value)}/>
               </div>
-              <div style={{ marginBottom:20 }}>
+              <div>
                 <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Status</label>
-                <button onClick={() => { toggle86(item.id); showToast(is86 ? `${item.name} reinstated` : `${item.name} 86'd`, 'warning'); onClose(); }} style={{
+                <button onClick={() => { toggle86(item.id); markBOChange(); showToast(is86 ? `${item.name} reinstated` : `${item.name} 86'd`, 'warning'); onClose(); }} style={{
                   padding:'8px 16px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
                   background: is86 ? 'var(--grn-d)' : 'var(--red-d)',
                   border:`1px solid ${is86 ? 'var(--grn-b)' : 'var(--red-b)'}`,
@@ -317,30 +317,34 @@ function EditItemModal({ item, onClose }) {
             </>
           )}
 
+          {/* Modifiers tab */}
+          {tab === 'modifiers' && (
+            <ModifiersEditor groups={modGroups} onChange={setModGroups}/>
+          )}
+
           {/* Allergens tab */}
           {tab === 'allergens' && (
             <>
-              <div style={{ fontSize:13, color:'var(--t3)', marginBottom:16, lineHeight:1.5 }}>
-                All 14 EU/UK mandatory allergens must always be declared. Tap to toggle. Changes are saved to the audit trail.
+              <div style={{ fontSize:12, color:'var(--t3)', marginBottom:14, lineHeight:1.5 }}>
+                All 14 EU/UK mandatory allergens. Toggle to declare. Changes logged in the audit trail.
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 {ALLERGENS.map(a => {
                   const active = allergens.includes(a.id);
                   return (
                     <button key={a.id} onClick={() => toggleA(a.id)} style={{
-                      padding:'10px 14px', borderRadius:10, cursor:'pointer',
-                      fontFamily:'inherit', textAlign:'left',
+                      padding:'10px 14px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
                       background: active ? 'var(--red-d)' : 'var(--bg3)',
                       border:`1.5px solid ${active ? 'var(--red)' : 'var(--bdr)'}`,
                       color: active ? 'var(--red)' : 'var(--t2)',
                       display:'flex', alignItems:'center', gap:8, transition:'all .1s',
                     }}>
                       <span style={{ fontSize:16 }}>{a.icon}</span>
-                      <div>
+                      <div style={{ flex:1 }}>
                         <div style={{ fontSize:12, fontWeight:600 }}>{a.label}</div>
                         {active && <div style={{ fontSize:10, color:'var(--red)', opacity:.8 }}>declared</div>}
                       </div>
-                      <div style={{ marginLeft:'auto', width:16, height:16, borderRadius:4, border:`2px solid ${active ? 'var(--red)' : 'var(--bdr2)'}`, background: active ? 'var(--red)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <div style={{ width:16, height:16, borderRadius:4, border:`2px solid ${active ? 'var(--red)' : 'var(--bdr2)'}`, background: active ? 'var(--red)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center' }}>
                         {active && <span style={{ color:'#fff', fontSize:10, fontWeight:800 }}>✓</span>}
                       </div>
                     </button>
@@ -362,6 +366,143 @@ function EditItemModal({ item, onClose }) {
             <button className="btn btn-acc" style={{ flex:2, height:42 }} onClick={handleSave}>Save changes</button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Modifiers editor ──────────────────────────────────────────────────────────
+function ModifiersEditor({ groups, onChange }) {
+  const [editingGroup, setEditingGroup] = useState(null); // index being edited, or 'new'
+  const [newGroupLabel, setNewGroupLabel] = useState('');
+  const [newGroupRequired, setNewGroupRequired] = useState(false);
+  const [newGroupMulti, setNewGroupMulti] = useState(false);
+
+  const addGroup = () => {
+    if (!newGroupLabel.trim()) return;
+    const g = {
+      id: `mg-${Date.now()}`,
+      label: newGroupLabel.trim(),
+      required: newGroupRequired,
+      multi: newGroupMulti,
+      options: [],
+    };
+    onChange([...groups, g]);
+    setNewGroupLabel(''); setNewGroupRequired(false); setNewGroupMulti(false);
+    setEditingGroup(groups.length); // open the new group to add options
+  };
+
+  const removeGroup = (i) => onChange(groups.filter((_,idx)=>idx!==i));
+
+  const updateGroup = (i, patch) => {
+    const updated = groups.map((g,idx)=>idx===i?{...g,...patch}:g);
+    onChange(updated);
+  };
+
+  const addOption = (gi) => {
+    const g = groups[gi];
+    const updated = groups.map((grp,idx)=>idx===gi?{...grp,options:[...grp.options,{id:`opt-${Date.now()}`,label:'',price:0}]}:grp);
+    onChange(updated);
+  };
+
+  const updateOption = (gi, oi, patch) => {
+    const updated = groups.map((g,gi2)=>gi2===gi?{...g,options:g.options.map((o,oi2)=>oi2===oi?{...o,...patch}:o)}:g);
+    onChange(updated);
+  };
+
+  const removeOption = (gi, oi) => {
+    const updated = groups.map((g,gi2)=>gi2===gi?{...g,options:g.options.filter((_,oi2)=>oi2!==oi)}:g);
+    onChange(updated);
+  };
+
+  const inp = { background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'6px 10px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none' };
+
+  return (
+    <div>
+      <div style={{ fontSize:12, color:'var(--t3)', marginBottom:16, lineHeight:1.5 }}>
+        Modifier groups appear as customer choices when ordering — "Cooking preference", "Sauce", "Size". Options can add to the base price.
+      </div>
+
+      {/* Existing groups */}
+      {groups.length === 0 && (
+        <div style={{ textAlign:'center', padding:'24px 0', color:'var(--t4)', fontSize:12, marginBottom:16 }}>
+          No modifier groups. Add one below to enable upsells and choices.
+        </div>
+      )}
+
+      {groups.map((g, gi) => (
+        <div key={g.id} style={{ background:'var(--bg3)', border:'1px solid var(--bdr)', borderRadius:12, marginBottom:10, overflow:'hidden' }}>
+          {/* Group header */}
+          <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', gap:10, cursor:'pointer', borderBottom: editingGroup===gi ? '1px solid var(--bdr)' : 'none' }}
+            onClick={() => setEditingGroup(editingGroup===gi?null:gi)}>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)' }}>{g.label}</div>
+              <div style={{ fontSize:11, color:'var(--t4)', marginTop:1 }}>
+                {g.required?'Required':'Optional'} · {g.multi?'Multi-select':'Pick one'} · {g.options.length} option{g.options.length!==1?'s':''}
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              {g.required && <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:20, background:'var(--acc-d)', border:'1px solid var(--acc-b)', color:'var(--acc)' }}>REQUIRED</span>}
+              <span style={{ fontSize:13, color:'var(--t3)' }}>{editingGroup===gi?'▲':'▼'}</span>
+            </div>
+          </div>
+
+          {/* Group edit expanded */}
+          {editingGroup === gi && (
+            <div style={{ padding:'12px 14px' }}>
+              {/* Group settings */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:12, alignItems:'center' }}>
+                <input style={{...inp, width:'100%', boxSizing:'border-box'}} value={g.label} onChange={e=>updateGroup(gi,{label:e.target.value})} placeholder="Group name"/>
+                <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--t2)', cursor:'pointer', whiteSpace:'nowrap' }}>
+                  <input type="checkbox" checked={g.required} onChange={e=>updateGroup(gi,{required:e.target.checked})} style={{ accentColor:'var(--acc)' }}/>
+                  Required
+                </label>
+                <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--t2)', cursor:'pointer', whiteSpace:'nowrap' }}>
+                  <input type="checkbox" checked={g.multi} onChange={e=>updateGroup(gi,{multi:e.target.checked})} style={{ accentColor:'var(--acc)' }}/>
+                  Multi-select
+                </label>
+              </div>
+
+              {/* Options */}
+              <div style={{ marginBottom:8 }}>
+                {g.options.map((opt, oi) => (
+                  <div key={opt.id} style={{ display:'grid', gridTemplateColumns:'1fr 90px auto', gap:6, marginBottom:5, alignItems:'center' }}>
+                    <input style={{...inp, boxSizing:'border-box'}} value={opt.label} onChange={e=>updateOption(gi,oi,{label:e.target.value})} placeholder="Option name"/>
+                    <div style={{ position:'relative' }}>
+                      <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)' }}>£</span>
+                      <input type="number" step="0.50" min="0" style={{...inp, width:'100%', paddingLeft:20, boxSizing:'border-box'}} value={opt.price||0} onChange={e=>updateOption(gi,oi,{price:parseFloat(e.target.value)||0})}/>
+                    </div>
+                    <button onClick={()=>removeOption(gi,oi)} style={{ width:28, height:28, borderRadius:7, border:'1px solid var(--red-b)', background:'var(--red-d)', color:'var(--red)', cursor:'pointer', fontFamily:'inherit', fontSize:14, flexShrink:0 }}>×</button>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={()=>addOption(gi)} style={{ flex:1, padding:'6px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg4)', border:'1px solid var(--bdr)', color:'var(--t2)', fontSize:11, fontWeight:600 }}>+ Add option</button>
+                <button onClick={()=>removeGroup(gi)} style={{ padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:11, fontWeight:700 }}>Remove group</button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Add new group */}
+      <div style={{ background:'var(--bg1)', border:'1.5px dashed var(--bdr2)', borderRadius:12, padding:'14px' }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:10 }}>Add modifier group</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center', marginBottom:8 }}>
+          <input style={{...inp, boxSizing:'border-box', width:'100%'}} value={newGroupLabel} onChange={e=>setNewGroupLabel(e.target.value)} placeholder="e.g. Cooking preference, Sauce, Size" onKeyDown={e=>e.key==='Enter'&&addGroup()}/>
+          <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--t2)', cursor:'pointer', whiteSpace:'nowrap' }}>
+            <input type="checkbox" checked={newGroupRequired} onChange={e=>setNewGroupRequired(e.target.checked)} style={{ accentColor:'var(--acc)' }}/>
+            Required
+          </label>
+          <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--t2)', cursor:'pointer', whiteSpace:'nowrap' }}>
+            <input type="checkbox" checked={newGroupMulti} onChange={e=>setNewGroupMulti(e.target.checked)} style={{ accentColor:'var(--acc)' }}/>
+            Multi
+          </label>
+        </div>
+        <button onClick={addGroup} disabled={!newGroupLabel.trim()} style={{ width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background: newGroupLabel.trim()?'var(--acc)':'var(--bg3)', border:'none', color: newGroupLabel.trim()?'#0b0c10':'var(--t4)', fontSize:12, fontWeight:700 }}>
+          + Add group
+        </button>
       </div>
     </div>
   );

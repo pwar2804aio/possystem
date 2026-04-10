@@ -10,42 +10,46 @@ import BackOfficeApp from './backoffice/BackOfficeApp';
 import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
+import KioskSurface from './surfaces/KioskSurface';
 
-const VERSION = '0.7.8';
+const VERSION = '0.7.9';
 
 const CHANGELOG = [
   {
-    version: '0.7.8', date: 'Apr 2026', label: 'Quick screen, EOD close, KDS centre filter',
+    version: '0.7.9', date: 'Apr 2026', label: 'Modifier groups, kiosk surface',
     changes: [
-      'Quick screen is now profile-aware — bar terminal (?t=bar) shows cocktails, spirits, drinks first. Out-of-stock items auto-removed and replaced with available alternatives',
-      'End of day close — Back Office → End of day. Full shift summary, EOD checklist, cash variance check, manager notes, confirm close with itemised list of what resets',
-      'KDS production centre auto-filter — ?t=kds&centre=pc1 (hot kitchen), pc2 (cold), pc3 (pizza), pc4 (bar). Bar terminal profile auto-filters KDS to bar station',
-      'BOReports: top items with revenue bars, hourly revenue chart, expandable check log showing items ordered per check',
-      'Shift stats compute live from closed checks — shift bar revenue, covers, avg check all update as checks are closed throughout service',
-      'TablesSurface: assignedSection from device profile auto-filters floor plan on load — bar terminal opens to bar section',
+      'Menu Manager: full modifier groups editor — add groups (name, required/optional, single/multi-select), add options with prices, remove groups and options. Edit modal now has a Modifiers tab alongside Details, Allergens, Daily count',
+      'Modifier groups save to store and push via Push to POS — POS ordering modal already handles them',
+      'Kiosk surface (?t=kiosk) — full customer-facing UI: category/popular tabs, search, large product grid, cart panel, modifier picker modal, order confirmation with order number',
+      'Kiosk renders full-screen with no staff sidebar, shift bar, or management features',
+      'Kiosk sends order to kitchen via sendToKitchen on Place order — appears in KDS immediately',
+      'EOD Close: full shift summary, EOD checklist with cash variance, manager notes, two-step confirm',
+      'Quick screen profile-aware: bar terminal shows bar/drinks items first, 86\'d items removed and padded with available alternatives',
+      'KDS auto-filters to bar station (pc4) when terminal profile has assignedSection=bar',
     ],
   },
   {
+    version: '0.7.8', date: 'Apr 2026', label: 'Quick screen, EOD close, KDS centre filter',
+    changes: ['Profile-aware quick screen, EOD close flow, KDS production centre filter'],
+  },
+  {
     version: '0.7.7', date: 'Apr 2026', label: 'Live shift stats + full BO reports',
-    changes: ['Shift bar stats compute from closedChecks, BOReports rebuilt with live data'],
+    changes: ['Live shift stats from closedChecks, BOReports with top items and hourly chart'],
   },
   {
     version: '0.7.6', date: 'Apr 2026', label: 'Menu edits live end-to-end',
-    changes: ['Menu edits write to store, POS reads store, push snapshot includes menu'],
+    changes: ['Menu items editable in BO, POS reads store, push snapshot includes menu'],
   },
   {
     version: '0.7.5', date: 'Apr 2026', label: 'Back Office publish workflow',
-    changes: ['"Push to POS" button, POS sync banner, config snapshot'],
-  },
-  {
-    version: '0.7.4', date: 'Apr 2026', label: 'Cross-tab sync',
-    changes: ['BroadcastChannel real-time sync, sync pulse, sessionStorage isolation'],
+    changes: ['"Push to POS", POS sync banner, config snapshot'],
   },
   {
     version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
     changes: ['Menu manager, floor plan, device profiles, devices, staff, print routing'],
   },
 ];
+
 
 
 
@@ -81,6 +85,8 @@ export default function App() {
 
   if (!staff) return <><SyncBridge onSyncPulse={handleSyncPulse}/><PINScreen /></>;
   if (appMode === 'backoffice') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
+  // Kiosk — full screen, no staff sidebar, no shift bar
+  if (surface === 'kiosk' || deviceConfig?.defaultSurface === 'kiosk') return <><SyncBridge onSyncPulse={handleSyncPulse}/><KioskSurface /></>;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
