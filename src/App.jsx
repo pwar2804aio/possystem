@@ -9,30 +9,35 @@ import { KDSSurface } from './surfaces/OtherSurfaces';
 import BackOfficeApp from './backoffice/BackOfficeApp';
 import StatusDrawer from './components/StatusDrawer';
 
-const VERSION = '0.7.2';
+const VERSION = '0.7.3';
 
 const CHANGELOG = [
   {
-    version: '0.7.2', date: 'Apr 2026', label: 'Status drawer + section management',
+    version: '0.7.3', date: 'Apr 2026', label: 'Terminal identity + multi-terminal testing',
     changes: [
-      '⊙ Status button in POS sidebar opens a terminal status drawer — shows sync status, active device profile, hardware (printer/payment terminal/KDS), and terminal identity',
-      'Amber dot on Status button when anything is offline or config changes are pending. Red dot when no profile is assigned',
-      'Floor Plan Builder: sections are now fully editable — add new sections (name/colour/icon), rename existing ones, remove sections (tables move to main)',
-      'Tables added in Back Office floor plan builder now appear in the POS floor plan immediately (shared store state)',
-      'Tables surface reads sections from the store — sections added in Back Office appear as filter tabs in the POS floor view',
-      'Status drawer shows profile reset and "Open Back Office" button for quick navigation',
-      'No profile assigned shows a red warning in the status drawer with direct link to Back Office',
+      'Terminal name now shown prominently in the shift bar — "Counter 1", "Bar", "Handheld 1" etc. Profile name shown below it in amber',
+      'URL params for terminal profiles — ?t=counter, ?t=bar, ?t=handheld, ?t=kiosk, ?t=kds each load a different device config',
+      'Switched to sessionStorage (tab-isolated) instead of localStorage — each browser tab is now an independent terminal with its own profile',
+      'Back Office overview panel: "Open terminals for testing" section with one-click links to open each terminal type in a new tab',
+      'Bar terminal (?t=bar): opens to bar tabs, hides takeaway/collection, no table service, bar section filtered',
+      'Handheld (?t=handheld): opens to POS ordering, dine-in only, no reports',
+      'KDS terminal (?t=kds): opens directly to kitchen display',
     ],
   },
   {
+    version: '0.7.2', date: 'Apr 2026', label: 'Status drawer + section management',
+    changes: ['Terminal status drawer, editable floor plan sections, sections from store'],
+  },
+  {
     version: '0.7.1', date: 'Apr 2026', label: 'Back Office polish',
-    changes: ['Print routing reassign modal, profile badge in shift bar, apply profile to terminal'],
+    changes: ['Print routing reassign, profile badge, apply profile to terminal'],
   },
   {
     version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
-    changes: ['Menu manager, floor plan builder, device profiles, device registry, staff manager, print routing, reports'],
+    changes: ['Menu manager, floor plan, device profiles, devices, staff, print routing'],
   },
 ];
+
 
 
 
@@ -86,11 +91,27 @@ const NAV = [
 
 function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme }) {
   const { deviceConfig } = useStore();
+  const terminalName = deviceConfig?.terminalName || 'POS';
+  const profileName  = deviceConfig?.profileName;
+  const urlParam     = deviceConfig?.param;
+
   return (
     <div style={{ height:42, display:'flex', alignItems:'center', background:'var(--bg1)', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
+      {/* Logo */}
       <div style={{ width:'var(--nav)', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', borderRight:'1px solid var(--bdr)', flexShrink:0 }}>
         <div style={{ width:30, height:30, background:'var(--acc)', borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, fontWeight:900, color:'#0b0c10', fontFamily:'var(--font-mono)' }}>R</div>
       </div>
+
+      {/* Terminal identity — LEFT, always visible */}
+      <div style={{ padding:'0 16px 0 14px', borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', justifyContent:'center', height:'100%', flexShrink:0 }}>
+        <div style={{ fontSize:13, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em', lineHeight:1 }}>{terminalName}</div>
+        <div style={{ fontSize:9, fontWeight:700, color: profileName ? 'var(--acc)' : 'var(--t4)', marginTop:2, letterSpacing:'.04em', textTransform:'uppercase' }}>
+          {profileName || 'No profile'}
+          {urlParam && <span style={{ marginLeft:4, padding:'0 4px', background:'var(--bg3)', borderRadius:3, color:'var(--t4)', fontFamily:'var(--font-mono)', fontSize:8 }}>?t={urlParam}</span>}
+        </div>
+      </div>
+
+      {/* Shift stats */}
       <div style={{ display:'flex', alignItems:'center', padding:'0 16px', flex:1, gap:0, overflow:'hidden' }}>
         <div style={{ display:'flex', alignItems:'center', gap:6, marginRight:20 }}>
           <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--grn)', boxShadow:'0 0 6px var(--grn)' }}/>
@@ -102,13 +123,6 @@ function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme }) {
             <span style={{ fontSize:13, fontWeight:700, color:'var(--t2)', fontFamily:typeof s.val==='string'&&s.val.includes('£')?'var(--font-mono)':'inherit' }}>{s.val}</span>
           </div>
         ))}
-        {/* Active device profile badge */}
-        {deviceConfig?.profileName && (
-          <div style={{ display:'flex', alignItems:'center', gap:5, padding:'2px 8px', borderRadius:20, background:'var(--bg3)', border:'1px solid var(--bdr)', marginLeft:4 }}>
-            <span style={{ fontSize:9, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.06em' }}>Profile</span>
-            <span style={{ fontSize:11, fontWeight:700, color:'var(--acc)' }}>{deviceConfig.profileName}</span>
-          </div>
-        )}
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 14px', flexShrink:0 }}>
         <div style={{ fontSize:11, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>

@@ -111,22 +111,38 @@ export const useStore = create((set, get) => ({
   appMode: 'pos',
   setAppMode: mode => set({ appMode: mode }),
 
-  // ── Device config (profile applied to this terminal) ─────────────────────
-  // Loaded from localStorage on startup, updated via Realtime in Phase 2
+  // ── Device config — uses sessionStorage so each browser tab is a separate terminal
+  // URL param ?t=bar or ?t=counter2 overrides on load (for testing)
+  // In Phase 2: loaded from Supabase by device ID on pairing
   deviceConfig: (() => {
     try {
-      const saved = localStorage.getItem('rpos-device-config');
+      // Check URL param first — ?t=bar, ?t=counter, ?t=handheld etc.
+      const urlParam = new URLSearchParams(window.location.search).get('t');
+      const PRESET_PROFILES = {
+        'counter':  { terminalName:'Counter 1',  profileName:'Main counter',    defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null,  hiddenFeatures:[],                    tableServiceEnabled:true,  quickScreenEnabled:true },
+        'counter2': { terminalName:'Counter 2',  profileName:'Main counter',    defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null,  hiddenFeatures:[],                    tableServiceEnabled:true,  quickScreenEnabled:true },
+        'bar':      { terminalName:'Bar',        profileName:'Bar terminal',     defaultSurface:'bar',    enabledOrderTypes:['dine-in'],                         assignedSection:'bar', hiddenFeatures:['courses','reports'], tableServiceEnabled:false, quickScreenEnabled:true },
+        'handheld': { terminalName:'Handheld 1', profileName:'Server handheld', defaultSurface:'pos',    enabledOrderTypes:['dine-in'],                         assignedSection:null,  hiddenFeatures:['reports','kiosk'],   tableServiceEnabled:true,  quickScreenEnabled:true },
+        'kiosk':    { terminalName:'Kiosk 1',    profileName:'Kiosk',           defaultSurface:'pos',    enabledOrderTypes:['dine-in','takeaway'],               assignedSection:null,  hiddenFeatures:['reports','staff'],   tableServiceEnabled:false, quickScreenEnabled:true },
+        'kds':      { terminalName:'KDS',        profileName:'Kitchen display',  defaultSurface:'kds',   enabledOrderTypes:[],                                   assignedSection:null,  hiddenFeatures:['reports'],           tableServiceEnabled:false, quickScreenEnabled:false },
+      };
+      if (urlParam && PRESET_PROFILES[urlParam]) {
+        const config = { ...PRESET_PROFILES[urlParam], source:'url-param', param:urlParam };
+        try { sessionStorage.setItem('rpos-terminal-config', JSON.stringify(config)); } catch {}
+        return config;
+      }
+      // Then check sessionStorage (tab-specific — each tab is a separate terminal)
+      const saved = sessionStorage.getItem('rpos-terminal-config');
       return saved ? JSON.parse(saved) : null;
     } catch { return null; }
   })(),
   setDeviceConfig: (config) => {
-    try { localStorage.setItem('rpos-device-config', JSON.stringify(config)); } catch {}
+    try { sessionStorage.setItem('rpos-terminal-config', JSON.stringify(config)); } catch {}
     set({ deviceConfig: config });
-    // If profile sets a defaultSurface, switch to it
     if (config?.defaultSurface) set({ surface: config.defaultSurface });
   },
   clearDeviceConfig: () => {
-    try { localStorage.removeItem('rpos-device-config'); } catch {}
+    try { sessionStorage.removeItem('rpos-terminal-config'); } catch {}
     set({ deviceConfig: null });
   },
 
