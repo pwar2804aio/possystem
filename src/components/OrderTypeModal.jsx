@@ -278,19 +278,24 @@ export default function OrderTypeModal({ items, onClose, onComplete }) {
               )}
               {occupiedTables.length > 0 && (
                 <>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', marginBottom: 10 }}>Occupied — merge or split</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', marginBottom: 10 }}>Occupied — choose how to add</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {occupiedTables.map(t => (
-                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 11, border: '1px solid var(--bdr)', background: 'var(--bg3)' }}>
-                        <div style={{ flex: 1 }}>
+                      <div key={t.id} style={{ padding: '12px', borderRadius: 11, border: '1px solid var(--bdr)', background: 'var(--bg3)' }}>
+                        <div style={{ marginBottom: 8 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>{t.label}</div>
-                          <div style={{ fontSize: 10, color: 'var(--t4)' }}>
-                            {t.session?.items?.filter(i => !i.voided).length || 0} items · £{(t.session?.subtotal || 0).toFixed(2)} · {t.session?.server}
+                          <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 2 }}>
+                            {t.session?.items?.filter(i => !i.voided).length || 0} items · £{(t.session?.subtotal || 0).toFixed(2)} · {t.session?.server || 'no server'}
                           </div>
                         </div>
-                        <button onClick={() => confirmMergeTable(t)} style={{ padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', background: 'var(--acc-d)', border: '1px solid var(--acc-b)', color: 'var(--acc)', fontSize: 11, fontWeight: 700 }}>
-                          Merge
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => confirmMergeTable(t)} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', background: 'var(--acc-d)', border: '1px solid var(--acc-b)', color: 'var(--acc)', fontSize: 11, fontWeight: 700 }}>
+                            ⊕ Add to this check
+                          </button>
+                          <button onClick={() => onComplete({ type: 'dine-in', action: 'split', tableId: t.id, tableLabel: t.label })} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', background: 'var(--bg1)', border: '1px solid var(--bdr2)', color: 'var(--t2)', fontSize: 11, fontWeight: 600 }}>
+                            ⊗ New separate check
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -728,78 +728,69 @@ export default function POSSurface() {
           items={items}
           onClose={() => setShowSendModal(false)}
           onComplete={(result) => {
+            // Always close modals first
             setShowSendModal(false);
             setShowCheckout(false);
 
+            // Use store directly for all actions to avoid async state timing issues
+            const store = useStore.getState();
+
             if (result.type === 'counter') {
-              // Named counter order — send to kitchen, appear in Orders Hub, clear POS
-              setOrderType('dine-in');
-              setCustomer({ name: result.name, isASAP: true, isNamedDineIn: true, channel: 'counter' });
-              setTimeout(() => {
-                useStore.getState().sendToKitchen();
-                clearWalkIn();
-                showToast(`${result.name} sent to kitchen`, 'success');
-              }, 30);
+              store.setCustomer({ name: result.name, isASAP: true, isNamedDineIn: true, channel: 'counter' });
+              store.setOrderType('dine-in');
+              store.sendToKitchen();
+              store.clearWalkIn();
+              showToast(result.name ? `${result.name} — sent to kitchen` : 'Sent to kitchen', 'success');
 
             } else if (result.type === 'takeaway' || result.type === 'collection') {
-              // Takeaway / collection — send to kitchen + queue, clear POS
-              setOrderType(result.type);
-              setCustomer({ name: result.name, phone: result.phone, collectionTime: result.time, isASAP: result.isASAP });
-              setTimeout(() => {
-                useStore.getState().sendToKitchen();
-                clearWalkIn();
-                showToast(`${result.name} — ${result.type} sent`, 'success');
-              }, 30);
+              store.setCustomer({ name: result.name, phone: result.phone, collectionTime: result.time, isASAP: result.isASAP });
+              store.setOrderType(result.type);
+              store.sendToKitchen();
+              store.clearWalkIn();
+              showToast(`${result.name} — ${result.type} sent`, 'success');
 
             } else if (result.type === 'delivery') {
-              // Delivery — send to queue, clear POS
-              setOrderType('delivery');
-              setCustomer({ name: result.name, phone: result.phone, address: result.address, isASAP: false });
-              setTimeout(() => {
-                useStore.getState().sendToKitchen();
-                clearWalkIn();
-                showToast(`Delivery for ${result.name} sent`, 'success');
-              }, 30);
+              store.setCustomer({ name: result.name, phone: result.phone, address: result.address, isASAP: false });
+              store.setOrderType('delivery');
+              store.sendToKitchen();
+              store.clearWalkIn();
+              showToast(`Delivery for ${result.name} sent`, 'success');
 
             } else if (result.type === 'dine-in' && result.action === 'new') {
-              // Seat at available table
-              seatTableWithItems(result.tableId, items, { server: staff?.name, covers: 1 });
-              clearWalkIn();
-              setActiveTableId(result.tableId);
+              // Seat items at a free table — store action handles clearing walkIn and setting active table
+              store.seatTableWithItems(result.tableId, items, { server: store.staff?.name, covers: 1 });
               setSurface('tables');
               showToast(`Seated at ${result.tableLabel}`, 'success');
 
             } else if (result.type === 'dine-in' && result.action === 'merge') {
-              // Merge into existing table
-              mergeItemsToTable(result.tableId, items);
-              clearWalkIn();
-              setActiveTableId(result.tableId);
+              // Add items to an occupied table's existing check
+              store.mergeItemsToTable(result.tableId, items);
               setSurface('tables');
-              showToast(`Merged into ${result.tableLabel}`, 'success');
+              showToast(`Added to ${result.tableLabel}`, 'success');
+
+            } else if (result.type === 'dine-in' && result.action === 'split') {
+              // Create a new separate check on the same table (T1.2)
+              store.splitTableCheck(result.tableId, items, store.staff?.name);
+              store.clearWalkIn();
+              setSurface('tables');
+              showToast(`New check created at ${result.tableLabel}`, 'success');
 
             } else if (result.type === 'bar' && result.action === 'new') {
-              // Open new bar tab and add items as first round
-              const tab = useStore.getState().openTab({ name: result.tabName });
-              useStore.getState().addRoundToTab(tab.id, items);
-              // Send items to bar KDS
-              setOrderType('dine-in');
-              setCustomer({ name: result.tabName });
-              setTimeout(() => {
-                useStore.getState().sendToKitchen();
-                clearWalkIn();
-              }, 30);
+              const tab = store.openTab({ name: result.tabName });
+              store.addRoundToTab(tab.id, items);
+              store.setCustomer({ name: result.tabName });
+              store.setOrderType('dine-in');
+              store.sendToKitchen();
+              store.clearWalkIn();
               setSurface('bar');
               showToast(`Bar tab "${result.tabName}" opened`, 'success');
 
             } else if (result.type === 'bar' && result.action === 'add') {
-              // Add items to existing bar tab as a new round
-              useStore.getState().addRoundToTab(result.tabId, items);
-              setOrderType('dine-in');
-              setCustomer({ name: result.tabName });
-              setTimeout(() => {
-                useStore.getState().sendToKitchen();
-                clearWalkIn();
-              }, 30);
+              store.addRoundToTab(result.tabId, items);
+              store.setCustomer({ name: result.tabName });
+              store.setOrderType('dine-in');
+              store.sendToKitchen();
+              store.clearWalkIn();
               setSurface('bar');
               showToast(`Added to "${result.tabName}"`, 'success');
             }
