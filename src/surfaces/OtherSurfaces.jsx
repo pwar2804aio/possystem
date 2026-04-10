@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { ALLERGENS, INITIAL_TABLES } from '../data/seed';
+import { ALLERGENS, INITIAL_TABLES, MENU_ITEMS, CATEGORIES, PRINTERS, PRODUCTION_CENTRES, STAFF } from '../data/seed';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Payment Screen
@@ -337,66 +337,153 @@ export function TablesSurface() {
 // ══════════════════════════════════════════════════════════════════════════════
 // KDS Surface
 // ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// KDS Surface — redesigned
+// ══════════════════════════════════════════════════════════════════════════════
 export function KDSSurface() {
   const { kdsTickets, bumpTicket, showToast } = useStore();
-  const tc = (m) => m>=25?'urgent':m>=12?'warning':'ok';
+  const [filter, setFilter] = useState('all');
+  const [, setTick] = useState(0);
+
+  // Re-render every 10s so timers stay live
+  useEffect(() => {
+    const id = setInterval(() => setTick(t=>t+1), 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Compute live minutes from sentAt if available, else use stored minutes
+  const getLiveMinutes = (ticket) => {
+    if (ticket.sentAt) return Math.floor((Date.now() - ticket.sentAt) / 60000);
+    return ticket.minutes || 0;
+  };
+
+  const CENTRE_LABELS = { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo' };
+
+  const urgency = (m) => m>=25?'urgent':m>=12?'warning':'ok';
   const fmt = (m) => m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
-  const tcColor = { urgent:'var(--red)', warning:'var(--acc)', ok:'var(--grn)' };
+  const URG = {
+    urgent:  { color:'var(--red)',  bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  pulse:true },
+    warning: { color:'var(--acc)',  bg:'rgba(232,160,32,.08)', border:'rgba(232,160,32,.25)', pulse:false },
+    ok:      { color:'var(--grn)',  bg:'transparent',          border:'var(--bdr)',            pulse:false },
+  };
+
+  const stations = ['all', ...new Set(kdsTickets.map(t=>t.centreId||t.station||'pc1').filter(Boolean))];
+  const displayed = kdsTickets.filter(t => filter==='all' || (t.centreId||t.station||'pc1')===filter);
+  const counts = {
+    urgent:  displayed.filter(t=>urgency(getLiveMinutes(t))==='urgent').length,
+    warning: displayed.filter(t=>urgency(getLiveMinutes(t))==='warning').length,
+    ok:      displayed.filter(t=>urgency(getLiveMinutes(t))==='ok').length,
+  };
 
   return (
-    <div style={{ display:'flex', flex:1, flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ height:52, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 20px', borderBottom:'1px solid var(--bdr)', background:'var(--bg2)', flexShrink:0 }}>
-        <div><div style={{fontSize:15,fontWeight:600}}>Kitchen display</div><div style={{fontSize:11,color:'var(--t3)'}}>{kdsTickets.length} active ticket{kdsTickets.length!==1?'s':''}</div></div>
-        <div style={{ display:'flex', gap:8 }}>
-          {['urgent','warning','ok'].map(s=>(
-            <span key={s} style={{ padding:'3px 10px', borderRadius:10, fontSize:11, fontWeight:600, background:tcColor[s]+'18', border:`1px solid ${tcColor[s]}44`, color:tcColor[s] }}>
-              {kdsTickets.filter(t=>tc(t.minutes)===s).length} {s}
-            </span>
-          ))}
-        </div>
-      </div>
+    <div style={{ display:'flex', flex:1, flexDirection:'column', overflow:'hidden', background:'var(--bg)' }}>
 
-      <div style={{ flex:1, overflowY:'auto', padding:14, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:12, alignContent:'start' }}>
-        {kdsTickets.length===0&&(
-          <div style={{ gridColumn:'1/-1', textAlign:'center', color:'var(--t3)', padding:'80px 0', fontSize:14 }}>
-            <div style={{fontSize:40,marginBottom:12}}>✓</div>Kitchen clear
+      {/* Header */}
+      <div style={{ height:52, display:'flex', alignItems:'center', gap:14, padding:'0 18px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+        <div>
+          <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>Kitchen display</div>
+          <div style={{ fontSize:10, color:'var(--t3)', fontWeight:600 }}>
+            {displayed.length} ticket{displayed.length!==1?'s':''} · live
+          </div>
+        </div>
+
+        {/* Urgency badges */}
+        <div style={{ display:'flex', gap:6 }}>
+          {counts.urgent>0&&<span style={{ padding:'3px 10px', borderRadius:10, fontSize:11, fontWeight:700, background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)' }}>{counts.urgent} urgent</span>}
+          {counts.warning>0&&<span style={{ padding:'3px 10px', borderRadius:10, fontSize:11, fontWeight:700, background:'var(--acc-d)', border:'1px solid var(--acc-b)', color:'var(--acc)' }}>{counts.warning} warn</span>}
+          {counts.ok>0&&<span style={{ padding:'3px 10px', borderRadius:10, fontSize:11, fontWeight:700, background:'var(--grn-d)', border:'1px solid var(--grn-b)', color:'var(--grn)' }}>{counts.ok} ok</span>}
+        </div>
+
+        {/* Station filter */}
+        {stations.length>1&&(
+          <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
+            {stations.map(s=>(
+              <button key={s} onClick={()=>setFilter(s)} style={{
+                padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
+                background:filter===s?'var(--acc-d)':'transparent',
+                border:`1px solid ${filter===s?'var(--acc-b)':'var(--bdr)'}`,
+                color:filter===s?'var(--acc)':'var(--t3)',
+                fontSize:11, fontWeight:700, textTransform:'capitalize',
+              }}>{s}</button>
+            ))}
           </div>
         )}
-        {kdsTickets.map(ticket=>{
-          const t = tc(ticket.minutes);
-          const col = tcColor[t];
+      </div>
+
+      {/* Tickets grid */}
+      <div style={{ flex:1, overflowY:'auto', padding:14, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12, alignContent:'start' }}>
+        {displayed.length===0&&(
+          <div style={{ gridColumn:'1/-1', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'80px 0', color:'var(--t3)' }}>
+            <div style={{ width:64, height:64, borderRadius:18, background:'var(--grn-d)', border:'2px solid var(--grn-b)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, marginBottom:16 }}>✓</div>
+            <div style={{ fontSize:16, fontWeight:800, color:'var(--t2)', marginBottom:4 }}>Kitchen clear</div>
+            <div style={{ fontSize:12 }}>All orders bumped</div>
+          </div>
+        )}
+        {displayed.map(ticket=>{
+          const liveMin = ticket.sentAt ? Math.floor((Date.now()-ticket.sentAt)/60000) : (ticket.minutes||0);
+          const urg = urgency(liveMin);
+          const u   = URG[urg];
+          const stationLabel = CENTRE_LABELS[ticket.centreId||ticket.station] || ticket.station || 'Kitchen';
           return (
-            <div key={ticket.id} style={{ background:'var(--bg3)', border:`1px solid ${col}44`, borderRadius:14, overflow:'hidden', transition:'border-color .2s' }}>
-              <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <div>
-                  <div style={{ fontSize:14, fontWeight:700 }}>{ticket.table}</div>
-                  <div style={{ fontSize:10, color:'var(--t3)', marginTop:2 }}>{ticket.server} · {ticket.covers} covers</div>
+            <div key={ticket.id} style={{
+              background:u.bg, border:`1.5px solid ${u.border}`,
+              borderRadius:16, overflow:'hidden',
+              boxShadow: urg==='urgent'?`0 0 20px ${u.color}22`:'none',
+            }}>
+              {/* Ticket header */}
+              <div style={{ padding:'11px 14px', borderBottom:`1px solid ${u.border}`, display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:15, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>{ticket.table}</div>
+                  <div style={{ fontSize:10, color:'var(--t3)', marginTop:1, fontWeight:600 }}>
+                    {ticket.server}{ticket.covers?` · ${ticket.covers} covers`:''} · <span style={{color:u.color}}>{stationLabel}</span>
+                  </div>
                 </div>
-                <div style={{ padding:'3px 10px', borderRadius:10, fontSize:12, fontWeight:700, background:`${col}18`, border:`1px solid ${col}44`, color:col }}>
-                  {fmt(ticket.minutes)}
+                {/* Live timer */}
+                <div style={{
+                  padding:'5px 12px', borderRadius:20,
+                  background:urg==='urgent'?'var(--red-d)':urg==='warning'?'var(--acc-d)':'var(--grn-d)',
+                  border:`1px solid ${u.color}55`,
+                  display:'flex', alignItems:'center', gap:5,
+                }}>
+                  {urg==='urgent'&&<div style={{ width:6,height:6,borderRadius:'50%',background:'var(--red)',animation:'pulse 1s ease-in-out infinite' }}/>}
+                  <span style={{ fontSize:13, fontWeight:800, color:u.color, fontFamily:'var(--font-mono)' }}>{fmt(liveMin)}</span>
                 </div>
               </div>
+
+              {/* Items */}
               <div style={{ padding:'10px 14px' }}>
                 {ticket.items.map((item,i)=>(
-                  <div key={i} style={{ display:'flex', gap:8, padding:'5px 0', borderBottom:i<ticket.items.length-1?'1px solid var(--bdr)':'none' }}>
-                    <span style={{ fontSize:14, fontWeight:700, color:'var(--acc)', minWidth:24 }}>{item.qty}×</span>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:500 }}>{item.name}</div>
-                      {item.mods&&<div style={{ fontSize:11, color:item.mods.includes('⚠')?'var(--red)':'var(--t3)', marginTop:2 }}>{item.mods}</div>}
+                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, paddingBottom:8, marginBottom:i<ticket.items.length-1?8:0, borderBottom:i<ticket.items.length-1?`1px solid ${u.border}`:'none' }}>
+                    <div style={{ width:26, height:26, borderRadius:7, background:u.color+'22', border:`1.5px solid ${u.color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:u.color, flexShrink:0, fontFamily:'var(--font-mono)' }}>
+                      {item.qty}
                     </div>
-                    <span style={{ fontSize:10, padding:'2px 6px', borderRadius:5, background:'var(--blu-d)', border:'1px solid var(--blu-b)', color:'var(--blu)', fontWeight:600, alignSelf:'flex-start', whiteSpace:'nowrap' }}>
-                      {item.course===1?'C1':'C'+item.course}
-                    </span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)', lineHeight:1.3 }}>{item.name}</div>
+                      {item.mods&&<div style={{ fontSize:11, color:item.mods.includes('⚠')?'var(--red)':'var(--t4)', marginTop:2, lineHeight:1.4 }}>{item.mods}</div>}
+                    </div>
+                    {item.course>0&&(
+                      <span style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'var(--blu-d)', border:'1px solid var(--blu-b)', color:'var(--blu)', fontWeight:800, flexShrink:0, marginTop:2 }}>
+                        C{item.course}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
-              <div style={{ padding:'8px 14px', borderTop:'1px solid var(--bdr)', display:'flex', gap:6 }}>
-                <button className="btn btn-grn" style={{ flex:1, height:34, fontSize:12, fontWeight:700 }}
-                  onClick={()=>{ bumpTicket(ticket.id); showToast(`${ticket.table} bumped`,'success'); }}>
+
+              {/* Actions */}
+              <div style={{ padding:'10px 14px', borderTop:`1px solid ${u.border}`, display:'flex', gap:6 }}>
+                <button style={{
+                  flex:1, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit',
+                  background:'var(--grn)', border:'none', color:'#fff', fontSize:13, fontWeight:800,
+                  transition:'all .12s',
+                }}
+                onClick={()=>{ bumpTicket(ticket.id); showToast(`${ticket.table} bumped ✓`,'success'); }}
+                onMouseEnter={e=>e.currentTarget.style.background='#16a34a'}
+                onMouseLeave={e=>e.currentTarget.style.background='var(--grn)'}>
                   Bump ✓
                 </button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>showToast('Ticket recalled','info')}>Recall</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>showToast('Reprinted to kitchen','info')}>Print</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>showToast('Recalled to queue','info')}>Recall</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>showToast('Reprinted to kitchen printer','info')}>🖨</button>
               </div>
             </div>
           );
@@ -409,102 +496,341 @@ export function KDSSurface() {
 // ══════════════════════════════════════════════════════════════════════════════
 // Back Office Surface
 // ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// Back Office Surface — with real reporting
+// ══════════════════════════════════════════════════════════════════════════════
 export function BackOfficeSurface() {
-  const { staff, shift, logout, showToast } = useStore();
-  const [subview, setSubview] = useState('overview');
+  const { staff, shift, logout, showToast, closedChecks } = useStore();
+  const [subview, setSubview] = useState('reports');
 
   const views = [
-    { id:'overview',  label:'Overview' },
-    { id:'menu',      label:'Menu builder' },
-    { id:'printers',  label:'Printers' },
-    { id:'shift',     label:'Shift' },
-    { id:'staff',     label:'Staff' },
+    { id:'reports',  label:'Reports',       icon:'📊' },
+    { id:'menu',     label:'Menu',          icon:'🍽' },
+    { id:'printers', label:'Printers',      icon:'🖨' },
+    { id:'shift',    label:'Shift',         icon:'🕐' },
+    { id:'staff',    label:'Staff',         icon:'👥' },
   ];
 
   return (
     <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
       {/* Sub-nav */}
-      <div style={{ width:180, background:'var(--bg2)', borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', padding:'16px 8px' }}>
-        <div style={{ fontSize:11, fontWeight:600, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', padding:'0 8px', marginBottom:10 }}>Back office</div>
+      <div style={{ width:190, background:'var(--bg1)', borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', padding:'14px 8px', flexShrink:0 }}>
+        <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em', padding:'0 10px', marginBottom:12 }}>Back office</div>
         {views.map(v=>(
           <button key={v.id} onClick={()=>setSubview(v.id)} style={{
-            width:'100%', padding:'9px 12px', borderRadius:8, cursor:'pointer', textAlign:'left',
-            fontSize:13, fontWeight:500, border:'none', fontFamily:'inherit',
-            background: subview===v.id?'var(--acc-d)':'transparent',
-            color: subview===v.id?'var(--acc)':'var(--t2)',
-            marginBottom:2,
-          }}>{v.label}</button>
+            width:'100%', padding:'9px 12px', borderRadius:10, cursor:'pointer', textAlign:'left',
+            fontSize:13, fontWeight:subview===v.id?700:500, border:'none', fontFamily:'inherit',
+            background:subview===v.id?'var(--acc-d)':'transparent',
+            color:subview===v.id?'var(--acc)':'var(--t2)',
+            marginBottom:2, display:'flex', alignItems:'center', gap:8,
+            borderLeft:`2px solid ${subview===v.id?'var(--acc)':'transparent'}`,
+            transition:'all .12s',
+          }}>
+            <span style={{ fontSize:15 }}>{v.icon}</span>
+            {v.label}
+          </button>
         ))}
-        <div style={{ marginTop:'auto' }}>
-          <button onClick={logout} style={{ width:'100%', padding:'9px 12px', borderRadius:8, cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--red)', background:'transparent', border:'none', fontFamily:'inherit' }}>
-            Sign out
+        <div style={{ marginTop:'auto', paddingTop:12, borderTop:'1px solid var(--bdr)' }}>
+          <button onClick={logout} style={{ width:'100%', padding:'9px 12px', borderRadius:10, cursor:'pointer', textAlign:'left', fontSize:13, color:'var(--red)', background:'transparent', border:'none', fontFamily:'inherit', display:'flex', alignItems:'center', gap:8 }}>
+            <span>⏻</span> Sign out
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ flex:1, overflowY:'auto', padding:24 }}>
-        {subview==='overview' && <BOOverview shift={shift} staff={staff} showToast={showToast}/>}
-        {subview==='menu'     && <BOMenu showToast={showToast}/>}
+      <div style={{ flex:1, overflowY:'auto' }}>
+        {subview==='reports'  && <BOReports  closedChecks={closedChecks} shift={shift} staff={staff}/>}
+        {subview==='menu'     && <BOMenu     showToast={showToast}/>}
         {subview==='printers' && <BOPrinters showToast={showToast}/>}
-        {subview==='shift'    && <BOShift shift={shift} showToast={showToast}/>}
-        {subview==='staff'    && <BOStaff showToast={showToast}/>}
+        {subview==='shift'    && <BOShift    shift={shift} showToast={showToast}/>}
+        {subview==='staff'    && <BOStaff    showToast={showToast}/>}
       </div>
     </div>
   );
 }
 
-// ── Back office sub-views ─────────────────────────────────────────────────────
-function BOOverview({ shift, staff, showToast }) {
-  const { PRINTERS } = require('../data/seed');
+// ── Reporting ─────────────────────────────────────────────────────────────────
+function Stat({ label, value, sub, color, mono }) {
   return (
-    <>
-      <div style={{ fontSize:18, fontWeight:600, marginBottom:20 }}>Good evening, {staff?.name}</div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:28 }}>
-        {[
-          { label:'Sales today',   val:`£${shift.sales.toLocaleString()}`, positive:true, sub:shift.name },
-          { label:'Covers',        val:shift.covers, sub:`Avg £${shift.avgCheck.toFixed(2)}` },
-          { label:'Cash sales',    val:`£${shift.cashSales.toFixed(0)}`, sub:'of total' },
-          { label:'Tips declared', val:`£${shift.tips.toFixed(2)}`, sub:'this shift' },
-        ].map(s=>(
-          <div key={s.label} style={{ background:'var(--bg3)', border:'1px solid var(--bdr)', borderRadius:12, padding:16 }}>
-            <div style={{ fontSize:11, color:'var(--t3)', marginBottom:6 }}>{s.label}</div>
-            <div style={{ fontSize:22, fontWeight:700, color:s.positive?'var(--grn)':'var(--t1)' }}>{s.val}</div>
-            <div style={{ fontSize:11, color:'var(--t3)', marginTop:3 }}>{s.sub}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-        <div style={{ background:'var(--bg3)', border:'1px solid var(--bdr)', borderRadius:12, padding:16 }}>
-          <div style={{ fontSize:13, fontWeight:600, marginBottom:14 }}>Printer status</div>
-          {PRINTERS.map(p=>(
-            <div key={p.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:'1px solid var(--bdr)' }}>
-              <div style={{ width:8, height:8, borderRadius:'50%', background:p.status==='online'?'var(--grn)':'var(--red)', flexShrink:0 }}/>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:500 }}>{p.name}</div>
-                <div style={{ fontSize:11, color:'var(--t3)' }}>{p.model} · {p.ip}</div>
-              </div>
-              <span className={`badge badge-${p.status==='online'?'grn':'red'}`}>{p.status}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{ background:'var(--bg3)', border:'1px solid var(--bdr)', borderRadius:12, padding:16 }}>
-          <div style={{ fontSize:13, fontWeight:600, marginBottom:14 }}>Top items today</div>
-          {[['Margherita pizza','£252.00',18],['Ribeye steak','£256.00',8],['Espresso Martini','£100.00',8],['Carbonara','£217.50',15],['House red wine','£142.50',19]].map(([n,rev,qty])=>(
-            <div key={n} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid var(--bdr)', fontSize:12 }}>
-              <span style={{ color:'var(--t2)' }}>{n}</span>
-              <span style={{ color:'var(--t3)' }}>×{qty}</span>
-              <span style={{ color:'var(--acc)', fontWeight:600 }}>{rev}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
+    <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:14, padding:'16px 18px' }}>
+      <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>{label}</div>
+      <div style={{ fontSize:24, fontWeight:800, color:color||'var(--t1)', fontFamily:mono?'var(--font-mono)':'inherit', letterSpacing:'-.01em' }}>{value}</div>
+      {sub&&<div style={{ fontSize:11, color:'var(--t3)', marginTop:4 }}>{sub}</div>}
+    </div>
   );
 }
 
+function MiniBar({ label, value, max, color }) {
+  const pct = max>0 ? Math.min(100,(value/max)*100) : 0;
+  return (
+    <div style={{ marginBottom:10 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:4 }}>
+        <span style={{ color:'var(--t2)', fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{label}</span>
+        <span style={{ color:'var(--acc)', fontWeight:700, fontFamily:'var(--font-mono)', flexShrink:0, marginLeft:10 }}>£{value.toFixed(2)}</span>
+      </div>
+      <div style={{ height:6, background:'var(--bg4)', borderRadius:3, overflow:'hidden' }}>
+        <div style={{ height:'100%', width:`${pct}%`, background:color||'var(--acc)', borderRadius:3, transition:'width .4s' }}/>
+      </div>
+    </div>
+  );
+}
+
+function BOReports({ closedChecks, shift, staff }) {
+  const [period, setPeriod] = useState('today');
+  const [tab, setTab] = useState('overview');
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const startOfWeek = new Date(startOfDay.getTime()-startOfDay.getDay()*86400000);
+
+  const filtered = closedChecks.filter(c => {
+    const d = new Date(c.closedAt);
+    if (period==='today') return d >= startOfDay;
+    if (period==='week')  return d >= startOfWeek;
+    return true;
+  });
+
+  // Core metrics
+  const revenue      = filtered.reduce((s,c)=>s+c.total,0);
+  const refunded     = filtered.reduce((s,c)=>s+c.refunds.reduce((r,rf)=>r+rf.amount,0),0);
+  const netRevenue   = revenue - refunded;
+  const totalCovers  = filtered.reduce((s,c)=>s+(c.covers||1),0);
+  const avgCheck     = filtered.length>0 ? revenue/filtered.length : 0;
+  const totalTips    = filtered.reduce((s,c)=>s+(c.tip||0),0);
+  const cardSales    = filtered.filter(c=>c.method==='card').reduce((s,c)=>s+c.total,0);
+  const cashSales    = filtered.filter(c=>c.method==='cash').reduce((s,c)=>s+c.total,0);
+  const splitSales   = filtered.filter(c=>c.method==='split').reduce((s,c)=>s+c.total,0);
+
+  // Top items from all checks
+  const itemMap = {};
+  filtered.forEach(c => {
+    c.items.forEach(item => {
+      if (!itemMap[item.name]) itemMap[item.name] = { name:item.name, qty:0, revenue:0 };
+      itemMap[item.name].qty    += item.qty;
+      itemMap[item.name].revenue += item.price * item.qty;
+    });
+  });
+  const topItems = Object.values(itemMap).sort((a,b)=>b.revenue-a.revenue).slice(0,8);
+  const maxItemRevenue = topItems[0]?.revenue || 1;
+
+  // By server
+  const serverMap = {};
+  filtered.forEach(c => {
+    const s = c.server||'Unknown';
+    if (!serverMap[s]) serverMap[s] = { name:s, checks:0, revenue:0, covers:0, tips:0 };
+    serverMap[s].checks++;
+    serverMap[s].revenue += c.total;
+    serverMap[s].covers  += c.covers||1;
+    serverMap[s].tips    += c.tip||0;
+  });
+  const byServer = Object.values(serverMap).sort((a,b)=>b.revenue-a.revenue);
+  const maxServerRev = byServer[0]?.revenue || 1;
+
+  // By order type
+  const typeMap = {};
+  filtered.forEach(c => {
+    const t = c.orderType||'dine-in';
+    if (!typeMap[t]) typeMap[t] = 0;
+    typeMap[t] += c.total;
+  });
+
+  // Hourly breakdown
+  const hourMap = {};
+  for (let h=11;h<=23;h++) hourMap[h]=0;
+  filtered.forEach(c => {
+    const h = new Date(c.closedAt).getHours();
+    hourMap[h] = (hourMap[h]||0) + c.total;
+  });
+  const maxHourRevenue = Math.max(...Object.values(hourMap),1);
+  const hours = Object.entries(hourMap).map(([h,v])=>({h:parseInt(h),v}));
+
+  // Payment split pct
+  const cardPct  = revenue>0?Math.round(cardSales/revenue*100):0;
+  const cashPct  = revenue>0?Math.round(cashSales/revenue*100):0;
+  const splitPct = revenue>0?Math.round(splitSales/revenue*100):0;
+
+  const TABS = [['overview','Overview'],['items','Top items'],['servers','By server'],['hourly','Hourly']];
+
+  return (
+    <div style={{ padding:24 }}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+        <div>
+          <div style={{ fontSize:20, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>Reports</div>
+          <div style={{ fontSize:12, color:'var(--t3)', marginTop:2 }}>Live from {filtered.length} closed check{filtered.length!==1?'s':''}</div>
+        </div>
+        <div style={{ display:'flex', gap:4 }}>
+          {[['today','Today'],['week','This week'],['all','All time']].map(([p,l])=>(
+            <button key={p} onClick={()=>setPeriod(p)} style={{
+              padding:'6px 14px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
+              background:period===p?'var(--acc-d)':'var(--bg3)',
+              border:`1.5px solid ${period===p?'var(--acc-b)':'var(--bdr)'}`,
+              color:period===p?'var(--acc)':'var(--t3)',
+              fontSize:12, fontWeight:700, transition:'all .12s',
+            }}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI row */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }}>
+        <Stat label="Net revenue"   value={`£${netRevenue.toFixed(2)}`}  color="var(--acc)" mono/>
+        <Stat label="Checks"        value={filtered.length}               sub={`Avg £${avgCheck.toFixed(2)}`}/>
+        <Stat label="Covers"        value={totalCovers}                   sub={totalCovers>0?`£${(netRevenue/totalCovers).toFixed(2)} per head`:''}/>
+        <Stat label="Tips"          value={`£${totalTips.toFixed(2)}`}    color="var(--grn)" mono sub={refunded>0?`−£${refunded.toFixed(2)} refunded`:''}/>
+      </div>
+
+      {/* Payment method split */}
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:14, padding:'16px 18px', marginBottom:20 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:14 }}>Payment methods</div>
+        <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+          {[
+            { label:'💳 Card',  val:cardSales,  pct:cardPct,  color:'#3b82f6' },
+            { label:'💵 Cash',  val:cashSales,  pct:cashPct,  color:'var(--grn)' },
+            { label:'⚖ Split', val:splitSales, pct:splitPct, color:'var(--pur)' },
+          ].map(m=>(
+            <div key={m.label} style={{ flex:1, padding:'10px 14px', background:'var(--bg3)', borderRadius:10, border:'1px solid var(--bdr)' }}>
+              <div style={{ fontSize:12, color:'var(--t3)', marginBottom:5 }}>{m.label}</div>
+              <div style={{ fontSize:18, fontWeight:800, color:m.color, fontFamily:'var(--font-mono)' }}>£{m.val.toFixed(2)}</div>
+              <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>{m.pct}% of sales</div>
+            </div>
+          ))}
+        </div>
+        {/* Bar */}
+        <div style={{ height:8, borderRadius:4, overflow:'hidden', display:'flex', gap:2 }}>
+          {cardPct>0&&<div style={{ width:`${cardPct}%`, background:'#3b82f6', borderRadius:4, transition:'width .4s' }}/>}
+          {cashPct>0&&<div style={{ width:`${cashPct}%`, background:'var(--grn)', borderRadius:4, transition:'width .4s' }}/>}
+          {splitPct>0&&<div style={{ width:`${splitPct}%`, background:'var(--pur)', borderRadius:4, transition:'width .4s' }}/>}
+        </div>
+      </div>
+
+      {/* Tab nav */}
+      <div style={{ display:'flex', gap:0, borderBottom:'1px solid var(--bdr)', marginBottom:20 }}>
+        {TABS.map(([t,l])=>(
+          <button key={t} onClick={()=>setTab(t)} style={{
+            padding:'9px 18px', cursor:'pointer', fontFamily:'inherit', border:'none',
+            borderBottom:`2.5px solid ${tab===t?'var(--acc)':'transparent'}`,
+            background:'transparent', color:tab===t?'var(--acc)':'var(--t3)',
+            fontSize:13, fontWeight:tab===t?800:500, transition:'all .12s',
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {/* Overview */}
+      {tab==='overview'&&(
+        <>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            {/* Order types */}
+            <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:14, padding:'16px 18px' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:14 }}>Order types</div>
+              {Object.entries(typeMap).length===0&&<div style={{color:'var(--t4)',fontSize:12}}>No data yet</div>}
+              {Object.entries(typeMap).map(([type,val])=>(
+                <MiniBar key={type} label={type.charAt(0).toUpperCase()+type.slice(1)} value={val} max={revenue} color="var(--acc)"/>
+              ))}
+            </div>
+            {/* Refunds */}
+            <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:14, padding:'16px 18px' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:14 }}>Refunds &amp; adjustments</div>
+              <div style={{ fontSize:11, color:'var(--t3)', marginBottom:8 }}>{filtered.filter(c=>c.refunds.length>0).length} checks with refunds</div>
+              <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--bdr)', fontSize:13 }}>
+                <span style={{color:'var(--t2)'}}>Gross revenue</span>
+                <span style={{fontFamily:'var(--font-mono)',fontWeight:700}}>£{revenue.toFixed(2)}</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--bdr)', fontSize:13 }}>
+                <span style={{color:'var(--red)'}}>Total refunded</span>
+                <span style={{fontFamily:'var(--font-mono)',fontWeight:700,color:'var(--red)'}}>−£{refunded.toFixed(2)}</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', fontSize:14, fontWeight:800 }}>
+                <span>Net revenue</span>
+                <span style={{fontFamily:'var(--font-mono)',color:'var(--acc)'}}>£{netRevenue.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Top items */}
+      {tab==='items'&&(
+        <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:14, padding:'16px 18px' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:16 }}>Top items by revenue</div>
+          {topItems.length===0&&<div style={{color:'var(--t4)',fontSize:12}}>No items data yet</div>}
+          {topItems.map((item,i)=>(
+            <div key={item.name} style={{ marginBottom:14 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:5 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:11, fontWeight:800, width:18, height:18, borderRadius:5, background:'var(--acc-d)', color:'var(--acc)', display:'flex', alignItems:'center', justifyContent:'center' }}>{i+1}</span>
+                  <span style={{color:'var(--t1)',fontWeight:600}}>{item.name}</span>
+                </div>
+                <div style={{ display:'flex', gap:14, flexShrink:0 }}>
+                  <span style={{color:'var(--t3)'}}>×{item.qty}</span>
+                  <span style={{color:'var(--acc)',fontWeight:700,fontFamily:'var(--font-mono)'}}>£{item.revenue.toFixed(2)}</span>
+                </div>
+              </div>
+              <div style={{ height:5, background:'var(--bg4)', borderRadius:3, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${(item.revenue/maxItemRevenue)*100}%`, background:'var(--acc)', borderRadius:3 }}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* By server */}
+      {tab==='servers'&&(
+        <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:14, padding:'16px 18px' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:16 }}>Server performance</div>
+          {byServer.length===0&&<div style={{color:'var(--t4)',fontSize:12}}>No server data yet</div>}
+          {byServer.map(srv=>(
+            <div key={srv.name} style={{ marginBottom:16, paddingBottom:16, borderBottom:'1px solid var(--bdr)' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>{srv.name}</div>
+                  <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>{srv.checks} checks · {srv.covers} covers</div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:16, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>£{srv.revenue.toFixed(2)}</div>
+                  <div style={{ fontSize:11, color:'var(--t3)' }}>avg £{srv.checks>0?(srv.revenue/srv.checks).toFixed(2):'0'} · tips £{srv.tips.toFixed(2)}</div>
+                </div>
+              </div>
+              <div style={{ height:5, background:'var(--bg4)', borderRadius:3, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${(srv.revenue/maxServerRev)*100}%`, background:'var(--blu)', borderRadius:3 }}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Hourly */}
+      {tab==='hourly'&&(
+        <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:14, padding:'16px 18px' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:20 }}>Revenue by hour</div>
+          <div style={{ display:'flex', alignItems:'flex-end', gap:6, height:140 }}>
+            {hours.map(({h,v})=>{
+              const pct = v>0?(v/maxHourRevenue)*100:0;
+              const label = h<12?`${h}am`:h===12?'12pm':h===0?'12am':`${h-12}pm`;
+              return (
+                <div key={h} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, height:'100%', justifyContent:'flex-end' }}>
+                  <div style={{ fontSize:9, color:'var(--t4)', fontFamily:'var(--font-mono)', marginBottom:2 }}>{v>0?`£${v.toFixed(0)}`:''}</div>
+                  <div style={{ width:'100%', background:pct>0?'var(--acc)':'var(--bg4)', borderRadius:'4px 4px 0 0', height:`${Math.max(pct,v>0?4:2)}%`, transition:'height .4s', minHeight:v>0?4:2 }}/>
+                  <div style={{ fontSize:9, color:'var(--t4)', whiteSpace:'nowrap' }}>{label}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop:14, display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', borderTop:'1px solid var(--bdr)', paddingTop:10 }}>
+            <span>Peak hour: {hours.reduce((p,h)=>h.v>p.v?h:p,hours[0])?.h}:00</span>
+            <span>Total: £{revenue.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BOOverview({ shift, staff, showToast }) {
+  // Kept for any legacy refs — now replaced by BOReports
+  return <BOReports closedChecks={[]} shift={shift} staff={staff}/>;
+}
 function BOMenu({ showToast }) {
-  const { MENU_ITEMS, CATEGORIES } = require('../data/seed');
   const [cat, setCat] = useState('starters');
   const [status, setStatus] = useState('draft');
   const items = MENU_ITEMS.filter(i=>i.cat===cat);
@@ -550,7 +876,6 @@ function BOMenu({ showToast }) {
 }
 
 function BOPrinters({ showToast }) {
-  const { PRINTERS, PRODUCTION_CENTRES } = require('../data/seed');
   const [printers, setPrinters] = useState(PRINTERS);
   const testPrint = (p) => showToast(`Test print sent to ${p.name}`, 'info');
   const toggle = (id) => setPrinters(ps=>ps.map(p=>p.id===id?{...p,status:p.status==='online'?'offline':'online'}:p));
@@ -696,7 +1021,6 @@ function BOShift({ shift, showToast }) {
 }
 
 function BOStaff({ showToast }) {
-  const { STAFF } = require('../data/seed');
   return (
     <>
       <div style={{ fontSize:17, fontWeight:600, marginBottom:20 }}>Staff management</div>

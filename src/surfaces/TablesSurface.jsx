@@ -64,6 +64,107 @@ function SeatModal({ table, onConfirm, onCancel }) {
 const L = { display:'block', fontSize:11, fontWeight:700, color:'var(--t2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:8 };
 const QB = { width:34, height:34, borderRadius:8, border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)', fontSize:20, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center' };
 
+// ─── Reservation Modal ────────────────────────────────────────────────────────
+const TIME_SLOTS = [];
+for (let h=11; h<=23; h++) {
+  for (let m=0; m<60; m+=15) {
+    const hh = h.toString().padStart(2,'0');
+    const mm = m.toString().padStart(2,'0');
+    TIME_SLOTS.push(`${hh}:${mm}`);
+  }
+}
+
+function ReservationModal({ table, existing, onConfirm, onCancel }) {
+  const now = new Date();
+  const nearestSlot = TIME_SLOTS.find(t => {
+    const [h,m] = t.split(':').map(Number);
+    return h * 60 + m >= now.getHours() * 60 + now.getMinutes() + 15;
+  }) || TIME_SLOTS[TIME_SLOTS.length - 1];
+
+  const [name,      setName]     = useState(existing?.name      || '');
+  const [phone,     setPhone]    = useState(existing?.phone     || '');
+  const [partySize, setParty]    = useState(existing?.partySize || Math.min(2, table.maxCovers));
+  const [time,      setTime]     = useState(existing?.time      || nearestSlot);
+  const [notes,     setNotes]    = useState(existing?.notes     || '');
+  const [date,      setDate]     = useState(existing?.date      || new Date().toLocaleDateString('en-CA')); // YYYY-MM-DD
+
+  const canSave = name.trim().length > 0;
+
+  return (
+    <div className="modal-back" onClick={e=>e.target===e.currentTarget&&onCancel()}>
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:22, width:'100%', maxWidth:400, maxHeight:'88vh', overflow:'auto', boxShadow:'var(--sh3)' }}>
+        {/* Header */}
+        <div style={{ padding:'16px 20px 12px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)' }}>{existing ? 'Edit reservation' : 'New reservation'}</div>
+            <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>{table.label} · max {table.maxCovers} covers</div>
+          </div>
+          <button onClick={onCancel} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:22 }}>×</button>
+        </div>
+
+        <div style={{ padding:'16px 20px' }}>
+          {/* Guest name */}
+          <div style={{ marginBottom:14 }}>
+            <label style={L}>Guest name <span style={{ color:'var(--red)', fontWeight:400 }}>*</span></label>
+            <input className="input" placeholder="Full name" value={name} onChange={e=>setName(e.target.value)} autoFocus/>
+          </div>
+
+          {/* Phone */}
+          <div style={{ marginBottom:14 }}>
+            <label style={L}>Phone number</label>
+            <input className="input" type="tel" placeholder="+44 7700 000000" value={phone} onChange={e=>setPhone(e.target.value)}/>
+          </div>
+
+          {/* Date + time row */}
+          <div style={{ display:'flex', gap:10, marginBottom:14 }}>
+            <div style={{ flex:1.2 }}>
+              <label style={L}>Date</label>
+              <input className="input" type="date" value={date} onChange={e=>setDate(e.target.value)}/>
+            </div>
+            <div style={{ flex:1 }}>
+              <label style={L}>Time</label>
+              <select value={time} onChange={e=>setTime(e.target.value)} style={{ width:'100%', background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:11, padding:'0 12px', height:42, fontSize:13, color:'var(--t1)', fontFamily:'inherit', outline:'none', cursor:'pointer' }}>
+                {TIME_SLOTS.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Party size */}
+          <div style={{ marginBottom:14 }}>
+            <label style={L}>Party size</label>
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <button onClick={()=>setParty(p=>Math.max(1,p-1))} style={QB}>−</button>
+              <span style={{ fontSize:22, fontWeight:800, minWidth:36, textAlign:'center', color:'var(--t1)' }}>{partySize}</span>
+              <button onClick={()=>setParty(p=>Math.min(table.maxCovers,p+1))} style={QB}>+</button>
+              {partySize > table.maxCovers && (
+                <span style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>Exceeds table max ({table.maxCovers})</span>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div style={{ marginBottom:20 }}>
+            <label style={L}>Notes <span style={{ fontWeight:400, color:'var(--t4)', textTransform:'none', letterSpacing:0 }}>optional</span></label>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Birthday, dietary requirements, VIP, high chair needed…" rows={2}
+              style={{ width:'100%', background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:11, padding:'10px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.5, display:'block', transition:'border-color .15s' }}
+              onFocus={e=>e.target.style.borderColor='var(--acc-b)'}
+              onBlur={e=>e.target.style.borderColor='var(--bdr2)'}/>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display:'flex', gap:8 }}>
+            <button className="btn btn-ghost" style={{ flex:1 }} onClick={onCancel}>Cancel</button>
+            <button className="btn btn-acc" style={{ flex:2, height:46 }} disabled={!canSave}
+              onClick={()=>onConfirm({ name:name.trim(), phone, partySize, time, date, notes })}>
+              {existing ? 'Update reservation' : 'Confirm reservation'} →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Table Node ───────────────────────────────────────────────────────────────
 function TableNode({ table, onClick }) {
   const sm = STATUS[table.status] || STATUS.available;
@@ -134,6 +235,7 @@ export default function TablesSurface() {
   const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff } = useStore();
   const [selected, setSelected]   = useState(null);
   const [showSeat, setShowSeat]   = useState(false);
+  const [showReservation, setShowReservation] = useState(false);
   const [section, setSection]     = useState('all');
   const [view, setView]           = useState('floor');  // floor | mine | all
   const [, setTick] = useState(0);
@@ -179,12 +281,7 @@ export default function TablesSurface() {
         setSelected(null);
         break;
       case 'reserve':
-        const name = prompt('Reservation name:');
-        if (name) {
-          setReservation(selectedTable.id, { name, phone:'', time:'7:00 PM', partySize:2 });
-          showToast(`${selectedTable.label} reserved for ${name}`, 'success');
-          setSelected(null);
-        }
+        setShowReservation(true);
         break;
       case 'cancel_reserve':
         setReservation(selectedTable.id, null);
@@ -456,11 +553,21 @@ export default function TablesSurface() {
                           <span style={{ color:'var(--t3)' }}>Name</span><span style={{ color:'var(--t1)', fontWeight:600 }}>{selectedTable.reservation.name}</span>
                         </div>
                         <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:3 }}>
-                          <span style={{ color:'var(--t3)' }}>Time</span><span style={{ color:'var(--t1)', fontWeight:600 }}>{selectedTable.reservation.time}</span>
+                          <span style={{ color:'var(--t3)' }}>Time</span><span style={{ color:'var(--t1)', fontWeight:600 }}>{selectedTable.reservation.time}{selectedTable.reservation.date ? ` · ${new Date(selectedTable.reservation.date+'T12:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}` : ''}</span>
                         </div>
-                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:selectedTable.reservation.notes?3:0 }}>
                           <span style={{ color:'var(--t3)' }}>Party</span><span style={{ color:'var(--t1)', fontWeight:600 }}>{selectedTable.reservation.partySize} guests</span>
                         </div>
+                        {selectedTable.reservation.phone && (
+                          <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:selectedTable.reservation.notes?3:0 }}>
+                            <span style={{ color:'var(--t3)' }}>Phone</span><span style={{ color:'var(--t1)', fontWeight:600 }}>{selectedTable.reservation.phone}</span>
+                          </div>
+                        )}
+                        {selectedTable.reservation.notes && (
+                          <div style={{ marginTop:4, fontSize:11, color:'var(--orn)', fontStyle:'italic', padding:'5px 8px', background:'rgba(249,115,22,.08)', borderRadius:6 }}>
+                            📝 {selectedTable.reservation.notes}
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
@@ -492,13 +599,14 @@ export default function TablesSurface() {
               {selectedTable.status==='available' && (
                 <>
                   <button className="btn btn-acc btn-full" onClick={()=>handleAction('seat')} style={{ height:44, fontSize:14 }}>Seat guests →</button>
-                  <button className="btn btn-ghost btn-full" onClick={()=>handleAction('reserve')}>Reserve table</button>
+                  <button className="btn btn-ghost btn-full" onClick={()=>setShowReservation(true)}>Reserve table</button>
                 </>
               )}
               {selectedTable.status==='reserved' && (
                 <>
                   <button className="btn btn-acc btn-full" onClick={()=>handleAction('seat')} style={{ height:44, fontSize:14 }}>Seat guests →</button>
-                  <button className="btn btn-ghost btn-full" onClick={()=>handleAction('cancel_reserve')}>Cancel reservation</button>
+                  <button className="btn btn-ghost btn-full" onClick={()=>setShowReservation(true)}>✏ Edit reservation</button>
+                  <button className="btn btn-red btn-sm btn-full" style={{ height:32 }} onClick={()=>handleAction('cancel_reserve')}>Cancel reservation</button>
                 </>
               )}
               {selectedTable.status==='open' && (
@@ -525,6 +633,19 @@ export default function TablesSurface() {
           table={selectedTable}
           onConfirm={(opts)=>{ seatTable(selectedTable.id, opts); setShowSeat(false); setSelected(null); showToast(`${selectedTable.label} seated — ${opts.covers} covers`,'success'); }}
           onCancel={()=>setShowSeat(false)}
+        />
+      )}
+
+      {showReservation && selectedTable && (
+        <ReservationModal
+          table={selectedTable}
+          existing={selectedTable.reservation}
+          onConfirm={(res)=>{
+            setReservation(selectedTable.id, res);
+            setShowReservation(false);
+            showToast(`${selectedTable.label} reserved for ${res.name} at ${res.time}`, 'success');
+          }}
+          onCancel={()=>setShowReservation(false)}
         />
       )}
     </div>

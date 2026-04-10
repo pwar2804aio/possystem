@@ -7,63 +7,56 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.6.2';
+const VERSION = '0.6.3';
 
 const CHANGELOG = [
   {
+    version: '0.6.3', date: 'Apr 2026', label: 'KDS connected + proper reservations',
+    changes: [
+      'KDS now connected to real orders — Send fires tickets directly to the kitchen display grouped by production centre (Hot kitchen, Cold section, Pizza oven, Bar)',
+      'Each KDS ticket shows live elapsed time computed from sentAt timestamp, not hardcoded minutes',
+      'Ticket header shows station name in the urgency colour — instant at-a-glance context',
+      'Station filter uses production centre IDs matching menu item routing',
+      'Reservations: replaced browser prompt() with a full modal — guest name, phone, date picker, time picker (15-min slots), party size, notes',
+      'Reservation detail panel shows full info: time, date, party size, phone, notes',
+      'Edit reservation button on reserved tables — pre-fills the modal',
+      'Fixed OtherSurfaces.jsx: useEffect now properly imported, removed all require() calls',
+    ],
+  },
+  {
     version: '0.6.2', date: 'Apr 2026', label: 'Item info, daily count & order review',
     changes: [
-      'Long press any product card (600ms) → item info sheet with image hero, story, full allergen grid, variants, modifier options',
-      'Recipe tab: full ingredient list with quantities and units, numbered method steps with category colour numbering',
-      'Daily count tab: set how many portions are available today using numpad or quick-set buttons',
-      'Count badge on cards: green = in stock, amber = 3 or fewer remaining',
-      'Auto 86: when remaining count hits 0, item is automatically 86\'d and a toast fires',
-      'Reset/clear count from the item info modal',
-      '📋 Review button in the order panel action row',
-      'Order review modal: compact mode (name + price only) or detailed mode (mods, notes, allergens, seat, course, sent status)',
-      'Review modal: totals, print button, and direct "Checkout →" action',
-      'Recipe data added for: Bruschetta, Burrata, Carbonara, Ribeye steak, Sea bass, Tiramisu',
+      'Long press any product card (600ms) → item info sheet with recipe, allergens, daily count',
+      'Daily count: set portions available today, card shows X left badge, auto 86 at zero',
+      'Order review modal: compact / detailed toggle, totals, print and checkout actions',
     ],
   },
   {
     version: '0.6.1', date: 'Apr 2026', label: 'Light mode + checkout redesign',
     changes: [
-      'Light mode with ☀️/🌙 toggle in shift bar, persisted to localStorage',
-      'Checkout: Card/Cash buttons theme-aware, £ amounts as hero in tip picker',
-      'Card terminal: SVG spinner, payment method pills, card illustration',
-      'Cash screen: side-by-side due/change display, 56px numpad keys',
+      'Light mode ☀️/🌙 toggle, persisted to localStorage',
+      'Checkout rebuilt: theme-aware card/cash buttons, £ hero in tip, SVG card terminal, 56px numpad',
     ],
   },
   {
     version: '0.6.0', date: 'Apr 2026', label: 'Operator Dark UI revamp',
     changes: [
-      'Product cards: larger, price hero, coloured left border per category',
-      'Category nav: 60px buttons, colour bar, active glow',
-      'Order items: status left border, proper Void/Remove buttons, bigger steppers',
+      'Product cards: price hero, coloured left border, 110px min height',
+      'Category nav: 60px buttons with live colour indicator',
+      'Order items: status left border, proper Void/Remove buttons',
     ],
   },
-  {
-    version: '0.5.3', date: 'Apr 2026', label: 'Orders list view',
-    changes: ['My orders / All open orders tabs, urgency colours, tap to open in POS'],
-  },
-  {
-    version: '0.5.2', date: 'Apr 2026', label: 'Full split bill',
-    changes: ['Even, By seat, By item, Custom — each portion tendered independently'],
-  },
-  {
-    version: '0.5.1', date: 'Apr 2026', label: 'Fast checkout',
-    changes: ['Card/Cash primary buttons, tip picker, cash numpad'],
-  },
-  {
-    version: '0.5.0', date: 'Apr 2026', label: 'Voids, discounts & history',
-    changes: ['Manager PIN voids, discounts, print, 4-step refund'],
-  },
+  { version:'0.5.3', date:'Apr 2026', label:'Orders list view', changes:['My orders / All open orders tabs, urgency colours'] },
+  { version:'0.5.2', date:'Apr 2026', label:'Full split bill', changes:['Even, By seat, By item, Custom — each portion tendered independently'] },
+  { version:'0.5.1', date:'Apr 2026', label:'Fast checkout', changes:['Card/Cash primary buttons, tip picker, cash numpad'] },
+  { version:'0.5.0', date:'Apr 2026', label:'Voids, discounts & history', changes:['Manager PIN voids, discounts, 4-step refund with tender'] },
   { version:'0.4.1', date:'Apr 2026', label:'Table sessions', changes:['Tables own sessions, floor plan, seat guests'] },
   { version:'0.4.0', date:'Apr 2026', label:'Bar tabs', changes:['Rounds, pre-auth, roaming tabs'] },
   { version:'0.3.0', date:'Mar 2026', label:'Takeaway & collection', changes:['Customer capture, collection slots, Orders hub'] },
   { version:'0.2.0', date:'Mar 2026', label:'POS core ordering', changes:['Variants, modifiers, courses, seat assignment, 86'] },
   { version:'0.1.0', date:'Mar 2026', label:'Foundation', changes:['POS, Quick Screen, 14 allergens, KDS, floor plan, PIN login'] },
 ];
+
 
 
 

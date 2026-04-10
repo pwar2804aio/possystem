@@ -251,27 +251,62 @@ export const useStore = create((set, get) => ({
   // ── SEND TO KITCHEN ────────────────────────
   // Fires courses 0+1, marks table occupied, updates totals
   sendToKitchen: () => {
-    const { activeTableId, staff, orderType, customer, addToQueue } = get();
+    const { activeTableId, staff, orderType, customer, addToQueue, tables } = get();
+
+    const createKdsTickets = (items, tableLabel, serverName, covers) => {
+      const byCenter = {};
+      items.filter(i => [0,1].includes(i.course) && !i.voided && i.status==='pending').forEach(item => {
+        const cid = item.centreId || 'pc1';
+        if (!byCenter[cid]) byCenter[cid] = [];
+        byCenter[cid].push(item);
+      });
+      return Object.entries(byCenter).map(([centreId, centreItems]) => ({
+        id: `kds-${Date.now()}-${centreId}-${Math.random().toString(36).slice(2,6)}`,
+        table: tableLabel, server: serverName, covers, centreId,
+        sentAt: Date.now(), minutes: 0,
+        items: centreItems.map(i => ({
+          qty: i.qty, name: i.name,
+          mods: [
+            ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
+            ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
+            ...(i.notes ? [`📝 ${i.notes}`] : []),
+          ].join(' · '),
+          course: i.course, centreId, uid: i.uid,
+        })),
+      }));
+    };
 
     if (activeTableId) {
-      set(s=>({ tables:s.tables.map(t=>{
-        if(t.id!==activeTableId||!t.session)return t;
-        const fired=[0,1];
-        const firedCourses=[...new Set([...(t.session.firedCourses||[]),...fired])];
-        const items=t.session.items.map(i=>firedCourses.includes(i.course)?{...i,fired:true,status:'sent'}:i);
-        const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
-        return {...t, status:'occupied', session:{...t.session, items, firedCourses, sentAt:t.session.sentAt||new Date(), server:staff?.name||t.session.server, subtotal, total:subtotal*1.125 }};
-      })}) );
+      const table = tables.find(t => t.id === activeTableId);
+      const session = table?.session;
+      const pendingItems = session?.items?.filter(i => i.status === 'pending' && !i.voided) || [];
+      const newTickets = createKdsTickets(pendingItems, table?.label || activeTableId, staff?.name || 'Server', session?.covers || 2);
+      set(s=>({
+        tables: s.tables.map(t=>{
+          if(t.id!==activeTableId||!t.session)return t;
+          const fired=[0,1];
+          const firedCourses=[...new Set([...(t.session.firedCourses||[]),...fired])];
+          const items=t.session.items.map(i=>firedCourses.includes(i.course)?{...i,fired:true,status:'sent'}:i);
+          const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
+          return {...t, status:'occupied', session:{...t.session, items, firedCourses, sentAt:t.session.sentAt||new Date(), server:staff?.name||t.session.server, subtotal, total:subtotal*1.125 }};
+        }),
+        kdsTickets: [...s.kdsTickets, ...newTickets],
+      }));
       get().showToast('Sent to kitchen','success');
     } else {
-      // Walk-in / takeaway
       const order = get().walkInOrder;
       if (!order?.items?.length) return;
+      const pendingItems = order.items.filter(i => i.status === 'pending' && !i.voided);
+      const label = customer?.name ? `${orderType.charAt(0).toUpperCase()+orderType.slice(1)} · ${customer.name}` : orderType;
+      const newTickets = createKdsTickets(pendingItems, label, staff?.name || 'Server', 1);
       if (orderType!=='dine-in' && customer) {
         const ref = `#${++_orderNum}`;
         addToQueue({ ref, type:orderType, customer:{...customer}, items:order.items, total:order.items.reduce((s,i)=>s+i.price*i.qty,0), status:'received', createdAt:new Date(), collectionTime:customer.collectionTime, isASAP:customer.isASAP, staff:staff?.name });
       }
-      set(s=>({ walkInOrder:{ ...(s.walkInOrder||{}), sentAt:new Date(), items:(s.walkInOrder?.items||[]).map(i=>[0,1].includes(i.course)?{...i,fired:true,status:'sent'}:i) } }));
+      set(s=>({
+        walkInOrder:{ ...(s.walkInOrder||{}), sentAt:new Date(), items:(s.walkInOrder?.items||[]).map(i=>[0,1].includes(i.course)?{...i,fired:true,status:'sent'}:i) },
+        kdsTickets: [...s.kdsTickets, ...newTickets],
+      }));
       get().showToast(orderType==='dine-in'?'Sent to kitchen':`Order for ${customer?.name} sent`,'success');
     }
   },
