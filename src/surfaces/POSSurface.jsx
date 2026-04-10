@@ -176,14 +176,20 @@ export default function POSSurface() {
 
   const handleSend = () => {
     if (!items.length) { showToast('No items on order', 'error'); return; }
-    // If already sitting at a table, send directly
+
     if (activeTableId) {
+      // Send to kitchen, then clear POS so it's ready for the next order
+      const label = activeTable?.label || activeTableId;
       setShowCheckout(false);
       sendToKitchen();
-      showToast(`Table ${activeTable?.label} order sent`, 'success');
+      // Deselect the table — it stays occupied in the floor plan
+      // POS resets to walk-in mode, ready for the next order
+      setActiveTableId(null);
+      showToast(`${label} — sent to kitchen`, 'success');
       return;
     }
-    // Otherwise, always ask what type this order is
+
+    // No table → ask what type this order is
     setShowSendModal(true);
   };
 

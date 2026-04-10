@@ -14,16 +14,25 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '0.9.4';
+const VERSION = '0.9.5';
 
 const CHANGELOG = [
   {
+    version: '0.9.5', date: 'Apr 2026', label: 'Table send clears POS, Orders tab restored',
+    changes: [
+      'Table orders (including split checks T1.2, T1.3): clicking Send now clears the POS panel immediately — table stays occupied in the floor plan, POS resets ready for the next order.',
+      'Walk-in orders: clicking Send through OrderTypeModal always clears POS (fixed in v0.9.4).',
+      'Orders tab restored to sidebar nav: Bar → Floor → POS → Orders → KDS.',
+      'Orders Hub: filter by order type (All / Tables / Bar / Dine-in / Takeaway / Collection / Delivery), "👤 My orders" quick filter, search by name/ref/server, show completed toggle.',
+    ],
+  },
+  {
     version: '0.9.4', date: 'Apr 2026', label: 'Send flow fixes & split check restored',
     changes: [
-      'Send always clears the order — removed async setTimeout, now uses direct store calls so customer/orderType are set before sendToKitchen reads them. No more orders stuck in checkout.',
-      'Occupied table: both "Add to existing check" and "New separate check (T1.2)" options restored in the OrderTypeModal table picker.',
-      'Table send now also closes the checkout modal before sending.',
-      'Split check creates a child table (T1.2, T1.3 etc.) with its own independent session and bill.',
+      'Send always clears the order — removed async setTimeout, now uses direct store calls so customer/orderType are set before sendToKitchen reads them.',
+      'Occupied table: both "Add to existing check" and "New separate check (T1.2)" options restored.',
+      'Split check creates a child table (T1.2) with its own independent session and bill.',
+      'Full CHANGELOG updated from v0.7.0.',
     ],
   },
   {
@@ -244,6 +253,7 @@ const NAV = [
   { id:'bar',     label:'Bar',    icon:'🍸' },
   { id:'tables',  label:'Floor',  icon:'⬚' },
   { id:'pos',     label:'POS',    icon:'⊞' },
+  { id:'orders',  label:'Orders', icon:'📋' },
   { id:'kds',     label:'KDS',    icon:'▣' },
 ];
 
