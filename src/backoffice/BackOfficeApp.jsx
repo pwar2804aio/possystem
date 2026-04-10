@@ -8,6 +8,7 @@ import DeviceRegistry from './sections/DeviceRegistry';
 import StaffManager from './sections/StaffManager';
 import PrintRouting from './sections/PrintRouting';
 import BOReports from './sections/BOReports';
+import EODClose from './sections/EODClose';
 
 const NAV = [
   { id:'overview',  label:'Overview',       icon:'◈',  group:'Dashboard' },
@@ -18,6 +19,7 @@ const NAV = [
   { id:'staff',     label:'Staff & access', icon:'👥',  group:'Configuration' },
   { id:'printing',  label:'Print routing',  icon:'🖨',  group:'Configuration' },
   { id:'reports',   label:'Reports',        icon:'📊',  group:'Analytics' },
+  { id:'eod',       label:'End of day',     icon:'🔒',  group:'Analytics' },
 ];
 
 export default function BackOfficeApp() {
@@ -149,6 +151,7 @@ export default function BackOfficeApp() {
           {section === 'staff'     && <StaffManager />}
           {section === 'printing'  && <PrintRouting />}
           {section === 'reports'   && <BOReports />}
+          {section === 'eod'       && <EODClose />}
         </div>
       </div>
     </div>

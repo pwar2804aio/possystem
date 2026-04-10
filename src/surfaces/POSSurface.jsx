@@ -87,14 +87,33 @@ export default function POSSurface() {
   const catMeta = CAT_META[cat] || CAT_META.quick;
   const activeQueueCount = orderQueue.filter(o=>o.status!=='collected').length;
 
+  // Smart quick screen: filter to assigned section, exclude 86'd, show available items
+  // For bar terminal (assignedSection='bar'), show bar/drinks items first
+  const assignedSection = deviceConfig?.assignedSection;
+  const quickItems = useMemo(() => {
+    const available = MENU_ITEMS.filter(i => !eightySixIds.includes(i.id) && !i.archived);
+    // If terminal has an assigned section, prioritise items relevant to that section
+    if (assignedSection === 'bar') {
+      const barCats = ['cocktails','spirits','wines','beers','soft_drinks','shots'];
+      const barFirst = available.filter(i => barCats.includes(i.cat));
+      const others   = available.filter(i => !barCats.includes(i.cat));
+      return [...barFirst, ...others].slice(0, 16);
+    }
+    // Default: use QUICK_IDS ordering but filter out 86'd items, pad with popular from other cats
+    const fromQuick = QUICK_IDS.map(id => MENU_ITEMS.find(i => i.id === id)).filter(i => i && !eightySixIds.includes(i.id));
+    if (fromQuick.length >= 12) return fromQuick.slice(0, 16);
+    const pad = available.filter(i => !QUICK_IDS.includes(i.id)).slice(0, 16 - fromQuick.length);
+    return [...fromQuick, ...pad];
+  }, [MENU_ITEMS, eightySixIds, assignedSection]);
+
   const rawItems = cat==='quick'
-    ? QUICK_IDS.map(id=>MENU_ITEMS.find(i=>i.id===id)).filter(Boolean)
-    : MENU_ITEMS.filter(i=>i.cat===cat);
+    ? quickItems
+    : MENU_ITEMS.filter(i=>i.cat===cat && !i.archived);
   const displayItems = useMemo(()=>{
     if (!search.trim()) return rawItems;
     const q=search.toLowerCase();
     return MENU_ITEMS.filter(i=>i.name.toLowerCase().includes(q)||i.description?.toLowerCase().includes(q));
-  },[cat,search]);
+  },[cat,search,rawItems]);
 
   const byCourse = useMemo(()=>{
     const g={};
@@ -378,7 +397,7 @@ export default function POSSurface() {
           {CATEGORIES.map(c=>{
             const m=CAT_META[c.id]||{};
             const isActive=cat===c.id&&!search;
-            const count=c.id==='quick'?QUICK_IDS.length:MENU_ITEMS.filter(i=>i.cat===c.id).length;
+            const count=c.id==='quick'?quickItems.length:MENU_ITEMS.filter(i=>i.cat===c.id&&!i.archived).length;
             const e86=MENU_ITEMS.filter(i=>i.cat===c.id&&eightySixIds.includes(i.id)).length;
             return(
               <button key={c.id} onClick={()=>{setCat(c.id);setSearch('');}} className="cat-btn" style={{

@@ -341,23 +341,21 @@ export function TablesSurface() {
 // KDS Surface — redesigned
 // ══════════════════════════════════════════════════════════════════════════════
 export function KDSSurface() {
-  const { kdsTickets, bumpTicket, showToast } = useStore();
-  const [filter, setFilter] = useState('all');
-  const [, setTick] = useState(0);
-
-  // Re-render every 10s so timers stay live
-  useEffect(() => {
-    const id = setInterval(() => setTick(t=>t+1), 10000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Compute live minutes from sentAt if available, else use stored minutes
-  const getLiveMinutes = (ticket) => {
-    if (ticket.sentAt) return Math.floor((Date.now() - ticket.sentAt) / 60000);
-    return ticket.minutes || 0;
-  };
+  const { kdsTickets, bumpTicket, showToast, deviceConfig } = useStore();
 
   const CENTRE_LABELS = { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo' };
+
+  // If device profile specifies a centre (future: ?t=kds&centre=pc1), auto-filter
+  const defaultFilter = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get('centre');
+    if (c && CENTRE_LABELS[c]) return c;
+    if (deviceConfig?.assignedSection === 'bar') return 'pc4';
+    return 'all';
+  })();
+
+  const [filter, setFilter] = useState(defaultFilter);
+  const [, setTick] = useState(0);
 
   const urgency = (m) => m>=25?'urgent':m>=12?'warning':'ok';
   const fmt = (m) => m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;

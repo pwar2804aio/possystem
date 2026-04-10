@@ -11,40 +11,42 @@ import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
 
-const VERSION = '0.7.6';
+const VERSION = '0.7.8';
 
 const CHANGELOG = [
   {
-    version: '0.7.6', date: 'Apr 2026', label: 'Menu edits live end-to-end',
+    version: '0.7.8', date: 'Apr 2026', label: 'Quick screen, EOD close, KDS centre filter',
     changes: [
-      'Menu items are now fully editable in Back Office — name, price, description, allergens. Changes write to the store immediately',
-      'New items can be added from Back Office → Menu Manager → "+ Add item" with full allergen selection',
-      'POS now reads from the store\'s editable menu — pushing from Back Office updates what appears on the POS ordering screen',
-      'Menu items included in the Push to POS snapshot — "Sync now" on the POS banner also updates the menu',
-      'Sync banner now shows menu item count alongside tables and sections in the update summary',
-      'Floor plan save status corrected: now says "Staged — hit Push to POS to go live" instead of "Pushed to all terminals"',
-      'hiddenFeatures from device profile now actually hides POS sidebar icons — bar terminal (?t=bar) no longer shows KDS',
-      'markBOChange wired into DeviceProfiles (save/add/delete) and StaffManager (save/add/remove)',
-      'StatusDrawer printers reference fixed — no longer causes a silent store error',
+      'Quick screen is now profile-aware — bar terminal (?t=bar) shows cocktails, spirits, drinks first. Out-of-stock items auto-removed and replaced with available alternatives',
+      'End of day close — Back Office → End of day. Full shift summary, EOD checklist, cash variance check, manager notes, confirm close with itemised list of what resets',
+      'KDS production centre auto-filter — ?t=kds&centre=pc1 (hot kitchen), pc2 (cold), pc3 (pizza), pc4 (bar). Bar terminal profile auto-filters KDS to bar station',
+      'BOReports: top items with revenue bars, hourly revenue chart, expandable check log showing items ordered per check',
+      'Shift stats compute live from closed checks — shift bar revenue, covers, avg check all update as checks are closed throughout service',
+      'TablesSurface: assignedSection from device profile auto-filters floor plan on load — bar terminal opens to bar section',
     ],
   },
   {
+    version: '0.7.7', date: 'Apr 2026', label: 'Live shift stats + full BO reports',
+    changes: ['Shift bar stats compute from closedChecks, BOReports rebuilt with live data'],
+  },
+  {
+    version: '0.7.6', date: 'Apr 2026', label: 'Menu edits live end-to-end',
+    changes: ['Menu edits write to store, POS reads store, push snapshot includes menu'],
+  },
+  {
     version: '0.7.5', date: 'Apr 2026', label: 'Back Office publish workflow',
-    changes: ['"Push to POS" button, POS sync banner, config snapshot, staged vs instant sync'],
+    changes: ['"Push to POS" button, POS sync banner, config snapshot'],
   },
   {
-    version: '0.7.4', date: 'Apr 2026', label: 'Cross-tab sync via BroadcastChannel',
-    changes: ['Real-time cross-tab sync, sync pulse in shift bar'],
-  },
-  {
-    version: '0.7.3', date: 'Apr 2026', label: 'Terminal identity + multi-terminal testing',
-    changes: ['Terminal name in shift bar, URL param profiles, sessionStorage isolation'],
+    version: '0.7.4', date: 'Apr 2026', label: 'Cross-tab sync',
+    changes: ['BroadcastChannel real-time sync, sync pulse, sessionStorage isolation'],
   },
   {
     version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
     changes: ['Menu manager, floor plan, device profiles, devices, staff, print routing'],
   },
 ];
+
 
 
 
