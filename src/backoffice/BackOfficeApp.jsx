@@ -9,18 +9,20 @@ import StaffManager from './sections/StaffManager';
 import PrintRouting from './sections/PrintRouting';
 import BOReports from './sections/BOReports';
 import EODClose from './sections/EODClose';
+import Inventory from './sections/Inventory';
 import SupabaseSetup from '../lib/SupabaseSetup';
 
 const NAV = [
-  { id:'overview',  label:'Overview',       icon:'◈',  group:'Dashboard' },
-  { id:'menu',      label:'Menu manager',   icon:'🍽',  group:'Configuration' },
-  { id:'floorplan', label:'Floor plan',     icon:'⬚',  group:'Configuration' },
-  { id:'profiles',  label:'Device profiles',icon:'📋', group:'Devices' },
-  { id:'devices',   label:'Devices',        icon:'📱',  group:'Devices' },
-  { id:'staff',     label:'Staff & access', icon:'👥',  group:'Configuration' },
-  { id:'printing',  label:'Print routing',  icon:'🖨',  group:'Configuration' },
-  { id:'reports',   label:'Reports',        icon:'📊',  group:'Analytics' },
-  { id:'eod',       label:'End of day',     icon:'🔒',  group:'Analytics' },
+  { id:'overview',   label:'Overview',        icon:'◈',  group:'Dashboard' },
+  { id:'menu',       label:'Menu manager',    icon:'🍽',  group:'Configuration' },
+  { id:'floorplan',  label:'Floor plan',      icon:'⬚',  group:'Configuration' },
+  { id:'inventory',  label:'Inventory',       icon:'📦',  group:'Configuration' },
+  { id:'profiles',   label:'Device profiles', icon:'📋',  group:'Devices' },
+  { id:'devices',    label:'Devices',         icon:'📱',  group:'Devices' },
+  { id:'staff',      label:'Staff & access',  icon:'👥',  group:'Configuration' },
+  { id:'printing',   label:'Print routing',   icon:'🖨',  group:'Configuration' },
+  { id:'reports',    label:'Reports',         icon:'📊',  group:'Analytics' },
+  { id:'eod',        label:'End of day',      icon:'🔒',  group:'Analytics' },
 ];
 
 export default function BackOfficeApp() {
@@ -144,15 +146,16 @@ export default function BackOfficeApp() {
 
         {/* Sections */}
         <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
-          {section === 'overview'  && <BOOverview setSection={setSection} />}
-          {section === 'menu'      && <MenuManager />}
-          {section === 'floorplan' && <FloorPlanBuilder />}
-          {section === 'profiles'  && <DeviceProfiles />}
-          {section === 'devices'   && <DeviceRegistry />}
-          {section === 'staff'     && <StaffManager />}
-          {section === 'printing'  && <PrintRouting />}
-          {section === 'reports'   && <BOReports />}
-          {section === 'eod'       && <EODClose />}
+          {section === 'overview'   && <BOOverview setSection={setSection} />}
+          {section === 'menu'       && <MenuManager />}
+          {section === 'floorplan'  && <FloorPlanBuilder />}
+          {section === 'inventory'  && <Inventory />}
+          {section === 'profiles'   && <DeviceProfiles />}
+          {section === 'devices'    && <DeviceRegistry />}
+          {section === 'staff'      && <StaffManager />}
+          {section === 'printing'   && <PrintRouting />}
+          {section === 'reports'    && <BOReports />}
+          {section === 'eod'        && <EODClose />}
         </div>
       </div>
     </div>

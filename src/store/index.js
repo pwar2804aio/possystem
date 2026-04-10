@@ -191,24 +191,30 @@ export const useStore = create((set, get) => ({
   // ── Editable menu items (live copy from seed, editable in back office) ─────
   menuItems: [...MENU_ITEMS], // editable copy — Back Office writes here, POS reads here
   menuCategories: [...CATEGORIES],
-  updateMenuItem: (id, patch) => set(s => ({
-    menuItems: s.menuItems.map(item => item.id===id ? { ...item, ...patch } : item)
-  })),
-  addMenuItem: (item) => set(s => ({
-    menuItems: [...s.menuItems, { id:`m-${Date.now()}`, status:'active', ...item }]
-  })),
+  updateMenuItem: (id, patch) => {
+    set(s => ({ menuItems: s.menuItems.map(item => item.id===id ? { ...item, ...patch } : item) }));
+    import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem({ id, ...patch }));
+  },
+  addMenuItem: (item) => {
+    const newItem = { id:`m-${Date.now()}`, status:'active', ...item };
+    set(s => ({ menuItems: [...s.menuItems, newItem] }));
+    import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem(newItem));
+  },
   archiveMenuItem: (id) => set(s => ({
     menuItems: s.menuItems.map(item => item.id===id ? { ...item, archived:true } : item)
   })),
 
   // ── Editable floor plan ────────────────────────────────────────────────────
   // Tables state already exists in `tables` — floor plan builder just edits positions
-  updateTableLayout: (id, patch) => set(s => ({
-    tables: s.tables.map(t => t.id===id ? { ...t, ...patch } : t)
-  })),
-  addTableToLayout: (table) => set(s => ({
-    tables: [...s.tables, { id:`t-${Date.now()}`, status:'available', session:null, ...table }]
-  })),
+  updateTableLayout: (id, patch) => {
+    set(s => ({ tables: s.tables.map(t => t.id===id ? { ...t, ...patch } : t) }));
+    import('../lib/db.js').then(({ upsertFloorTable }) => upsertFloorTable({ id, ...patch }));
+  },
+  addTableToLayout: (table) => {
+    const newTable = { id:`t-${Date.now()}`, status:'available', session:null, ...table };
+    set(s => ({ tables: [...s.tables, newTable] }));
+    import('../lib/db.js').then(({ upsertFloorTable }) => upsertFloorTable(newTable));
+  },
   removeTableFromLayout: (id) => set(s => ({
     tables: s.tables.filter(t => t.id!==id && t.parentId!==id)
   })),

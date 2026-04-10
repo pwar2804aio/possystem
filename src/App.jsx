@@ -13,7 +13,7 @@ import ConfigSyncBanner from './components/ConfigSyncBanner';
 import KioskSurface from './surfaces/KioskSurface';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '0.7.9';
+const VERSION = '0.8.2';
 
 const CHANGELOG = [
   {
