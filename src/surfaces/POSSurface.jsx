@@ -152,11 +152,16 @@ export default function POSSurface() {
         <div style={{padding:'10px 12px 8px',borderBottom:'1px solid var(--bdr)',flexShrink:0}}>
           {activeTable ? (
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:40,height:40,borderRadius:activeTable.shape==='rd'?'50%':10,background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'var(--acc)',flexShrink:0,letterSpacing:'-.01em'}}>
+              <div style={{width:40,height:40,borderRadius:activeTable.shape==='rd'?'50%':10,background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:activeTable.parentId?9:11,fontWeight:800,color:'var(--acc)',flexShrink:0,letterSpacing:'-.01em',textAlign:'center',lineHeight:1.1}}>
                 {activeTable.label}
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:800,color:'var(--t1)',letterSpacing:'-.01em'}}>{activeTable.label}</div>
+                <div style={{fontSize:15,fontWeight:800,color:'var(--t1)',letterSpacing:'-.01em',display:'flex',alignItems:'center',gap:6}}>
+                  {activeTable.label}
+                  {activeTable.parentId && (
+                    <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:20,background:'var(--acc)',color:'#0b0c10'}}>Check 2</span>
+                  )}
+                </div>
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>
                   {session?.covers} covers · {session?.server}
                   {session?.seatedAt?<span style={{color:'var(--t4)'}}> · {Math.floor((Date.now()-session.seatedAt)/60000)}m</span>:''}
@@ -250,17 +255,6 @@ export default function POSSurface() {
             );
           })}
         </div>
-
-        {/* No table warning */}
-        {orderType === 'dine-in' && !activeTableId && items.length > 0 && (
-          <div onClick={() => setSurface('tables')} style={{ margin:'0 10px 6px', padding:'9px 12px', borderRadius:10, background:'var(--red-d)', border:'1px solid var(--red-b)', cursor:'pointer', display:'flex', alignItems:'center', gap:8, transition:'all .14s' }}>
-            <span style={{ fontSize:16 }}>⚠</span>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'var(--red)' }}>No table selected</div>
-              <div style={{ fontSize:11, color:'var(--red)', opacity:.8 }}>Tap to go to Floor plan →</div>
-            </div>
-          </div>
-        )}
 
         {/* Order note */}
         {items.length>0&&(

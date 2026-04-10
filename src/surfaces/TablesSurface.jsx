@@ -313,7 +313,8 @@ export default function TablesSurface() {
     }
   };
 
-  const filteredTables = section === 'all' ? tables : tables.filter(t => t.section === section);
+  const filteredTables = (section === 'all' ? tables : tables.filter(t => t.section === section))
+    .filter(t => !t.parentId);  // never render child tables (T1.2) on the floor plan
   // Canvas size — just big enough for all positions
   const canvasW = Math.max(...tables.map(t => t.x + t.w)) + 20;
   const canvasH = Math.max(...tables.map(t => t.y + t.h)) + 20;
@@ -369,7 +370,7 @@ export default function TablesSurface() {
         {(view==='mine' || view==='all') && (() => {
           const now = Date.now();
           const activeTables = tables.filter(t =>
-            (t.status==='open'||t.status==='occupied') && t.session
+            (t.status==='open'||t.status==='occupied') && t.session && !t.parentId
           ).filter(t =>
             view==='all' || t.session.server===staff?.name
           ).sort((a,b) => (b.session.seatedAt||0) - (a.session.seatedAt||0));
@@ -422,12 +423,18 @@ export default function TablesSurface() {
                   const seatedMins = Math.floor((now - (session.seatedAt||now)) / 60000);
                   const lastActivity = session.sentAt ? new Date(session.sentAt).getTime() : (session.seatedAt||now);
                   const idleMins = Math.floor((now - lastActivity) / 60000);
+                  const childChecks = tables.filter(t => t.parentId === table.id);
+                  const hasChildren = childChecks.length > 0;
+                  // Combined total across all checks
+                  const allChecks = [table, ...childChecks];
+                  const combinedTotal = allChecks.reduce((s,t) => s+(t.session?.subtotal||0), 0);
 
                   return (
-                    <div key={table.id} onClick={()=>openTable(table)} style={{
+                    <div key={table.id}>
+                    <div onClick={()=>openTable(table)} style={{
                       display:'flex', alignItems:'center', gap:16, padding:'14px 18px',
-                      borderRadius:14, cursor:'pointer', border:us.border, background:us.bg,
-                      transition:'all .15s',
+                      borderRadius:hasChildren?'14px 14px 0 0':14, cursor:'pointer', border:us.border, background:us.bg,
+                      transition:'all .15s', borderBottom:hasChildren?'none':us.border,
                     }}>
                       {/* Urgency dot */}
                       <div style={{ width:10, height:10, borderRadius:'50%', background:us.dot, flexShrink:0, boxShadow:`0 0 6px ${us.dot}` }}/>
@@ -469,15 +476,44 @@ export default function TablesSurface() {
                       {/* Check total */}
                       <div style={{ marginLeft:'auto', textAlign:'right', flexShrink:0 }}>
                         <div style={{ fontSize:20, fontWeight:800, color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>
-                          £{(session.subtotal||0).toFixed(2)}
+                          £{combinedTotal.toFixed(2)}
                         </div>
                         <div style={{ fontSize:11, color:'var(--t3)' }}>
-                          {session.items?.filter(i=>!i.voided).length||0} items
+                          {hasChildren ? `${allChecks.length} checks` : `${session.items?.filter(i=>!i.voided).length||0} items`}
                         </div>
                       </div>
 
                       {/* Arrow */}
                       <div style={{ color:'var(--t4)', fontSize:18, flexShrink:0 }}>›</div>
+                    </div>
+
+                    {/* Child check sub-rows */}
+                    {hasChildren && childChecks.map((child, ci) => {
+                      const childSub = child.session?.subtotal || 0;
+                      const childItems = child.session?.items?.filter(i=>!i.voided).length || 0;
+                      return (
+                        <div key={child.id} onClick={()=>openTableInPOS(child.id)} style={{
+                          display:'flex', alignItems:'center', gap:16, padding:'10px 18px',
+                          cursor:'pointer', background:us.bg, borderLeft:`3px solid var(--acc)`,
+                          border:us.border, borderTop:'none',
+                          borderRadius:ci===childChecks.length-1?'0 0 14px 14px':'0',
+                          transition:'all .15s',
+                        }}>
+                          <div style={{ width:10, height:10, borderRadius:'50%', background:'var(--acc)', flexShrink:0 }}/>
+                          <div style={{ width:80, flexShrink:0 }}>
+                            <div style={{ fontSize:15, fontWeight:700, color:'var(--acc)' }}>{child.label}</div>
+                            <div style={{ fontSize:10, color:'var(--t4)' }}>Check {ci+2}</div>
+                          </div>
+                          <div style={{ fontSize:12, color:'var(--t3)', flex:1 }}>
+                            {child.session?.server} · {childItems} items
+                          </div>
+                          <div style={{ fontSize:16, fontWeight:800, color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>
+                            £{childSub.toFixed(2)}
+                          </div>
+                          <div style={{ color:'var(--t4)', fontSize:16 }}>›</div>
+                        </div>
+                      );
+                    })}
                     </div>
                   );
                 })}
