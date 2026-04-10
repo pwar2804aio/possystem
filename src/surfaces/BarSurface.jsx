@@ -145,6 +145,7 @@ export default function BarSurface() {
   const [modalItem, setModalItem]           = useState(null);
   const [editingNote, setEditingNote]       = useState(false);
   const [noteVal, setNoteVal]               = useState('');
+  const [voidConfirm, setVoidConfirm]       = useState(null); // { tabId, roundId, rNum }
   const [showTabFilter, setShowTabFilter]   = useState('active'); // active | all
 
   useEffect(() => { if (tabs.length===0) seedTabs(); }, []);
@@ -375,7 +376,7 @@ export default function BarSurface() {
                       </div>
                       <div style={{ display:'flex',alignItems:'center',gap:8 }}>
                         <span style={{ fontSize:13,fontWeight:700,color:'var(--t2)',fontFamily:'DM Mono,monospace' }}>£{round.subtotal.toFixed(2)}</span>
-                        <button onClick={()=>{if(window.confirm(`Void round ${rNum}?`))voidTabRound(activeTab.id,round.id);}} style={{ fontSize:10,color:'var(--red)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0 }}>Void</button>
+                        <button onClick={()=>setVoidConfirm({ tabId:activeTab.id, roundId:round.id, rNum })} style={{ fontSize:10,color:'var(--red)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0 }}>Void</button>
                       </div>
                     </div>
                     <div style={{ padding:'8px 12px' }}>
@@ -526,6 +527,26 @@ export default function BarSurface() {
           />
         );
       })()}
+
+      {/* Void round confirmation */}
+      {voidConfirm && (
+        <div className="modal-back" onClick={e=>e.target===e.currentTarget&&setVoidConfirm(null)}>
+          <div style={{ background:'var(--bg2)', border:'1px solid var(--red-b)', borderRadius:20, width:'100%', maxWidth:360, padding:24, boxShadow:'var(--sh3)' }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)', marginBottom:8 }}>Void round {voidConfirm.rNum}?</div>
+            <div style={{ fontSize:13, color:'var(--t3)', marginBottom:20, lineHeight:1.5 }}>
+              This will void the entire round and remove it from the tab total. This action cannot be undone.
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="btn btn-ghost" style={{ flex:1 }} onClick={()=>setVoidConfirm(null)}>Cancel</button>
+              <button className="btn btn-red" style={{ flex:1, height:42 }} onClick={()=>{
+                voidTabRound(voidConfirm.tabId, voidConfirm.roundId);
+                showToast(`Round ${voidConfirm.rNum} voided`, 'warning');
+                setVoidConfirm(null);
+              }}>Void round</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

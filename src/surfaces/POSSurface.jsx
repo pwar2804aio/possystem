@@ -11,6 +11,8 @@ import CheckHistory from '../components/CheckHistory';
 import ItemInfoModal from '../components/ItemInfoModal';
 import OrderReviewModal from '../components/OrderReviewModal';
 import SendWithoutTableModal from '../components/SendWithoutTableModal';
+import AllergenCheckoutModal from '../components/AllergenCheckoutModal';
+import TableActionsModal from '../components/TableActionsModal';
 
 const COURSE_COLORS = {
   0:{label:'Immediate',color:'#22d3ee',bg:'rgba(34,211,238,.1)'},
@@ -58,6 +60,8 @@ export default function POSSurface() {
   const [infoItem, setInfoItem]         = useState(null);  // long-press item info
   const [showReview, setShowReview]     = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showAllergenGate, setShowAllergenGate] = useState(false);
+  const [showTableActions, setShowTableActions] = useState(false);
   const longPressTimer = useRef(null);
 
   const activeTable = activeTableId ? tables.find(t=>t.id===activeTableId) : null;
@@ -152,15 +156,16 @@ export default function POSSurface() {
         <div style={{padding:'10px 12px 8px',borderBottom:'1px solid var(--bdr)',flexShrink:0}}>
           {activeTable ? (
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:40,height:40,borderRadius:activeTable.shape==='rd'?'50%':10,background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:activeTable.parentId?9:11,fontWeight:800,color:'var(--acc)',flexShrink:0,letterSpacing:'-.01em',textAlign:'center',lineHeight:1.1}}>
+              <div onClick={()=>setShowTableActions(true)} style={{width:40,height:40,borderRadius:activeTable.shape==='rd'?'50%':10,background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:activeTable.parentId?9:11,fontWeight:800,color:'var(--acc)',flexShrink:0,letterSpacing:'-.01em',textAlign:'center',lineHeight:1.1,cursor:'pointer'}}>
                 {activeTable.label}
               </div>
-              <div style={{flex:1,minWidth:0}}>
+              <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={()=>setShowTableActions(true)}>
                 <div style={{fontSize:15,fontWeight:800,color:'var(--t1)',letterSpacing:'-.01em',display:'flex',alignItems:'center',gap:6}}>
                   {activeTable.label}
                   {activeTable.parentId && (
                     <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:20,background:'var(--acc)',color:'#0b0c10'}}>Check 2</span>
                   )}
+                  <span style={{fontSize:10,color:'var(--t4)'}}>✎</span>
                 </div>
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>
                   {session?.covers} covers · {session?.server}
@@ -178,12 +183,13 @@ export default function POSSurface() {
                   </button>
                 ))}
               </div>
-              {orderType!=='dine-in'&&customer&&(
+              {/* Named order: show customer name even on dine-in type */}
+              {customer&&(
                 <div style={{background:'var(--bg3)',borderRadius:10,padding:'8px 12px',marginTop:8,display:'flex',alignItems:'center',gap:10,border:'1px solid var(--bdr)'}}>
                   <div style={{width:32,height:32,borderRadius:'50%',background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'var(--acc)',flexShrink:0}}>{customer.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:700,color:'var(--t1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{customer.name}</div>
-                    <div style={{fontSize:11,color:'var(--t3)'}}>{customer.phone}{orderType==='collection'?` · ${customer.isASAP?'⚡ ASAP':`🕐 ${customer.collectionTime}`}`:''}</div>
+                    <div style={{fontSize:11,color:'var(--t3)'}}>{customer.phone}{orderType==='collection'?` · ${customer.isASAP?'⚡ ASAP':`🕐 ${customer.collectionTime}`}`:orderType==='dine-in'?' · Named order':''}</div>
                   </div>
                   <button onClick={()=>{setShowCustomerModal(true);setPendingOrderType(orderType);}} style={{fontSize:11,fontWeight:700,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0,flexShrink:0}}>Edit</button>
                 </div>
@@ -334,7 +340,12 @@ export default function POSSurface() {
               onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--bdr3)';e.currentTarget.style.color='var(--t2)';}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr2)';e.currentTarget.style.color='var(--t3)';}}>+</button>
             <button className="btn btn-ghost" style={{flex:1,height:40,opacity:items.length===0?.3:1,fontSize:13,fontWeight:700,letterSpacing:.01}} onClick={handleSend}>Send →</button>
-            <button className="btn btn-acc" style={{flex:1.4,height:40,opacity:items.length===0?.3:1,fontSize:14,fontWeight:800,letterSpacing:.01}} onClick={()=>items.length>0&&setShowCheckout(true)}>
+            <button className="btn btn-acc" style={{flex:1.4,height:40,opacity:items.length===0?.3:1,fontSize:14,fontWeight:800,letterSpacing:.01}} onClick={()=>{
+              if (!items.length) return;
+              const hasAllergens = items.some(i=>!i.voided&&i.allergens?.length);
+              if (hasAllergens) setShowAllergenGate(true);
+              else setShowCheckout(true);
+            }}>
               {items.length>0?`Pay £${total.toFixed(2)}`:'Pay'}
             </button>
           </div>
@@ -629,16 +640,39 @@ export default function POSSurface() {
         </div></div>
       )}
 
+      {/* Allergen confirmation gate before checkout */}
+      {showAllergenGate && (
+        <AllergenCheckoutModal
+          items={items}
+          onConfirm={()=>{ setShowAllergenGate(false); setShowCheckout(true); }}
+          onCancel={()=>setShowAllergenGate(false)}
+        />
+      )}
+
+      {/* Table actions — covers edit + transfer */}
+      {showTableActions && activeTable && (
+        <TableActionsModal
+          table={activeTable}
+          onClose={()=>setShowTableActions(false)}
+        />
+      )}
+
       {/* Send without table modal */}
       {showSendModal && (
         <SendWithoutTableModal
           items={items}
           onClose={()=>setShowSendModal(false)}
           onNameOrder={(name)=>{
-            // Set a named order — send as walk-in with the name as customer
-            setCustomer({ name, phone:'', isASAP:true });
+            // Set customer on the walk-in order, then immediately send
+            setCustomer({ name, phone:'', isASAP:true, isNamedDineIn:true });
             setShowSendModal(false);
-            setTimeout(()=>{ sendToKitchen(); clearWalkIn(); }, 50);
+            // Use a brief tick to let state settle before sending
+            setTimeout(()=>{
+              const state = useStore.getState();
+              if (state.walkInOrder?.items?.length) {
+                state.sendToKitchen();
+              }
+            }, 50);
           }}
           onSendToKitchen={()=>{ sendToKitchen(); }}
         />

@@ -218,6 +218,34 @@ export const useStore = create((set, get) => ({
     get()._updateTable(tableId, { status: res?'reserved':'available', reservation: res||null });
   },
 
+  // Update covers count mid-service
+  updateCovers: (tableId, covers) => {
+    set(s => ({
+      tables: s.tables.map(t =>
+        t.id === tableId && t.session
+          ? { ...t, session: { ...t.session, covers } }
+          : t
+      ),
+    }));
+  },
+
+  // Transfer a table's session to another table
+  transferTable: (fromId, toId) => {
+    const { tables } = get();
+    const from = tables.find(t => t.id === fromId);
+    const to   = tables.find(t => t.id === toId);
+    if (!from?.session || !to) return;
+    set(s => ({
+      tables: s.tables.map(t => {
+        if (t.id === fromId) return { ...t, status:'available', session:null, childIds:[] };
+        if (t.id === toId)   return { ...t, status:'occupied', session:{ ...from.session }, reservation:null };
+        return t;
+      }),
+      activeTableId: toId,
+    }));
+    get().showToast(`Transferred to ${to.label}`, 'success');
+  },
+
   // ── Active table context ───────────────────
   activeTableId: null,
   setActiveTableId: id => set({ activeTableId:id }),
@@ -297,7 +325,17 @@ export const useStore = create((set, get) => ({
 
   updateItemQty: (itemUid, delta) => {
     const { activeTableId } = get();
-    const applyQty = items => items.map(i=>i.uid===itemUid?{...i,qty:Math.max(1,i.qty+delta)}:i);
+    const applyQty = items => {
+      const item = items.find(i => i.uid === itemUid);
+      if (!item) return items;
+      const newQty = item.qty + delta;
+      if (newQty <= 0) {
+        // Pending items can be removed by dragging to 0; committed items must be voided
+        if (item.status === 'sent' || item.voided) return items;
+        return items.filter(i => i.uid !== itemUid);
+      }
+      return items.map(i => i.uid === itemUid ? { ...i, qty: newQty } : i);
+    };
     if (activeTableId) {
       set(s=>({ tables:s.tables.map(t=>{
         if(t.id!==activeTableId||!t.session)return t;

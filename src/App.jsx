@@ -7,50 +7,59 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.6.6';
+const VERSION = '0.6.7';
 
 const CHANGELOG = [
   {
+    version: '0.6.7', date: 'Apr 2026', label: 'POS function fixes',
+    changes: [
+      'Qty stepper: pending items now delete when reduced to 0 instead of blocking at 1',
+      'Allergen gate: Pay button now requires a mandatory allergen confirmation before checkout when any items have declared allergens — EU/UK FIC compliant, recorded on audit trail',
+      'Edit covers mid-service: tap the table label/icon in the POS header to open a covers stepper and table transfer panel',
+      'Table transfer: move a session to any available table without re-seating',
+      'Bar tab round void: replaced browser window.confirm() with a proper in-app confirmation modal',
+      'Named dine-in orders: customer name shown in the order panel header with "Named order" label',
+      'TableActionsModal: edit covers or transfer table from within the POS screen without going back to floor plan',
+    ],
+  },
+  {
     version: '0.6.6', date: 'Apr 2026', label: 'Split check polish',
     changes: [
-      'Child tables (T1.2) no longer appear on the floor plan canvas — only parent tables shown',
-      'Orders list filters out child tables, shows them as indented sub-rows under the parent with amber ⦿ dot and their own tap target',
-      'Combined total shown on parent row when splits exist (all checks summed)',
-      'POS order header shows "Check 2" amber badge when working on a split check',
-      '"No table selected" red banner removed — the Send routing modal handles it gracefully now',
-      'Orders list and floor plan urgency counts use parent tables only, no double-counting',
+      'Child tables hidden from floor plan and orders list (shown as sub-rows under parent)',
+      'Combined total on parent row, Check 2 badge in POS header',
+      '"No table" warning removed — routing modal handles it',
     ],
   },
   {
     version: '0.6.5', date: 'Apr 2026', label: 'Send routing + split checks',
     changes: [
-      'Dine-in Send without table → routing modal: add to table or name the order',
+      'Send without table → routing modal: add to table or name the order',
       'Merge into existing check or create T1.2 split check',
-      'Check selector modal when opening a table with multiple checks',
-      'Floor plan split badge, orders list check sub-rows',
+      'Check selector modal, floor plan split badge',
     ],
   },
   {
-    version: '0.6.4', date: 'Apr 2026', label: 'AI assistant + KDS fixes',
-    changes: ['AI Shift Assistant in Back Office — Claude-powered with full shift context', 'fireCourse sends real KDS tickets'],
+    version: '0.6.4', date: 'Apr 2026', label: 'AI assistant + KDS',
+    changes: ['AI Shift Assistant in Back Office', 'KDS wired to real orders'],
   },
   {
     version: '0.6.3', date: 'Apr 2026', label: 'KDS connected + reservations',
-    changes: ['KDS wired to real orders, live timers', 'Reservations modal with date/time/party/notes'],
+    changes: ['KDS live timers, reservations modal'],
   },
-  { version:'0.6.2', date:'Apr 2026', label:'Item info + daily count + order review', changes:['Long press, recipe, daily count, auto 86, review modal'] },
-  { version:'0.6.1', date:'Apr 2026', label:'Light mode + checkout redesign', changes:['☀️/🌙 toggle, SVG card terminal, 56px cash numpad'] },
-  { version:'0.6.0', date:'Apr 2026', label:'Operator Dark UI revamp', changes:['Cards, nav, order items rebuilt for speed and touch'] },
-  { version:'0.5.3', date:'Apr 2026', label:'Orders list view', changes:['My orders / All open, urgency colours'] },
-  { version:'0.5.2', date:'Apr 2026', label:'Full split bill', changes:['Even, seat, item, custom — each tendered independently'] },
-  { version:'0.5.1', date:'Apr 2026', label:'Fast checkout', changes:['Card/Cash buttons, tip picker, cash numpad'] },
-  { version:'0.5.0', date:'Apr 2026', label:'Voids, discounts & history', changes:['Manager PIN, discounts, refund with tender'] },
-  { version:'0.4.1', date:'Apr 2026', label:'Table sessions', changes:['Tables own sessions, floor plan, seat guests'] },
+  { version:'0.6.2', date:'Apr 2026', label:'Item info + daily count + order review', changes:['Long press, recipe, daily count, auto 86'] },
+  { version:'0.6.1', date:'Apr 2026', label:'Light mode + checkout', changes:['☀️/🌙, SVG terminal, cash numpad'] },
+  { version:'0.6.0', date:'Apr 2026', label:'Operator Dark UI', changes:['Cards, nav, order items rebuilt'] },
+  { version:'0.5.3', date:'Apr 2026', label:'Orders list', changes:['My orders / All open, urgency colours'] },
+  { version:'0.5.2', date:'Apr 2026', label:'Split bill', changes:['Even, seat, item, custom — independently tendered'] },
+  { version:'0.5.1', date:'Apr 2026', label:'Fast checkout', changes:['Card/Cash buttons, tip, cash numpad'] },
+  { version:'0.5.0', date:'Apr 2026', label:'Voids, discounts & history', changes:['Manager PIN, discounts, refund'] },
+  { version:'0.4.1', date:'Apr 2026', label:'Table sessions', changes:['Sessions, floor plan, seat guests'] },
   { version:'0.4.0', date:'Apr 2026', label:'Bar tabs', changes:['Rounds, pre-auth, roaming tabs'] },
   { version:'0.3.0', date:'Mar 2026', label:'Takeaway & collection', changes:['Customer capture, Orders hub'] },
-  { version:'0.2.0', date:'Mar 2026', label:'POS core ordering', changes:['Variants, modifiers, courses, seat, 86'] },
+  { version:'0.2.0', date:'Mar 2026', label:'POS core ordering', changes:['Variants, modifiers, courses, seat'] },
   { version:'0.1.0', date:'Mar 2026', label:'Foundation', changes:['POS, Quick Screen, allergens, KDS, floor plan'] },
 ];
+
 
 
 
