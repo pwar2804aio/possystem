@@ -1,13 +1,15 @@
 import { useState } from 'react';
+import { useStore } from '../store';
 import { ALLERGENS, PIZZA_TOPPINGS, PIZZA_BASES, PIZZA_CRUSTS, PIZZA_SIZES } from '../data/seed';
 
 // ── Main product modal dispatcher ─────────────────────────────────────────────
 export default function ProductModal({ item, activeAllergens = [], onConfirm, onCancel }) {
   if (!item) return null;
-  if (item.type === 'pizza')     return <PizzaModal     item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
-  if (item.type === 'variants')  return <VariantsModal  item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
-  if (item.type === 'modifiers') return <ModifiersModal item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
-  return null; // simple items don't need a modal
+  if (item.type === 'pizza')      return <PizzaModal     item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
+  if (item.type === 'variants')   return <VariantsModal  item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
+  // Both 'modifiers' (legacy) and 'modifiable' (new auto type) show the ModifiersModal
+  if (item.type === 'modifiers' || item.type === 'modifiable') return <ModifiersModal item={item} activeAllergens={activeAllergens} onConfirm={onConfirm} onCancel={onCancel} />;
+  return null;
 }
 
 // ── Shared shell ──────────────────────────────────────────────────────────────
@@ -142,13 +144,24 @@ function VariantsModal({ item, activeAllergens, onConfirm, onCancel }) {
   const canAdd = !!selected;
 
   const handleAdd = () => {
-    onConfirm(item, [], null, {
-      variant: selected,
-      notes: notes.trim(),
-      qty,
-      linePrice: price,
-      displayName: `${item.name} — ${selected.label}`,
-    });
+    // If variant has a _childItem (linked-children system), add the child item directly
+    if (selected._childItem) {
+      const child = selected._childItem;
+      onConfirm(child, [], null, {
+        notes: notes.trim(),
+        qty,
+        linePrice: selected.price * qty,
+        displayName: `${child.menuName || child.name}`,
+      });
+    } else {
+      onConfirm(item, [], null, {
+        variant: selected,
+        notes: notes.trim(),
+        qty,
+        linePrice: price,
+        displayName: `${item.menuName || item.name} — ${selected.label}`,
+      });
+    }
   };
 
   return (
@@ -193,27 +206,56 @@ function VariantsModal({ item, activeAllergens, onConfirm, onCancel }) {
 
 // ── Modifiers modal (steak cooking, cocktail base, etc.) ──────────────────────
 function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
+  const { modifierLibrary, menuItems } = useStore.getState();
   const [selections, setSelections] = useState({});
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState('');
+
+  // Resolve options for a group — supports both old inline options and new modifierIds system
+  const resolveOptions = (group) => {
+    // New system: modifierIds array referencing subitems or library
+    if (group.modifierIds?.length) {
+      return group.modifierIds.map(id => {
+        const subitem = menuItems.find(i => i.id === id && i.type === 'subitem');
+        if (subitem) return { id: subitem.id, label: subitem.menuName || subitem.name, price: subitem.pricing?.base ?? subitem.price ?? 0 };
+        const libMod = modifierLibrary.find(m => m.id === id);
+        if (libMod) return { id: libMod.id, label: libMod.name, price: libMod.price || 0 };
+        return null;
+      }).filter(Boolean);
+    }
+    // Old system: inline options array
+    return group.options || [];
+  };
+
+  // Determine selection type: new system uses selectionType, old uses group.multi/required
+  const getSelType = (group) => group.selectionType || (group.multi ? 'multiple' : 'single');
+  const isRequired = (group) => group.min > 0 || group.required;
 
   const toggleSingle = (groupId, opt) => setSelections(s => ({ ...s, [groupId]: s[groupId]?.id === opt.id ? null : opt }));
   const toggleMulti  = (groupId, opt) => setSelections(s => {
     const cur = s[groupId] || [];
     const has = cur.find(o => o.id === opt.id);
+    const group = (item.modifierGroups || []).find(g => g.id === groupId);
+    const maxSel = group?.max || 99;
+    if (!has && cur.length >= maxSel) return s; // at max
     return { ...s, [groupId]: has ? cur.filter(o => o.id !== opt.id) : [...cur, opt] };
   });
 
   const allRequired = (item.modifierGroups || [])
-    .filter(g => g.required)
-    .every(g => g.multi ? (selections[g.id]?.length > 0) : !!selections[g.id]);
+    .filter(g => isRequired(g))
+    .every(g => {
+      const selType = getSelType(g);
+      if (selType === 'single') return !!selections[g.id];
+      return (selections[g.id]?.length || 0) >= (g.min || 1);
+    });
 
   const extraCost = Object.values(selections).flat().filter(Boolean).reduce((s, m) => s + (m?.price || 0), 0);
-  const price = (item.price + extraCost) * qty;
+  const basePrice = item.pricing?.base ?? item.price ?? 0;
+  const price = (basePrice + extraCost) * qty;
 
   const buildDisplayName = () => {
     const parts = Object.values(selections).flat().filter(Boolean).map(m => m.label);
-    return parts.length ? `${item.name} — ${parts.join(', ')}` : item.name;
+    return parts.length ? `${item.menuName || item.name} — ${parts.join(', ')}` : (item.menuName || item.name);
   };
 
   const handleAdd = () => {
@@ -231,50 +273,72 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
 
   return (
     <ModalShellWrapper item={item} price={price} canAdd={allRequired} onAdd={handleAdd} onCancel={onCancel} activeAllergens={activeAllergens}>
-      {(item.modifierGroups || []).map(group => (
-        <div key={group.id} style={{ marginBottom:20 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-            <span className="label-xs">{group.label}</span>
-            {group.required && <span style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>Required</span>}
-            {group.multi    && <span style={{ fontSize:11, color:'var(--blu)' }}>Choose multiple</span>}
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            {group.options.map(opt => {
-              const cur = selections[group.id];
-              const isSelected = group.multi
-                ? !!(cur || []).find(o => o.id === opt.id)
-                : cur?.id === opt.id;
-              return (
-                <button key={opt.id}
-                  onClick={() => group.multi ? toggleMulti(group.id, opt) : toggleSingle(group.id, opt)}
-                  style={{
-                    padding:'11px 14px', borderRadius:10, cursor:'pointer',
-                    border:`1.5px solid ${isSelected ? 'var(--acc)' : 'var(--bdr)'}`,
-                    background: isSelected ? 'var(--acc-d)' : 'var(--bg3)',
-                    display:'flex', alignItems:'center', justifyContent:'space-between',
-                    transition:'all .12s', fontFamily:'inherit',
-                  }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <div style={{
-                      width:18, height:18,
-                      borderRadius: group.multi ? 4 : '50%',
-                      border:`2px solid ${isSelected ? 'var(--acc)' : 'var(--bdr2)'}`,
-                      background: isSelected ? 'var(--acc)' : 'transparent',
-                      display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+      {(item.modifierGroups || []).map(group => {
+        const options = resolveOptions(group);
+        const selType = getSelType(group);
+        const required = isRequired(group);
+        const maxSel = group.max || (selType === 'single' ? 1 : 99);
+        const cur = selections[group.id];
+        const selectedCount = Array.isArray(cur) ? cur.length : (cur ? 1 : 0);
+
+        return (
+          <div key={group.id} style={{ marginBottom:20 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+              <span className="label-xs">{group.label}</span>
+              {required && <span style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>Required</span>}
+              {!required && <span style={{ fontSize:11, color:'var(--t4)' }}>Optional</span>}
+              {selType !== 'single' && <span style={{ fontSize:11, color:'var(--t3)' }}>Pick up to {maxSel}</span>}
+              {selType !== 'single' && selectedCount > 0 && <span style={{ fontSize:11, color:'var(--acc)', fontWeight:700 }}>{selectedCount} selected</span>}
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {options.map(opt => {
+                const isSelected = selType === 'single'
+                  ? cur?.id === opt.id
+                  : !!(cur || []).find(o => o.id === opt.id);
+                const atMax = selType !== 'single' && !isSelected && selectedCount >= maxSel;
+                return (
+                  <button key={opt.id}
+                    onClick={() => {
+                      if (atMax) return;
+                      selType === 'single' ? toggleSingle(group.id, opt) : toggleMulti(group.id, opt);
+                    }}
+                    style={{
+                      padding:'11px 14px', borderRadius:10, cursor: atMax ? 'not-allowed' : 'pointer',
+                      border:`1.5px solid ${isSelected ? 'var(--acc)' : 'var(--bdr)'}`,
+                      background: isSelected ? 'var(--acc-d)' : atMax ? 'var(--bg2)' : 'var(--bg3)',
+                      display:'flex', alignItems:'center', justifyContent:'space-between',
+                      transition:'all .12s', fontFamily:'inherit', opacity: atMax ? .5 : 1,
                     }}>
-                      {isSelected && <div style={{ width:6, height:6, borderRadius:group.multi?1:'50%', background:'#0e0f14' }}/>}
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{
+                        width:18, height:18,
+                        borderRadius: selType === 'single' ? '50%' : 4,
+                        border:`2px solid ${isSelected ? 'var(--acc)' : 'var(--bdr2)'}`,
+                        background: isSelected ? 'var(--acc)' : 'transparent',
+                        display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                      }}>
+                        {isSelected && <div style={{ width:6, height:6, borderRadius: selType === 'single' ? '50%' : 1, background:'#0e0f14' }}/>}
+                      </div>
+                      <span style={{ fontSize:14, fontWeight:500, color: isSelected ? 'var(--acc)' : 'var(--t1)' }}>{opt.label}</span>
                     </div>
-                    <span style={{ fontSize:14, fontWeight:500, color: isSelected ? 'var(--acc)' : 'var(--t1)' }}>{opt.label}</span>
-                  </div>
-                  {opt.price > 0 && (
-                    <span style={{ fontSize:13, fontWeight:600, color: isSelected ? 'var(--acc)' : 'var(--t3)' }}>+£{opt.price.toFixed(2)}</span>
-                  )}
-                </button>
-              );
-            })}
+                    {opt.price > 0 && (
+                      <span style={{ fontSize:13, fontWeight:600, color: isSelected ? 'var(--acc)' : 'var(--t3)' }}>+£{opt.price.toFixed(2)}</span>
+                    )}
+                    {opt.price === 0 && isSelected && (
+                      <span style={{ fontSize:12, color:'var(--acc)' }}>✓</span>
+                    )}
+                  </button>
+                );
+              })}
+              {options.length === 0 && (
+                <div style={{ fontSize:12, color:'var(--t4)', padding:'8px 12px', background:'var(--bg3)', borderRadius:8 }}>
+                  No options configured — add sub items to this modifier group in the Menu Manager
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       <div style={{ display:'flex', alignItems:'center', gap:16, paddingTop:4, marginBottom:16 }}>
         <div className="label-xs">Quantity</div>

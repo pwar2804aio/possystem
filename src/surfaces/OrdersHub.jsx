@@ -43,7 +43,9 @@ export default function OrdersHub() {
   const [channel, setChannel]   = useState('all');
   const [search, setSearch]     = useState('');
   const [showDone, setShowDone] = useState(false);
+  const [myOrders, setMyOrders] = useState(false);
   const [tick, setTick]         = useState(0);
+  const currentStaff = useStore(s => s.staff);
 
   // Refresh elapsed times every 30s
   useEffect(() => {
@@ -133,6 +135,10 @@ export default function OrdersHub() {
       );
     }
     if (!showDone) list = list.filter(o => !['collected','paid'].includes(o.status));
+    if (myOrders && currentStaff) {
+      const myName = currentStaff.name?.toLowerCase();
+      list = list.filter(o => o.server?.toLowerCase() === myName);
+    }
     return list;
   }, [allOrders, channel, search, showDone]);
 
@@ -197,11 +203,23 @@ export default function OrdersHub() {
               All live orders — tables, bar tabs, walk-in, collection & delivery
             </div>
           </div>
-          <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:12, color:'var(--t3)' }}>
-            <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)}
-              style={{ accentColor:'var(--acc)', width:14, height:14 }} />
-            Show completed
-          </label>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            {currentStaff && (
+              <button onClick={() => setMyOrders(m => !m)} style={{
+                padding:'5px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
+                background: myOrders ? 'var(--acc-d)' : 'var(--bg3)',
+                border: `1.5px solid ${myOrders ? 'var(--acc)' : 'var(--bdr)'}`,
+                color: myOrders ? 'var(--acc)' : 'var(--t3)', fontSize:11, fontWeight:myOrders?800:500,
+              }}>
+                👤 My orders
+              </button>
+            )}
+            <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:12, color:'var(--t3)' }}>
+              <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)}
+                style={{ accentColor:'var(--acc)', width:14, height:14 }} />
+              Show completed
+            </label>
+          </div>
           <div style={{ position:'relative' }}>
             <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t4)', fontSize:12, pointerEvents:'none' }}>🔍</span>
             <input

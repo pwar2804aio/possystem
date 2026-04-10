@@ -10,7 +10,7 @@ import { ReceiptModal, ReprintModal } from '../components/ReceiptModal';
 import CheckHistory from '../components/CheckHistory';
 import ItemInfoModal from '../components/ItemInfoModal';
 import OrderReviewModal from '../components/OrderReviewModal';
-import SendWithoutTableModal from '../components/SendWithoutTableModal';
+import OrderTypeModal from '../components/OrderTypeModal';
 import AllergenCheckoutModal from '../components/AllergenCheckoutModal';
 import TableActionsModal from '../components/TableActionsModal';
 
@@ -114,11 +114,12 @@ export default function POSSurface() {
 
   const catItems = cat==='quick'
     ? quickItems
-    : MENU_ITEMS.filter(i=>i.cat===cat && !i.archived);
+    // Hide subitems (only in modifier groups) and variant children (only via parent picker)
+    : MENU_ITEMS.filter(i=>i.cat===cat && !i.archived && i.type!=='subitem' && !i.parentId);
   const displayItems = useMemo(()=>{
     if (!search.trim()) return catItems;
     const q=search.toLowerCase();
-    return MENU_ITEMS.filter(i=>i.name.toLowerCase().includes(q)||i.description?.toLowerCase().includes(q));
+    return MENU_ITEMS.filter(i=>i.name.toLowerCase().includes(q)||i.description?.toLowerCase().includes(q) && i.type!=='subitem' && !i.parentId);
   },[cat,search,catItems]);
 
   const byCourse = useMemo(()=>{
@@ -140,37 +141,49 @@ export default function POSSurface() {
     openFlow(item);
   };
   const openFlow = (item) => {
-    if (item.type==='simple') {
-      addItem(item,[],null,{displayName:item.name,qty:1,linePrice:item.price});
-      showToast(`${item.name} added`,'success');
+    // Subitems should never appear on POS grid — skip
+    if (item.type === 'subitem') return;
+
+    // Linked-children variants: show picker with children as options
+    if (item.type === 'variants') {
+      const children = MENU_ITEMS.filter(i => i.parentId === item.id && !i.archived && !eightySixIds.includes(i.id));
+      if (children.length > 0) {
+        // Build a synthetic variants array from children for the ProductModal
+        const syntheticItem = {
+          ...item,
+          variants: children.map(c => ({
+            id: c.id,
+            label: c.menuName || c.name,
+            price: c.pricing?.base ?? c.price ?? 0,
+            _childItem: c, // preserve full child for adding
+          })),
+        };
+        setModalItem(syntheticItem);
+        return;
+      }
+      // Fall through to modal if no children (old variants[] array style)
+    }
+
+    if (item.type === 'simple' && !item.modifierGroups?.length) {
+      addItem(item, [], null, { displayName: item.menuName || item.name, qty:1, linePrice: item.pricing?.base ?? item.price ?? 0 });
+      showToast(`${item.menuName || item.name} added`, 'success');
       setLastAddedUid(item.id);
-      setTimeout(()=>setLastAddedUid(null), 300);
+      setTimeout(() => setLastAddedUid(null), 300);
       return;
     }
-    else setModalItem(item);
+    setModalItem(item);
   };
 
   const handleSend = () => {
     if (!items.length) { showToast('No items on order', 'error'); return; }
-
-    // Dine-in with no table → show the routing modal
-    if (orderType === 'dine-in' && !activeTableId) {
-      setShowSendModal(true);
+    // If already sitting at a table, send directly
+    if (activeTableId) {
+      sendToKitchen();
+      showToast(`Table ${activeTable?.label} order sent`, 'success');
       return;
     }
-
-    // Takeaway / collection must have customer details
-    if (orderType !== 'dine-in' && !customer) {
-      setPendingOrderType(orderType); setShowCustomerModal(true); return;
-    }
-
-    sendToKitchen();
-    if (activeTableId) {
-      setActiveTableId(null);
-      showToast(`${activeTable?.label} order sent to kitchen`, 'success');
-    } else {
-      clearWalkIn();
-    }
+    // Otherwise, always ask what type this order is
+    setShowSendModal(true);
   };
 
   const handlePayComplete = (paymentInfo = {}) => {
@@ -708,24 +721,87 @@ export default function POSSurface() {
         />
       )}
 
-      {/* Send without table modal */}
+      {/* Order type / send modal */}
       {showSendModal && (
-        <SendWithoutTableModal
+        <OrderTypeModal
           items={items}
-          onClose={()=>setShowSendModal(false)}
-          onNameOrder={(name)=>{
-            // Set customer on the walk-in order, then immediately send
-            setCustomer({ name, phone:'', isASAP:true, isNamedDineIn:true });
+          onClose={() => setShowSendModal(false)}
+          onComplete={(result) => {
             setShowSendModal(false);
-            // Use a brief tick to let state settle before sending
-            setTimeout(()=>{
-              const state = useStore.getState();
-              if (state.walkInOrder?.items?.length) {
-                state.sendToKitchen();
-              }
-            }, 50);
+
+            if (result.type === 'counter') {
+              // Named counter order — send to kitchen, appear in Orders Hub, clear POS
+              setOrderType('dine-in');
+              setCustomer({ name: result.name, isASAP: true, isNamedDineIn: true, channel: 'counter' });
+              setTimeout(() => {
+                useStore.getState().sendToKitchen();
+                clearWalkIn();
+                showToast(`${result.name} sent to kitchen`, 'success');
+              }, 30);
+
+            } else if (result.type === 'takeaway' || result.type === 'collection') {
+              // Takeaway / collection — send to kitchen + queue, clear POS
+              setOrderType(result.type);
+              setCustomer({ name: result.name, phone: result.phone, collectionTime: result.time, isASAP: result.isASAP });
+              setTimeout(() => {
+                useStore.getState().sendToKitchen();
+                clearWalkIn();
+                showToast(`${result.name} — ${result.type} sent`, 'success');
+              }, 30);
+
+            } else if (result.type === 'delivery') {
+              // Delivery — send to queue, clear POS
+              setOrderType('delivery');
+              setCustomer({ name: result.name, phone: result.phone, address: result.address, isASAP: false });
+              setTimeout(() => {
+                useStore.getState().sendToKitchen();
+                clearWalkIn();
+                showToast(`Delivery for ${result.name} sent`, 'success');
+              }, 30);
+
+            } else if (result.type === 'dine-in' && result.action === 'new') {
+              // Seat at available table
+              seatTableWithItems(result.tableId, items, { server: staff?.name, covers: 1 });
+              clearWalkIn();
+              setActiveTableId(result.tableId);
+              setSurface('tables');
+              showToast(`Seated at ${result.tableLabel}`, 'success');
+
+            } else if (result.type === 'dine-in' && result.action === 'merge') {
+              // Merge into existing table
+              mergeItemsToTable(result.tableId, items);
+              clearWalkIn();
+              setActiveTableId(result.tableId);
+              setSurface('tables');
+              showToast(`Merged into ${result.tableLabel}`, 'success');
+
+            } else if (result.type === 'bar' && result.action === 'new') {
+              // Open new bar tab and add items as first round
+              const tab = useStore.getState().openTab({ name: result.tabName });
+              useStore.getState().addRoundToTab(tab.id, items);
+              // Send items to bar KDS
+              setOrderType('dine-in');
+              setCustomer({ name: result.tabName });
+              setTimeout(() => {
+                useStore.getState().sendToKitchen();
+                clearWalkIn();
+              }, 30);
+              setSurface('bar');
+              showToast(`Bar tab "${result.tabName}" opened`, 'success');
+
+            } else if (result.type === 'bar' && result.action === 'add') {
+              // Add items to existing bar tab as a new round
+              useStore.getState().addRoundToTab(result.tabId, items);
+              setOrderType('dine-in');
+              setCustomer({ name: result.tabName });
+              setTimeout(() => {
+                useStore.getState().sendToKitchen();
+                clearWalkIn();
+              }, 30);
+              setSurface('bar');
+              showToast(`Added to "${result.tabName}"`, 'success');
+            }
           }}
-          onSendToKitchen={()=>{ sendToKitchen(); }}
         />
       )}
 
