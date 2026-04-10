@@ -500,7 +500,7 @@ export default function POSSurface() {
 
         {/* Tab bar */}
         <div style={{padding:'0 14px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0,display:'flex',alignItems:'center',gap:0}}>
-          {[['menu','Menu'],['orders','Orders hub'],['history','History']].map(([t,l])=>{
+          {[['menu','Menu'],['history','History']].map(([t,l])=>{
             const isActive = rightTab===t;
             const badge = t==='orders' ? orderQueue.filter(o=>o.status!=='collected').length : 0;
             return (
@@ -588,6 +588,13 @@ export default function POSSurface() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+            {/* Subcategory pills */}
+            {!search&&cat!=='quick'&&subCategories.length>0&&(
+              <div style={{display:'flex',gap:4,flexWrap:'wrap',paddingBottom:10}}>
+                <button onClick={()=>setSubCat(null)} style={{padding:'4px 12px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:!subCat?800:500,border:'none',background:!subCat?'var(--acc)':'var(--bg3)',color:!subCat?'#0b0c10':'var(--t3)'}}>All</button>
+                {subCategories.map(sc=>{const a=subCat===sc.id;const cl=sc.color||'var(--acc)';return(<button key={sc.id} onClick={()=>setSubCat(sc.id)} style={{padding:'4px 12px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:a?800:500,border:`1.5px solid ${a?cl:'var(--bdr)'}`,background:a?`${cl}20`:'var(--bg3)',color:a?cl:'var(--t3)'}}>{sc.icon&&<span style={{marginRight:4}}>{sc.icon}</span>}{sc.label}</button>);})}
               </div>
             )}
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
@@ -685,7 +692,6 @@ export default function POSSurface() {
         )}
 
         {/* ── Orders hub tab ── */}
-        {rightTab==='orders'&&<OrdersHub orderQueue={orderQueue} updateQueueStatus={updateQueueStatus} removeFromQueue={removeFromQueue} showToast={showToast}/>}
 
         {/* ── History tab ── */}
         {rightTab==='history'&&<CheckHistory/>}
