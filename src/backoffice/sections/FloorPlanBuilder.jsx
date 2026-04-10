@@ -1,23 +1,31 @@
 import { useState, useRef, useCallback } from 'react';
 import { useStore } from '../../store';
 
-const SECTIONS = ['main', 'bar', 'patio'];
-const SHAPES = [{ id:'sq', label:'Square' }, { id:'rd', label:'Round' }];
-const SECTION_COLORS = { main:'#3b82f6', bar:'#e8a020', patio:'#22c55e' };
+const SHAPES = [{ id:'sq', label:'Square/Rect' }, { id:'rd', label:'Round' }];
+const SECTION_PALETTE = ['#3b82f6','#e8a020','#22c55e','#a855f7','#ef4444','#22d3ee','#f97316','#ec4899'];
 
 export default function FloorPlanBuilder() {
-  const { tables, updateTableLayout, addTableToLayout, removeTableFromLayout, showToast } = useStore();
-  const [selected, setSelected] = useState(null);
-  const [dragging, setDragging] = useState(null);
+  const {
+    tables, updateTableLayout, addTableToLayout, removeTableFromLayout,
+    locationSections, addSection, updateSection, removeSection,
+    showToast,
+  } = useStore();
+
+  const [selected, setSelected]   = useState(null);
+  const [dragging, setDragging]   = useState(null);
   const [dragOffset, setDragOffset] = useState({ x:0, y:0 });
-  const [section, setSection] = useState('all');
+  const [viewSection, setViewSection] = useState('all');
   const [showAddTable, setShowAddTable] = useState(false);
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [editingSection, setEditingSection] = useState(null);
   const canvasRef = useRef(null);
 
-  // Only show non-child tables on floor plan builder
-  const displayTables = tables.filter(t => !t.parentId && (section === 'all' || t.section === section));
+  const displayTables = tables.filter(t =>
+    !t.parentId && (viewSection === 'all' || t.section === viewSection)
+  );
   const selectedTable = tables.find(t => t.id === selected);
 
+  // Drag handlers
   const handleMouseDown = useCallback((e, tableId) => {
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
@@ -25,110 +33,173 @@ export default function FloorPlanBuilder() {
     if (!table) return;
     setDragging(tableId);
     setSelected(tableId);
-    setDragOffset({
-      x: e.clientX - rect.left - table.x,
-      y: e.clientY - rect.top - table.y,
-    });
+    setDragOffset({ x: e.clientX - rect.left - table.x, y: e.clientY - rect.top - table.y });
   }, [tables]);
 
   const handleMouseMove = useCallback((e) => {
-    if (!dragging) return;
+    if (!dragging || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.round((e.clientX - rect.left - dragOffset.x) / 8) * 8);
-    const y = Math.max(0, Math.round((e.clientY - rect.top - dragOffset.y) / 8) * 8);
+    const y = Math.max(28, Math.round((e.clientY - rect.top - dragOffset.y) / 8) * 8);
     updateTableLayout(dragging, { x, y });
   }, [dragging, dragOffset, updateTableLayout]);
 
   const handleMouseUp = useCallback(() => {
-    if (dragging) {
-      showToast('Table position saved', 'success');
-      setDragging(null);
-    }
+    if (dragging) { showToast('Position saved', 'success'); setDragging(null); }
   }, [dragging, showToast]);
 
-  const updateSelected = (patch) => {
+  const upd = (key, val) => {
     if (!selected) return;
-    updateTableLayout(selected, patch);
+    updateTableLayout(selected, { [key]: val });
   };
 
-  const sectionStats = SECTIONS.map(s => ({
-    id: s,
-    count: tables.filter(t => t.section === s && !t.parentId).length,
-    active: tables.filter(t => t.section === s && !t.parentId && (t.status === 'open' || t.status === 'occupied')).length,
-  }));
+  const sectionColor = (id) => locationSections.find(s => s.id === id)?.color || '#888780';
+  const sectionLabel = (id) => locationSections.find(s => s.id === id)?.label || id;
 
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
-      {/* Left panel */}
-      <div style={{ width:220, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', background:'var(--bg1)', flexShrink:0 }}>
-        <div style={{ padding:'14px 14px 10px', borderBottom:'1px solid var(--bdr)' }}>
-          <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:8 }}>Sections</div>
-          <button onClick={() => setSection('all')} style={{ width:'100%', marginBottom:4, padding:'7px 10px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight: section === 'all' ? 700 : 400, border:'none', background: section === 'all' ? 'var(--acc-d)' : 'transparent', color: section === 'all' ? 'var(--acc)' : 'var(--t2)', textAlign:'left', borderLeft:`2px solid ${section === 'all' ? 'var(--acc)' : 'transparent'}` }}>All sections</button>
-          {SECTIONS.map(s => {
-            const stats = sectionStats.find(x => x.id === s);
-            const active = section === s;
+
+      {/* ── Left panel ── */}
+      <div style={{ width:240, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', background:'var(--bg1)', flexShrink:0, overflow:'hidden' }}>
+
+        {/* Sections management */}
+        <div style={{ padding:'12px 12px 8px', borderBottom:'1px solid var(--bdr)' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+            <span style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em' }}>Sections</span>
+            <button onClick={() => setShowAddSection(true)} style={{ fontSize:11, fontWeight:700, color:'var(--acc)', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', padding:0 }}>+ Add</button>
+          </div>
+
+          <button onClick={() => setViewSection('all')} style={{
+            width:'100%', marginBottom:3, padding:'6px 8px', borderRadius:8,
+            cursor:'pointer', fontFamily:'inherit', fontSize:12,
+            fontWeight: viewSection==='all' ? 700 : 400, border:'none',
+            background: viewSection==='all' ? 'var(--acc-d)' : 'transparent',
+            color: viewSection==='all' ? 'var(--acc)' : 'var(--t2)',
+            textAlign:'left', borderLeft:`2px solid ${viewSection==='all' ? 'var(--acc)' : 'transparent'}`,
+          }}>All sections</button>
+
+          {locationSections.map(sec => {
+            const active = viewSection === sec.id;
+            const count = tables.filter(t => t.section === sec.id && !t.parentId).length;
             return (
-              <button key={s} onClick={() => setSection(s)} style={{ width:'100%', marginBottom:4, padding:'7px 10px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight: active ? 700 : 400, border:'none', background: active ? `${SECTION_COLORS[s]}22` : 'transparent', color: active ? SECTION_COLORS[s] : 'var(--t2)', textAlign:'left', display:'flex', justifyContent:'space-between', alignItems:'center', borderLeft:`2px solid ${active ? SECTION_COLORS[s] : 'transparent'}` }}>
-                <span style={{ textTransform:'capitalize' }}>{s}</span>
-                <span style={{ fontSize:10, color:'var(--t4)' }}>{stats?.count || 0} tables</span>
-              </button>
+              <div key={sec.id} style={{ display:'flex', alignItems:'center', marginBottom:2 }}>
+                <button onClick={() => setViewSection(sec.id)} style={{
+                  flex:1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                  fontSize:12, fontWeight: active ? 700 : 400, border:'none',
+                  background: active ? `${sec.color}22` : 'transparent',
+                  color: active ? sec.color : 'var(--t2)', textAlign:'left',
+                  borderLeft:`2px solid ${active ? sec.color : 'transparent'}`,
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                }}>
+                  <span>{sec.icon} {sec.label}</span>
+                  <span style={{ fontSize:10, color:'var(--t4)' }}>{count}</span>
+                </button>
+                <button onClick={() => setEditingSection(sec)} style={{
+                  width:22, height:22, borderRadius:6, border:'none', background:'transparent',
+                  color:'var(--t4)', cursor:'pointer', fontFamily:'inherit', fontSize:13,
+                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--t1)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--t4)'}>✎</button>
+              </div>
             );
           })}
         </div>
 
-        <div style={{ padding:'14px' }}>
-          <button onClick={() => setShowAddTable(true)} style={{ width:'100%', padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700, marginBottom:10 }}>+ Add table</button>
-          {selected && selectedTable && (
+        {/* Add table button */}
+        <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)' }}>
+          <button onClick={() => setShowAddTable(true)} style={{
+            width:'100%', padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
+            background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700,
+          }}>+ Add table</button>
+        </div>
+
+        {/* Selected table editor */}
+        <div style={{ flex:1, overflowY:'auto', padding:'10px 12px' }}>
+          {selected && selectedTable ? (
             <>
-              <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:10 }}>Edit — {selectedTable.label}</div>
-              <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:10 }}>
+                Edit — {selectedTable.label}
+              </div>
+
+              <div style={{ marginBottom:9 }}>
                 <label style={{ display:'block', fontSize:10, color:'var(--t4)', marginBottom:4 }}>Label</label>
-                <input style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'6px 9px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} value={selectedTable.label} onChange={e => updateSelected({ label: e.target.value })}/>
+                <input style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'6px 9px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                  value={selectedTable.label} onChange={e => upd('label', e.target.value)}/>
               </div>
-              <div style={{ marginBottom:8 }}>
+
+              <div style={{ marginBottom:9 }}>
                 <label style={{ display:'block', fontSize:10, color:'var(--t4)', marginBottom:4 }}>Max covers</label>
-                <input type="number" min="1" max="20" style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'6px 9px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} value={selectedTable.maxCovers} onChange={e => updateSelected({ maxCovers: parseInt(e.target.value) || 1 })}/>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <button onClick={() => upd('maxCovers', Math.max(1, selectedTable.maxCovers - 1))} style={{ width:28, height:28, borderRadius:7, border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)', fontSize:16, cursor:'pointer', fontFamily:'inherit' }}>−</button>
+                  <span style={{ fontSize:16, fontWeight:800, minWidth:24, textAlign:'center' }}>{selectedTable.maxCovers}</span>
+                  <button onClick={() => upd('maxCovers', Math.min(20, selectedTable.maxCovers + 1))} style={{ width:28, height:28, borderRadius:7, border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)', fontSize:16, cursor:'pointer', fontFamily:'inherit' }}>+</button>
+                </div>
               </div>
-              <div style={{ marginBottom:8 }}>
+
+              <div style={{ marginBottom:9 }}>
                 <label style={{ display:'block', fontSize:10, color:'var(--t4)', marginBottom:4 }}>Shape</label>
                 <div style={{ display:'flex', gap:5 }}>
                   {SHAPES.map(sh => (
-                    <button key={sh.id} onClick={() => updateSelected({ shape: sh.id })} style={{ flex:1, padding:'5px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:10, fontWeight:700, border:`1px solid ${selectedTable.shape === sh.id ? 'var(--acc)' : 'var(--bdr)'}`, background: selectedTable.shape === sh.id ? 'var(--acc-d)' : 'var(--bg3)', color: selectedTable.shape === sh.id ? 'var(--acc)' : 'var(--t2)' }}>{sh.label}</button>
+                    <button key={sh.id} onClick={() => upd('shape', sh.id)} style={{
+                      flex:1, padding:'5px', borderRadius:7, cursor:'pointer', fontFamily:'inherit',
+                      fontSize:10, fontWeight:700,
+                      border:`1px solid ${selectedTable.shape===sh.id?'var(--acc)':'var(--bdr)'}`,
+                      background: selectedTable.shape===sh.id ? 'var(--acc-d)' : 'var(--bg3)',
+                      color: selectedTable.shape===sh.id ? 'var(--acc)' : 'var(--t2)',
+                    }}>{sh.label}</button>
                   ))}
                 </div>
               </div>
-              <div style={{ marginBottom:8 }}>
+
+              <div style={{ marginBottom:9 }}>
                 <label style={{ display:'block', fontSize:10, color:'var(--t4)', marginBottom:4 }}>Section</label>
-                <select value={selectedTable.section} onChange={e => updateSelected({ section: e.target.value })} style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'6px 9px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', cursor:'pointer' }}>
-                  {SECTIONS.map(s => <option key={s} value={s} style={{ textTransform:'capitalize' }}>{s}</option>)}
+                <select value={selectedTable.section} onChange={e => upd('section', e.target.value)} style={{
+                  width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)',
+                  borderRadius:8, padding:'6px 9px', color:'var(--t1)', fontSize:12,
+                  fontFamily:'inherit', outline:'none', cursor:'pointer',
+                }}>
+                  {locationSections.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:12 }}>
-                {[['Width', 'w'], ['Height', 'h']].map(([label, key]) => (
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:12 }}>
+                {[['Width','w'],['Height','h']].map(([label, key]) => (
                   <div key={key}>
                     <label style={{ display:'block', fontSize:10, color:'var(--t4)', marginBottom:4 }}>{label}px</label>
-                    <input type="number" min="40" max="200" step="8" style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'6px 9px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} value={selectedTable[key]} onChange={e => updateSelected({ [key]: parseInt(e.target.value) || 64 })}/>
+                    <input type="number" min="40" max="200" step="8"
+                      style={{ width:'100%', background:'var(--bg3)', border:'1px solid var(--bdr2)', borderRadius:8, padding:'6px 9px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+                      value={selectedTable[key]} onChange={e => upd(key, parseInt(e.target.value)||64)}/>
                   </div>
                 ))}
               </div>
-              <button onClick={() => { removeTableFromLayout(selected); setSelected(null); showToast(`Table removed`, 'warning'); }} style={{ width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:700 }}>
-                Remove table
-              </button>
+
+              <button onClick={() => { removeTableFromLayout(selected); setSelected(null); showToast('Table removed', 'warning'); }} style={{
+                width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:700,
+              }}>Remove table</button>
             </>
+          ) : (
+            <div style={{ textAlign:'center', padding:'30px 0', color:'var(--t4)' }}>
+              <div style={{ fontSize:28, marginBottom:8, opacity:.3 }}>⬚</div>
+              <div style={{ fontSize:12 }}>Click a table to edit</div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Canvas */}
-      <div style={{ flex:1, overflow:'auto', background:'var(--bg)', position:'relative' }}>
-        <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', fontSize:11, color:'var(--t4)', background:'var(--bg1)', display:'flex', gap:16, alignItems:'center' }}>
-          <span>Drag tables to reposition · Click to select and edit</span>
+      {/* ── Canvas ── */}
+      <div style={{ flex:1, overflow:'auto', background:'var(--bg)' }}>
+        <div style={{ padding:'8px 14px', borderBottom:'1px solid var(--bdr)', fontSize:11, color:'var(--t4)', background:'var(--bg1)', display:'flex', gap:16, alignItems:'center' }}>
+          <span>Drag tables to reposition · click to select</span>
+          {selected && <span style={{ color:'var(--acc)', fontWeight:700 }}>Editing: {selectedTable?.label}</span>}
           <span style={{ marginLeft:'auto' }}>{displayTables.length} table{displayTables.length !== 1 ? 's' : ''} shown</span>
         </div>
+
         <div
           ref={canvasRef}
           style={{
-            position:'relative', minWidth:700, minHeight:560,
+            position:'relative', minWidth:700, minHeight:600,
             margin:20, background:'var(--bg1)',
             border:'1px solid var(--bdr)', borderRadius:16,
             userSelect:'none', cursor: dragging ? 'grabbing' : 'default',
@@ -136,58 +207,103 @@ export default function FloorPlanBuilder() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onClick={e => { if (e.target === canvasRef.current) setSelected(null); }}
         >
           {/* Section dividers */}
-          <div style={{ position:'absolute', top:8, left:16, fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em' }}>Main dining</div>
-          <div style={{ position:'absolute', top:8, left:410, fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em' }}>Bar</div>
-          <div style={{ position:'absolute', top:8, left:500, fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em' }}>Patio</div>
-          <div style={{ position:'absolute', top:0, left:405, bottom:0, width:1, background:'var(--bdr)', opacity:.5 }}/>
-          <div style={{ position:'absolute', top:0, left:495, bottom:0, width:1, background:'var(--bdr)', opacity:.5 }}/>
+          {locationSections.map((sec, i) => {
+            const secTables = displayTables.filter(t => t.section === sec.id);
+            if (!secTables.length && viewSection !== 'all') return null;
+            const minX = secTables.length ? Math.min(...secTables.map(t => t.x)) - 20 : 20 + i * 160;
+            return (
+              <div key={sec.id} style={{
+                position:'absolute', top:8, left:Math.max(8, minX),
+                fontSize:9, fontWeight:800, color:sec.color,
+                textTransform:'uppercase', letterSpacing:'.1em', opacity:.7,
+              }}>{sec.icon} {sec.label}</div>
+            );
+          })}
 
           {/* Tables */}
           {displayTables.map(table => {
             const isSelected = selected === table.id;
-            const sColor = SECTION_COLORS[table.section] || '#888780';
+            const sColor = sectionColor(table.section);
             const isRound = table.shape === 'rd';
-            const active = table.status === 'open' || table.status === 'occupied';
+            const isActive = table.status === 'open' || table.status === 'occupied';
 
             return (
               <div
                 key={table.id}
                 onMouseDown={e => handleMouseDown(e, table.id)}
-                onClick={() => setSelected(table.id === selected ? null : table.id)}
                 style={{
-                  position:'absolute',
-                  left:table.x, top:table.y,
+                  position:'absolute', left:table.x, top:table.y,
                   width:table.w, height:table.h,
-                  borderRadius: isRound ? '50%' : 10,
-                  background: active ? `${sColor}20` : 'var(--bg3)',
-                  border:`${isSelected ? 2 : 1.5}px solid ${isSelected ? sColor : sColor + '60'}`,
-                  boxShadow: isSelected ? `0 0 0 3px ${sColor}33, 0 2px 8px rgba(0,0,0,.1)` : '0 1px 4px rgba(0,0,0,.05)',
+                  borderRadius: isRound ? '50%' : 12,
+                  background: isSelected ? `${sColor}30` : isActive ? `${sColor}18` : 'var(--bg3)',
+                  border:`${isSelected ? 2.5 : 1.5}px solid ${isSelected ? sColor : sColor + '55'}`,
+                  boxShadow: isSelected ? `0 0 0 4px ${sColor}28, 0 2px 8px rgba(0,0,0,.1)` : '0 1px 3px rgba(0,0,0,.05)',
                   cursor: dragging === table.id ? 'grabbing' : 'grab',
                   display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-                  gap:2, transition:'box-shadow .1s', userSelect:'none',
+                  gap:2, transition:'box-shadow .1s, background .1s', userSelect:'none',
                 }}
               >
-                <div style={{ fontSize: table.w > 80 ? 12 : 10, fontWeight:800, color:sColor }}>{table.label}</div>
+                <div style={{ fontSize: table.w > 80 ? 13 : 10, fontWeight:800, color:sColor, letterSpacing:'-.01em' }}>{table.label}</div>
                 <div style={{ fontSize:9, color:sColor, opacity:.7 }}>{table.maxCovers} cvr</div>
-                {active && <div style={{ width:6, height:6, borderRadius:'50%', background:sColor, position:'absolute', top:4, right:4 }}/>}
+                {isActive && <div style={{ width:6, height:6, borderRadius:'50%', background:sColor, position:'absolute', top:4, right:4 }}/>}
+                {isSelected && <div style={{ position:'absolute', top:-8, right:-8, width:16, height:16, borderRadius:'50%', background:sColor, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'#fff', fontWeight:800 }}>✓</div>}
               </div>
             );
           })}
         </div>
       </div>
 
-      {showAddTable && <AddTableModal onClose={() => setShowAddTable(false)} onAdd={table => { addTableToLayout(table); showToast(`${table.label} added`, 'success'); setShowAddTable(false); }}/>}
+      {/* ── Add table modal ── */}
+      {showAddTable && (
+        <AddTableModal
+          sections={locationSections}
+          defaultSection={viewSection === 'all' ? locationSections[0]?.id : viewSection}
+          onClose={() => setShowAddTable(false)}
+          onAdd={table => {
+            addTableToLayout(table);
+            showToast(`${table.label} added`, 'success');
+            setShowAddTable(false);
+          }}
+        />
+      )}
+
+      {/* ── Add section modal ── */}
+      {showAddSection && (
+        <SectionModal
+          section={null}
+          onSave={sec => { addSection(sec); showToast(`"${sec.label}" section added`, 'success'); setShowAddSection(false); }}
+          onClose={() => setShowAddSection(false)}
+        />
+      )}
+
+      {/* ── Edit section modal ── */}
+      {editingSection && (
+        <SectionModal
+          section={editingSection}
+          onSave={sec => { updateSection(editingSection.id, sec); showToast('Section updated', 'success'); setEditingSection(null); }}
+          onDelete={() => {
+            if (locationSections.length <= 1) { showToast('Must keep at least one section', 'error'); return; }
+            removeSection(editingSection.id);
+            showToast('Section removed', 'warning');
+            setEditingSection(null);
+            setViewSection('all');
+          }}
+          onClose={() => setEditingSection(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AddTableModal({ onAdd, onClose }) {
-  const [label, setLabel] = useState('');
+// ── Add table modal ───────────────────────────────────────────────────────────
+function AddTableModal({ sections, defaultSection, onAdd, onClose }) {
+  const [label, setLabel]       = useState('');
   const [maxCovers, setMaxCovers] = useState(4);
-  const [shape, setShape] = useState('sq');
-  const [section, setSection] = useState('main');
+  const [shape, setShape]       = useState('sq');
+  const [section, setSection]   = useState(defaultSection || sections[0]?.id);
 
   const inp = { width:'100%', background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:10, padding:'9px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', display:'block', boxSizing:'border-box' };
 
@@ -199,30 +315,77 @@ function AddTableModal({ onAdd, onClose }) {
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:20 }}>×</button>
         </div>
         <div style={{ padding:'18px 20px' }}>
-          <div style={{ marginBottom:12 }}><label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Label</label><input style={inp} placeholder="T11, Bar stool, Banquette…" value={label} onChange={e => setLabel(e.target.value)} autoFocus/></div>
-          <div style={{ marginBottom:12 }}>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Max covers</label>
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <button onClick={() => setMaxCovers(c => Math.max(1,c-1))} style={{ width:36, height:36, borderRadius:9, border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)', fontSize:20, cursor:'pointer', fontFamily:'inherit' }}>−</button>
-              <span style={{ fontSize:22, fontWeight:800, minWidth:30, textAlign:'center' }}>{maxCovers}</span>
-              <button onClick={() => setMaxCovers(c => Math.min(20,c+1))} style={{ width:36, height:36, borderRadius:9, border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)', fontSize:20, cursor:'pointer', fontFamily:'inherit' }}>+</button>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Label</label>
+            <input style={inp} placeholder="T11, Bar stool 1, Banquette…" value={label} onChange={e => setLabel(e.target.value)} autoFocus/>
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Max covers</label>
+            <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+              <button onClick={() => setMaxCovers(c => Math.max(1,c-1))} style={{ width:36, height:36, borderRadius:9, border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)', fontSize:22, cursor:'pointer', fontFamily:'inherit' }}>−</button>
+              <span style={{ fontSize:24, fontWeight:800, minWidth:30, textAlign:'center' }}>{maxCovers}</span>
+              <button onClick={() => setMaxCovers(c => Math.min(20,c+1))} style={{ width:36, height:36, borderRadius:9, border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)', fontSize:22, cursor:'pointer', fontFamily:'inherit' }}>+</button>
             </div>
           </div>
-          <div style={{ marginBottom:12 }}>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Shape</label>
-            <div style={{ display:'flex', gap:6 }}>
-              {SHAPES.map(s => <button key={s.id} onClick={() => setShape(s.id)} style={{ flex:1, padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, border:`1.5px solid ${shape === s.id ? 'var(--acc)' : 'var(--bdr)'}`, background: shape === s.id ? 'var(--acc-d)' : 'var(--bg3)', color: shape === s.id ? 'var(--acc)' : 'var(--t2)' }}>{s.label}</button>)}
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Shape</label>
+            <div style={{ display:'flex', gap:8 }}>
+              {SHAPES.map(s => <button key={s.id} onClick={() => setShape(s.id)} style={{ flex:1, padding:'9px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, border:`1.5px solid ${shape===s.id?'var(--acc)':'var(--bdr)'}`, background:shape===s.id?'var(--acc-d)':'var(--bg3)', color:shape===s.id?'var(--acc)':'var(--t2)' }}>{s.label}</button>)}
             </div>
           </div>
           <div style={{ marginBottom:20 }}>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Section</label>
-            <div style={{ display:'flex', gap:6 }}>
-              {SECTIONS.map(s => <button key={s} onClick={() => setSection(s)} style={{ flex:1, padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, textTransform:'capitalize', border:`1.5px solid ${section === s ? SECTION_COLORS[s] : 'var(--bdr)'}`, background: section === s ? `${SECTION_COLORS[s]}22` : 'var(--bg3)', color: section === s ? SECTION_COLORS[s] : 'var(--t2)' }}>{s}</button>)}
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Section</label>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {sections.map(s => <button key={s.id} onClick={() => setSection(s.id)} style={{ padding:'7px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, border:`1.5px solid ${section===s.id?s.color:'var(--bdr)'}`, background:section===s.id?`${s.color}22`:'var(--bg3)', color:section===s.id?s.color:'var(--t2)' }}>{s.icon} {s.label}</button>)}
             </div>
           </div>
           <div style={{ display:'flex', gap:8 }}>
             <button className="btn btn-ghost" style={{ flex:1 }} onClick={onClose}>Cancel</button>
-            <button className="btn btn-acc" style={{ flex:2, height:42 }} disabled={!label.trim()} onClick={() => onAdd({ label, maxCovers, shape, section, x:40, y:40, w: shape === 'rd' ? 72 : 72, h: shape === 'rd' ? 72 : 64 })}>Add to floor plan</button>
+            <button className="btn btn-acc" style={{ flex:2, height:42 }} disabled={!label.trim()} onClick={() => onAdd({ label, maxCovers, shape, section, x:40, y:40, w:shape==='rd'?72:80, h:shape==='rd'?72:64 })}>Add to floor plan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Section modal (add/edit) ──────────────────────────────────────────────────
+function SectionModal({ section, onSave, onDelete, onClose }) {
+  const [label, setLabel] = useState(section?.label || '');
+  const [color, setColor] = useState(section?.color || '#3b82f6');
+  const [icon, setIcon]   = useState(section?.icon  || '🍽');
+  const ICONS = ['🍽','🍸','🌿','☕','🍕','🎭','🌅','🏖','🏠','⬚'];
+
+  return (
+    <div className="modal-back" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:20, width:'100%', maxWidth:360, boxShadow:'var(--sh3)', overflow:'hidden' }}>
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--bdr)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontSize:16, fontWeight:800 }}>{section ? 'Edit section' : 'New section'}</div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:20 }}>×</button>
+        </div>
+        <div style={{ padding:'18px 20px' }}>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Name</label>
+            <input style={{ width:'100%', background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:10, padding:'9px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Rooftop, Garden, Private dining" autoFocus/>
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Colour</label>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {SECTION_PALETTE.map(c => <button key={c} onClick={() => setColor(c)} style={{ width:28, height:28, borderRadius:'50%', background:c, border:'none', cursor:'pointer', outline:color===c?'3px solid var(--t1)':'3px solid transparent', outlineOffset:2 }}/>)}
+            </div>
+          </div>
+          <div style={{ marginBottom:20 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Icon</label>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {ICONS.map(ic => <button key={ic} onClick={() => setIcon(ic)} style={{ width:36, height:36, borderRadius:9, border:`1.5px solid ${icon===ic?'var(--acc)':'var(--bdr)'}`, background:icon===ic?'var(--acc-d)':'var(--bg3)', cursor:'pointer', fontSize:18 }}>{ic}</button>)}
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            {section && onDelete && <button onClick={onDelete} style={{ padding:'8px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:700 }}>Remove</button>}
+            <button className="btn btn-ghost" style={{ flex:1 }} onClick={onClose}>Cancel</button>
+            <button className="btn btn-acc" style={{ flex:2, height:40 }} disabled={!label.trim()} onClick={() => onSave({ label, color, icon })}>
+              {section ? 'Save' : 'Add section'}
+            </button>
           </div>
         </div>
       </div>

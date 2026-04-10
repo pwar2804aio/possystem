@@ -241,7 +241,7 @@ function TableNode({ table, onClick }) {
 
 // ─── Main Tables Surface ─────────────────────────────────────────────────────
 export default function TablesSurface() {
-  const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff } = useStore();
+  const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff, locationSections } = useStore();
   const [selected, setSelected]   = useState(null);
   const [showSeat, setShowSeat]   = useState(false);
   const [showReservation, setShowReservation] = useState(false);
@@ -260,10 +260,8 @@ export default function TablesSurface() {
   const selectedTable = tables.find(t => t.id === selected);
 
   const sections = [
-    { id:'all',   label:'All' },
-    { id:'main',  label:'Main dining' },
-    { id:'bar',   label:'Bar' },
-    { id:'patio', label:'Patio' },
+    { id:'all', label:'All' },
+    ...locationSections,
   ];
 
   const counts = {

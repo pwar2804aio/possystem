@@ -78,7 +78,36 @@ export const useStore = create((set, get) => ({
   surface: 'tables',
   setSurface: s => set({ surface:s }),
 
-  // ── App mode — 'pos' (terminal) | 'backoffice' (management portal) ─────────
+  // ── Location sections (editable, replaces hardcoded array) ──────────────
+  locationSections: [
+    { id:'main',  label:'Main dining', color:'#3b82f6', icon:'🍽' },
+    { id:'bar',   label:'Bar',         color:'#e8a020', icon:'🍸' },
+    { id:'patio', label:'Patio',       color:'#22c55e', icon:'🌿' },
+  ],
+  addSection: (section) => set(s => ({ locationSections: [...s.locationSections, { id:`sec-${Date.now()}`, ...section }] })),
+  updateSection: (id, patch) => set(s => ({ locationSections: s.locationSections.map(sec => sec.id===id ? { ...sec, ...patch } : sec) })),
+  removeSection: (id) => set(s => ({
+    locationSections: s.locationSections.filter(sec => sec.id !== id),
+    // Move tables in deleted section to 'main'
+    tables: s.tables.map(t => t.section===id ? { ...t, section:'main' } : t),
+  })),
+
+  // ── Sync status — tracks whether POS config is current ───────────────────
+  syncStatus: {
+    lastConfigChange: null,      // timestamp when BO last pushed a change
+    lastTerminalSync: Date.now(), // timestamp when this terminal last received config
+    pendingChanges: false,
+    printerOnline: true,
+    paymentTerminalOnline: true,
+    kdsOnline: true,
+  },
+  setSyncStatus: (patch) => set(s => ({ syncStatus: { ...s.syncStatus, ...patch } })),
+  markConfigChanged: () => set(s => ({
+    syncStatus: { ...s.syncStatus, lastConfigChange: Date.now(), pendingChanges: true }
+  })),
+  markTerminalSynced: () => set(s => ({
+    syncStatus: { ...s.syncStatus, lastTerminalSync: Date.now(), pendingChanges: false }
+  })),
   appMode: 'pos',
   setAppMode: mode => set({ appMode: mode }),
 

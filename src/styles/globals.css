@@ -260,3 +260,5 @@ button { font-family: inherit; }
   padding: 2px 8px; border-radius: 20px;
   font-size: 10px; font-weight: 700; letter-spacing: .04em;
 }
+
+@keyframes slideRight { from { transform:translateX(-100%); opacity:0; } to { transform:translateX(0); opacity:1; } }

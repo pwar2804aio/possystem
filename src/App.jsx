@@ -7,54 +7,33 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface } from './surfaces/OtherSurfaces';
 import BackOfficeApp from './backoffice/BackOfficeApp';
+import StatusDrawer from './components/StatusDrawer';
 
-const VERSION = '0.7.1';
+const VERSION = '0.7.2';
 
 const CHANGELOG = [
   {
-    version: '0.7.1', date: 'Apr 2026', label: 'Back Office polish',
+    version: '0.7.2', date: 'Apr 2026', label: 'Status drawer + section management',
     changes: [
-      'Print routing: real reassignment modal — select which printer receives tickets from each production centre',
-      'Active device profile badge in the POS shift bar — shows which profile is loaded on this terminal',
-      'Device profile "Apply to this terminal" button writes the config to localStorage and immediately changes the POS surface and available order types',
-      'PrintRouting section fully rebuilt — live job log, production centre routing map, reassign modal, online/offline toggle per printer',
-      'BOReports require() call removed — reports load cleanly without module errors',
+      '⊙ Status button in POS sidebar opens a terminal status drawer — shows sync status, active device profile, hardware (printer/payment terminal/KDS), and terminal identity',
+      'Amber dot on Status button when anything is offline or config changes are pending. Red dot when no profile is assigned',
+      'Floor Plan Builder: sections are now fully editable — add new sections (name/colour/icon), rename existing ones, remove sections (tables move to main)',
+      'Tables added in Back Office floor plan builder now appear in the POS floor plan immediately (shared store state)',
+      'Tables surface reads sections from the store — sections added in Back Office appear as filter tabs in the POS floor view',
+      'Status drawer shows profile reset and "Open Back Office" button for quick navigation',
+      'No profile assigned shows a red warning in the status drawer with direct link to Back Office',
     ],
+  },
+  {
+    version: '0.7.1', date: 'Apr 2026', label: 'Back Office polish',
+    changes: ['Print routing reassign modal, profile badge in shift bar, apply profile to terminal'],
   },
   {
     version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
-    changes: [
-      'Separate Back Office portal — ⚙ Office in sidebar, ← Back to POS to return',
-      'Menu Manager: full CRUD with allergen editor, 86 toggle, daily count setter',
-      'Floor Plan Builder: drag tables, edit properties, add/remove, section filter',
-      'Device Profiles: create/edit profiles with default screen, order types, hidden features, table service toggle',
-      'Device Registry: pair new Sunmi hardware, assign profiles, online/offline',
-      'Staff Manager: add/edit/remove, roles, granular permissions, PIN change flow',
-      'Print Routing: production centre → printer mapping with live job feed',
-    ],
+    changes: ['Menu manager, floor plan builder, device profiles, device registry, staff manager, print routing, reports'],
   },
-  {
-    version: '0.6.8', date: 'Apr 2026', label: 'Allergens on bill + printer routing',
-    changes: ['Allergens on checkout and receipt, printer routing fires per centre, item add animation'],
-  },
-  {
-    version: '0.6.7', date: 'Apr 2026', label: 'POS function fixes',
-    changes: ['Qty removes at 0, allergen gate, covers edit, table transfer, bar void modal'],
-  },
-  {
-    version: '0.6.6', date: 'Apr 2026', label: 'Split check polish',
-    changes: ['Child tables hidden, orders list sub-rows, Check 2 badge'],
-  },
-  {
-    version: '0.6.5', date: 'Apr 2026', label: 'Send routing + split checks',
-    changes: ['Send without table modal, merge/split, check selector'],
-  },
-  { version:'0.6.4', date:'Apr 2026', label:'AI assistant + KDS', changes:['Claude-powered shift assistant, KDS wired to real orders'] },
-  { version:'0.6.3', date:'Apr 2026', label:'KDS + reservations', changes:['Live KDS timers, full reservations modal'] },
-  { version:'0.6.2', date:'Apr 2026', label:'Item info + daily count', changes:['Long press, recipe, daily count, order review'] },
-  { version:'0.6.1', date:'Apr 2026', label:'Light mode', changes:['☀️/🌙 toggle, checkout redesign'] },
-  { version:'0.6.0', date:'Apr 2026', label:'Operator Dark UI', changes:['Cards, nav, order items rebuilt'] },
 ];
+
 
 
 
@@ -219,8 +198,13 @@ function WhatsNewModal({ onClose }) {
 }
 
 function Sidebar({ surface, setSurface }) {
-  const { setAppMode } = useStore();
+  const { setAppMode, syncStatus, deviceConfig } = useStore();
+  const [showStatus, setShowStatus] = useState(false);
+
+  const allOk = syncStatus.printerOnline && syncStatus.paymentTerminalOnline && !syncStatus.pendingChanges;
+
   return (
+    <>
     <nav style={{ width:'var(--nav)', background:'var(--bg1)', borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', alignItems:'center', padding:'10px 0', gap:2, flexShrink:0 }}>
       {NAV.map(n=>{
         const active=surface===n.id;
@@ -229,16 +213,44 @@ function Sidebar({ surface, setSurface }) {
           <span style={{ fontSize:9, fontWeight:700, letterSpacing:'.04em', color:active?'var(--acc)':'var(--t3)' }}>{n.label}</span>
         </button>);
       })}
-      {/* Divider + Back Office button */}
-      <div style={{ width:32, height:1, background:'var(--bdr)', margin:'6px 0' }}/>
-      <button onClick={() => setAppMode('backoffice')} title="Back Office" style={{ width:46, height:46, borderRadius:10, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, background:'transparent', border:'1px solid transparent', color:'var(--t3)', transition:'all .15s', fontFamily:'inherit' }}
-        onMouseEnter={e=>{e.currentTarget.style.background='var(--bg3)';e.currentTarget.style.color='var(--t1)';}}
-        onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='var(--t3)';}}>
-        <span style={{ fontSize:18, lineHeight:1 }}>⚙</span>
+
+      {/* Divider */}
+      <div style={{ width:32, height:1, background:'var(--bdr)', margin:'4px 0' }}/>
+
+      {/* Status button — shows dot if anything offline or pending */}
+      <button onClick={() => setShowStatus(true)} title="Terminal status" style={{
+        width:46, height:46, borderRadius:10, cursor:'pointer',
+        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
+        background:'transparent', border:'1px solid transparent',
+        color: allOk ? 'var(--t3)' : 'var(--acc)', transition:'all .15s', fontFamily:'inherit',
+        position:'relative',
+      }}
+      onMouseEnter={e=>{e.currentTarget.style.background='var(--bg3)';}}
+      onMouseLeave={e=>{e.currentTarget.style.background='transparent';}}>
+        <span style={{ fontSize:17, lineHeight:1 }}>⊙</span>
+        <span style={{ fontSize:9, fontWeight:700, letterSpacing:'.04em' }}>Status</span>
+        {!allOk && <div style={{ position:'absolute', top:6, right:8, width:7, height:7, borderRadius:'50%', background:'var(--acc)', boxShadow:'0 0 6px var(--acc)' }}/>}
+        {!deviceConfig && <div style={{ position:'absolute', top:6, right:8, width:7, height:7, borderRadius:'50%', background:'var(--red)', boxShadow:'0 0 6px var(--red)' }}/>}
+      </button>
+
+      {/* Back Office button */}
+      <button onClick={() => setAppMode('backoffice')} title="Back Office" style={{
+        width:46, height:46, borderRadius:10, cursor:'pointer',
+        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
+        background:'transparent', border:'1px solid transparent',
+        color:'var(--t3)', transition:'all .15s', fontFamily:'inherit',
+      }}
+      onMouseEnter={e=>{e.currentTarget.style.background='var(--bg3)';e.currentTarget.style.color='var(--t1)';}}
+      onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='var(--t3)';}}>
+        <span style={{ fontSize:17, lineHeight:1 }}>⚙</span>
         <span style={{ fontSize:9, fontWeight:700, letterSpacing:'.04em' }}>Office</span>
       </button>
+
       <div style={{ marginTop:'auto' }}><StaffAvatar /></div>
     </nav>
+
+    {showStatus && <StatusDrawer onClose={() => setShowStatus(false)} />}
+    </>
   );
 }
 
