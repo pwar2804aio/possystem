@@ -712,7 +712,12 @@ export const useStore = create((set, get) => ({
 
   // ── 86 ────────────────────────────────────
   eightySixIds: [],
-  toggle86: id => set(s=>({ eightySixIds:s.eightySixIds.includes(id)?s.eightySixIds.filter(x=>x!==id):[...s.eightySixIds,id] })),
+  toggle86: id => {
+    const is86 = get().eightySixIds.includes(id);
+    set(s => ({ eightySixIds: is86 ? s.eightySixIds.filter(x=>x!==id) : [...s.eightySixIds, id] }));
+    // Write to Supabase (no-op in mock mode)
+    import('../lib/db.js').then(({ toggle86DB }) => toggle86DB(id, is86));
+  },
 
   // ── Daily counts / par levels ──────────────────────────────────────────────
   dailyCounts: {},
@@ -981,7 +986,10 @@ export const useStore = create((set, get) => ({
 
   // ── KDS ───────────────────────────────────
   kdsTickets: INITIAL_KDS,
-  bumpTicket: id => set(s=>({ kdsTickets:s.kdsTickets.filter(t=>t.id!==id) })),
+  bumpTicket: id => {
+    set(s => ({ kdsTickets: s.kdsTickets.filter(t => t.id !== id) }));
+    import('../lib/db.js').then(({ bumpKDSTicket }) => bumpKDSTicket(id));
+  },
 
   // ── Print job routing ─────────────────────────────────────────────────────
   // In production this would POST to the Sunmi NT311 ESC/POS bridge.
