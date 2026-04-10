@@ -728,6 +728,7 @@ export default function POSSurface() {
           onClose={() => setShowSendModal(false)}
           onComplete={(result) => {
             setShowSendModal(false);
+            setShowCheckout(false);
 
             if (result.type === 'counter') {
               // Named counter order — send to kitchen, appear in Orders Hub, clear POS
