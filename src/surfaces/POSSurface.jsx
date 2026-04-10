@@ -41,6 +41,7 @@ export default function POSSurface() {
     addItemDiscount, removeItemDiscount,
     deviceConfig,
     menuItems: storeMenuItems,
+    menuCategories,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
@@ -58,6 +59,7 @@ export default function POSSurface() {
   const visibleOrderTypes = ALL_ORDER_TYPES.filter(([t]) => allowedOrderTypes.includes(t));
 
   const [cat, setCat]             = useState('quick');
+  const [subCat, setSubCat]       = useState(null);
   const [modalItem, setModalItem] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [search, setSearch]       = useState('');
@@ -112,15 +114,37 @@ export default function POSSurface() {
     return [...fromQuick, ...pad];
   }, [MENU_ITEMS, eightySixIds, assignedSection]);
 
-  const catItems = cat==='quick'
-    ? quickItems
-    // Hide subitems (only in modifier groups) and variant children (only via parent picker)
-    : MENU_ITEMS.filter(i=>i.cat===cat && !i.archived && i.type!=='subitem' && !i.parentId);
-  const displayItems = useMemo(()=>{
+  // When the main category changes, reset the subcategory selection
+  useEffect(() => { setSubCat(null); }, [cat]);
+
+  // Find subcategories of the active category
+  const subCategories = useMemo(() =>
+    menuCategories.filter(c => c.parentId === cat).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0)),
+  [cat, menuCategories]);
+
+  const catItems = useMemo(() => {
+    if (cat === 'quick') return quickItems;
+    const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
+    if (subCat) {
+      // Specific subcategory selected
+      return base.filter(i => i.cat === subCat);
+    }
+    if (subCategories.length > 0) {
+      // Parent with subcategories — show items in parent + all subcategories
+      const subIds = subCategories.map(s => s.id);
+      return base.filter(i => i.cat === cat || subIds.includes(i.cat));
+    }
+    return base.filter(i => i.cat === cat);
+  }, [cat, subCat, subCategories, MENU_ITEMS, quickItems]);
+
+  const displayItems = useMemo(() => {
     if (!search.trim()) return catItems;
-    const q=search.toLowerCase();
-    return MENU_ITEMS.filter(i=>i.name.toLowerCase().includes(q)||i.description?.toLowerCase().includes(q) && i.type!=='subitem' && !i.parentId);
-  },[cat,search,catItems]);
+    const q = search.toLowerCase();
+    return MENU_ITEMS.filter(i =>
+      !i.archived && i.type !== 'subitem' && !i.parentId &&
+      ((i.menuName||i.name||'').toLowerCase().includes(q) || i.description?.toLowerCase().includes(q))
+    );
+  }, [cat, search, catItems, MENU_ITEMS]);
 
   const byCourse = useMemo(()=>{
     const g={};
@@ -141,31 +165,33 @@ export default function POSSurface() {
     openFlow(item);
   };
   const openFlow = (item) => {
-    // Subitems should never appear on POS grid — skip
     if (item.type === 'subitem') return;
 
-    // Linked-children variants: show picker with children as options
-    if (item.type === 'variants') {
-      const children = MENU_ITEMS.filter(i => i.parentId === item.id && !i.archived && !eightySixIds.includes(i.id));
-      if (children.length > 0) {
-        // Build a synthetic variants array from children for the ProductModal
-        const syntheticItem = {
+    // Variant parent: detected by type OR by having linked children
+    const variantChildren = MENU_ITEMS.filter(i => i.parentId === item.id && !i.archived && !eightySixIds.includes(i.id));
+    if (item.type === 'variants' || variantChildren.length > 0) {
+      if (variantChildren.length > 0) {
+        setModalItem({
           ...item,
-          variants: children.map(c => ({
+          type: 'variants',
+          variants: variantChildren.map(c => ({
             id: c.id,
             label: c.menuName || c.name,
             price: c.pricing?.base ?? c.price ?? 0,
-            _childItem: c, // preserve full child for adding
+            _childItem: c,
           })),
-        };
-        setModalItem(syntheticItem);
+        });
         return;
       }
-      // Fall through to modal if no children (old variants[] array style)
     }
 
-    if (item.type === 'simple' && !item.modifierGroups?.length && !item.assignedModifierGroups?.length && !item.assignedInstructionGroups?.length) {
-      addItem(item, [], null, { displayName: item.menuName || item.name, qty:1, linePrice: item.pricing?.base ?? item.price ?? 0 });
+    const needsModal = item.assignedModifierGroups?.length > 0
+      || item.assignedInstructionGroups?.length > 0
+      || item.modifierGroups?.length > 0
+      || ['modifiable','modifiers','pizza'].includes(item.type);
+
+    if (!needsModal) {
+      addItem(item, [], null, { displayName: item.menuName || item.name, qty: 1, linePrice: item.pricing?.base ?? item.price ?? 0 });
       showToast(`${item.menuName || item.name} added`, 'success');
       setLastAddedUid(item.id);
       setTimeout(() => setLastAddedUid(null), 300);
@@ -420,30 +446,33 @@ export default function POSSurface() {
           <div style={{fontSize:9,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'.12em',paddingLeft:2}}>Menu</div>
         </div>
         <div style={{flex:1,overflowY:'auto',padding:'6px 7px'}}>
-          {CATEGORIES.map(c=>{
-            const m=CAT_META[c.id]||{};
-            const isActive=cat===c.id&&!search;
-            const count=c.id==='quick'?quickItems.length:MENU_ITEMS.filter(i=>i.cat===c.id&&!i.archived).length;
-            const e86=MENU_ITEMS.filter(i=>i.cat===c.id&&eightySixIds.includes(i.id)).length;
-            return(
-              <button key={c.id} onClick={()=>{setCat(c.id);setSearch('');}} className="cat-btn" style={{
+          {/* Quick screen always first */}
+          {[{ id:'quick', label:'Quick', icon:'⚡', color:'var(--acc)' }].concat(
+            menuCategories.filter(c => !c.parentId && !c.isSpecial).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0))
+          ).map(c => {
+            const isActive = cat === c.id && !search;
+            const color = c.color || 'var(--acc)';
+            const subIds = menuCategories.filter(s => s.parentId === c.id).map(s => s.id);
+            const count = c.id === 'quick'
+              ? quickItems.length
+              : MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId && (i.cat === c.id || subIds.includes(i.cat))).length;
+            const hasSubcats = subIds.length > 0;
+            return (
+              <button key={c.id} onClick={() => { setCat(c.id); setSearch(''); }} className="cat-btn" style={{
                 marginBottom:3,
-                background:isActive?`${m.color}15`:'transparent',
-                borderColor:isActive?`${m.color}40`:'transparent',
+                background:isActive?`${color}15`:'transparent',
+                borderColor:isActive?`${color}40`:'transparent',
               }}>
-                {/* Left colour bar */}
-                <div style={{width:3,height:32,borderRadius:2,background:isActive?m.color:'var(--bg5)',flexShrink:0,transition:'all .14s'}}/>
+                <div style={{width:3,height:32,borderRadius:2,background:isActive?color:'var(--bg5)',flexShrink:0,transition:'all .14s'}}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:1}}>
-                    <span style={{fontSize:20,lineHeight:1,flexShrink:0}}>{m.icon||'•'}</span>
-                    <span style={{fontSize:12,fontWeight:700,color:isActive?m.color:'var(--t2)',letterSpacing:.01,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.label}</span>
+                    <span style={{fontSize:20,lineHeight:1,flexShrink:0}}>{c.icon||'•'}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:isActive?color:'var(--t2)',letterSpacing:.01,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.label}</span>
+                    {hasSubcats && <span style={{fontSize:8,color:'var(--t4)',flexShrink:0}}>▾</span>}
                   </div>
-                  <div style={{fontSize:9,color:'var(--t4)',paddingLeft:26,display:'flex',gap:6}}>
-                    <span>{count}</span>
-                    {e86>0&&<span style={{color:'var(--red)',fontWeight:700}}>{e86} 86'd</span>}
-                  </div>
+                  <div style={{fontSize:9,color:'var(--t4)',paddingLeft:26}}>{count} items</div>
                 </div>
-                {isActive&&<div style={{width:5,height:5,borderRadius:'50%',background:m.color,flexShrink:0,boxShadow:`0 0 6px ${m.color}`}}/>}
+                {isActive && <div style={{width:5,height:5,borderRadius:'50%',background:color,flexShrink:0,boxShadow:`0 0 6px ${color}`}}/>}
               </button>
             );
           })}
@@ -530,7 +559,38 @@ export default function POSSurface() {
                   <button onClick={()=>setSearch('')} style={{fontSize:11,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:600,padding:0}}>✕ Clear</button>
                 </div>
               )}
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
+            {/* Subcategory strip — shown when active category has subcategories */}
+            {!search && cat !== 'quick' && subCategories.length > 0 && (
+              <div style={{ display:'flex', gap:4, padding:'6px 0 10px', flexWrap:'wrap' }}>
+                <button
+                  onClick={() => setSubCat(null)}
+                  style={{
+                    padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
+                    fontSize:11, fontWeight:!subCat ? 800 : 500, border:'none',
+                    background:!subCat ? 'var(--acc)' : 'var(--bg3)',
+                    color:!subCat ? '#0b0c10' : 'var(--t3)',
+                  }}>
+                  All
+                </button>
+                {subCategories.map(sc => {
+                  const active = subCat === sc.id;
+                  const color = sc.color || 'var(--acc)';
+                  return (
+                    <button key={sc.id} onClick={() => setSubCat(sc.id)} style={{
+                      padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
+                      fontSize:11, fontWeight:active ? 800 : 500,
+                      border:`1.5px solid ${active ? color : 'var(--bdr)'}`,
+                      background:active ? `${color}20` : 'var(--bg3)',
+                      color:active ? color : 'var(--t3)',
+                    }}>
+                      {sc.icon && <span style={{ marginRight:4 }}>{sc.icon}</span>}
+                      {sc.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
                 {displayItems.map(item=>{
                   const m=CAT_META[item.cat]||CAT_META.quick;
                   const flagged=allergens.some(a=>item.allergens?.includes(a));

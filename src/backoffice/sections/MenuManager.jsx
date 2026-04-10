@@ -591,44 +591,65 @@ function ItemEditor({ item, onUpdate, onArchive, onClose, is86, onToggle86 }) {
 // TAB 3 — Modifier groups (paid options)
 // ═════════════════════════════════════════════════════════════════════════════
 function ModifiersTab() {
-  const { modifierGroupDefs: groups, addModifierGroupDef, updateModifierGroupDef, removeModifierGroupDef, markBOChange, showToast } = useStore();
+  const { modifierGroupDefs: groups, addModifierGroupDef, updateModifierGroupDef, removeModifierGroupDef, menuItems, markBOChange, showToast } = useStore();
   const [selId, setSelId] = useState(null);
   const [newName, setNewName] = useState('');
+  const [subSearch, setSubSearch] = useState('');
 
-  const sel = groups?.find(g=>g.id===selId);
+  // Only sub items can be options in modifier groups
+  const subitems = menuItems.filter(i => i.type === 'subitem' && !i.archived);
+  const filteredSubs = subSearch
+    ? subitems.filter(i => (i.menuName||i.name||'').toLowerCase().includes(subSearch.toLowerCase()))
+    : subitems;
+
+  const sel = groups?.find(g => g.id === selId);
 
   const addGroup = () => {
     if (!newName.trim()) return;
     addModifierGroupDef({ name:newName.trim(), min:0, max:1, options:[] });
     markBOChange();
     setNewName('');
-    setTimeout(()=>setSelId(useStore.getState().modifierGroupDefs.slice(-1)[0]?.id),30);
+    setTimeout(() => setSelId(useStore.getState().modifierGroupDefs.slice(-1)[0]?.id), 30);
   };
 
-  const updGroup = (patch) => { updateModifierGroupDef(selId,patch); markBOChange(); };
-  const addOpt   = () => updGroup({ options:[...(sel.options||[]),{id:`mgo-${Date.now()}`,name:'',price:0}] });
-  const delOpt   = (oid) => updGroup({ options:(sel.options||[]).filter(o=>o.id!==oid) });
-  const updOpt   = (oid,k,v) => updGroup({ options:(sel.options||[]).map(o=>o.id===oid?{...o,[k]:v}:o) });
+  const updGroup = (patch) => { updateModifierGroupDef(selId, patch); markBOChange(); };
+
+  // Add a sub item as an option (uses sub item id, name, price)
+  const addSubitemOpt = (subitem) => {
+    if ((sel.options||[]).find(o => o.id === subitem.id)) {
+      showToast('Already in this group', 'error'); return;
+    }
+    updGroup({ options: [...(sel.options||[]), {
+      id: subitem.id,
+      name: subitem.menuName || subitem.name,
+      price: subitem.pricing?.base ?? subitem.price ?? 0,
+    }]});
+  };
+
+  const delOpt = (oid) => updGroup({ options: (sel.options||[]).filter(o => o.id !== oid) });
+
+  const isRequired = sel?.min > 0;
+  const maxUnlimited = !sel?.max || sel.max >= 99;
 
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
-      {/* Group list */}
-      <div style={{ width:260, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', flexShrink:0, overflow:'hidden' }}>
+      {/* Left: group list */}
+      <div style={{ width:240, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', flexShrink:0, overflow:'hidden' }}>
         <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
           <div style={{ fontSize:13, fontWeight:800, color:'var(--t1)', marginBottom:4 }}>Modifier groups</div>
-          <div style={{ fontSize:11, color:'var(--t3)', marginBottom:10 }}>Groups of paid options (change price). Assign to items in the Builder.</div>
+          <div style={{ fontSize:11, color:'var(--t3)', marginBottom:8, lineHeight:1.4 }}>Paid options that change the price. Options must be sub items.</div>
           <div style={{ display:'flex', gap:6 }}>
             <input style={{ ...inp, flex:1, fontSize:12, padding:'6px 10px' }} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addGroup()} placeholder="New group name…"/>
             <button onClick={addGroup} disabled={!newName.trim()} style={{ padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700, opacity:newName.trim()?1:.4 }}>+</button>
           </div>
         </div>
         <div style={{ flex:1, overflowY:'auto', padding:'8px' }}>
-          {(groups||[]).map(g=>(
-            <button key={g.id} onClick={()=>setSelId(g.id===selId?null:g.id)} style={{ ...row(selId===g.id), marginBottom:4 }}>
+          {(groups||[]).map(g => (
+            <button key={g.id} onClick={() => setSelId(g.id === selId ? null : g.id)} style={{ ...row(selId===g.id), marginBottom:4 }}>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:12, fontWeight:700, color:selId===g.id?'var(--acc)':'var(--t1)' }}>{g.name}</div>
                 <div style={{ fontSize:10, color:'var(--t4)', marginTop:1 }}>
-                  {(g.options||[]).length} options · {g.min>0?`min ${g.min} · `:'optional · '}max {g.max}
+                  {(g.options||[]).length} options · {g.min>0 ? 'required' : 'optional'} · {g.max>=99?'unlimited':g.max} max
                 </div>
               </div>
               <button onClick={e=>{e.stopPropagation();if(confirm(`Remove "${g.name}"?`)){removeModifierGroupDef(g.id);if(selId===g.id)setSelId(null);markBOChange();}}} style={{ width:22, height:22, borderRadius:5, border:'1px solid var(--red-b)', background:'var(--red-d)', color:'var(--red)', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
@@ -638,35 +659,68 @@ function ModifiersTab() {
         </div>
       </div>
 
-      {/* Group editor */}
+      {/* Middle: group editor */}
       {sel ? (
-        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-            <input style={{ ...inp, fontSize:15, fontWeight:800, border:'none', background:'transparent', padding:'0 0 4px' }} value={sel.name} onChange={e=>updGroup({name:e.target.value})} placeholder="Group name"/>
-            <div style={{ display:'flex', gap:12, marginTop:8, flexWrap:'wrap' }}>
-              <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:12, color:'var(--t2)' }}>
-                <input type="checkbox" checked={sel.min>0} onChange={e=>updGroup({min:e.target.checked?1:0})} style={{ accentColor:'var(--acc)' }}/>
-                Required (customer must choose)
-              </label>
-              <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:12, color:'var(--t2)' }}>
-                Max selections:
-                <input type="number" min="1" max="20" style={{ ...inp, width:52, padding:'3px 8px', fontSize:12 }} value={sel.max||1} onChange={e=>updGroup({max:parseInt(e.target.value)||1})}/>
-              </label>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minWidth:0 }}>
+          {/* Group name + controls */}
+          <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+            <input style={{ ...inp, fontSize:15, fontWeight:800, border:'none', background:'transparent', padding:'0 0 8px' }} value={sel.name} onChange={e=>updGroup({name:e.target.value})} placeholder="Group name"/>
+
+            {/* Force / Unforce toggle */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+              <button onClick={() => updGroup({ min:0 })} style={{
+                padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                border:`2px solid ${!isRequired ? 'var(--grn)' : 'var(--bdr)'}`,
+                background:!isRequired ? 'var(--grn-d)' : 'var(--bg3)',
+              }}>
+                <div style={{ fontSize:12, fontWeight:700, color:!isRequired?'var(--grn)':'var(--t2)' }}>Optional</div>
+                <div style={{ fontSize:10, color:'var(--t4)' }}>Customer can skip this group</div>
+              </button>
+              <button onClick={() => updGroup({ min:1 })} style={{
+                padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                border:`2px solid ${isRequired ? 'var(--acc)' : 'var(--bdr)'}`,
+                background:isRequired ? 'var(--acc-d)' : 'var(--bg3)',
+              }}>
+                <div style={{ fontSize:12, fontWeight:700, color:isRequired?'var(--acc)':'var(--t2)' }}>Required</div>
+                <div style={{ fontSize:10, color:'var(--t4)' }}>Must pick at least one</div>
+              </button>
+            </div>
+
+            {/* Max selections */}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:12, color:'var(--t2)', fontWeight:600 }}>Max selections:</span>
+              <button onClick={() => updGroup({ max:1 })} style={{ padding:'4px 10px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:sel.max===1?800:500, border:`1px solid ${sel.max===1?'var(--acc)':'var(--bdr)'}`, background:sel.max===1?'var(--acc-d)':'var(--bg3)', color:sel.max===1?'var(--acc)':'var(--t3)' }}>1 (pick one)</button>
+              <button onClick={() => updGroup({ max:99 })} style={{ padding:'4px 10px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:maxUnlimited&&sel.max!==1?800:500, border:`1px solid ${maxUnlimited&&sel.max!==1?'var(--acc)':'var(--bdr)'}`, background:maxUnlimited&&sel.max!==1?'var(--acc-d)':'var(--bg3)', color:maxUnlimited&&sel.max!==1?'var(--acc)':'var(--t3)' }}>Unlimited</button>
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <span style={{ fontSize:11, color:'var(--t4)' }}>Custom:</span>
+                <input type="number" min="1" max="20" style={{ ...inp, width:52, padding:'4px 8px', fontSize:12 }} value={!maxUnlimited&&sel.max!==1?sel.max:''} placeholder="N" onChange={e => updGroup({ max:parseInt(e.target.value)||1 })}/>
+              </div>
             </div>
           </div>
-          <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
-            <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:10 }}>Options (these change the price)</div>
-            {(sel.options||[]).map(opt=>(
-              <div key={opt.id} style={{ display:'grid', gridTemplateColumns:'1fr 100px auto', gap:8, marginBottom:8, alignItems:'center' }}>
-                <input style={inp} value={opt.name} onChange={e=>updOpt(opt.id,'name',e.target.value)} placeholder="Option name"/>
-                <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)' }}>£</span>
-                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:18 }} value={opt.price||0} onChange={e=>updOpt(opt.id,'price',parseFloat(e.target.value)||0)} placeholder="0.00"/>
-                </div>
-                <button onClick={()=>delOpt(opt.id)} style={{ width:30, height:36, borderRadius:7, border:'1px solid var(--red-b)', background:'var(--red-d)', color:'var(--red)', cursor:'pointer', fontSize:14 }}>×</button>
+
+          {/* Options list */}
+          <div style={{ flex:1, overflowY:'auto', padding:'12px 14px' }}>
+            <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 }}>Options in this group</div>
+            {(sel.options||[]).length === 0 ? (
+              <div style={{ padding:'12px', background:'var(--bg3)', borderRadius:9, fontSize:11, color:'var(--t4)', marginBottom:12 }}>
+                No options yet — add sub items from the right panel
               </div>
-            ))}
-            <button onClick={addOpt} style={{ padding:'7px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600 }}>+ Add option</button>
+            ) : (
+              (sel.options||[]).map(opt => {
+                const sub = menuItems.find(i => i.id === opt.id);
+                return (
+                  <div key={opt.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 11px', marginBottom:6, borderRadius:9, background:'var(--bg3)', border:'1px solid var(--bdr)' }}>
+                    <span style={{ fontSize:9, padding:'1px 5px', borderRadius:4, background:'var(--bg1)', border:'1px solid var(--bdr)', color:'var(--t4)', fontWeight:700 }}>⬡</span>
+                    <span style={{ flex:1, fontSize:13, color:'var(--t1)', fontWeight:600 }}>{opt.name}</span>
+                    <span style={{ fontSize:13, fontFamily:'var(--font-mono)', color: opt.price > 0 ? 'var(--acc)' : 'var(--t4)' }}>
+                      {opt.price > 0 ? `+£${opt.price.toFixed(2)}` : 'free'}
+                    </span>
+                    {!sub && <span style={{ fontSize:9, color:'var(--red)', padding:'1px 5px', borderRadius:4, background:'var(--red-d)' }}>missing</span>}
+                    <button onClick={() => delOpt(opt.id)} style={{ width:24, height:24, borderRadius:5, border:'1px solid var(--red-b)', background:'var(--red-d)', color:'var(--red)', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       ) : (
@@ -675,6 +729,47 @@ function ModifiersTab() {
             <div style={{ fontSize:32, opacity:.2, marginBottom:8 }}>⊕</div>
             <div style={{ fontSize:12, fontWeight:600, color:'var(--t2)' }}>Select a modifier group to edit</div>
           </div>
+        </div>
+      )}
+
+      {/* Right: sub item picker */}
+      {sel && (
+        <div style={{ width:220, borderLeft:'1px solid var(--bdr)', display:'flex', flexDirection:'column', flexShrink:0, overflow:'hidden', background:'var(--bg2)' }}>
+          <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--t2)', marginBottom:6 }}>Add sub items</div>
+            <input style={{ ...inp, fontSize:12, padding:'5px 10px' }} value={subSearch} onChange={e=>setSubSearch(e.target.value)} placeholder="Search sub items…"/>
+          </div>
+          <div style={{ flex:1, overflowY:'auto', padding:'6px 8px' }}>
+            {filteredSubs.length === 0 ? (
+              <div style={{ padding:'16px 8px', textAlign:'center', fontSize:11, color:'var(--t4)', lineHeight:1.5 }}>
+                No sub items yet.{'\n'}Create sub items in the Items tab first.
+              </div>
+            ) : filteredSubs.map(sub => {
+              const alreadyAdded = (sel.options||[]).some(o => o.id === sub.id);
+              const price = sub.pricing?.base ?? sub.price ?? 0;
+              return (
+                <button key={sub.id} onClick={() => !alreadyAdded && addSubitemOpt(sub)} style={{
+                  width:'100%', textAlign:'left', padding:'7px 10px', borderRadius:8, marginBottom:4,
+                  cursor: alreadyAdded ? 'default' : 'pointer', fontFamily:'inherit',
+                  border:`1px solid ${alreadyAdded?'var(--grn-b)':'var(--bdr)'}`,
+                  background:alreadyAdded?'var(--grn-d)':'var(--bg3)',
+                  opacity: alreadyAdded ? .7 : 1,
+                }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ flex:1, fontSize:12, fontWeight:600, color:alreadyAdded?'var(--grn)':'var(--t1)' }}>{sub.menuName||sub.name}</span>
+                    <span style={{ fontSize:11, color:alreadyAdded?'var(--grn)':price>0?'var(--acc)':'var(--t4)', fontFamily:'var(--font-mono)' }}>
+                      {alreadyAdded ? '✓' : price > 0 ? `+£${price.toFixed(2)}` : 'free'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {subitems.length === 0 && (
+            <div style={{ padding:'8px 10px', borderTop:'1px solid var(--bdr)', fontSize:10, color:'var(--acc)', background:'var(--acc-d)', lineHeight:1.4 }}>
+              💡 Go to Items tab → toggle Sub items → create items first
+            </div>
+          )}
         </div>
       )}
     </div>

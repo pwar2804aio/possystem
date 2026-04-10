@@ -42,26 +42,15 @@ export const PRINTERS = [
 ];
 
 // ─── Categories ───────────────────────────────────────────────────────────────
+// ─── Categories (built in Menu Manager — Categories tab) ─────────────────────
+// parentId links subcategories to their parent
 export const CATEGORIES = [
-  { id:'quick',     label:'Quick screen', isSpecial:true },
-  { id:'starters',  label:'Starters'   },
-  { id:'mains',     label:'Mains'      },
-  { id:'pizza',     label:'Pizza'      },
-  { id:'sides',     label:'Sides'      },
-  { id:'desserts',  label:'Desserts'   },
-  { id:'drinks',    label:'Drinks'     },
-  { id:'cocktails', label:'Cocktails'  },
+  { id:'quick', label:'Quick screen', isSpecial:true },
 ];
 
+// CAT_META kept for POS colour/icon — store-based categories use their own color/icon
 export const CAT_META = {
-  quick:    { icon:'⚡', color:'#e8a020' },
-  starters: { icon:'🥗', color:'#22c55e' },
-  mains:    { icon:'🍽', color:'#3b82f6' },
-  pizza:    { icon:'🍕', color:'#f07020' },
-  sides:    { icon:'🍟', color:'#a855f7' },
-  desserts: { icon:'🍮', color:'#e84066' },
-  drinks:   { icon:'🍷', color:'#e84040' },
-  cocktails:{ icon:'🍸', color:'#22d3ee' },
+  quick: { icon:'⚡', color:'#e8a020' },
 };
 
 // ─── Pizza config ─────────────────────────────────────────────────────────────
@@ -74,16 +63,12 @@ export const PIZZA_TOPPINGS = [
   { id:'onion',   name:'Red onion',    color:'#9333ea', price:1.5, allergens:[]       },
   { id:'jalapeno',name:'Jalapeño',     color:'#16a34a', price:1.5, allergens:[]       },
   { id:'anchovy', name:'Anchovy',      color:'#92400e', price:1.5, allergens:['fish'] },
-  { id:'basil',   name:'Fresh basil',  color:'#15803d', price:1.0, allergens:[]       },
   { id:'chicken', name:'BBQ chicken',  color:'#d97706', price:2.0, allergens:[]       },
-  { id:'nduja',   name:"N'duja",       color:'#b91c1c', price:2.5, allergens:[]       },
-  { id:'truffle', name:'Truffle oil',  color:'#44403c', price:3.0, allergens:[]       },
 ];
-export const PIZZA_BASES = [
-  { id:'tomato', name:'Tomato',  allergens:[]              },
-  { id:'white',  name:'White',   allergens:['milk']        },
-  { id:'pesto',  name:'Pesto',   allergens:['nuts','milk'] },
-  { id:'bbq',    name:'BBQ',     allergens:[]              },
+export const PIZZA_BASES  = [
+  { id:'tomato', name:'Tomato', allergens:[] },
+  { id:'white',  name:'White',  allergens:['milk'] },
+  { id:'pesto',  name:'Pesto',  allergens:['nuts','milk'] },
 ];
 export const PIZZA_CRUSTS = [
   { id:'thin',    name:'Classic thin',  extra:0   },
@@ -91,245 +76,212 @@ export const PIZZA_CRUSTS = [
   { id:'stuffed', name:'Stuffed crust', extra:2.0 },
   { id:'gf',      name:'Gluten-free',   extra:2.5 },
 ];
-export const PIZZA_SIZES = [
-  { id:'personal', name:'Personal 9"',  basePrice:10 },
-  { id:'large',    name:'Large 12"',    basePrice:14 },
-  { id:'xl',       name:'XL 14"',       basePrice:18 },
+export const PIZZA_SIZES  = [
+  { id:'personal', name:'Personal 9\"',  basePrice:10 },
+  { id:'large',    name:'Large 12\"',    basePrice:14 },
+  { id:'xl',       name:'XL 14\"',       basePrice:18 },
 ];
 
-// ─── Product types ────────────────────────────────────────────────────────────
-// type: 'simple' | 'variants' | 'modifiers' | 'pizza'
-//
-// variants: array of { id, label, price }   — user must pick exactly one
-// modifierGroups: array of {
-//   id, label, required, multi (bool),
-//   options: [{ id, label, price }]
-// }
+// ─── The Anchor — complete menu ───────────────────────────────────────────────
+// Built to demonstrate every Menu Manager feature:
+//   Categories with subcategories (parentId)
+//   Sub items (used only in modifier groups)
+//   Variants (parent item + children via parentId)
+//   Modifier groups (assigned via assignedModifierGroups)
+//   Instruction groups (assigned via assignedInstructionGroups)
 
 export const MENU_ITEMS = [
 
-  // ── Starters ────────────────────────────────────────────────────────────────
-  { id:'m1',  name:'Bruschetta',        cat:'starters', price:8.00,  allergens:['gluten','milk'],        centreId:'pc2', sales:312, type:'simple',
-    description:'Toasted sourdough, heritage tomatoes, basil oil' },
+  // ── SUB ITEMS — used in modifier groups only, never shown on POS ──────────
+  // Sides
+  { id:'sub-chips',    name:'Chips',              menuName:'Chips',              type:'subitem', cat:'', allergens:[], pricing:{base:0},   visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-salad',    name:'Side salad',         menuName:'Side salad',         type:'subitem', cat:'', allergens:[], pricing:{base:0},   visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-spfries',  name:'Sweet potato fries', menuName:'Sweet potato fries', type:'subitem', cat:'', allergens:[], pricing:{base:1.5}, visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-mash',     name:'Creamy mash',        menuName:'Creamy mash',        type:'subitem', cat:'', allergens:['milk'], pricing:{base:0}, visibility:{pos:false,kiosk:false,online:false} },
 
-  { id:'m2',  name:'Burrata',           cat:'starters', price:12.00, allergens:['milk'],                 centreId:'pc2', sales:287, type:'simple',
-    description:'Fresh burrata, heirloom tomatoes, aged balsamic' },
+  // Sauces
+  { id:'sub-pepper',   name:'Peppercorn sauce', menuName:'Peppercorn sauce', type:'subitem', cat:'', allergens:['milk'], pricing:{base:0}, visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-bearn',    name:'Béarnaise',        menuName:'Béarnaise',        type:'subitem', cat:'', allergens:['eggs','milk'], pricing:{base:0}, visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-chimich',  name:'Chimichurri',      menuName:'Chimichurri',      type:'subitem', cat:'', allergens:[], pricing:{base:0}, visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-nosace',   name:'No sauce',         menuName:'No sauce',         type:'subitem', cat:'', allergens:[], pricing:{base:0}, visibility:{pos:false,kiosk:false,online:false} },
 
-  { id:'m3',  name:'Prawn cocktail',    cat:'starters', price:11.00, allergens:['crustaceans','eggs','milk'], centreId:'pc2', sales:198, type:'simple',
-    description:'Tiger prawns, Marie Rose sauce, gem lettuce' },
+  // Pizza extras
+  { id:'sub-extra-ch', name:'Extra cheese',   menuName:'Extra cheese',   type:'subitem', cat:'', allergens:['milk'], pricing:{base:1.5}, visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-extra-pep',name:'Extra pepperoni',menuName:'Extra pepperoni',type:'subitem', cat:'', allergens:['gluten'], pricing:{base:1.5}, visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-truffle',  name:'Truffle oil',    menuName:'Truffle oil',    type:'subitem', cat:'', allergens:[], pricing:{base:3.0}, visibility:{pos:false,kiosk:false,online:false} },
 
-  { id:'m4',  name:'Soup of the day',   cat:'starters', price:7.50,  allergens:['gluten','milk','celery'], centreId:'pc1', sales:145, type:'modifiers',
-    description:'Ask your server for today\'s soup',
-    modifierGroups:[
-      { id:'bread', label:'Bread', required:false, multi:false,
-        options:[{ id:'yw', label:'With bread', price:0 },{ id:'nb', label:'No bread', price:0 }] },
-    ]},
+  // Coffee milks
+  { id:'sub-whole',    name:'Whole milk',   menuName:'Whole milk',   type:'subitem', cat:'', allergens:['milk'], pricing:{base:0},   visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-oat',      name:'Oat milk',     menuName:'Oat milk',     type:'subitem', cat:'', allergens:[], pricing:{base:0.5}, visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-almond',   name:'Almond milk',  menuName:'Almond milk',  type:'subitem', cat:'', allergens:['nuts'], pricing:{base:0.5}, visibility:{pos:false,kiosk:false,online:false} },
+  { id:'sub-soy',      name:'Soy milk',     menuName:'Soy milk',     type:'subitem', cat:'', allergens:['soy'], pricing:{base:0.5}, visibility:{pos:false,kiosk:false,online:false} },
 
-  { id:'m5',  name:'Charcuterie board', cat:'starters', price:16.00, allergens:['gluten','milk','mustard'], centreId:'pc2', sales:220, type:'modifiers',
-    description:'Cured meats, cornichons, mustard, sourdough',
-    modifierGroups:[
-      { id:'sz', label:'Size', required:true, multi:false,
-        options:[{ id:'sm', label:'Small (2 people)', price:0 },{ id:'lg', label:'Large (4 people)', price:8 }] },
-    ]},
+  // ── STARTERS ──────────────────────────────────────────────────────────────
+  { id:'m-soup',     name:'Soup of the day',       menuName:'Soup of the day',       receiptName:'Soup',         kitchenName:'SOUP',
+    type:'simple', cat:'cat-starters', allergens:['gluten','milk','celery'],
+    description:'Freshly made daily soup with crusty bread and butter',
+    pricing:{base:6.5,dineIn:null,takeaway:6.5,collection:6.5,delivery:6.5},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  // ── Mains ────────────────────────────────────────────────────────────────────
-  { id:'m6',  name:'Carbonara pasta',   cat:'mains', price:14.50, allergens:['gluten','eggs','milk'], centreId:'pc1', sales:445, type:'modifiers',
-    description:'Spaghetti, pancetta, Pecorino Romano, egg yolk',
-    modifierGroups:[
-      { id:'size', label:'Portion', required:false, multi:false,
-        options:[{ id:'reg', label:'Regular', price:0 },{ id:'lg', label:'Large', price:3 }] },
-      { id:'extra', label:'Add-ons', required:false, multi:true,
-        options:[{ id:'truffle', label:'Truffle oil', price:3.5 },{ id:'xbacon', label:'Extra pancetta', price:2.5 }] },
-    ]},
+  { id:'m-garlic',   name:'Garlic bread',          menuName:'Garlic bread',          receiptName:'Garlic bread', kitchenName:'GARLIC BREAD',
+    type:'simple', cat:'cat-starters', allergens:['gluten','milk'],
+    description:'Toasted sourdough with garlic butter',
+    pricing:{base:5.0,dineIn:null,takeaway:5.0,collection:5.0,delivery:5.0},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m7',  name:'Ribeye steak 8oz',  cat:'mains', price:32.00, allergens:[], may_contain:['milk'], centreId:'pc1', sales:398, type:'modifiers',
-    description:'Dry-aged ribeye, triple-cooked chips, watercress',
-    modifierGroups:[
-      { id:'cook',  label:'Cooking',       required:true,  multi:false,
-        options:[{ id:'rare', label:'Rare' },{ id:'mr', label:'Medium rare' },{ id:'med', label:'Medium' },{ id:'mw', label:'Medium well' },{ id:'wd', label:'Well done' }] },
-      { id:'sauce', label:'Sauce',         required:true,  multi:false,
-        options:[{ id:'pep', label:'Peppercorn' },{ id:'bear', label:'Béarnaise' },{ id:'chim', label:'Chimichurri' },{ id:'no', label:'No sauce' }] },
-      { id:'side',  label:'Swap side',     required:false, multi:false,
-        options:[{ id:'chips', label:'Chips (included)', price:0 },{ id:'salad', label:'Side salad', price:0 },{ id:'mac', label:'Mac & cheese', price:3 }] },
-    ]},
+  { id:'m-squid',    name:'Salt & pepper calamari', menuName:'Calamari',            receiptName:'Calamari',     kitchenName:'CALAMARI',
+    type:'simple', cat:'cat-starters', allergens:['gluten','molluscs'],
+    description:'Lightly dusted calamari, sriracha mayo, lemon',
+    pricing:{base:9.0,dineIn:null,takeaway:9.0,collection:9.0,delivery:9.0},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m8',  name:'Sea bass fillet',   cat:'mains', price:26.00, allergens:['fish'], centreId:'pc1', sales:267, type:'modifiers',
-    description:'Pan-fried sea bass, samphire, lemon butter, new potatoes',
-    modifierGroups:[
-      { id:'sauce', label:'Sauce', required:true, multi:false,
-        options:[{ id:'lb', label:'Lemon butter' },{ id:'none', label:'No sauce' }] },
-    ]},
+  { id:'m-pate',     name:'Chicken liver pâté',    menuName:'Chicken pâté',         receiptName:'Pâté',         kitchenName:'PATE',
+    type:'simple', cat:'cat-starters', allergens:['gluten','milk','eggs'],
+    description:'Smooth chicken liver pâté, sourdough toast, red onion jam',
+    pricing:{base:9.5,dineIn:null,takeaway:9.5,collection:9.5,delivery:9.5},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m9',  name:'Wild mushroom risotto', cat:'mains', price:18.00, allergens:['milk'], centreId:'pc1', sales:234, type:'modifiers',
-    description:'Arborio rice, wild mushrooms, truffle oil, Parmesan',
-    modifierGroups:[
-      { id:'xtra', label:'Add-ons', required:false, multi:true,
-        options:[{ id:'chicken', label:'Add chicken', price:4.5 },{ id:'xtruf', label:'Extra truffle', price:3 }] },
-    ]},
+  // ── GRILLS (subcategory of Mains) ─────────────────────────────────────────
+  { id:'m-rib8',     name:'8oz Ribeye steak',      menuName:'8oz Ribeye',           receiptName:'8oz Ribeye',   kitchenName:'RIBEYE 8OZ',
+    type:'modifiable', cat:'cat-grills', allergens:['milk'],
+    description:'28-day aged ribeye, triple-cooked chips, watercress',
+    pricing:{base:28.0,dineIn:null,takeaway:28.0,collection:28.0,delivery:28.0},
+    assignedModifierGroups:[{groupId:'mgd-sides',min:1,max:1},{groupId:'mgd-sauces',min:0,max:1}],
+    assignedInstructionGroups:['igd-cook-temp'] },
 
-  { id:'m10', name:'Chicken supreme',   cat:'mains', price:22.00, allergens:['milk'], centreId:'pc1', sales:312, type:'simple',
-    description:'Free-range chicken, dauphinoise, tenderstem broccoli, jus' },
+  { id:'m-sir6',     name:'6oz Sirloin steak',     menuName:'6oz Sirloin',          receiptName:'6oz Sirloin',  kitchenName:'SIRLOIN 6OZ',
+    type:'modifiable', cat:'cat-grills', allergens:['milk'],
+    description:'6oz sirloin, triple-cooked chips, watercress',
+    pricing:{base:22.0,dineIn:null,takeaway:22.0,collection:22.0,delivery:22.0},
+    assignedModifierGroups:[{groupId:'mgd-sides',min:1,max:1},{groupId:'mgd-sauces',min:0,max:1}],
+    assignedInstructionGroups:['igd-cook-temp'] },
 
-  // ── Pizza ────────────────────────────────────────────────────────────────────
-  { id:'m11', name:'Margherita',        cat:'pizza', price:14.00, allergens:['gluten','milk'], centreId:'pc3', sales:523, type:'pizza',
-    description:'San Marzano tomato, fior di latte, fresh basil', defaultToppings:['cheese'] },
+  { id:'m-chicken',  name:'Chicken supreme',        menuName:'Chicken supreme',      receiptName:'Chicken',      kitchenName:'CHICKEN',
+    type:'modifiable', cat:'cat-grills', allergens:['milk'],
+    description:'Free-range chicken breast, dauphinoise potatoes, seasonal veg',
+    pricing:{base:18.0,dineIn:null,takeaway:18.0,collection:18.0,delivery:18.0},
+    assignedModifierGroups:[{groupId:'mgd-sides',min:1,max:1}],
+    assignedInstructionGroups:[] },
 
-  { id:'m12', name:'Pepperoni',         cat:'pizza', price:15.50, allergens:['gluten','milk'], centreId:'pc3', sales:478, type:'pizza',
-    description:'Spicy pepperoni, mozzarella, tomato base', defaultToppings:['pep','cheese'] },
+  // ── FISH (subcategory of Mains) ───────────────────────────────────────────
+  { id:'m-fishchips', name:'Beer battered fish & chips', menuName:'Fish & chips',   receiptName:'Fish & chips', kitchenName:'FISH & CHIPS',
+    type:'simple', cat:'cat-fish', allergens:['gluten','fish','eggs'],
+    description:'MSC certified cod in our craft ale batter, chips, mushy peas, tartare sauce',
+    pricing:{base:16.0,dineIn:null,takeaway:16.0,collection:16.0,delivery:16.0},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m13', name:"Truffle & mushroom",cat:'pizza', price:17.00, allergens:['gluten','milk'], centreId:'pc3', sales:187, type:'pizza',
-    description:'White base, wild mushrooms, truffle oil, Parmesan', defaultToppings:['mush','truffle','cheese'] },
+  { id:'m-salmon',   name:'Grilled salmon',          menuName:'Grilled salmon',      receiptName:'Salmon',       kitchenName:'SALMON',
+    type:'simple', cat:'cat-fish', allergens:['fish','milk'],
+    description:'Atlantic salmon fillet, crushed new potatoes, tenderstem, lemon butter',
+    pricing:{base:19.0,dineIn:null,takeaway:19.0,collection:19.0,delivery:19.0},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m14', name:"N'duja & honey",    cat:'pizza', price:17.50, allergens:['gluten','milk'], centreId:'pc3', sales:156, type:'pizza',
-    description:"Spicy n'duja, mozzarella, drizzled honey", defaultToppings:['nduja','cheese'] },
+  // ── VEGETARIAN (subcategory of Mains) ─────────────────────────────────────
+  { id:'m-risotto',  name:'Wild mushroom risotto',   menuName:'Mushroom risotto',    receiptName:'Risotto',      kitchenName:'RISOTTO',
+    type:'simple', cat:'cat-veggie', allergens:['milk'],
+    description:'Porcini and chestnut mushroom risotto, truffle oil, parmesan',
+    pricing:{base:15.0,dineIn:null,takeaway:15.0,collection:15.0,delivery:15.0},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m15', name:'Build your own',    cat:'pizza', price:12.00, allergens:['gluten','milk'], centreId:'pc3', sales:340, type:'pizza',
-    description:'Choose size, base, crust & toppings', defaultToppings:[], isCustom:true },
+  { id:'m-vegburg',  name:'Smashed veggie burger',   menuName:'Veggie burger',       receiptName:'Veggie burger',kitchenName:'VEG BURGER',
+    type:'modifiable', cat:'cat-veggie', allergens:['gluten','eggs','milk'],
+    description:'Beetroot & black bean patty, brioche bun, skinny fries, slaw',
+    pricing:{base:14.0,dineIn:null,takeaway:14.0,collection:14.0,delivery:14.0},
+    assignedModifierGroups:[{groupId:'mgd-sides',min:0,max:1}],
+    assignedInstructionGroups:[] },
 
-  // ── Sides ────────────────────────────────────────────────────────────────────
-  { id:'m16', name:'Triple-cooked chips', cat:'sides', price:4.50, allergens:['gluten'],           centreId:'pc1', sales:612, type:'simple' },
-  { id:'m17', name:'Side salad',          cat:'sides', price:4.00, allergens:[],                   centreId:'pc2', sales:189, type:'simple' },
-  { id:'m18', name:'Garlic bread',        cat:'sides', price:4.50, allergens:['gluten','milk'],    centreId:'pc1', sales:287, type:'simple' },
-  { id:'m19', name:'Tenderstem broccoli', cat:'sides', price:4.50, allergens:[],                   centreId:'pc1', sales:167, type:'simple' },
-  { id:'m20', name:'Onion rings',         cat:'sides', price:4.50, allergens:['gluten','milk','eggs'], centreId:'pc1', sales:198, type:'simple' },
-  { id:'m20b',name:'Mac & cheese',        cat:'sides', price:6.50, allergens:['gluten','milk','eggs'], centreId:'pc1', sales:145, type:'simple' },
+  // ── PIZZA ─────────────────────────────────────────────────────────────────
+  { id:'m-marg',     name:'Margherita',              menuName:'Margherita',          receiptName:'Margherita',   kitchenName:'MARG',
+    type:'modifiable', cat:'cat-pizza', allergens:['gluten','milk'],
+    description:'San Marzano tomato, fior di latte, fresh basil',
+    pricing:{base:13.0,dineIn:null,takeaway:13.0,collection:13.0,delivery:13.0},
+    assignedModifierGroups:[{groupId:'mgd-pizza-extras',min:0,max:5}],
+    assignedInstructionGroups:[] },
 
-  // ── Desserts ─────────────────────────────────────────────────────────────────
-  { id:'m21', name:'Tiramisu',           cat:'desserts', price:7.50, allergens:['gluten','eggs','milk'],  centreId:'pc2', sales:334, type:'simple',
-    description:'Espresso-soaked Savoiardi, Mascarpone cream' },
+  { id:'m-pep',      name:'Pepperoni',               menuName:'Pepperoni',           receiptName:'Pepperoni',    kitchenName:'PEPPERONI',
+    type:'modifiable', cat:'cat-pizza', allergens:['gluten','milk'],
+    description:'San Marzano tomato, fior di latte, spicy pepperoni',
+    pricing:{base:15.0,dineIn:null,takeaway:15.0,collection:15.0,delivery:15.0},
+    assignedModifierGroups:[{groupId:'mgd-pizza-extras',min:0,max:5}],
+    assignedInstructionGroups:[] },
 
-  { id:'m22', name:'Panna cotta',        cat:'desserts', price:6.50, allergens:['milk'],                  centreId:'pc2', sales:212, type:'modifiers',
-    description:'Vanilla panna cotta, raspberry coulis',
-    modifierGroups:[
-      { id:'cmp', label:'Compote', required:false, multi:false,
-        options:[{ id:'rasp', label:'Raspberry (default)', price:0 },{ id:'mango', label:'Mango', price:0 },{ id:'none', label:'Plain', price:0 }] },
-    ]},
+  { id:'m-bbqchick', name:'BBQ chicken',             menuName:'BBQ chicken pizza',   receiptName:'BBQ Chicken',  kitchenName:'BBQ CHICK',
+    type:'modifiable', cat:'cat-pizza', allergens:['gluten','milk'],
+    description:'BBQ base, mozzarella, pulled chicken, red onion, coriander',
+    pricing:{base:15.0,dineIn:null,takeaway:15.0,collection:15.0,delivery:15.0},
+    assignedModifierGroups:[{groupId:'mgd-pizza-extras',min:0,max:5}],
+    assignedInstructionGroups:[] },
 
-  { id:'m23', name:'Affogato',           cat:'desserts', price:5.50, allergens:['milk'],                  centreId:'pc2', sales:167, type:'modifiers',
-    description:'Vanilla ice cream, fresh espresso',
-    modifierGroups:[
-      { id:'shot', label:'Liqueur', required:false, multi:false,
-        options:[{ id:'none', label:'No liqueur', price:0 },{ id:'amar', label:'Amaretto', price:2.5 },{ id:'kalh', label:'Kahlúa', price:2.5 }] },
-    ]},
+  // ── DESSERTS ──────────────────────────────────────────────────────────────
+  { id:'m-stp',      name:'Sticky toffee pudding',   menuName:'Sticky toffee',       receiptName:'STP',          kitchenName:'STP',
+    type:'simple', cat:'cat-desserts', allergens:['gluten','milk','eggs'],
+    description:'Warm sticky toffee pudding, toffee sauce, clotted cream ice cream',
+    pricing:{base:7.5,dineIn:null,takeaway:null,collection:null,delivery:null},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m24', name:'Chocolate fondant', cat:'desserts', price:8.00, allergens:['gluten','eggs','milk'],    centreId:'pc2', sales:287, type:'modifiers',
-    description:'Warm chocolate fondant, vanilla ice cream',
-    modifierGroups:[
-      { id:'ice', label:'Ice cream', required:false, multi:false,
-        options:[{ id:'van', label:'Vanilla (included)', price:0 },{ id:'salted', label:'Salted caramel', price:0 },{ id:'none', label:'No ice cream', price:0 }] },
-    ]},
+  { id:'m-cheese',   name:'Cheesecake',              menuName:'Cheesecake',          receiptName:'Cheesecake',   kitchenName:'CHEESECAKE',
+    type:'simple', cat:'cat-desserts', allergens:['gluten','milk','eggs'],
+    description:'New York style baked cheesecake, seasonal berry coulis',
+    pricing:{base:7.0,dineIn:null,takeaway:null,collection:null,delivery:null},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  // ── Drinks ───────────────────────────────────────────────────────────────────
-  { id:'m25', name:'Still water',       cat:'drinks', price:3.00, allergens:[], centreId:'pc4', sales:834, type:'variants',
-    variants:[
-      { id:'500ml', label:'500ml bottle', price:3.00   },
-      { id:'750ml', label:'750ml bottle', price:4.50   },
-      { id:'jug',   label:'Jug (1 litre)', price:5.00  },
-    ]},
+  { id:'m-icecream', name:'Ice cream',               menuName:'Ice cream (3 scoops)', receiptName:'Ice cream',   kitchenName:'ICE CREAM',
+    type:'simple', cat:'cat-desserts', allergens:['milk','eggs'],
+    description:"Ask your server for today's flavours",
+    pricing:{base:5.5,dineIn:null,takeaway:null,collection:null,delivery:null},
+    assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m26', name:'Sparkling water',   cat:'drinks', price:3.50, allergens:[], centreId:'pc4', sales:712, type:'variants',
-    variants:[
-      { id:'330ml', label:'330ml bottle', price:3.50   },
-      { id:'750ml', label:'750ml bottle', price:5.00   },
-    ]},
+  // ── DRAUGHT BEER (subcategory of Drinks) ──────────────────────────────────
+  // Lager — variant parent, children: pint & half pint
+  { id:'m-lager',    name:'Lager',    menuName:'Lager',    type:'variants', cat:'cat-draught', allergens:['gluten'], pricing:{base:0},   assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-lager-pt', name:'Lager — Pint',      menuName:'Pint',      parentId:'m-lager', type:'simple', cat:'cat-draught', allergens:['gluten'], pricing:{base:5.8},  assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-lager-hp', name:'Lager — Half pint', menuName:'Half pint', parentId:'m-lager', type:'simple', cat:'cat-draught', allergens:['gluten'], pricing:{base:3.2},  assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m27', name:'Peroni',            cat:'drinks', price:5.50, allergens:['gluten'], centreId:'pc4', sales:456, type:'variants',
-    variants:[
-      { id:'btl', label:'330ml bottle', price:5.50    },
-      { id:'pt',  label:'Pint',         price:6.50    },
-    ]},
+  // Stout — variant parent
+  { id:'m-stout',    name:'Stout',    menuName:'Stout',    type:'variants', cat:'cat-draught', allergens:['gluten'], pricing:{base:0},   assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-stout-pt', name:'Stout — Pint',      menuName:'Pint',      parentId:'m-stout', type:'simple', cat:'cat-draught', allergens:['gluten'], pricing:{base:6.2},  assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-stout-hp', name:'Stout — Half pint', menuName:'Half pint', parentId:'m-stout', type:'simple', cat:'cat-draught', allergens:['gluten'], pricing:{base:3.4},  assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m28', name:'House red wine',    cat:'drinks', price:7.50, allergens:['sulphites'], centreId:'pc4', sales:398, type:'variants',
-    description:'Montepulciano d\'Abruzzo',
-    variants:[
-      { id:'175', label:'175ml glass',  price:7.50    },
-      { id:'250', label:'250ml glass',  price:10.50   },
-      { id:'btl', label:'Bottle 750ml', price:28.00   },
-    ]},
+  // ── WINE (subcategory of Drinks) ──────────────────────────────────────────
+  { id:'m-hwine',    name:'House white wine', menuName:'House white', type:'variants', cat:'cat-wine', allergens:['sulphites'], pricing:{base:0}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-hwine-175',name:'House white — 175ml', menuName:'175ml', parentId:'m-hwine', type:'simple', cat:'cat-wine', allergens:['sulphites'], pricing:{base:6.5}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-hwine-250',name:'House white — 250ml', menuName:'250ml', parentId:'m-hwine', type:'simple', cat:'cat-wine', allergens:['sulphites'], pricing:{base:8.5}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-hwine-bot',name:'House white — Bottle', menuName:'Bottle', parentId:'m-hwine', type:'simple', cat:'cat-wine', allergens:['sulphites'], pricing:{base:28.0}, assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m29', name:'House white wine',  cat:'drinks', price:7.50, allergens:['sulphites'], centreId:'pc4', sales:367, type:'variants',
-    description:'Pinot Grigio delle Venezie',
-    variants:[
-      { id:'175', label:'175ml glass',  price:7.50    },
-      { id:'250', label:'250ml glass',  price:10.50   },
-      { id:'btl', label:'Bottle 750ml', price:28.00   },
-    ]},
+  { id:'m-hrwine',    name:'House red wine',   menuName:'House red', type:'variants', cat:'cat-wine', allergens:['sulphites'], pricing:{base:0}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-hrwine-175',name:'House red — 175ml',  menuName:'175ml', parentId:'m-hrwine', type:'simple', cat:'cat-wine', allergens:['sulphites'], pricing:{base:6.5}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-hrwine-250',name:'House red — 250ml',  menuName:'250ml', parentId:'m-hrwine', type:'simple', cat:'cat-wine', allergens:['sulphites'], pricing:{base:8.5}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-hrwine-bot',name:'House red — Bottle', menuName:'Bottle', parentId:'m-hrwine', type:'simple', cat:'cat-wine', allergens:['sulphites'], pricing:{base:28.0}, assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m30', name:'Rosé wine',         cat:'drinks', price:8.00, allergens:['sulphites'], centreId:'pc4', sales:245, type:'variants',
-    description:'Provence rosé, dry',
-    variants:[
-      { id:'175', label:'175ml glass',  price:8.00    },
-      { id:'250', label:'250ml glass',  price:11.00   },
-      { id:'btl', label:'Bottle 750ml', price:32.00   },
-    ]},
+  // ── SOFT DRINKS (subcategory of Drinks) ───────────────────────────────────
+  { id:'m-coke',     name:'Coca-Cola',       menuName:'Coke',          receiptName:'Coke',      kitchenName:'COKE',
+    type:'simple', cat:'cat-softs', allergens:[], pricing:{base:3.5,dineIn:null,takeaway:3.0,delivery:3.0}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-lemon',    name:'Lemonade',        menuName:'Lemonade',      receiptName:'Lemonade',  kitchenName:'LEMONADE',
+    type:'simple', cat:'cat-softs', allergens:[], pricing:{base:3.5,dineIn:null,takeaway:3.0,delivery:3.0}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-water',    name:'Still water',     menuName:'Still water',   receiptName:'Water',     kitchenName:'WATER',
+    type:'simple', cat:'cat-softs', allergens:[], pricing:{base:2.8}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-sparkling',name:'Sparkling water', menuName:'Sparkling water',receiptName:'Sparkling', kitchenName:'SPARKLING',
+    type:'simple', cat:'cat-softs', allergens:[], pricing:{base:2.8}, assignedModifierGroups:[], assignedInstructionGroups:[] },
 
-  { id:'m31', name:'Prosecco',          cat:'drinks', price:9.00, allergens:['sulphites'], centreId:'pc4', sales:198, type:'variants',
-    variants:[
-      { id:'gls', label:'125ml glass',  price:9.00    },
-      { id:'btl', label:'Bottle 750ml', price:38.00   },
-    ]},
+  // ── HOT DRINKS ────────────────────────────────────────────────────────────
+  { id:'m-espresso', name:'Espresso',        menuName:'Espresso',      receiptName:'Espresso',  kitchenName:'ESPRESSO',
+    type:'simple', cat:'cat-hot', allergens:[], pricing:{base:2.5}, assignedModifierGroups:[], assignedInstructionGroups:[] },
+  { id:'m-flat',     name:'Flat white',      menuName:'Flat white',    receiptName:'Flat white',kitchenName:'FLAT WHITE',
+    type:'modifiable', cat:'cat-hot', allergens:['milk'], pricing:{base:3.5},
+    assignedModifierGroups:[{groupId:'mgd-milk',min:1,max:1}],
+    assignedInstructionGroups:[] },
+  { id:'m-capp',     name:'Cappuccino',      menuName:'Cappuccino',    receiptName:'Cappuccino',kitchenName:'CAPP',
+    type:'modifiable', cat:'cat-hot', allergens:['milk'], pricing:{base:3.5},
+    assignedModifierGroups:[{groupId:'mgd-milk',min:1,max:1}],
+    assignedInstructionGroups:[] },
+  { id:'m-latte',    name:'Latte',           menuName:'Latte',         receiptName:'Latte',     kitchenName:'LATTE',
+    type:'modifiable', cat:'cat-hot', allergens:['milk'], pricing:{base:3.8},
+    assignedModifierGroups:[{groupId:'mgd-milk',min:1,max:1}],
+    assignedInstructionGroups:[] },
 
-  { id:'m32', name:'Soft drink',        cat:'drinks', price:3.00, allergens:[], centreId:'pc4', sales:290, type:'variants',
-    variants:[
-      { id:'cola',    label:'Coca-Cola',      price:3.00 },
-      { id:'dc',      label:'Diet Coke',      price:3.00 },
-      { id:'sprite',  label:'Sprite',         price:3.00 },
-      { id:'fever',   label:'Fever-Tree tonic',price:3.50 },
-      { id:'oj',      label:'Fresh orange juice', price:3.50 },
-    ]},
-
-  { id:'m33', name:'Juice',             cat:'drinks', price:3.50, allergens:[], centreId:'pc4', sales:145, type:'variants',
-    variants:[
-      { id:'oj',   label:'Orange',      price:3.50 },
-      { id:'appl', label:'Apple',       price:3.50 },
-      { id:'pine', label:'Pineapple',   price:3.50 },
-      { id:'cran', label:'Cranberry',   price:3.50 },
-    ]},
-
-  // ── Cocktails ────────────────────────────────────────────────────────────────
-  { id:'m34', name:'Negroni',           cat:'cocktails', price:11.00, allergens:['sulphites'], centreId:'pc4', sales:278, type:'modifiers',
-    description:'Gin, Campari, sweet vermouth',
-    modifierGroups:[
-      { id:'base', label:'Spirit', required:true, multi:false,
-        options:[{ id:'gin', label:'House gin', price:0 },{ id:'pregm', label:'Tanqueray', price:2 },{ id:'hend', label:'Hendrick\'s', price:3 }] },
-    ]},
-
-  { id:'m35', name:'Old Fashioned',     cat:'cocktails', price:12.00, allergens:[], centreId:'pc4', sales:234, type:'modifiers',
-    description:'Bourbon, sugar, Angostura bitters, orange peel',
-    modifierGroups:[
-      { id:'base', label:'Whiskey', required:true, multi:false,
-        options:[{ id:'maker', label:'Maker\'s Mark', price:0 },{ id:'woodf', label:'Woodford Reserve', price:3 },{ id:'bfm', label:'Buffalo Trace', price:2 }] },
-    ]},
-
-  { id:'m36', name:'Espresso Martini',  cat:'cocktails', price:12.50, allergens:[], centreId:'pc4', sales:312, type:'modifiers',
-    description:'Vodka, Kahlúa, fresh espresso',
-    modifierGroups:[
-      { id:'shots', label:'Espresso shots', required:false, multi:false,
-        options:[{ id:'s1', label:'Single shot', price:0 },{ id:'s2', label:'Double shot', price:0 }] },
-    ]},
-
-  { id:'m37', name:'Margarita',         cat:'cocktails', price:11.50, allergens:[], centreId:'pc4', sales:198, type:'modifiers',
-    description:'Tequila, triple sec, fresh lime',
-    modifierGroups:[
-      { id:'style', label:'Style', required:true, multi:false,
-        options:[{ id:'rocks', label:'On the rocks' },{ id:'frozen', label:'Frozen' },{ id:'straight', label:'Straight up' }] },
-      { id:'rim', label:'Rim', required:false, multi:false,
-        options:[{ id:'salt', label:'Salt rim', price:0 },{ id:'sugar', label:'Sugar rim', price:0 },{ id:'no', label:'No rim', price:0 }] },
-    ]},
-
-  { id:'m38', name:'Aperol Spritz',     cat:'cocktails', price:10.50, allergens:['sulphites'], centreId:'pc4', sales:267, type:'simple',
-    description:'Aperol, Prosecco, soda, orange' },
-
-  { id:'m39', name:'Mojito',            cat:'cocktails', price:11.00, allergens:[], centreId:'pc4', sales:189, type:'modifiers',
-    description:'White rum, fresh mint, lime, sugar, soda',
-    modifierGroups:[
-      { id:'style', label:'Style', required:false, multi:false,
-        options:[{ id:'classic', label:'Classic', price:0 },{ id:'passion', label:'Passion fruit', price:1.5 },{ id:'straw', label:'Strawberry', price:1.5 }] },
-    ]},
 ];
 
-// ─── Quick screen ─────────────────────────────────────────────────────────────
-export const QUICK_IDS = ['m11','m7','m36','m28','m12','m25','m2','m16','m6','m21','m34','m38'];
+export const QUICK_IDS = ['m-rib8','m-sir6','m-fishchips','m-marg','m-pep','m-flat','m-coke','m-stout','m-lager','m-stp','m-soup','m-squid'];
 
 export function getDaypart() {
   const h = new Date().getHours();

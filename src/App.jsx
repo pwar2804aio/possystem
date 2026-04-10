@@ -14,19 +14,27 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '0.9.5';
+const VERSION = '0.9.6';
 
 const CHANGELOG = [
   {
-    version: '0.9.5', date: 'Apr 2026', label: 'Unified Orders screen — sectioned by type',
+    version: '0.9.6', date: 'Apr 2026', label: 'Menu Manager ↔ POS bridge + The Anchor menu',
     changes: [
-      'Orders tab restored to sidebar (Bar → Floor → POS → Orders → KDS).',
-      'Orders screen now shows three clear sections: Tables, Bar tabs, Walk-in/Takeaway/Delivery — each collapsible.',
-      'Filter tabs: All / Tables / Bar / Counter / Takeaway / Collection / Delivery — each with live count badge.',
-      '👤 My orders quick filter: shows only current server\'s orders across all types.',
-      'Search by name, ref, or server. Show completed toggle.',
-      'Table send clears POS immediately — table stays occupied in floor plan, POS resets for next order.',
-      'Split checks (T1.2) show a "split" badge in the Orders screen.',
+      'POS category nav now reads from store (Menu Manager) — not static seed data. Categories you create appear on POS immediately.',
+      'Subcategories on POS: tapping Mains reveals Grills / Fish / Vegetarian sub-tabs. Tapping Drinks reveals Draught / Wine / Soft drinks. Pill strip appears above item grid.',
+      'Variants wired end-to-end: dragging an item under another in Items tab auto-sets parent type to "variants". POS detects variant parents via child lookup, not just type field. Lager → Pint/Half pint picker works.',
+      'Modifier groups: options must be sub items only. Three-panel editor: groups list, group editor, sub item picker (search + one-click add). Options show sub item name and price.',
+      'Force/Unforce controls: Optional/Required toggle buttons. Max = 1 (pick one) / Unlimited / Custom number.',
+      'Parent type auto-reverts to "simple" when last variant child is unlinked.',
+      'The Anchor seed menu: 29 orderable items across 6 categories, 5 subcategories, 4 variant parents (Lager, Stout, House White, House Red), 10 modifiable items (steaks, chicken, pizza, coffee), 15 sub items, 4 modifier groups, 4 instruction groups.',
+    ],
+  },
+  {
+    version: '0.9.5', date: 'Apr 2026', label: 'Unified Orders screen',
+    changes: [
+      'Orders tab restored to sidebar: Bar → Floor → POS → Orders → KDS.',
+      'Three clear sections: Tables, Bar tabs, Walk-in/Queue — each collapsible.',
+      'Filter tabs by type + 👤 My orders + search + show completed.',
     ],
   },
   {

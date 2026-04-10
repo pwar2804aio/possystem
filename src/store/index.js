@@ -214,22 +214,22 @@ export const useStore = create((set, get) => ({
   // accountingGroup → for financial reporting (P&L, tax)
   // statisticGroup  → for operational reporting (bestsellers, waste)
   menuCategories: [
-    ...CATEGORIES.map((c, i) => ({
-      ...c,
-      menuId: 'menu-1',
-      parentId: null,
-      accountingGroup: c.isSpecial ? 'Special' : 'Food & Beverage',
-      statisticGroup: c.label,
-      defaultProductionCentreId: null,
-      defaultCourse: null,
-      color: c.color || '#888780',
-      sortOrder: i,
-    })),
-    // Subcategory examples
-    { id:'cat-drinks-cocktails', menuId:'menu-1', parentId:'drinks',     label:'Cocktails',   icon:'🍸', accountingGroup:'Beverages', statisticGroup:'Cocktails', color:'#a855f7', sortOrder:0, defaultProductionCentreId:'pc4', defaultCourse:null },
-    { id:'cat-drinks-wine',      menuId:'menu-1', parentId:'drinks',     label:'Wine',        icon:'🍷', accountingGroup:'Beverages', statisticGroup:'Wine',      color:'#8b1e3f', sortOrder:1, defaultProductionCentreId:'pc4', defaultCourse:null },
-    { id:'cat-starters-hot',     menuId:'menu-1', parentId:'starters',   label:'Hot starters',icon:'🔥', accountingGroup:'Food',      statisticGroup:'Hot starters', color:'#ef4444', sortOrder:0, defaultProductionCentreId:'pc1', defaultCourse:1 },
-    { id:'cat-starters-cold',    menuId:'menu-1', parentId:'starters',   label:'Cold starters',icon:'❄️', accountingGroup:'Food',     statisticGroup:'Cold starters', color:'#22d3ee', sortOrder:1, defaultProductionCentreId:'pc2', defaultCourse:1 },
+    // ── The Anchor — category tree ──────────────────────────────────────────
+    // Root categories
+    { id:'cat-starters',  menuId:'menu-1', parentId:null, label:'Starters',  icon:'🥗', color:'#22c55e', accountingGroup:'Food',      sortOrder:0 },
+    { id:'cat-mains',     menuId:'menu-1', parentId:null, label:'Mains',     icon:'🍖', color:'#e8a020', accountingGroup:'Food',      sortOrder:1 },
+    { id:'cat-pizza',     menuId:'menu-1', parentId:null, label:'Pizza',     icon:'🍕', color:'#f97316', accountingGroup:'Food',      sortOrder:2 },
+    { id:'cat-desserts',  menuId:'menu-1', parentId:null, label:'Desserts',  icon:'🎂', color:'#ec4899', accountingGroup:'Food',      sortOrder:3 },
+    { id:'cat-drinks',    menuId:'menu-1', parentId:null, label:'Drinks',    icon:'🍸', color:'#a855f7', accountingGroup:'Beverages', sortOrder:4 },
+    { id:'cat-hot',       menuId:'menu-1', parentId:null, label:'Hot drinks',icon:'☕', color:'#78716c', accountingGroup:'Beverages', sortOrder:5 },
+    // Mains subcategories
+    { id:'cat-grills',    menuId:'menu-1', parentId:'cat-mains',  label:'From the grill', icon:'🥩', color:'#ef4444', accountingGroup:'Food',      sortOrder:0 },
+    { id:'cat-fish',      menuId:'menu-1', parentId:'cat-mains',  label:'Fish',           icon:'🐟', color:'#3b82f6', accountingGroup:'Food',      sortOrder:1 },
+    { id:'cat-veggie',    menuId:'menu-1', parentId:'cat-mains',  label:'Vegetarian',     icon:'🌿', color:'#22c55e', accountingGroup:'Food',      sortOrder:2 },
+    // Drinks subcategories
+    { id:'cat-draught',   menuId:'menu-1', parentId:'cat-drinks', label:'Draught beer', icon:'🍺', color:'#e8a020', accountingGroup:'Beverages', sortOrder:0 },
+    { id:'cat-wine',      menuId:'menu-1', parentId:'cat-drinks', label:'Wine',         icon:'🍷', color:'#8b1e3f', accountingGroup:'Beverages', sortOrder:1 },
+    { id:'cat-softs',     menuId:'menu-1', parentId:'cat-drinks', label:'Soft drinks',  icon:'🥤', color:'#22d3ee', accountingGroup:'Beverages', sortOrder:2 },
   ],
   addCategory: cat => set(s => ({ menuCategories: [...s.menuCategories, { id:`cat-${Date.now()}`, ...cat }] })),
   updateCategory: (id, patch) => set(s => ({ menuCategories: s.menuCategories.map(c => c.id===id ? { ...c, ...patch } : c) })),
@@ -263,14 +263,34 @@ export const useStore = create((set, get) => ({
   // ── Modifier groups — reusable paid option groups ─────────────────────────
   // These change the price. Assigned to items in the Product Builder.
   modifierGroupDefs: [
-    { id:'mgd-1', name:'Sauce choice',       min:0, max:1,
-      options:[{id:'mgo-1',name:'Peppercorn',price:0},{id:'mgo-2',name:'Béarnaise',price:0},{id:'mgo-3',name:'Chimichurri',price:0},{id:'mgo-4',name:'No sauce',price:0}] },
-    { id:'mgd-2', name:'Side swap',          min:0, max:1,
-      options:[{id:'mgo-5',name:'Salad instead of fries',price:0},{id:'mgo-6',name:'Sweet potato fries',price:1.50},{id:'mgo-7',name:'Mac & cheese',price:2.50}] },
-    { id:'mgd-3', name:'Extras',             min:0, max:5,
-      options:[{id:'mgo-8',name:'Extra sauce',price:0.50},{id:'mgo-9',name:'Truffle oil',price:3.50},{id:'mgo-10',name:'Extra bacon',price:2.50}] },
-    { id:'mgd-4', name:'Milk choice',        min:1, max:1,
-      options:[{id:'mgo-11',name:'Whole milk',price:0},{id:'mgo-12',name:'Oat milk',price:0.50},{id:'mgo-13',name:'Almond milk',price:0.50},{id:'mgo-14',name:'Soy milk',price:0.50}] },
+    // Options reference sub item IDs from MENU_ITEMS (type:'subitem')
+    { id:'mgd-sides',        name:'Side choice',       min:1, max:1,
+      options:[
+        {id:'sub-chips',   name:'Chips',               price:0},
+        {id:'sub-salad',   name:'Side salad',          price:0},
+        {id:'sub-spfries', name:'Sweet potato fries',  price:1.5},
+        {id:'sub-mash',    name:'Creamy mash',         price:0},
+      ]},
+    { id:'mgd-sauces',       name:'Sauce',              min:0, max:1,
+      options:[
+        {id:'sub-pepper',  name:'Peppercorn sauce',    price:0},
+        {id:'sub-bearn',   name:'Béarnaise',           price:0},
+        {id:'sub-chimich', name:'Chimichurri',         price:0},
+        {id:'sub-nosace',  name:'No sauce',            price:0},
+      ]},
+    { id:'mgd-pizza-extras', name:'Pizza extras',       min:0, max:5,
+      options:[
+        {id:'sub-extra-ch',  name:'Extra cheese',      price:1.5},
+        {id:'sub-extra-pep', name:'Extra pepperoni',   price:1.5},
+        {id:'sub-truffle',   name:'Truffle oil',       price:3.0},
+      ]},
+    { id:'mgd-milk',         name:'Milk choice',        min:1, max:1,
+      options:[
+        {id:'sub-whole',   name:'Whole milk',          price:0},
+        {id:'sub-oat',     name:'Oat milk',            price:0.5},
+        {id:'sub-almond',  name:'Almond milk',         price:0.5},
+        {id:'sub-soy',     name:'Soy milk',            price:0.5},
+      ]},
   ],
   addModifierGroupDef: g => set(s => ({ modifierGroupDefs:[...s.modifierGroupDefs,{id:`mgd-${Date.now()}`,...g}] })),
   updateModifierGroupDef: (id,patch) => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
@@ -279,14 +299,14 @@ export const useStore = create((set, get) => ({
   // ── Instruction groups — preparation instructions (no price change) ────────
   // These DON'T change the price. e.g. "Cooking preference: Rare / Medium / Well done"
   instructionGroupDefs: [
-    { id:'igd-1', name:'Cooking preference',
+    { id:'igd-cook-temp', name:'Cooking preference',
       options:['Rare','Medium rare','Medium','Medium well','Well done'] },
-    { id:'igd-2', name:'Bread service',
-      options:['With bread','No bread','Gluten-free bread'] },
-    { id:'igd-3', name:'Temperature',
-      options:['Hot','Warm','Room temperature','Cold'] },
-    { id:'igd-4', name:'Spice level',
+    { id:'igd-bread',     name:'Bread service',
+      options:['With bread','No bread','Gluten-free bread (+£1)'] },
+    { id:'igd-spice',     name:'Spice level',
       options:['Mild','Medium','Hot','Extra hot'] },
+    { id:'igd-allergen',  name:'Allergy note',
+      options:['Gluten-free option please','Dairy-free please','Nut allergy — check with kitchen','Speak to server'] },
   ],
   addInstructionGroupDef: g => set(s => ({ instructionGroupDefs:[...s.instructionGroupDefs,{id:`igd-${Date.now()}`,...g}] })),
   updateInstructionGroupDef: (id,patch) => set(s => ({ instructionGroupDefs:s.instructionGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
@@ -326,17 +346,37 @@ export const useStore = create((set, get) => ({
   })),
 
   updateMenuItem: (id, patch) => {
-    set(s => ({
-      menuItems: s.menuItems.map(item => {
+    set(s => {
+      let items = s.menuItems.map(item => {
         if (item.id !== id) return item;
         const updated = { ...item, ...patch };
-        // Auto-set type: simple↔modifiable based on whether modifier groups exist
-        if (patch.modifierGroups !== undefined && updated.type !== 'subitem' && updated.type !== 'variants' && updated.type !== 'combo' && updated.type !== 'pizza') {
-          updated.type = (patch.modifierGroups?.length > 0) ? 'modifiable' : 'simple';
+        // Auto simple↔modifiable based on modifier groups
+        if (patch.modifierGroups !== undefined && !['subitem','variants','combo','pizza'].includes(updated.type)) {
+          updated.type = patch.modifierGroups?.length > 0 ? 'modifiable' : 'simple';
         }
         return updated;
-      })
-    }));
+      });
+
+      // When setting parentId: auto-mark that parent as 'variants'
+      if (patch.parentId) {
+        items = items.map(item => {
+          if (item.id !== patch.parentId || item.type === 'subitem') return item;
+          return { ...item, type: 'variants' };
+        });
+      }
+      // When clearing parentId: revert parent to 'simple' if it has no remaining children
+      if ('parentId' in patch && !patch.parentId) {
+        const oldParentId = s.menuItems.find(i => i.id === id)?.parentId;
+        if (oldParentId) {
+          const remainingChildren = items.filter(i => i.parentId === oldParentId && i.id !== id && !i.archived);
+          if (remainingChildren.length === 0) {
+            items = items.map(item => item.id === oldParentId ? { ...item, type: 'simple' } : item);
+          }
+        }
+      }
+
+      return { menuItems: items };
+    });
     import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem({ id, ...patch }));
   },
   addMenuItem: item => {
