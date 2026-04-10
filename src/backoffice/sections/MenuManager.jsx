@@ -42,6 +42,61 @@ function getEffectivePrice(item, menuId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CategoryRow — proper component so useState is legal
+// ─────────────────────────────────────────────────────────────────────────────
+function CategoryRow({ cat, selectedCatId, subCats, menuItems, onSelect, onEdit, onAddSub }) {
+  const children = subCats(cat.id);
+  const itemCount = menuItems.filter(i => !i.archived && (i.cat === cat.id || children.some(c => c.id === i.cat))).length;
+  const isActive = selectedCatId === cat.id || children.some(c => c.id === selectedCatId);
+  const [expanded, setExpanded] = useState(isActive);
+
+  return (
+    <div>
+      <div style={{ display:'flex', alignItems:'center' }}>
+        {children.length > 0 && (
+          <button onClick={() => setExpanded(e => !e)} style={{ width:16, flexShrink:0, background:'none', border:'none', cursor:'pointer', color:'var(--t4)', fontSize:10, padding:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {expanded ? '▾' : '▸'}
+          </button>
+        )}
+        <button onClick={() => onSelect(cat.id)} style={{
+          flex:1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+          fontSize:12, fontWeight:selectedCatId===cat.id?700:400, border:'none', textAlign:'left',
+          background:selectedCatId===cat.id?`${cat.color||'var(--acc)'}22`:'transparent',
+          color:selectedCatId===cat.id?(cat.color||'var(--acc)'):'var(--t2)',
+          borderLeft:`2px solid ${selectedCatId===cat.id?(cat.color||'var(--acc)'):'transparent'}`,
+          display:'flex', justifyContent:'space-between', alignItems:'center',
+          marginLeft: children.length > 0 ? 0 : 16,
+        }} onContextMenu={e => { e.preventDefault(); onEdit(cat); }}>
+          <span>{cat.icon} {cat.label}</span>
+          <span style={{ fontSize:10, color:'var(--t4)' }}>{itemCount}</span>
+        </button>
+      </div>
+      {expanded && children.map(sub => {
+        const subCount = menuItems.filter(i => !i.archived && i.cat === sub.id).length;
+        return (
+          <button key={sub.id} onClick={() => onSelect(sub.id)} style={{
+            width:'calc(100% - 16px)', marginLeft:16, padding:'5px 8px', borderRadius:7, cursor:'pointer',
+            fontFamily:'inherit', fontSize:11, fontWeight:selectedCatId===sub.id?700:400, border:'none', textAlign:'left',
+            background:selectedCatId===sub.id?`${sub.color||'var(--acc)'}22`:'transparent',
+            color:selectedCatId===sub.id?(sub.color||'var(--acc)'):'var(--t3)',
+            borderLeft:`2px solid ${selectedCatId===sub.id?(sub.color||'var(--acc)'):'transparent'}`,
+            display:'flex', justifyContent:'space-between', alignItems:'center',
+          }}>
+            <span>{sub.icon} {sub.label}</span>
+            <span style={{ fontSize:9, color:'var(--t4)' }}>{subCount}</span>
+          </button>
+        );
+      })}
+      {expanded && (
+        <button onClick={() => onAddSub(cat.id)} style={{ width:'calc(100% - 16px)', marginLeft:16, padding:'4px 8px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:10, border:'none', textAlign:'left', background:'transparent', color:'var(--t4)' }}>
+          + Subcategory
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function MenuManager() {
@@ -134,60 +189,19 @@ export default function MenuManager() {
             borderLeft:`2px solid ${!selectedCatId?'var(--acc)':'transparent'}`,
           }}>All items <span style={{ color:'var(--t4)' }}>({menuItems.filter(i=>!i.archived).length})</span></button>
 
-          {rootCats.map(cat => {
-            const children = subCats(cat.id);
-            const itemCount = menuItems.filter(i => !i.archived && (i.cat === cat.id || children.some(c => c.id === i.cat))).length;
-            const isActive = selectedCatId === cat.id || children.some(c => c.id === selectedCatId);
-            const [expanded, setExpanded] = useState(isActive);
+          {rootCats.map(cat => (
+            <CategoryRow
+              key={cat.id}
+              cat={cat}
+              selectedCatId={selectedCatId}
+              subCats={subCats}
+              menuItems={menuItems}
+              onSelect={(id) => { setSelectedCatId(id); setSelectedItemId(null); }}
+              onEdit={setEditCat}
+              onAddSub={setShowNewCat}
+            />
+          ))}
 
-            return (
-              <div key={cat.id}>
-                <div style={{ display:'flex', alignItems:'center' }}>
-                  {children.length > 0 && (
-                    <button onClick={() => setExpanded(e => !e)} style={{ width:16, flexShrink:0, background:'none', border:'none', cursor:'pointer', color:'var(--t4)', fontSize:10, padding:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      {expanded ? '▾' : '▸'}
-                    </button>
-                  )}
-                  <button onClick={() => { setSelectedCatId(cat.id); setSelectedItemId(null); }} style={{
-                    flex:1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
-                    fontSize:12, fontWeight:selectedCatId===cat.id?700:400, border:'none', textAlign:'left',
-                    background:selectedCatId===cat.id?`${cat.color||'var(--acc)'}22`:'transparent',
-                    color:selectedCatId===cat.id?(cat.color||'var(--acc)'):'var(--t2)',
-                    borderLeft:`2px solid ${selectedCatId===cat.id?(cat.color||'var(--acc)'):'transparent'}`,
-                    display:'flex', justifyContent:'space-between', alignItems:'center',
-                    marginLeft: children.length > 0 ? 0 : 16,
-                  }}
-                  onContextMenu={e => { e.preventDefault(); setEditCat(cat); }}>
-                    <span>{cat.icon} {cat.label}</span>
-                    <span style={{ fontSize:10, color:'var(--t4)' }}>{itemCount}</span>
-                  </button>
-                </div>
-
-                {/* Subcategories */}
-                {expanded && children.map(sub => {
-                  const subCount = menuItems.filter(i => !i.archived && i.cat === sub.id).length;
-                  return (
-                    <button key={sub.id} onClick={() => { setSelectedCatId(sub.id); setSelectedItemId(null); }} style={{
-                      width:'calc(100% - 16px)', marginLeft:16, padding:'5px 8px', borderRadius:7, cursor:'pointer',
-                      fontFamily:'inherit', fontSize:11, fontWeight:selectedCatId===sub.id?700:400, border:'none', textAlign:'left',
-                      background:selectedCatId===sub.id?`${sub.color||'var(--acc)'}22`:'transparent',
-                      color:selectedCatId===sub.id?(sub.color||'var(--acc)'):'var(--t3)',
-                      borderLeft:`2px solid ${selectedCatId===sub.id?(sub.color||'var(--acc)'):'transparent'}`,
-                      display:'flex', justifyContent:'space-between', alignItems:'center',
-                    }}>
-                      <span>{sub.icon} {sub.label}</span>
-                      <span style={{ fontSize:9, color:'var(--t4)' }}>{subCount}</span>
-                    </button>
-                  );
-                })}
-                {expanded && (
-                  <button onClick={() => setShowNewCat(cat.id)} style={{ width:'calc(100% - 16px)', marginLeft:16, padding:'4px 8px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:10, border:'none', textAlign:'left', background:'transparent', color:'var(--t4)' }}>
-                    + Subcategory
-                  </button>
-                )}
-              </div>
-            );
-          })}
         </div>
       </div>
 
