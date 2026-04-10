@@ -43,8 +43,17 @@ export default function POSSurface() {
     menuItems: storeMenuItems,
   } = useStore();
 
-  // Use store's editable menu if available, otherwise fall back to seed
-  const MENU_ITEMS = storeMenuItems || SEED_MENU_ITEMS;
+  // Use store's editable menu — prefer menuName for display, fall back to name
+  const rawItems = storeMenuItems || SEED_MENU_ITEMS;
+  const MENU_ITEMS = rawItems.map(i => ({
+    ...i,
+    // Ensure display name uses menuName if set
+    name: i.menuName || i.name,
+    // Effective price from active menu override
+    price: (deviceConfig?.activeMenuId && i.priceOverrides?.[deviceConfig.activeMenuId] !== undefined)
+      ? i.priceOverrides[deviceConfig.activeMenuId]
+      : (i.price || i.basePrice || 0),
+  }));
 
   // Order types this terminal is allowed to show (from device profile)
   const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];

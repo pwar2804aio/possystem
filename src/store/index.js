@@ -620,7 +620,7 @@ export const useStore = create((set, get) => ({
         table: tableLabel, server: serverName, covers, centreId,
         sentAt: Date.now(), minutes: 0,
         items: centreItems.map(i => ({
-          qty: i.qty, name: i.name,
+          qty: i.qty, name: i.kitchenName || i.name,
           mods: [
             ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
             ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
@@ -695,7 +695,7 @@ export const useStore = create((set, get) => ({
         covers: session?.covers || 2,
         centreId, sentAt: Date.now(), minutes: 0,
         items: centreItems.map(i => ({
-          qty: i.qty, name: i.name,
+          qty: i.qty, name: i.kitchenName || i.name,
           mods: [
             ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
             ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),

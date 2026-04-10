@@ -38,7 +38,7 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
           : item.price;
         return `
           <div class="row">
-            <span>${item.qty > 1 ? item.qty+'× ' : ''}${item.name}</span>
+            <span>${item.qty > 1 ? item.qty+"× " : ""}${item.receiptName||item.name}</span>
             <span>£${(price*item.qty).toFixed(2)}</span>
           </div>
           ${item.mods?.length ? `<div class="muted" style="padding-left:12px">${item.mods.map(m=>m.label).join(', ')}</div>` : ''}
@@ -94,7 +94,7 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
             return (
               <div key={item.uid} style={{marginBottom:6}}>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t1)'}}>
-                  <span>{item.qty>1?`${item.qty}× `:''}{item.name}</span>
+                  <span>{item.qty>1?`${item.qty}× `:''}{item.receiptName||item.name}</span>
                   <span>£{(price*item.qty).toFixed(2)}</span>
                 </div>
                 {item.mods?.length>0&&<div style={{fontSize:10,color:'var(--t3)',paddingLeft:12}}>{item.mods.map(m=>m.label).join(', ')}</div>}
@@ -170,7 +170,7 @@ export function ReprintModal({ items, tableLabel, onClose, onReprint }) {
                       {on&&<div style={{width:7,height:7,background:'#0e0f14',borderRadius:1}}/>}
                     </div>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:12,fontWeight:600,color:on?'var(--t1)':'var(--t3)'}}>{item.qty>1?`${item.qty}× `:''}{item.name}</div>
+                      <div style={{fontSize:12,fontWeight:600,color:on?'var(--t1)':'var(--t3)'}}>{item.qty>1?`${item.qty}× `:''}{item.receiptName||item.name}</div>
                       {item.mods?.length>0&&<div style={{fontSize:10,color:'var(--t4)'}}>{item.mods.map(m=>m.label).join(', ')}</div>}
                       {item.notes&&<div style={{fontSize:10,color:'#f97316'}}>{item.notes}</div>}
                     </div>
