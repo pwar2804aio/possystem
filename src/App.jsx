@@ -68,67 +68,6 @@ const CHANGELOG = [
   },
 ];
 
-const CHANGELOG = [
-  {
-    version: '0.5.2', date: 'Apr 2026', label: 'Full split bill system',
-    changes: [
-      '4 split modes: Even (2–10 ways), By seat (auto from seat assignments), By item (tap items between checks), Custom amounts (each guest enters their share)',
-      'By seat: shared items automatically divided evenly across seats',
-      'By item: unassigned pool shown at top, tap items to move between 2–4 checks',
-      'Custom amounts: live coverage indicator shows shortfall or surplus, add/remove guests',
-      'Each split portion tendered independently — card or cash with change calc',
-      'Progress bar shows X of N portions paid',
-      'Paid portions show green with payment method and change amount',
-      'Split closes automatically when all portions are settled',
-    ],
-  },
-  {
-    version: '0.5.1', date: 'Apr 2026', label: 'Fast checkout',
-    changes: [
-      'Two primary buttons — Card (navy) and Cash (green) — at bottom of checkout',
-      'Card: tip picker then Stripe Terminal screen with pulsing animation',
-      'Cash: full transaction screen with 12-key numpad, quick cash buttons, live change display',
-      'Takeaway, collection and bar tabs skip the tip step',
-    ],
-  },
-  {
-    version: '0.5.0', date: 'Apr 2026', label: 'Voids, discounts & history',
-    changes: [
-      'Void committed items and entire checks — manager PIN + reason, full audit trail',
-      'Discounts — 2-step: choose amount then select items or whole check',
-      'Print check and reprint production tickets',
-      'History tab with closed check log and 4-step refund flow (card or cash)',
-      'Orders hub tab replacing queue button',
-    ],
-  },
-  {
-    version: '0.4.1', date: 'Apr 2026', label: 'Table sessions',
-    changes: [
-      'Tables own their order sessions — no sync issues',
-      'Floor plan with Seat Guests modal, live table status',
-      'Send commits to table, payment returns to floor',
-    ],
-  },
-  {
-    version: '0.4.0', date: 'Apr 2026', label: 'Bar tabs',
-    changes: [
-      'Full bar tab system with rounds, pre-auth, roaming tabs',
-      'Each round tendered separately via full checkout flow',
-    ],
-  },
-  {
-    version: '0.3.0', date: 'Mar 2026', label: 'Takeaway & collection',
-    changes: ['Customer capture, collection slots, Orders hub, no service charge on takeaway'],
-  },
-  {
-    version: '0.2.0', date: 'Mar 2026', label: 'POS core ordering',
-    changes: ['Variants, modifiers, pizza builder, courses, seat assignment, 86'],
-  },
-  {
-    version: '0.1.0', date: 'Mar 2026', label: 'Foundation',
-    changes: ['Three-column POS, Quick Screen, 14 allergens, KDS, floor plan, PIN login'],
-  },
-];
 
 export default function App() {
   const { staff, surface, setSurface, toast, shift } = useStore();
