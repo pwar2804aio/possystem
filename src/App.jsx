@@ -7,69 +7,64 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.6.1';
+const VERSION = '0.6.2';
 
 const CHANGELOG = [
   {
+    version: '0.6.2', date: 'Apr 2026', label: 'Item info, daily count & order review',
+    changes: [
+      'Long press any product card (600ms) → item info sheet with image hero, story, full allergen grid, variants, modifier options',
+      'Recipe tab: full ingredient list with quantities and units, numbered method steps with category colour numbering',
+      'Daily count tab: set how many portions are available today using numpad or quick-set buttons',
+      'Count badge on cards: green = in stock, amber = 3 or fewer remaining',
+      'Auto 86: when remaining count hits 0, item is automatically 86\'d and a toast fires',
+      'Reset/clear count from the item info modal',
+      '📋 Review button in the order panel action row',
+      'Order review modal: compact mode (name + price only) or detailed mode (mods, notes, allergens, seat, course, sent status)',
+      'Review modal: totals, print button, and direct "Checkout →" action',
+      'Recipe data added for: Bruschetta, Burrata, Carbonara, Ribeye steak, Sea bass, Tiramisu',
+    ],
+  },
+  {
     version: '0.6.1', date: 'Apr 2026', label: 'Light mode + checkout redesign',
     changes: [
-      'Light mode — full warm-cream theme, toggle ☀️/🌙 in the shift bar, persisted across sessions',
-      'Checkout: alternating row shading on bill items, qty × shown in amber, cleaner totals',
-      'Checkout: Card/Cash buttons now use CSS variables — fully light/dark-mode aware',
-      'Tip picker: £ amount is the hero, % shown as secondary label below',
-      'Card terminal: custom SVG spinner with amber arc, card illustration, payment method pills',
-      'Cash screen: side-by-side due/change display at top, bigger 56px numpad keys with hover states',
-      'Checkout header: cleaner with × close button replacing Cancel text',
-      'SplitModal: hover state on Split button — amber border on hover',
+      'Light mode with ☀️/🌙 toggle in shift bar, persisted to localStorage',
+      'Checkout: Card/Cash buttons theme-aware, £ amounts as hero in tip picker',
+      'Card terminal: SVG spinner, payment method pills, card illustration',
+      'Cash screen: side-by-side due/change display, 56px numpad keys',
     ],
   },
   {
     version: '0.6.0', date: 'Apr 2026', label: 'Operator Dark UI revamp',
     changes: [
-      'Product cards: larger, price as hero in category colour, coloured left border',
-      'Category nav: 60px buttons, colour bar indicator, active glow dot',
-      'Order items: status left border, proper Void/Remove pill buttons, bigger qty steppers',
-      'Send/Pay: 40px height, Pay wider for visual hierarchy',
-      'CSS system: --font-mono throughout, btn scale on press, modal blur + slide-up animation',
+      'Product cards: larger, price hero, coloured left border per category',
+      'Category nav: 60px buttons, colour bar, active glow',
+      'Order items: status left border, proper Void/Remove buttons, bigger steppers',
     ],
   },
   {
     version: '0.5.3', date: 'Apr 2026', label: 'Orders list view',
-    changes: ['Floor plan: My orders / All open orders tabs, urgency colours, tap to open in POS'],
+    changes: ['My orders / All open orders tabs, urgency colours, tap to open in POS'],
   },
   {
     version: '0.5.2', date: 'Apr 2026', label: 'Full split bill',
-    changes: ['Even, By seat, By item, Custom amounts — each portion tendered independently'],
+    changes: ['Even, By seat, By item, Custom — each portion tendered independently'],
   },
   {
     version: '0.5.1', date: 'Apr 2026', label: 'Fast checkout',
-    changes: ['Card/Cash primary buttons, tip picker, cash numpad with live change'],
+    changes: ['Card/Cash primary buttons, tip picker, cash numpad'],
   },
   {
     version: '0.5.0', date: 'Apr 2026', label: 'Voids, discounts & history',
-    changes: ['Manager PIN voids, discounts, print, 4-step refund with card/cash tender'],
+    changes: ['Manager PIN voids, discounts, print, 4-step refund'],
   },
-  {
-    version: '0.4.1', date: 'Apr 2026', label: 'Table sessions',
-    changes: ['Tables own sessions, floor plan, seat guests, live status'],
-  },
-  {
-    version: '0.4.0', date: 'Apr 2026', label: 'Bar tabs',
-    changes: ['Rounds, pre-auth, roaming tabs, checkout per tab'],
-  },
-  {
-    version: '0.3.0', date: 'Mar 2026', label: 'Takeaway & collection',
-    changes: ['Customer capture, collection slots, Orders hub'],
-  },
-  {
-    version: '0.2.0', date: 'Mar 2026', label: 'POS core ordering',
-    changes: ['Variants, modifiers, courses, seat assignment, 86'],
-  },
-  {
-    version: '0.1.0', date: 'Mar 2026', label: 'Foundation',
-    changes: ['POS, Quick Screen, 14 allergens, KDS, floor plan, PIN login'],
-  },
+  { version:'0.4.1', date:'Apr 2026', label:'Table sessions', changes:['Tables own sessions, floor plan, seat guests'] },
+  { version:'0.4.0', date:'Apr 2026', label:'Bar tabs', changes:['Rounds, pre-auth, roaming tabs'] },
+  { version:'0.3.0', date:'Mar 2026', label:'Takeaway & collection', changes:['Customer capture, collection slots, Orders hub'] },
+  { version:'0.2.0', date:'Mar 2026', label:'POS core ordering', changes:['Variants, modifiers, courses, seat assignment, 86'] },
+  { version:'0.1.0', date:'Mar 2026', label:'Foundation', changes:['POS, Quick Screen, 14 allergens, KDS, floor plan, PIN login'] },
 ];
+
 
 
 

@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useStore } from '../store';
-import { CATEGORIES, MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart } from '../data/seed';
+import { CATEGORIES, MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
 import CheckoutModal from './CheckoutModal';
 import CustomerModal from '../components/CustomerModal';
@@ -8,13 +8,9 @@ import VoidModal from '../components/VoidModal';
 import DiscountModal from '../components/DiscountModal';
 import { ReceiptModal, ReprintModal } from '../components/ReceiptModal';
 import CheckHistory from '../components/CheckHistory';
+import ItemInfoModal from '../components/ItemInfoModal';
+import OrderReviewModal from '../components/OrderReviewModal';
 
-const CAT_META = {
-  quick:    {icon:'⚡',color:'#e8a020'}, starters:{icon:'🥗',color:'#22c55e'},
-  mains:    {icon:'🍽',color:'#3b82f6'}, pizza:   {icon:'🍕',color:'#f07020'},
-  sides:    {icon:'🍟',color:'#a855f7'}, desserts:{icon:'🍮',color:'#e84066'},
-  drinks:   {icon:'🍷',color:'#e84040'}, cocktails:{icon:'🍸',color:'#22d3ee'},
-};
 const COURSE_COLORS = {
   0:{label:'Immediate',color:'#22d3ee',bg:'rgba(34,211,238,.1)'},
   1:{label:'Course 1', color:'#22c55e',bg:'rgba(34,197,94,.1)'},
@@ -34,6 +30,7 @@ export default function POSSurface() {
     orderQueue, updateQueueStatus, removeFromQueue, showToast,
     pendingItem, setPendingItem, clearPendingItem,
     eightySixIds, toggle86,
+    dailyCounts, setDailyCount, clearDailyCount,
     setSurface,
     voidItem, voidCheck,
     addCheckDiscount, removeCheckDiscount, addWalkInDiscount, removeWalkInDiscount,
@@ -56,6 +53,9 @@ export default function POSSurface() {
   const [showDiscount, setShowDiscount] = useState(false);
   const [showReceipt, setShowReceipt]   = useState(false);
   const [showReprint, setShowReprint]   = useState(false);
+  const [infoItem, setInfoItem]         = useState(null);  // long-press item info
+  const [showReview, setShowReview]     = useState(false); // order review modal
+  const longPressTimer = useRef(null);
 
   const activeTable = activeTableId ? tables.find(t=>t.id===activeTableId) : null;
   const session = activeTable?.session;
@@ -323,6 +323,7 @@ export default function POSSurface() {
 
               {/* Action row */}
               <div style={{padding:'6px 10px 4px',display:'flex',gap:4,flexWrap:'wrap'}}>
+                <button onClick={()=>setShowReview(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>📋 Review</button>
                 <button onClick={()=>setShowDiscount(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>🏷 Discount</button>
                 <button onClick={()=>setShowReceipt(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>🖨 Print</button>
                 {hasSent&&<button onClick={()=>setShowReprint(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>↻ Reprint</button>}
@@ -461,11 +462,31 @@ export default function POSSurface() {
                   const isHot=rank>=0&&rank<3;
                   const fromPrice=item.type==='variants'?Math.min(...item.variants.map(v=>v.price)):item.price;
                   const accentColor = is86?'var(--t4)':flagged?'var(--red)':m.color;
+                  const count = dailyCounts[item.id];
+                  const isLow = count && count.remaining <= 3 && count.remaining > 0;
+
+                  // Long-press handlers — 600ms hold opens item info sheet
+                  const handlePressStart = (e) => {
+                    e.preventDefault();
+                    longPressTimer.current = setTimeout(() => {
+                      setInfoItem(item);
+                    }, 600);
+                  };
+                  const handlePressEnd = () => {
+                    clearTimeout(longPressTimer.current);
+                  };
+
                   return(
-                    <button key={item.id} onClick={()=>handleItemTap(item)}
+                    <button key={item.id}
+                      onClick={()=>handleItemTap(item)}
+                      onMouseDown={handlePressStart}
+                      onMouseUp={handlePressEnd}
+                      onMouseLeave={handlePressEnd}
+                      onTouchStart={handlePressStart}
+                      onTouchEnd={handlePressEnd}
                       className={`prod-card${is86?' prod-card--disabled':''}`}
                       style={{minHeight:108}}>
-                      {/* Left colour bar — the fastest visual category cue */}
+                      {/* Left colour bar */}
                       <div style={{
                         position:'absolute',left:0,top:0,bottom:0,width:4,
                         background:is86?'var(--bg5)':flagged?'var(--red)':isHot?m.color:`${m.color}60`,
@@ -476,7 +497,17 @@ export default function POSSurface() {
                         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
                           <span style={{fontSize:24,lineHeight:1}}>{is86?'🚫':flagged?'⚠️':m.icon}</span>
                           <div style={{display:'flex',gap:3,flexDirection:'column',alignItems:'flex-end'}}>
-                            {isHot&&!is86&&!flagged&&(
+                            {/* Daily count badge */}
+                            {count&&!is86&&(
+                              <span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,
+                                background:isLow?'rgba(232,160,32,.2)':'rgba(34,197,94,.15)',
+                                color:isLow?'var(--acc)':'var(--grn)',
+                                border:`1px solid ${isLow?'rgba(232,160,32,.4)':'rgba(34,197,94,.3)'}`,
+                              }}>
+                                {count.remaining} left
+                              </span>
+                            )}
+                            {isHot&&!is86&&!flagged&&!count&&(
                               <span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:`${m.color}25`,color:m.color,letterSpacing:.02}}>#{rank+1}</span>
                             )}
                             {flagged&&<span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>⚠ allergen</span>}
@@ -485,7 +516,7 @@ export default function POSSurface() {
                         </div>
                         {/* Name */}
                         <div style={{fontSize:13,fontWeight:700,color:is86?'var(--t4)':flagged?'var(--red)':'var(--t1)',lineHeight:1.3,flex:1,marginBottom:8}}>{item.name}</div>
-                        {/* Bottom: price + type indicator */}
+                        {/* Bottom: price + type + 86 button */}
                         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:4}}>
                           <div style={{fontSize:18,fontWeight:800,color:accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>
                             {item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}
@@ -600,6 +631,34 @@ export default function POSSurface() {
             <button className="btn btn-acc" style={{flex:1}} disabled={!customName.trim()||!customPrice} onClick={()=>{addCustomItem(customName.trim(),customPrice,customNote);showToast(`${customName} added`,'success');setShowCustom(false);setCustomName('');setCustomPrice('');setCustomNote('');}}>Add to order</button>
           </div>
         </div></div>
+      )}
+
+      {/* Item info modal — long press */}
+      {infoItem&&(
+        <ItemInfoModal
+          item={infoItem}
+          onClose={()=>setInfoItem(null)}
+          onAddToOrder={()=>{ setInfoItem(null); handleItemTap(infoItem); }}
+        />
+      )}
+
+      {/* Order review modal */}
+      {showReview&&(
+        <OrderReviewModal
+          items={items}
+          subtotal={subtotal}
+          service={service}
+          total={total}
+          checkDiscount={checkDiscount}
+          orderType={orderType}
+          tableLabel={activeTable?.label}
+          server={session?.server||staff?.name}
+          covers={covers}
+          customer={customer}
+          onClose={()=>setShowReview(false)}
+          onCheckout={()=>{ setShowReview(false); if(items.length>0) setShowCheckout(true); }}
+          onPrint={()=>{ setShowReview(false); setShowReceipt(true); }}
+        />
       )}
     </div>
   );

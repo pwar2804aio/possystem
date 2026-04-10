@@ -137,6 +137,9 @@ export const useStore = create((set, get) => ({
       status: 'pending',
     };
 
+    // Decrement daily count if set
+    if (item.id) get().decrementDailyCount(item.id);
+
     if (activeTableId) {
       // Add to the table's session
       set(s => ({
@@ -361,6 +364,39 @@ export const useStore = create((set, get) => ({
   // ── 86 ────────────────────────────────────
   eightySixIds: [],
   toggle86: id => set(s=>({ eightySixIds:s.eightySixIds.includes(id)?s.eightySixIds.filter(x=>x!==id):[...s.eightySixIds,id] })),
+
+  // ── Daily counts / par levels ──────────────────────────────────────────────
+  dailyCounts: {},
+  setDailyCount: (itemId, count) => {
+    const n = parseInt(count);
+    if (!n || n <= 0) return;
+    set(s => {
+      // Un-86 if previously auto-86'd from count
+      const was86 = s.eightySixIds.includes(itemId);
+      return {
+        dailyCounts: { ...s.dailyCounts, [itemId]: { par: n, remaining: n } },
+        eightySixIds: was86 ? s.eightySixIds.filter(x => x !== itemId) : s.eightySixIds,
+      };
+    });
+  },
+  clearDailyCount: (itemId) => {
+    set(s => ({
+      dailyCounts: { ...s.dailyCounts, [itemId]: undefined },
+    }));
+  },
+  decrementDailyCount: (itemId) => {
+    set(s => {
+      const current = s.dailyCounts[itemId];
+      if (!current || current.remaining <= 0) return s;
+      const remaining = current.remaining - 1;
+      const newCounts = { ...s.dailyCounts, [itemId]: { ...current, remaining } };
+      if (remaining <= 0) {
+        get().showToast(`Sold out — auto 86'd`, 'warning');
+        return { dailyCounts: newCounts, eightySixIds: [...s.eightySixIds, itemId] };
+      }
+      return { dailyCounts: newCounts };
+    });
+  },
 
   // ── Bar tabs ──────────────────────────────
   tabs: [],
