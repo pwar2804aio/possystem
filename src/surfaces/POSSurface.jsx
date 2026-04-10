@@ -115,14 +115,14 @@ export default function POSSurface() {
     return [...fromQuick, ...pad];
   }, [MENU_ITEMS, eightySixIds, assignedSection]);
 
-  const rawItems = cat==='quick'
+  const catItems = cat==='quick'
     ? quickItems
     : MENU_ITEMS.filter(i=>i.cat===cat && !i.archived);
   const displayItems = useMemo(()=>{
-    if (!search.trim()) return rawItems;
+    if (!search.trim()) return catItems;
     const q=search.toLowerCase();
     return MENU_ITEMS.filter(i=>i.name.toLowerCase().includes(q)||i.description?.toLowerCase().includes(q));
-  },[cat,search,rawItems]);
+  },[cat,search,catItems]);
 
   const byCourse = useMemo(()=>{
     const g={};
