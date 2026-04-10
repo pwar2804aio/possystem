@@ -463,11 +463,10 @@ export const useStore = create((set, get) => ({
     return record;
   },
 
-  refundCheck: (checkId, { items: refundItems, isFullRefund, manager, reason }) => {
+  refundCheck: (checkId, { items: refundItems, isFullRefund, manager, reason, tenderMethod, amount }) => {
     set(s => ({
       closedChecks: s.closedChecks.map(chk => {
         if (chk.id !== checkId) return chk;
-        const refundAmount = refundItems.reduce((sum, ri) => sum + ri.price * ri.refundQty, 0);
         const refund = {
           id: `ref-${Date.now()}`,
           timestamp: new Date(),
@@ -475,15 +474,16 @@ export const useStore = create((set, get) => ({
           managerId: manager.id,
           reason,
           isFullRefund,
+          tenderMethod: tenderMethod || 'card',
           items: refundItems,
-          amount: refundAmount,
+          amount: amount || refundItems.reduce((s, ri) => s + ri.price * ri.refundQty, 0),
         };
         const totalRefunded = [...chk.refunds, refund].reduce((s, r) => s + r.amount, 0);
         const status = totalRefunded >= chk.subtotal ? 'refunded' : 'partial_refund';
         return { ...chk, refunds: [...chk.refunds, refund], status };
       }),
     }));
-    get().showToast(`Refund processed by ${manager.name}`, 'success');
+    get().showToast(`Refund of £${amount?.toFixed(2)} processed via ${tenderMethod}`, 'success');
   },
 
   // ── Void log ──────────────────────────────
