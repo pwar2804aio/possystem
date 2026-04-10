@@ -260,6 +260,38 @@ export const useStore = create((set, get) => ({
   updateModifier: (id, patch) => set(s => ({ modifierLibrary: s.modifierLibrary.map(m => m.id===id ? {...m,...patch} : m) })),
   removeModifier: id => set(s => ({ modifierLibrary: s.modifierLibrary.filter(m => m.id!==id) })),
 
+  // ── Modifier groups — reusable paid option groups ─────────────────────────
+  // These change the price. Assigned to items in the Product Builder.
+  modifierGroupDefs: [
+    { id:'mgd-1', name:'Sauce choice',       min:0, max:1,
+      options:[{id:'mgo-1',name:'Peppercorn',price:0},{id:'mgo-2',name:'Béarnaise',price:0},{id:'mgo-3',name:'Chimichurri',price:0},{id:'mgo-4',name:'No sauce',price:0}] },
+    { id:'mgd-2', name:'Side swap',          min:0, max:1,
+      options:[{id:'mgo-5',name:'Salad instead of fries',price:0},{id:'mgo-6',name:'Sweet potato fries',price:1.50},{id:'mgo-7',name:'Mac & cheese',price:2.50}] },
+    { id:'mgd-3', name:'Extras',             min:0, max:5,
+      options:[{id:'mgo-8',name:'Extra sauce',price:0.50},{id:'mgo-9',name:'Truffle oil',price:3.50},{id:'mgo-10',name:'Extra bacon',price:2.50}] },
+    { id:'mgd-4', name:'Milk choice',        min:1, max:1,
+      options:[{id:'mgo-11',name:'Whole milk',price:0},{id:'mgo-12',name:'Oat milk',price:0.50},{id:'mgo-13',name:'Almond milk',price:0.50},{id:'mgo-14',name:'Soy milk',price:0.50}] },
+  ],
+  addModifierGroupDef: g => set(s => ({ modifierGroupDefs:[...s.modifierGroupDefs,{id:`mgd-${Date.now()}`,...g}] })),
+  updateModifierGroupDef: (id,patch) => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
+  removeModifierGroupDef: id => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.filter(g=>g.id!==id) })),
+
+  // ── Instruction groups — preparation instructions (no price change) ────────
+  // These DON'T change the price. e.g. "Cooking preference: Rare / Medium / Well done"
+  instructionGroupDefs: [
+    { id:'igd-1', name:'Cooking preference',
+      options:['Rare','Medium rare','Medium','Medium well','Well done'] },
+    { id:'igd-2', name:'Bread service',
+      options:['With bread','No bread','Gluten-free bread'] },
+    { id:'igd-3', name:'Temperature',
+      options:['Hot','Warm','Room temperature','Cold'] },
+    { id:'igd-4', name:'Spice level',
+      options:['Mild','Medium','Hot','Extra hot'] },
+  ],
+  addInstructionGroupDef: g => set(s => ({ instructionGroupDefs:[...s.instructionGroupDefs,{id:`igd-${Date.now()}`,...g}] })),
+  updateInstructionGroupDef: (id,patch) => set(s => ({ instructionGroupDefs:s.instructionGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
+  removeInstructionGroupDef: id => set(s => ({ instructionGroupDefs:s.instructionGroupDefs.filter(g=>g.id!==id) })),
+
   // ── Menu items — full enhanced model ─────────────────────────────────────────
   //
   // Triple naming:  menuName | receiptName | kitchenName
