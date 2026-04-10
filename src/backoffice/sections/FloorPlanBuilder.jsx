@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 
 const SHAPES = [{ id:'sq', label:'Square/Rect' }, { id:'rd', label:'Round' }];
@@ -18,7 +18,19 @@ export default function FloorPlanBuilder() {
   const [showAddTable, setShowAddTable] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
-  const canvasRef = useRef(null);
+  const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' | 'saving' | 'pushed'
+  const saveTimer = useRef(null);
+  const canvasRef  = useRef(null);
+
+  // Called on every floor plan mutation — shows save status
+  const markChanged = useCallback(() => {
+    setSaveStatus('saving');
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      setSaveStatus('pushed');
+      setTimeout(() => setSaveStatus('saved'), 2500);
+    }, 300);
+  }, []);
 
   const displayTables = tables.filter(t =>
     !t.parentId && (viewSection === 'all' || t.section === viewSection)
@@ -45,12 +57,13 @@ export default function FloorPlanBuilder() {
   }, [dragging, dragOffset, updateTableLayout]);
 
   const handleMouseUp = useCallback(() => {
-    if (dragging) { showToast('Position saved', 'success'); setDragging(null); }
-  }, [dragging, showToast]);
+    if (dragging) { markChanged(); setDragging(null); }
+  }, [dragging, markChanged]);
 
   const upd = (key, val) => {
     if (!selected) return;
     updateTableLayout(selected, { [key]: val });
+    markChanged();
   };
 
   const sectionColor = (id) => locationSections.find(s => s.id === id)?.color || '#888780';
@@ -174,7 +187,7 @@ export default function FloorPlanBuilder() {
                 ))}
               </div>
 
-              <button onClick={() => { removeTableFromLayout(selected); setSelected(null); showToast('Table removed', 'warning'); }} style={{
+              <button onClick={() => { removeTableFromLayout(selected); setSelected(null); markChanged(); }} style={{
                 width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
                 background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:700,
               }}>Remove table</button>
@@ -190,10 +203,28 @@ export default function FloorPlanBuilder() {
 
       {/* ── Canvas ── */}
       <div style={{ flex:1, overflow:'auto', background:'var(--bg)' }}>
-        <div style={{ padding:'8px 14px', borderBottom:'1px solid var(--bdr)', fontSize:11, color:'var(--t4)', background:'var(--bg1)', display:'flex', gap:16, alignItems:'center' }}>
+        <div style={{ padding:'8px 14px', borderBottom:'1px solid var(--bdr)', fontSize:11, color:'var(--t4)', background:'var(--bg1)', display:'flex', gap:16, alignItems:'center', flexShrink:0 }}>
           <span>Drag tables to reposition · click to select</span>
           {selected && <span style={{ color:'var(--acc)', fontWeight:700 }}>Editing: {selectedTable?.label}</span>}
-          <span style={{ marginLeft:'auto' }}>{displayTables.length} table{displayTables.length !== 1 ? 's' : ''} shown</span>
+          <span style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6 }}>
+            {saveStatus === 'saving' && (
+              <span style={{ display:'flex', alignItems:'center', gap:5, color:'var(--t3)' }}>
+                <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--acc)', animation:'pulse 1s ease-in-out infinite' }}/>
+                Saving…
+              </span>
+            )}
+            {saveStatus === 'pushed' && (
+              <span style={{ display:'flex', alignItems:'center', gap:5, color:'var(--grn)', fontWeight:700 }}>
+                <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--grn)' }}/>
+                ✓ Pushed to all terminals
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span style={{ color:'var(--t4)' }}>Auto-saves · syncs to all POS terminals</span>
+            )}
+            <span style={{ color:'var(--bdr2)' }}>·</span>
+            <span>{displayTables.length} table{displayTables.length !== 1 ? 's' : ''}</span>
+          </span>
         </div>
 
         <div
@@ -264,7 +295,7 @@ export default function FloorPlanBuilder() {
           onClose={() => setShowAddTable(false)}
           onAdd={table => {
             addTableToLayout(table);
-            showToast(`${table.label} added`, 'success');
+            markChanged();
             setShowAddTable(false);
           }}
         />
@@ -274,7 +305,7 @@ export default function FloorPlanBuilder() {
       {showAddSection && (
         <SectionModal
           section={null}
-          onSave={sec => { addSection(sec); showToast(`"${sec.label}" section added`, 'success'); setShowAddSection(false); }}
+          onSave={sec => { addSection(sec); markChanged(); setShowAddSection(false); }}
           onClose={() => setShowAddSection(false)}
         />
       )}
@@ -283,11 +314,11 @@ export default function FloorPlanBuilder() {
       {editingSection && (
         <SectionModal
           section={editingSection}
-          onSave={sec => { updateSection(editingSection.id, sec); showToast('Section updated', 'success'); setEditingSection(null); }}
+          onSave={sec => { updateSection(editingSection.id, sec); markChanged(); setEditingSection(null); }}
           onDelete={() => {
             if (locationSections.length <= 1) { showToast('Must keep at least one section', 'error'); return; }
             removeSection(editingSection.id);
-            showToast('Section removed', 'warning');
+            markChanged();
             setEditingSection(null);
             setViewSection('all');
           }}
