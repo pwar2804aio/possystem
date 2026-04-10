@@ -8,33 +8,42 @@ import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface } from './surfaces/OtherSurfaces';
 import BackOfficeApp from './backoffice/BackOfficeApp';
 
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 
 const CHANGELOG = [
   {
-    version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
+    version: '0.7.1', date: 'Apr 2026', label: 'Back Office polish',
     changes: [
-      'Back Office is now a fully separate portal — click ⚙ Office in the sidebar to enter, or ← Back to POS to return',
-      'Menu Manager: view all items by category, edit name/price/description/allergens, toggle 86 status, set daily counts, add new items. Active/86\'d filter and live search',
-      'Floor Plan Builder: drag tables to reposition (snap to 8px grid), edit label/covers/shape/section, resize, add new tables, remove tables',
-      'Device Profiles: create named profiles (e.g. "Bar terminal") with full config — default screen, order types, section filter, hidden features, table service on/off. Edit, push to terminals',
-      'Device Registry: register Sunmi hardware via pairing code flow, assign profiles, toggle online/offline, configure per-device settings',
-      'Staff Manager: add/edit/remove staff, set roles (Manager/Server/Bartender/Cashier/Kitchen), granular permissions, change PIN with confirmation numpad',
-      'Print Routing: production centre → printer mapping, live print job log, test print, online/offline toggle',
-      'Reports: full shift reporting with period filter (today/week/all time) and closed check log',
+      'Print routing: real reassignment modal — select which printer receives tickets from each production centre',
+      'Active device profile badge in the POS shift bar — shows which profile is loaded on this terminal',
+      'Device profile "Apply to this terminal" button writes the config to localStorage and immediately changes the POS surface and available order types',
+      'PrintRouting section fully rebuilt — live job log, production centre routing map, reassign modal, online/offline toggle per printer',
+      'BOReports require() call removed — reports load cleanly without module errors',
     ],
   },
   {
-    version: '0.6.8', date: 'Apr 2026', label: 'Allergens on bill + printer routing + item animation',
-    changes: ['Allergens on checkout review and receipt', 'Printer routing fires per production centre', 'Item add animation, search result count'],
+    version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
+    changes: [
+      'Separate Back Office portal — ⚙ Office in sidebar, ← Back to POS to return',
+      'Menu Manager: full CRUD with allergen editor, 86 toggle, daily count setter',
+      'Floor Plan Builder: drag tables, edit properties, add/remove, section filter',
+      'Device Profiles: create/edit profiles with default screen, order types, hidden features, table service toggle',
+      'Device Registry: pair new Sunmi hardware, assign profiles, online/offline',
+      'Staff Manager: add/edit/remove, roles, granular permissions, PIN change flow',
+      'Print Routing: production centre → printer mapping with live job feed',
+    ],
+  },
+  {
+    version: '0.6.8', date: 'Apr 2026', label: 'Allergens on bill + printer routing',
+    changes: ['Allergens on checkout and receipt, printer routing fires per centre, item add animation'],
   },
   {
     version: '0.6.7', date: 'Apr 2026', label: 'POS function fixes',
-    changes: ['Qty removes at 0, allergen gate, covers edit, table transfer, bar void modal, named order display'],
+    changes: ['Qty removes at 0, allergen gate, covers edit, table transfer, bar void modal'],
   },
   {
     version: '0.6.6', date: 'Apr 2026', label: 'Split check polish',
-    changes: ['Child tables hidden, sub-rows in orders list, Check 2 badge in POS'],
+    changes: ['Child tables hidden, orders list sub-rows, Check 2 badge'],
   },
   {
     version: '0.6.5', date: 'Apr 2026', label: 'Send routing + split checks',
@@ -45,9 +54,8 @@ const CHANGELOG = [
   { version:'0.6.2', date:'Apr 2026', label:'Item info + daily count', changes:['Long press, recipe, daily count, order review'] },
   { version:'0.6.1', date:'Apr 2026', label:'Light mode', changes:['☀️/🌙 toggle, checkout redesign'] },
   { version:'0.6.0', date:'Apr 2026', label:'Operator Dark UI', changes:['Cards, nav, order items rebuilt'] },
-  { version:'0.5.2', date:'Apr 2026', label:'Split bill', changes:['4 modes, independently tendered'] },
-  { version:'0.5.0', date:'Apr 2026', label:'Voids, discounts & history', changes:['Manager PIN, discounts, refund'] },
 ];
+
 
 
 
@@ -98,6 +106,7 @@ const NAV = [
 ];
 
 function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme }) {
+  const { deviceConfig } = useStore();
   return (
     <div style={{ height:42, display:'flex', alignItems:'center', background:'var(--bg1)', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
       <div style={{ width:'var(--nav)', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', borderRight:'1px solid var(--bdr)', flexShrink:0 }}>
@@ -114,6 +123,13 @@ function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme }) {
             <span style={{ fontSize:13, fontWeight:700, color:'var(--t2)', fontFamily:typeof s.val==='string'&&s.val.includes('£')?'var(--font-mono)':'inherit' }}>{s.val}</span>
           </div>
         ))}
+        {/* Active device profile badge */}
+        {deviceConfig?.profileName && (
+          <div style={{ display:'flex', alignItems:'center', gap:5, padding:'2px 8px', borderRadius:20, background:'var(--bg3)', border:'1px solid var(--bdr)', marginLeft:4 }}>
+            <span style={{ fontSize:9, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.06em' }}>Profile</span>
+            <span style={{ fontSize:11, fontWeight:700, color:'var(--acc)' }}>{deviceConfig.profileName}</span>
+          </div>
+        )}
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 14px', flexShrink:0 }}>
         <div style={{ fontSize:11, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>
