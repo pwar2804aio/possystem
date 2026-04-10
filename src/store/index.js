@@ -103,7 +103,8 @@ export const useStore = create((set, get) => ({
   },
 
   // Close / clear a table after payment
-  clearTable: (tableId) => {
+  clearTable: (tableId, paymentInfo = {}) => {
+    get().recordClosedCheck(tableId, paymentInfo);
     get()._updateTable(tableId, { status:'available', session:null });
     set(s => ({ activeTableId: s.activeTableId===tableId ? null : s.activeTableId }));
   },
@@ -385,6 +386,105 @@ export const useStore = create((set, get) => ({
     { id:'t-demo2', ref:'TAB-002', name:'Tom & Sarah', seatId:null, tableId:'t4', openedBy:'Tom', openedAt:new Date(Date.now()-45*60000), status:'running', preAuth:false, preAuthAmount:0, note:'', total:56,
       rounds:[{ id:'r3', sentAt:new Date(Date.now()-40*60000), subtotal:28, note:'', items:[{uid:'ri4',name:'Old Fashioned',price:12,qty:2,mods:[{label:'Woodford Reserve',price:3}],notes:''}] }] },
   ] }),
+
+  // ── Closed check history ──────────────────
+  closedChecks: [
+    { id:'cc1', ref:'#1042', tableId:'t1', tableLabel:'T1', server:'Sarah', covers:2, orderType:'dine-in', customer:null,
+      items:[{uid:'cc1i1',name:'Carbonara pasta',price:14.5,qty:2,mods:[],notes:'',allergens:[]},{uid:'cc1i2',name:'House red wine — 250ml',price:10.5,qty:2,mods:[],notes:'',allergens:[]}],
+      discounts:[], subtotal:50, service:6.25, tip:7.50, total:63.75, method:'card',
+      closedAt:new Date(Date.now()-25*60000), status:'paid', refunds:[] },
+    { id:'cc2', ref:'#1041', tableId:'t3', tableLabel:'T3', server:'Tom', covers:4, orderType:'dine-in', customer:null,
+      items:[{uid:'cc2i1',name:'Ribeye steak 8oz',price:32,qty:2,mods:[{label:'Cooking: Medium rare',price:0}],notes:'',allergens:[]},{uid:'cc2i2',name:'Chicken supreme',price:22,qty:1,mods:[],notes:'',allergens:[]},{uid:'cc2i3',name:'Tiramisu',price:8.5,qty:2,mods:[],notes:'',allergens:[]}],
+      discounts:[], subtotal:103, service:12.88, tip:15, total:130.88, method:'card',
+      closedAt:new Date(Date.now()-62*60000), status:'partial_refund',
+      refunds:[{id:'r1',timestamp:new Date(Date.now()-30*60000),manager:'Alex',managerId:'s1',reason:'Quality issue',isFullRefund:false,items:[{uid:'cc2i3',name:'Tiramisu',price:8.5,qty:2,refundQty:1}],amount:8.5}] },
+    { id:'cc3', ref:'#1040', tableId:null, tableLabel:null, server:'Alex', covers:1, orderType:'collection',
+      customer:{name:'James Wilson',phone:'07700 900123',collectionTime:'6:30 PM'},
+      items:[{uid:'cc3i1',name:'Pepperoni pizza',price:14,qty:1,mods:[],notes:'Extra cheese',allergens:[]},{uid:'cc3i2',name:'Garlic bread',price:4.5,qty:1,mods:[],notes:'',allergens:[]}],
+      discounts:[], subtotal:18.5, service:0, tip:0, total:18.5, method:'card',
+      closedAt:new Date(Date.now()-90*60000), status:'paid', refunds:[] },
+  ],
+
+  recordClosedCheck: (tableId, paymentInfo = {}) => {
+    const { tables, staff } = get();
+    const table = tables.find(t => t.id === tableId);
+    const session = table?.session;
+    if (!session) return;
+
+    const ref = `#${Math.floor(1000 + Math.random() * 9000)}`;
+    const record = {
+      id: `chk-${Date.now()}`,
+      ref,
+      tableId,
+      tableLabel: table.label,
+      server:     session.server || staff?.name || 'Staff',
+      covers:     session.covers || 1,
+      orderType:  'dine-in',
+      items:      session.items.filter(i => !i.voided).map(i => ({ ...i })),
+      discounts:  session.discounts || [],
+      subtotal:   session.subtotal || 0,
+      service:    (session.subtotal || 0) * 0.125,
+      tip:        paymentInfo.tip || 0,
+      total:      paymentInfo.grand || session.total || 0,
+      method:     paymentInfo.method || 'card',
+      closedAt:   new Date(),
+      status:     'paid',   // paid | partial_refund | refunded
+      refunds:    [],
+    };
+    set(s => ({ closedChecks: [record, ...s.closedChecks] }));
+    return record;
+  },
+
+  recordWalkInClosed: (walkInOrder, orderType, customer, paymentInfo = {}) => {
+    if (!walkInOrder?.items?.length) return;
+    const { staff } = get();
+    const subtotal = walkInOrder.items.reduce((s, i) => s + i.price * i.qty, 0);
+    const record = {
+      id: `chk-${Date.now()}`,
+      ref: `#${Math.floor(1000 + Math.random() * 9000)}`,
+      tableId: null,
+      tableLabel: null,
+      server: staff?.name || 'Staff',
+      covers: 1,
+      orderType,
+      customer,
+      items: walkInOrder.items.filter(i => !i.voided).map(i => ({ ...i })),
+      discounts: walkInOrder.discounts || [],
+      subtotal,
+      service: 0,
+      tip: paymentInfo.tip || 0,
+      total: paymentInfo.grand || subtotal,
+      method: paymentInfo.method || 'card',
+      closedAt: new Date(),
+      status: 'paid',
+      refunds: [],
+    };
+    set(s => ({ closedChecks: [record, ...s.closedChecks] }));
+    return record;
+  },
+
+  refundCheck: (checkId, { items: refundItems, isFullRefund, manager, reason }) => {
+    set(s => ({
+      closedChecks: s.closedChecks.map(chk => {
+        if (chk.id !== checkId) return chk;
+        const refundAmount = refundItems.reduce((sum, ri) => sum + ri.price * ri.refundQty, 0);
+        const refund = {
+          id: `ref-${Date.now()}`,
+          timestamp: new Date(),
+          manager: manager.name,
+          managerId: manager.id,
+          reason,
+          isFullRefund,
+          items: refundItems,
+          amount: refundAmount,
+        };
+        const totalRefunded = [...chk.refunds, refund].reduce((s, r) => s + r.amount, 0);
+        const status = totalRefunded >= chk.subtotal ? 'refunded' : 'partial_refund';
+        return { ...chk, refunds: [...chk.refunds, refund], status };
+      }),
+    }));
+    get().showToast(`Refund processed by ${manager.name}`, 'success');
+  },
 
   // ── Void log ──────────────────────────────
   voidLog: [],

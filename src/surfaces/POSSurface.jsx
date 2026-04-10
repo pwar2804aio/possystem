@@ -7,6 +7,7 @@ import CustomerModal from '../components/CustomerModal';
 import VoidModal from '../components/VoidModal';
 import DiscountModal from '../components/DiscountModal';
 import { ReceiptModal, ReprintModal } from '../components/ReceiptModal';
+import CheckHistory from '../components/CheckHistory';
 
 const CAT_META = {
   quick:    {icon:'⚡',color:'#e8a020'}, starters:{icon:'🥗',color:'#22c55e'},
@@ -28,7 +29,7 @@ export default function POSSurface() {
     updateItemSeat, updateItemCourse, setOrderNote,
     sendToKitchen, fireCourse,
     getPOSItems, getPOSTotals, getPOSOrderNote,
-    activeTableId, tables, clearTable, clearWalkIn, setActiveTableId,
+    activeTableId, tables, clearTable, clearWalkIn, setActiveTableId, recordWalkInClosed,
     orderType, setOrderType, customer, setCustomer, clearCustomer,
     orderQueue, updateQueueStatus, removeFromQueue, showToast,
     pendingItem, setPendingItem, clearPendingItem,
@@ -124,13 +125,14 @@ export default function POSSurface() {
     }
   };
 
-  const handlePayComplete = () => {
+  const handlePayComplete = (paymentInfo = {}) => {
     setShowCheckout(false);
     if (activeTableId) {
-      clearTable(activeTableId);
+      clearTable(activeTableId, paymentInfo);
       showToast('Payment complete — table cleared','success');
       setSurface('tables');
     } else {
+      recordWalkInClosed(useStore.getState().walkInOrder, orderType, customer, paymentInfo);
       clearWalkIn();
       showToast('Payment complete','success');
     }
@@ -342,7 +344,7 @@ export default function POSSurface() {
 
         {/* Tab bar */}
         <div style={{padding:'0 14px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0,display:'flex',alignItems:'center',gap:0}}>
-          {[['menu','Menu'],['orders','Orders hub']].map(([t,l])=>{
+          {[['menu','Menu'],['orders','Orders hub'],['history','History']].map(([t,l])=>{
             const isActive = rightTab===t;
             const badge = t==='orders' ? orderQueue.filter(o=>o.status!=='collected').length : 0;
             return (
@@ -426,6 +428,9 @@ export default function POSSurface() {
 
         {/* ── Orders hub tab ── */}
         {rightTab==='orders'&&<OrdersHub orderQueue={orderQueue} updateQueueStatus={updateQueueStatus} removeFromQueue={removeFromQueue} showToast={showToast}/>}
+
+        {/* ── History tab ── */}
+        {rightTab==='history'&&<CheckHistory/>}
       </div>
 
       {/* Modals */}

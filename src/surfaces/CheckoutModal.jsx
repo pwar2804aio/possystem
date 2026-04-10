@@ -7,12 +7,18 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
   const [customTip, setCustomTip] = useState('');
   const [cash, setCash]       = useState('');
   const [splits, setSplits]   = useState(2);
+  const [payMethod, setPayMethod] = useState('card');
 
   const isBarTab = orderType === 'bar-tab';
 
   const tipAmt  = customTip !== '' ? (parseFloat(customTip)||0) : subtotal * tipPct / 100;
   const grand   = total + tipAmt;
   const change  = cash ? Math.max(0, parseFloat(cash) - grand) : 0;
+
+  const complete = (method) => {
+    const m = method || payMethod;
+    onComplete({ method: m, tip: tipAmt, grand });
+  };
 
   const STEPS = { review:'Review', tip:'Tip', method:'Payment', card:'Card', cash:'Cash', split:'Split' };
 
@@ -160,7 +166,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                 <div key={m.id} style={{ padding:16, background:'var(--bg3)', borderRadius:12, cursor:'pointer', border:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:14, marginBottom:8, transition:'all .12s' }}
                   onMouseEnter={e=>e.currentTarget.style.borderColor='var(--acc-b)'}
                   onMouseLeave={e=>e.currentTarget.style.borderColor='var(--bdr)'}
-                  onClick={() => setStep(m.id)}>
+                  onClick={() => { setPayMethod(m.id); setStep(m.id); }}>
                   <div style={{ fontSize:28 }}>{m.icon}</div>
                   <div><div style={{ fontWeight:500, fontSize:14 }}>{m.label}</div><div style={{ fontSize:12, color:'var(--t3)', marginTop:2 }}>{m.sub}</div></div>
                 </div>
@@ -179,7 +185,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                 Waiting for card...
               </div>
               <br/>
-              <button className="btn btn-grn btn-lg" onClick={onComplete}>Simulate payment ✓</button>
+              <button className="btn btn-grn btn-lg" onClick={()=>complete()}>Simulate payment ✓</button>
             </div>
           )}
 
@@ -204,7 +210,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
               )}
               <button className="btn btn-grn btn-full btn-lg"
                 disabled={!cash || parseFloat(cash) < grand}
-                onClick={onComplete}>
+                onClick={()=>complete()}>
                 Complete cash payment
               </button>
             </>
@@ -240,7 +246,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                   <button className="btn btn-ghost btn-sm">Charge card</button>
                 </div>
               ))}
-              <button className="btn btn-grn btn-full btn-lg" style={{ marginTop:12 }} onClick={onComplete}>Mark all paid ✓</button>
+              <button className="btn btn-grn btn-full btn-lg" style={{ marginTop:12 }} onClick={()=>complete()}>Mark all paid ✓</button>
             </>
           )}
         </div>
