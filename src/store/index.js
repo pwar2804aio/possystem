@@ -188,19 +188,91 @@ export const useStore = create((set, get) => ({
   updateDevice: (id, patch) => set(s => ({ devices:s.devices.map(d=>d.id===id?{...d,...patch}:d) })),
   removeDevice: (id) => set(s => ({ devices:s.devices.filter(d=>d.id!==id) })),
 
-  // ── Editable menu items (live copy from seed, editable in back office) ─────
-  menuItems: [...MENU_ITEMS], // editable copy — Back Office writes here, POS reads here
-  menuCategories: [...CATEGORIES],
+  // ── Menus (multiple menus per location, assigned to device profiles) ─────────
+  menus: [
+    { id:'menu-1', name:'Main menu',    description:'Full food and drinks', scope:'local', assignedProfiles:[], isDefault:true,  isActive:true, sortOrder:0 },
+    { id:'menu-2', name:'Bar menu',     description:'Drinks and bar snacks',scope:'local', assignedProfiles:['prof-2'],isDefault:false, isActive:true, sortOrder:1 },
+    { id:'menu-3', name:'Lunch menu',   description:'Midday menu',          scope:'local', assignedProfiles:[], isDefault:false, isActive:true, sortOrder:2 },
+  ],
+  activeMenuId: 'menu-1',
+  setActiveMenuId: id => set({ activeMenuId: id }),
+  addMenu: menu => set(s => ({ menus: [...s.menus, { id:`menu-${Date.now()}`, ...menu }] })),
+  updateMenu: (id, patch) => set(s => ({ menus: s.menus.map(m => m.id===id ? { ...m, ...patch } : m) })),
+  removeMenu: id => set(s => ({ menus: s.menus.filter(m => m.id!==id) })),
+
+  // ── Categories (hierarchical — parentId for subcategories) ───────────────────
+  // accountingGroup → for financial reporting (P&L, tax)
+  // statisticGroup  → for operational reporting (bestsellers, waste)
+  menuCategories: [
+    ...CATEGORIES.map((c, i) => ({
+      ...c,
+      menuId: 'menu-1',
+      parentId: null,
+      accountingGroup: c.isSpecial ? 'Special' : 'Food & Beverage',
+      statisticGroup: c.label,
+      defaultProductionCentreId: null,
+      defaultCourse: null,
+      color: c.color || '#888780',
+      sortOrder: i,
+    })),
+    // Subcategory examples
+    { id:'cat-drinks-cocktails', menuId:'menu-1', parentId:'drinks',     label:'Cocktails',   icon:'🍸', accountingGroup:'Beverages', statisticGroup:'Cocktails', color:'#a855f7', sortOrder:0, defaultProductionCentreId:'pc4', defaultCourse:null },
+    { id:'cat-drinks-wine',      menuId:'menu-1', parentId:'drinks',     label:'Wine',        icon:'🍷', accountingGroup:'Beverages', statisticGroup:'Wine',      color:'#8b1e3f', sortOrder:1, defaultProductionCentreId:'pc4', defaultCourse:null },
+    { id:'cat-starters-hot',     menuId:'menu-1', parentId:'starters',   label:'Hot starters',icon:'🔥', accountingGroup:'Food',      statisticGroup:'Hot starters', color:'#ef4444', sortOrder:0, defaultProductionCentreId:'pc1', defaultCourse:1 },
+    { id:'cat-starters-cold',    menuId:'menu-1', parentId:'starters',   label:'Cold starters',icon:'❄️', accountingGroup:'Food',     statisticGroup:'Cold starters', color:'#22d3ee', sortOrder:1, defaultProductionCentreId:'pc2', defaultCourse:1 },
+  ],
+  addCategory: cat => set(s => ({ menuCategories: [...s.menuCategories, { id:`cat-${Date.now()}`, ...cat }] })),
+  updateCategory: (id, patch) => set(s => ({ menuCategories: s.menuCategories.map(c => c.id===id ? { ...c, ...patch } : c) })),
+  removeCategory: id => set(s => ({ menuCategories: s.menuCategories.filter(c => c.id!==id) })),
+
+  // ── Menu items — full enhanced model ─────────────────────────────────────────
+  //
+  // Triple naming:  menuName (POS button) | receiptName | kitchenName
+  // Pricing:        basePrice + priceOverrides{menuId→price} + locationPriceOverrides{locId→price}
+  // Scope:          local | shared (name shared, price per-location) | global (all shared)
+  // Routing:        productionCentreId (null = inherit from category), course (null = inherit)
+  // Type:           simple | modifiers | variants | pizza | bundle
+  // Visibility:     { pos, kiosk, online, onlineDelivery }
+  //
+  menuItems: MENU_ITEMS.map(item => ({
+    // Backward-compat: existing fields stay
+    ...item,
+    // Triple naming — defaults to existing name
+    menuName:    item.menuName    || item.name,
+    receiptName: item.receiptName || item.name,
+    kitchenName: item.kitchenName || item.name,
+    // Multi-site scope
+    scope: item.scope || 'local',
+    // Per-menu price overrides
+    priceOverrides: item.priceOverrides || {},
+    locationPriceOverrides: item.locationPriceOverrides || {},
+    // Routing (null = inherit from category)
+    productionCentreId: item.centreId || null,
+    course: item.course || null,
+    // Content
+    instructions: item.instructions || '',
+    image: item.image || null,
+    tags: item.tags || [],
+    // Visibility
+    visibility: item.visibility || { pos:true, kiosk:true, online:true, onlineDelivery:true },
+  })),
+
   updateMenuItem: (id, patch) => {
     set(s => ({ menuItems: s.menuItems.map(item => item.id===id ? { ...item, ...patch } : item) }));
     import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem({ id, ...patch }));
   },
-  addMenuItem: (item) => {
-    const newItem = { id:`m-${Date.now()}`, status:'active', ...item };
+  addMenuItem: item => {
+    const newItem = { id:`m-${Date.now()}`, scope:'local', priceOverrides:{}, locationPriceOverrides:{}, instructions:'', image:null, tags:[], visibility:{pos:true,kiosk:true,online:true,onlineDelivery:true}, ...item, menuName:item.menuName||item.name, receiptName:item.receiptName||item.name, kitchenName:item.kitchenName||item.name };
     set(s => ({ menuItems: [...s.menuItems, newItem] }));
     import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem(newItem));
   },
-  archiveMenuItem: (id) => set(s => ({
+  duplicateMenuItem: id => {
+    const source = useStore.getState().menuItems.find(i => i.id === id);
+    if (!source) return;
+    const dupe = { ...source, id:`m-${Date.now()}`, menuName:`${source.menuName} (copy)`, receiptName:`${source.receiptName} (copy)`, kitchenName:`${source.kitchenName} (copy)` };
+    set(s => ({ menuItems: [...s.menuItems, dupe] }));
+  },
+  archiveMenuItem: id => set(s => ({
     menuItems: s.menuItems.map(item => item.id===id ? { ...item, archived:true } : item)
   })),
 
