@@ -11,39 +11,41 @@ import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
 
-const VERSION = '0.7.5';
+const VERSION = '0.7.6';
 
 const CHANGELOG = [
   {
-    version: '0.7.5', date: 'Apr 2026', label: 'Back Office publish workflow',
+    version: '0.7.6', date: 'Apr 2026', label: 'Menu edits live end-to-end',
     changes: [
-      'Back Office changes no longer push to POS automatically — they stage as drafts',
-      '"Push to POS →" button in the Back Office header — shows a change counter badge when there are unpublished edits. Glows amber when changes are pending',
-      'POS sync banner — slides down below the shift bar when the Back Office has pushed an update. Shows who pushed it, when, and what changed',
-      '"Sync now" button on the banner applies the config update immediately — merges layout changes with live operational state (tables keep their sessions/orders)',
-      '"Later" dismisses the banner without applying — useful during busy service',
-      'Tabs that open after a push still see the pending update (config snapshot persisted in localStorage)',
-      'Floor plan, sections, and future menu changes go through this publish workflow',
-      '86 list and daily counts still sync instantly (operational) — only config goes through publish',
+      'Menu items are now fully editable in Back Office — name, price, description, allergens. Changes write to the store immediately',
+      'New items can be added from Back Office → Menu Manager → "+ Add item" with full allergen selection',
+      'POS now reads from the store\'s editable menu — pushing from Back Office updates what appears on the POS ordering screen',
+      'Menu items included in the Push to POS snapshot — "Sync now" on the POS banner also updates the menu',
+      'Sync banner now shows menu item count alongside tables and sections in the update summary',
+      'Floor plan save status corrected: now says "Staged — hit Push to POS to go live" instead of "Pushed to all terminals"',
+      'hiddenFeatures from device profile now actually hides POS sidebar icons — bar terminal (?t=bar) no longer shows KDS',
+      'markBOChange wired into DeviceProfiles (save/add/delete) and StaffManager (save/add/remove)',
+      'StatusDrawer printers reference fixed — no longer causes a silent store error',
     ],
   },
   {
+    version: '0.7.5', date: 'Apr 2026', label: 'Back Office publish workflow',
+    changes: ['"Push to POS" button, POS sync banner, config snapshot, staged vs instant sync'],
+  },
+  {
     version: '0.7.4', date: 'Apr 2026', label: 'Cross-tab sync via BroadcastChannel',
-    changes: ['Real-time cross-tab sync for orders, KDS, 86 list, tables. Sync pulse in shift bar'],
+    changes: ['Real-time cross-tab sync, sync pulse in shift bar'],
   },
   {
     version: '0.7.3', date: 'Apr 2026', label: 'Terminal identity + multi-terminal testing',
     changes: ['Terminal name in shift bar, URL param profiles, sessionStorage isolation'],
   },
   {
-    version: '0.7.2', date: 'Apr 2026', label: 'Status drawer + section management',
-    changes: ['Terminal status drawer, editable floor plan sections'],
-  },
-  {
     version: '0.7.0', date: 'Apr 2026', label: '⚙ Back Office Portal',
     changes: ['Menu manager, floor plan, device profiles, devices, staff, print routing'],
   },
 ];
+
 
 
 
@@ -235,12 +237,20 @@ function Sidebar({ surface, setSurface }) {
   const { setAppMode, syncStatus, deviceConfig } = useStore();
   const [showStatus, setShowStatus] = useState(false);
 
+  const hidden = deviceConfig?.hiddenFeatures || [];
   const allOk = syncStatus.printerOnline && syncStatus.paymentTerminalOnline && !syncStatus.pendingChanges;
+
+  // Filter nav items based on device profile hiddenFeatures
+  const FEATURE_MAP = { kds:'kds', reports:'backoffice' };
+  const visibleNav = NAV.filter(n => {
+    const featureKey = Object.entries(FEATURE_MAP).find(([,v]) => v === n.id)?.[0];
+    return !featureKey || !hidden.includes(featureKey);
+  });
 
   return (
     <>
     <nav style={{ width:'var(--nav)', background:'var(--bg1)', borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', alignItems:'center', padding:'10px 0', gap:2, flexShrink:0 }}>
-      {NAV.map(n=>{
+      {visibleNav.map(n=>{
         const active=surface===n.id;
         return(<button key={n.id} onClick={()=>setSurface(n.id)} style={{ width:46, height:46, borderRadius:10, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, background:active?'var(--acc-d)':'transparent', border:`1px solid ${active?'var(--acc-b)':'transparent'}`, color:active?'var(--acc)':'var(--t3)', transition:'all .15s', fontFamily:'inherit' }}>
           <span style={{ fontSize:18, lineHeight:1 }}>{n.icon}</span>

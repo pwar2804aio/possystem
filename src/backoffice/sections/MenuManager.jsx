@@ -9,7 +9,10 @@ const inp = {
 };
 
 export default function MenuManager() {
-  const { eightySixIds, toggle86, showToast, dailyCounts, setDailyCount, markBOChange } = useStore();
+  const { eightySixIds, toggle86, showToast, dailyCounts, setDailyCount, markBOChange, menuItems: storeItems } = useStore();
+
+  // Use store's editable menu — always reflects latest edits
+  const ALL_ITEMS = storeItems || MENU_ITEMS;
   const [activeCat, setActiveCat] = useState('starters');
   const [search, setSearch] = useState('');
   const [editItem, setEditItem] = useState(null);
@@ -19,7 +22,7 @@ export default function MenuManager() {
   const cats = CATEGORIES.filter(c => !c.isSpecial);
 
   const displayItems = useMemo(() => {
-    let items = MENU_ITEMS.filter(i => i.cat === activeCat);
+    let items = ALL_ITEMS.filter(i => i.cat === activeCat);
     if (search) items = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.description?.toLowerCase().includes(search.toLowerCase()));
     if (statusFilter === 'active') items = items.filter(i => !eightySixIds.includes(i.id));
     if (statusFilter === '86d') items = items.filter(i => eightySixIds.includes(i.id));
@@ -29,12 +32,12 @@ export default function MenuManager() {
   const catCounts = useMemo(() => {
     const m = {};
     CATEGORIES.filter(c => !c.isSpecial).forEach(c => {
-      m[c.id] = MENU_ITEMS.filter(i => i.cat === c.id).length;
+      m[c.id] = ALL_ITEMS.filter(i => i.cat === c.id).length;
     });
     return m;
   }, []);
 
-  const totalItems  = MENU_ITEMS.length;
+  const totalItems  = ALL_ITEMS.length;
   const total86     = eightySixIds.length;
   const totalActive = totalItems - total86;
 
@@ -59,7 +62,7 @@ export default function MenuManager() {
         {cats.map(c => {
           const m = CAT_META[c.id] || {};
           const active = activeCat === c.id;
-          const count86 = MENU_ITEMS.filter(i => i.cat === c.id && eightySixIds.includes(i.id)).length;
+          const count86 = ALL_ITEMS.filter(i => i.cat === c.id && eightySixIds.includes(i.id)).length;
           return (
             <button key={c.id} onClick={() => setActiveCat(c.id)} style={{
               width:'100%', padding:'8px 10px', borderRadius:9, cursor:'pointer',
@@ -233,20 +236,23 @@ export default function MenuManager() {
 
 // ── Edit item modal ───────────────────────────────────────────────────────────
 function EditItemModal({ item, onClose }) {
-  const { showToast, setDailyCount, toggle86, eightySixIds } = useStore();
+  const { showToast, setDailyCount, toggle86, eightySixIds, updateMenuItem, markBOChange } = useStore();
   const [tab, setTab] = useState(item._countMode ? 'count' : 'details');
   const [name, setName]     = useState(item.name);
   const [price, setPrice]   = useState(String(item.price || ''));
   const [desc, setDesc]     = useState(item.description || '');
   const [allergens, setAllergens] = useState([...(item.allergens || [])]);
-  const [countVal, setCountVal] = useState('');
   const is86 = eightySixIds.includes(item.id);
 
   const toggleA = (id) => setAllergens(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id]);
 
   const handleSave = () => {
-    // In production this would update Supabase; for now shows what would change
-    showToast(`${name} saved (menu sync in Phase 2)`, 'success');
+    const patch = { name: name.trim(), description: desc };
+    if (item.type !== 'variants' && price) patch.price = parseFloat(price);
+    patch.allergens = allergens;
+    updateMenuItem(item.id, patch);
+    markBOChange();
+    showToast(`${name} updated — push to POS to go live`, 'success');
     onClose();
   };
 
@@ -419,7 +425,7 @@ function DailyCountEditor({ item, onDone }) {
 
 // ── Add item modal ─────────────────────────────────────────────────────────────
 function AddItemModal({ cat, onClose }) {
-  const { showToast } = useStore();
+  const { showToast, addMenuItem, markBOChange } = useStore();
   const [name, setName]   = useState('');
   const [price, setPrice] = useState('');
   const [desc, setDesc]   = useState('');
@@ -428,7 +434,16 @@ function AddItemModal({ cat, onClose }) {
 
   const handleAdd = () => {
     if (!name.trim() || !price) return;
-    showToast(`${name} added to menu (sync in Phase 2)`, 'success');
+    addMenuItem({
+      name: name.trim(),
+      description: desc,
+      price: parseFloat(price),
+      cat,
+      allergens,
+      type: 'single',
+    });
+    markBOChange();
+    showToast(`${name} added — push to POS to go live`, 'success');
     onClose();
   };
 

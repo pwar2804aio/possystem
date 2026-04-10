@@ -157,14 +157,14 @@ export default function BackOfficeApp() {
 
 // ── Push to POS button ────────────────────────────────────────────────────────
 function PushToPOSButton() {
-  const { pendingBOChanges, clearBOChanges, tables, locationSections, staff } = useStore();
+  const { pendingBOChanges, clearBOChanges, tables, locationSections, menuItems, staff } = useStore();
   const [pushing, setPushing] = useState(false);
   const [justPushed, setJustPushed] = useState(false);
 
   const handlePush = () => {
     setPushing(true);
 
-    // Build config snapshot — layout data only (not operational/session state)
+    // Build config snapshot — layout + menu config (not operational/session state)
     const snapshot = {
       version: Date.now(),
       pushedAt: new Date().toISOString(),
@@ -174,6 +174,7 @@ function PushToPOSButton() {
         shape:t.shape, maxCovers:t.maxCovers, section:t.section,
       })),
       locationSections,
+      menuItems,
       changeCount: pendingBOChanges,
     };
 

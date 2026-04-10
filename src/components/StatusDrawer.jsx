@@ -4,7 +4,7 @@ import { useStore } from '../store';
 export default function StatusDrawer({ onClose }) {
   const {
     deviceConfig, clearDeviceConfig, syncStatus, setSyncStatus,
-    devices, printers, setAppMode, markTerminalSynced,
+    devices, setAppMode, markTerminalSynced,
   } = useStore();
 
   const [tick, setTick] = useState(0);

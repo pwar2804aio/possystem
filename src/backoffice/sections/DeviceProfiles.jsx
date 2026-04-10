@@ -48,25 +48,28 @@ const DEFAULT_PROFILES = [
 ];
 
 export default function DeviceProfiles() {
-  const { showToast, devices, setDeviceConfig } = useStore();
+  const { showToast, devices, setDeviceConfig, markBOChange } = useStore();
   const [profiles, setProfiles] = useState(DEFAULT_PROFILES);
   const [editing, setEditing] = useState(null);
   const [showNew, setShowNew] = useState(false);
 
   const save = (updated) => {
     setProfiles(ps => ps.map(p => p.id === updated.id ? updated : p));
+    markBOChange();
     showToast(`"${updated.name}" profile saved`, 'success');
     setEditing(null);
   };
 
   const addProfile = (profile) => {
     setProfiles(ps => [...ps, { ...profile, id:`prof-${Date.now()}`, deviceCount:0 }]);
+    markBOChange();
     showToast(`"${profile.name}" profile created`, 'success');
     setShowNew(false);
   };
 
   const deleteProfile = (id) => {
     setProfiles(ps => ps.filter(p => p.id !== id));
+    markBOChange();
     showToast('Profile deleted', 'info');
   };
 

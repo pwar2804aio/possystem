@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useStore } from '../store';
-import { CATEGORIES, MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
+import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
 import CheckoutModal from './CheckoutModal';
 import CustomerModal from '../components/CustomerModal';
@@ -40,7 +40,11 @@ export default function POSSurface() {
     addCheckDiscount, removeCheckDiscount, addWalkInDiscount, removeWalkInDiscount,
     addItemDiscount, removeItemDiscount,
     deviceConfig,
+    menuItems: storeMenuItems,
   } = useStore();
+
+  // Use store's editable menu if available, otherwise fall back to seed
+  const MENU_ITEMS = storeMenuItems || SEED_MENU_ITEMS;
 
   // Order types this terminal is allowed to show (from device profile)
   const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];

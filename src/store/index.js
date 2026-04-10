@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { INITIAL_KDS, SHIFT } from '../data/seed';
+import { INITIAL_KDS, SHIFT, MENU_ITEMS, CATEGORIES } from '../data/seed';
 
 // ─── ID helpers ──────────────────────────────────────────────────────────────
 let _itemUid = 1;
@@ -93,24 +93,23 @@ export const useStore = create((set, get) => ({
   applyConfigUpdate: () => {
     const snap = useStore.getState().configUpdateSnapshot;
     if (!snap) return;
-    // Apply layout and section config from snapshot, preserve live operational state
     set({
+      // Layout: merge positions/labels into live tables, preserve session/order state
       tables: snap.tables
         ? useStore.getState().tables.map(t => {
-            const snapTable = snap.tables.find(st => st.id === t.id);
-            if (!snapTable) return t;
-            // Merge: keep operational state (status, session, items), apply layout changes
-            return { ...t, label: snapTable.label, x: snapTable.x, y: snapTable.y, w: snapTable.w, h: snapTable.h, shape: snapTable.shape, maxCovers: snapTable.maxCovers, section: snapTable.section };
+            const st = snap.tables.find(s => s.id === t.id);
+            return st ? { ...t, label:st.label, x:st.x, y:st.y, w:st.w, h:st.h, shape:st.shape, maxCovers:st.maxCovers, section:st.section } : t;
           })
         : useStore.getState().tables,
+      // Sections
       locationSections: snap.locationSections || useStore.getState().locationSections,
+      // Menu items — full replace with pushed version
+      ...(snap.menuItems ? { menuItems: snap.menuItems } : {}),
       configVersion: snap.version,
       configUpdateAvailable: false,
       configUpdateSnapshot: null,
     });
-    try {
-      sessionStorage.setItem('rpos-config-version', String(snap.version));
-    } catch {}
+    try { sessionStorage.setItem('rpos-config-version', String(snap.version)); } catch {}
   },
   locationSections: [
     { id:'main',  label:'Main dining', color:'#3b82f6', icon:'🍽' },
@@ -190,20 +189,17 @@ export const useStore = create((set, get) => ({
   removeDevice: (id) => set(s => ({ devices:s.devices.filter(d=>d.id!==id) })),
 
   // ── Editable menu items (live copy from seed, editable in back office) ─────
-  menuItems: null, // null means "use MENU_ITEMS from seed" — populated on first edit
-  menuCategories: null,
-  updateMenuItem: (id, patch) => {
-    const { menuItems } = get();
-    const base = menuItems || (typeof window !== 'undefined' ? [] : []);
-    set({ menuItems: base.map(item => item.id===id ? { ...item, ...patch } : item) });
-  },
-  addMenuItem: (item) => set(s => ({
-    menuItems: [...(s.menuItems||[]), { id:`m-${Date.now()}`, ...item }]
+  menuItems: [...MENU_ITEMS], // editable copy — Back Office writes here, POS reads here
+  menuCategories: [...CATEGORIES],
+  updateMenuItem: (id, patch) => set(s => ({
+    menuItems: s.menuItems.map(item => item.id===id ? { ...item, ...patch } : item)
   })),
-  archive86Item: (id) => {
-    get().updateMenuItem(id, { archived: true });
-    set(s => ({ eightySixIds: [...s.eightySixIds, id] }));
-  },
+  addMenuItem: (item) => set(s => ({
+    menuItems: [...s.menuItems, { id:`m-${Date.now()}`, status:'active', ...item }]
+  })),
+  archiveMenuItem: (id) => set(s => ({
+    menuItems: s.menuItems.map(item => item.id===id ? { ...item, archived:true } : item)
+  })),
 
   // ── Editable floor plan ────────────────────────────────────────────────────
   // Tables state already exists in `tables` — floor plan builder just edits positions

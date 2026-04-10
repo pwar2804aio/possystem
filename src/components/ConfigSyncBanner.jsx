@@ -51,6 +51,7 @@ export default function ConfigSyncBanner() {
             {[
               snap.tables?.length && `${snap.tables.length} tables`,
               snap.locationSections?.length && `${snap.locationSections.length} sections`,
+              snap.menuItems?.length && `${snap.menuItems.length} menu items`,
             ].filter(Boolean).join(' · ')}
           </div>
         )}

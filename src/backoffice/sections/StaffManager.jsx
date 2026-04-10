@@ -23,6 +23,7 @@ const ROLE_DEFAULTS = {
 };
 
 export default function StaffManager() {
+  const { markBOChange } = useStore();
   const [staffList, setStaffList] = useState(STAFF.map(s => ({ ...s, permissions: ROLE_DEFAULTS[s.role] || [] })));
   const [editing, setEditing] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -30,16 +31,19 @@ export default function StaffManager() {
 
   const save = (updated) => {
     setStaffList(sl => sl.map(s => s.id === updated.id ? updated : s));
+    markBOChange();
     setEditing(null);
   };
 
   const add = (member) => {
     setStaffList(sl => [...sl, { ...member, id:`s-${Date.now()}` }]);
+    markBOChange();
     setShowAdd(false);
   };
 
   const remove = (id) => {
     setStaffList(sl => sl.filter(s => s.id !== id));
+    markBOChange();
     setEditing(null);
   };
 

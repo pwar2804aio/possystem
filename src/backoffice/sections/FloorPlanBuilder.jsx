@@ -213,17 +213,17 @@ export default function FloorPlanBuilder() {
             {saveStatus === 'saving' && (
               <span style={{ display:'flex', alignItems:'center', gap:5, color:'var(--t3)' }}>
                 <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--acc)', animation:'pulse 1s ease-in-out infinite' }}/>
-                Saving…
+                Staging…
               </span>
             )}
             {saveStatus === 'pushed' && (
-              <span style={{ display:'flex', alignItems:'center', gap:5, color:'var(--grn)', fontWeight:700 }}>
-                <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--grn)' }}/>
-                ✓ Pushed to all terminals
+              <span style={{ display:'flex', alignItems:'center', gap:5, color:'var(--acc)', fontWeight:700 }}>
+                <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--acc)' }}/>
+                ✓ Staged — hit "Push to POS" to go live
               </span>
             )}
             {saveStatus === 'saved' && (
-              <span style={{ color:'var(--t4)' }}>Auto-saves · syncs to all POS terminals</span>
+              <span style={{ color:'var(--t4)' }}>Changes staged until you Push to POS</span>
             )}
             <span style={{ color:'var(--bdr2)' }}>·</span>
             <span>{displayTables.length} table{displayTables.length !== 1 ? 's' : ''}</span>
