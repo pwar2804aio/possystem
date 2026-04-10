@@ -7,27 +7,35 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
 
 const CHANGELOG = [
+  {
+    version: '0.5.1', date: 'Apr 2026', label: 'Fast checkout',
+    changes: [
+      'Checkout redesigned around two primary buttons — Card and Cash — always visible at the bottom',
+      'Card payment: deep navy button → tip picker (None/10/12.5/15/20% + custom) → Stripe Terminal screen with pulsing animation',
+      'Takeaway, collection and bar tabs skip the tip step and go straight to terminal',
+      'Cash payment: deep green button → full cash transaction screen',
+      'Cash screen: large amount due, quick-cash buttons (next note above total + Exact), 12-key numpad',
+      'Change display: live green/red indicator, shortfall shown in red, change in green',
+      'Complete button only activates when tendered ≥ due, shows change amount inline',
+      'Split check moved to secondary button below the two primaries',
+      'Card terminal: spinning ring animation, auto-completes after approval',
+    ],
+  },
   {
     version: '0.5.0', date: 'Apr 2026', label: 'Voids, discounts & history',
     changes: [
       'Void committed items — manager PIN + reason required, item stays visible with strikethrough',
       'Void entire check — same auth flow, clears table, logged to audit trail',
-      '9 void reasons including free-text Other',
-      'Discounts — 2-step: choose amount (6 presets or custom % / £) then select items or whole check',
+      'Discounts — 2-step: choose amount then select items or whole check',
       'Comp (100%) requires manager PIN',
-      'Item discounts shown in green with original price struck through',
-      'Check discounts as named line in totals with ✕ to remove',
-      'Print check — formatted receipt preview with print-to-browser',
-      'Reprint production tickets — select items by production centre',
+      'Print check and reprint production tickets',
       'History tab — full closed check log with search and date filter',
-      'Refund flow — 4 steps: select items → manager PIN → reason → tender',
-      'Tender: return to card (tokenised, no re-present) or cash payout with drawer prompt',
-      'Full refund audit trail per check — net revenue calculation',
-      'Orders hub — inline tab replacing queue button, live status advance',
-      'Send / Pay buttons always visible in order panel',
+      'Refund flow — 4 steps: select items → manager PIN → reason → tender (card or cash)',
+      'Full refund audit trail per check with net revenue calculation',
+      'Orders hub inline tab replacing queue button',
       'Block send without table (dine-in) or customer name (takeaway/collection)',
     ],
   },
@@ -37,8 +45,7 @@ const CHANGELOG = [
       'Tables now own their order sessions — no sync issues',
       'Proper floor plan with Seat Guests modal (covers, server, note)',
       'Occupied tables show server, time seated, running total on the node',
-      'Clicking occupied table on floor loads existing order in POS',
-      'Send fires to kitchen AND commits to table in one action',
+      'Send fires to kitchen and commits to table in one action',
       'Payment clears table and returns to floor automatically',
     ],
   },
@@ -46,43 +53,32 @@ const CHANGELOG = [
     version: '0.4.0', date: 'Apr 2026', label: 'Bar tabs',
     changes: [
       'Full bar tab system with rounds, pre-auth toggle, roaming tabs',
-      'Open tab modal — name, bar seat, table link, pre-auth hold amount',
       'Round builder — add items, item notes, round note, fire to bar',
-      'Per-round history with time, subtotal, void option',
-      'Close tab → full checkout flow (card / cash / split)',
-      'Item notes — tap any order line to add a kitchen note',
-      'Order-level notes field on every order',
+      'Close tab → full checkout flow',
+      'Item notes and order-level notes on every order',
     ],
   },
   {
     version: '0.3.0', date: 'Apr 2026', label: 'Takeaway & collection',
     changes: [
-      'Customer info capture triggered on Takeaway / Collection',
-      'Returning customer lookup by phone or name',
+      'Customer info capture, returning customer lookup',
       'Collection time slots — ASAP or scheduled in 15-min increments',
-      'Collection queue → Orders hub tab with live status flow',
+      'Orders hub with live status flow',
       'No service charge on takeaway or collection orders',
     ],
   },
   {
     version: '0.2.0', date: 'Mar 2026', label: 'POS core ordering',
     changes: [
-      'Product variants, required & optional modifier groups, multi-select',
-      'Pizza half & half builder',
+      'Product variants, modifier groups, pizza half & half builder',
       'Course management — auto-assign, hold & fire per course',
-      'Seat assignment — tag items to seats, tap to reassign',
-      'Live 86 — one tap, propagates to all terminals',
-      'Custom items — open price with kitchen note',
+      'Seat assignment, live 86, custom items',
     ],
   },
   {
     version: '0.1.0', date: 'Mar 2026', label: 'Foundation',
     changes: [
-      'Three-column POS layout — order panel, category nav, product grid',
-      'Quick Screen — AI-ranked items by daypart',
-      'All 14 EU/UK mandatory allergens — filter, warn, audit trail',
-      'KDS with urgency colouring, bump and recall',
-      'Visual floor plan with table sections',
+      'Three-column POS, Quick Screen, 14 allergens, KDS, floor plan',
       'PIN login with role-based staff profiles',
       'Dark premium design system',
     ],
