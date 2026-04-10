@@ -2,328 +2,350 @@ import { useState, useEffect } from 'react';
 import { ALLERGENS } from '../data/seed';
 import SplitModal from '../components/SplitModal';
 
-// ─── Tip selector ─────────────────────────────────────────────────────────────
+// ─── Tip picker ───────────────────────────────────────────────────────────────
 function TipPicker({ total, onSelect }) {
   const [custom, setCustom] = useState('');
-  const presets = [0, 10, 12.5, 15, 20];
   const [active, setActive] = useState(12.5);
-
+  const presets = [0, 10, 12.5, 15, 20];
   const tipAmt = custom !== '' ? (parseFloat(custom)||0) : total * active / 100;
-
-  const pick = (pct) => { setActive(pct); setCustom(''); };
+  const pick = (p) => { setActive(p); setCustom(''); };
 
   return (
     <div>
-      <div style={{ fontSize:11, fontWeight:700, color:'var(--t2)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Add gratuity</div>
-
-      {/* Preset grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:5, marginBottom:12 }}>
-        {presets.map(p=>(
-          <button key={p} onClick={()=>pick(p)} style={{
-            padding:'9px 4px', borderRadius:9, cursor:'pointer', textAlign:'center', fontFamily:'inherit',
-            border:`1.5px solid ${active===p&&custom===''?'var(--acc)':'var(--bdr)'}`,
-            background:active===p&&custom===''?'var(--acc-d)':'var(--bg3)',
-          }}>
-            <div style={{ fontSize:13, fontWeight:700, color:active===p&&custom===''?'var(--acc)':'var(--t1)' }}>{p===0?'None':`${p}%`}</div>
-            {p>0&&<div style={{ fontSize:10, color:'var(--t3)', marginTop:1 }}>£{(total*p/100).toFixed(2)}</div>}
-          </button>
-        ))}
+      <div style={{ textAlign:'center', marginBottom:20 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 }}>Add gratuity to</div>
+        <div style={{ fontSize:32, fontWeight:800, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>£{total.toFixed(2)}</div>
       </div>
 
-      {/* Custom */}
-      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
-        <span style={{ fontSize:15, color:'var(--t3)', fontWeight:600 }}>£</span>
-        <input type="number" value={custom} onChange={e=>{setCustom(e.target.value);setActive(null);}} placeholder="Custom amount" className="input" style={{ fontSize:15 }}/>
-      </div>
-
-      {/* Summary row */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'var(--bg3)', borderRadius:10, marginBottom:14 }}>
-        <span style={{ fontSize:13, color:'var(--t3)' }}>Tip</span>
-        <span style={{ fontSize:15, fontWeight:700, color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>+£{tipAmt.toFixed(2)}</span>
-      </div>
-
-      <button className="btn btn-acc btn-full" style={{ height:46 }}
-        onClick={()=>onSelect(tipAmt)}>
-        Confirm · total £{(total+tipAmt).toFixed(2)} →
-      </button>
-    </div>
-  );
-}
-
-// ─── Card terminal screen ─────────────────────────────────────────────────────
-function CardTerminal({ grand, onComplete, onBack }) {
-  const [state, setState] = useState('waiting');  // waiting | approved
-
-  useEffect(()=>{
-    if(state==='approved'){
-      const t = setTimeout(onComplete, 800);
-      return ()=>clearTimeout(t);
-    }
-  },[state]);
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', padding:'24px 0 8px' }}>
-      {state==='waiting'&&(
-        <>
-          <div style={{ position:'relative', width:100, height:100, marginBottom:20 }}>
-            <div style={{ width:100, height:100, borderRadius:'50%', border:'3px solid var(--bdr2)', position:'absolute' }}/>
-            <div style={{ width:100, height:100, borderRadius:'50%', border:'3px solid transparent', borderTopColor:'var(--acc)', position:'absolute', animation:'spin 1s linear infinite' }}/>
-            <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:36 }}>💳</div>
-          </div>
-          <div style={{ fontSize:34, fontWeight:800, color:'var(--t1)', fontFamily:'DM Mono,monospace', marginBottom:6 }}>£{grand.toFixed(2)}</div>
-          <div style={{ fontSize:14, color:'var(--t3)', marginBottom:6 }}>Present card to Stripe Reader S700</div>
-          <div style={{ fontSize:12, color:'var(--t4)', marginBottom:28 }}>Tap · Chip · Contactless · Apple Pay · Google Pay</div>
-
-          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 20px', background:'var(--acc-d)', border:'1px solid var(--acc-b)', borderRadius:20, fontSize:12, color:'var(--acc)', marginBottom:28 }}>
-            <div style={{ width:7,height:7,borderRadius:'50%',background:'var(--acc)',animation:'pulse 1.5s ease-in-out infinite'}}/>
-            Waiting for card…
-          </div>
-
-          <div style={{ display:'flex', gap:8, width:'100%' }}>
-            <button className="btn btn-ghost" style={{ flex:1 }} onClick={onBack}>← Back</button>
-            <button className="btn btn-grn" style={{ flex:2, height:46 }} onClick={()=>setState('approved')}>
-              Simulate payment ✓
+      {/* Preset grid — £ amount as hero */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:6, marginBottom:16 }}>
+        {presets.map(p => {
+          const isOn = active===p && custom==='';
+          const amt  = total * p / 100;
+          return (
+            <button key={p} onClick={()=>pick(p)} style={{
+              padding:'12px 4px', borderRadius:12, cursor:'pointer', textAlign:'center', fontFamily:'inherit',
+              border:`2px solid ${isOn?'var(--acc)':'var(--bdr)'}`,
+              background:isOn?'var(--acc-d)':'var(--bg3)',
+              transition:'all .12s',
+            }}>
+              {p===0 ? (
+                <div style={{ fontSize:15, fontWeight:800, color:isOn?'var(--acc)':'var(--t3)', lineHeight:1 }}>None</div>
+              ) : (
+                <>
+                  <div style={{ fontSize:15, fontWeight:800, color:isOn?'var(--acc)':'var(--t1)', fontFamily:'var(--font-mono)', lineHeight:1 }}>£{amt.toFixed(2)}</div>
+                  <div style={{ fontSize:10, color:isOn?'var(--acc)':'var(--t4)', marginTop:3, fontWeight:700 }}>{p}%</div>
+                </>
+              )}
             </button>
-          </div>
-        </>
-      )}
-
-      {state==='approved'&&(
-        <>
-          <div style={{ width:80,height:80,borderRadius:'50%',background:'var(--grn-d)',border:'2px solid var(--grn)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:36,marginBottom:16 }}>✓</div>
-          <div style={{ fontSize:26, fontWeight:800, color:'var(--grn)', marginBottom:6 }}>Approved</div>
-          <div style={{ fontSize:14, color:'var(--t3)' }}>£{grand.toFixed(2)} charged</div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ─── Cash transaction screen ──────────────────────────────────────────────────
-function CashTransaction({ grand, onComplete, onBack }) {
-  const [entered, setEntered] = useState('');
-
-  const tendered = parseFloat(entered) || 0;
-  const change   = Math.max(0, tendered - grand);
-  const isValid  = tendered >= grand;
-
-  // Numpad
-  const press = (d) => {
-    if (d === '⌫') { setEntered(p => p.slice(0,-1)); return; }
-    if (d === '.' && entered.includes('.')) return;
-    if (entered.includes('.') && entered.split('.')[1]?.length >= 2) return;
-    setEntered(p => p + d);
-  };
-
-  // Quick cash — round up to next note + exact
-  const quickAmounts = [
-    ...([5,10,20,50].filter(n => n >= grand)),
-    Math.ceil(grand),
-    Math.ceil(grand/5)*5,
-  ].filter((v,i,a) => a.indexOf(v)===i).sort((a,b)=>a-b).slice(0,5);
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
-      {/* Due amount */}
-      <div style={{ textAlign:'center', marginBottom:16 }}>
-        <div style={{ fontSize:12, color:'var(--t3)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>Amount due</div>
-        <div style={{ fontSize:40, fontWeight:800, color:'var(--t1)', fontFamily:'DM Mono,monospace' }}>£{grand.toFixed(2)}</div>
+          );
+        })}
       </div>
 
-      {/* Change display */}
-      <div style={{
-        height:72, borderRadius:14, marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 20px',
-        background: isValid ? 'var(--grn-d)' : entered ? 'var(--red-d)' : 'var(--bg3)',
-        border: `1.5px solid ${isValid ? 'var(--grn-b)' : entered ? 'var(--red-b)' : 'var(--bdr)'}`,
-        transition: 'all .2s',
-      }}>
+      {/* Custom amount */}
+      <div style={{ position:'relative', marginBottom:16 }}>
+        <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--t3)', fontWeight:700, fontSize:16, fontFamily:'var(--font-mono)' }}>£</span>
+        <input type="number" value={custom}
+          onChange={e=>{setCustom(e.target.value);setActive(null);}}
+          placeholder="Custom amount"
+          className="input" style={{ paddingLeft:30, fontSize:16, height:46 }}/>
+      </div>
+
+      {/* Live summary */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', background:'var(--bg3)', borderRadius:12, marginBottom:16, border:'1px solid var(--bdr)' }}>
         <div>
-          <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.06em', color:isValid?'var(--grn)':entered?'var(--red)':'var(--t3)' }}>
-            {isValid ? 'Change due' : entered ? 'Short by' : 'Cash tendered'}
-          </div>
-          <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>
-            {entered ? `£${tendered.toFixed(2)} tendered` : 'Enter amount or tap quick cash'}
-          </div>
+          <div style={{ fontSize:11, color:'var(--t3)', fontWeight:600, marginBottom:2 }}>Tip added</div>
+          <div style={{ fontSize:13, color:'var(--t2)' }}>Bill + tip</div>
         </div>
-        <div style={{ fontSize:32, fontWeight:800, fontFamily:'DM Mono,monospace', color:isValid?'var(--grn)':entered?'var(--red)':'var(--t4)' }}>
-          {isValid ? `£${change.toFixed(2)}` : entered ? `£${(grand-tendered).toFixed(2)}` : '—'}
+        <div style={{ textAlign:'right' }}>
+          <div style={{ fontSize:16, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>+£{tipAmt.toFixed(2)}</div>
+          <div style={{ fontSize:20, fontWeight:800, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>£{(total+tipAmt).toFixed(2)}</div>
         </div>
       </div>
 
-      {/* Quick cash buttons */}
-      <div style={{ display:'flex', gap:5, marginBottom:12 }}>
-        {quickAmounts.map(a=>(
-          <button key={a} onClick={()=>setEntered(String(a))} style={{
-            flex:1, padding:'7px 4px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
-            background: entered===String(a) ? 'var(--acc-d)' : 'var(--bg3)',
-            border: `1px solid ${entered===String(a)?'var(--acc)':'var(--bdr2)'}`,
-            color: entered===String(a)?'var(--acc)':'var(--t2)',
-            fontSize:12, fontWeight:700,
-          }}>£{Number.isInteger(a)?a:a.toFixed(2)}</button>
-        ))}
-        <button onClick={()=>setEntered(grand.toFixed(2))} style={{
-          flex:1.2, padding:'7px 4px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
-          background: entered===grand.toFixed(2)?'var(--acc-d)':'var(--bg3)',
-          border: `1px solid ${entered===grand.toFixed(2)?'var(--acc)':'var(--bdr2)'}`,
-          color: entered===grand.toFixed(2)?'var(--acc)':'var(--t2)',
-          fontSize:11, fontWeight:700,
-        }}>Exact</button>
-      </div>
-
-      {/* Numpad */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, marginBottom:12 }}>
-        {[7,8,9,4,5,6,1,2,3,'.',0,'⌫'].map((d,i)=>(
-          <button key={i} onClick={()=>press(String(d))} style={{
-            height:52, borderRadius:10, cursor:'pointer', fontFamily:'inherit',
-            background: d==='⌫'?'var(--red-d)':'var(--bg3)',
-            border: `1px solid ${d==='⌫'?'var(--red-b)':'var(--bdr2)'}`,
-            color: d==='⌫'?'var(--red)':'var(--t1)',
-            fontSize: d==='⌫'?18:20, fontWeight:700,
-          }}>{d}</button>
-        ))}
-      </div>
-
-      {/* Actions */}
       <div style={{ display:'flex', gap:8 }}>
-        <button className="btn btn-ghost" style={{ flex:1 }} onClick={onBack}>← Back</button>
-        <button className="btn btn-grn" style={{ flex:2, height:46 }}
-          disabled={!isValid}
-          onClick={()=>onComplete(tendered)}>
-          {isValid ? `Complete · change £${change.toFixed(2)}` : 'Enter cash amount'}
+        <button className="btn btn-ghost" style={{ flex:1, height:46 }} onClick={()=>onSelect(0)}>Skip</button>
+        <button className="btn btn-acc" style={{ flex:2, height:46, fontSize:14 }} onClick={()=>onSelect(tipAmt)}>
+          Confirm tip · £{(total+tipAmt).toFixed(2)} →
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Split check screen ───────────────────────────────────────────────────────
-function SplitCheck({ grand, covers, onComplete, onBack }) {
-  const [splits, setSplits] = useState(Math.max(2, covers));
-  const each = grand / splits;
+// ─── Card terminal ────────────────────────────────────────────────────────────
+function CardTerminal({ grand, onComplete, onBack }) {
+  const [state, setState] = useState('waiting');
+
+  useEffect(()=>{
+    if(state==='approved'){
+      const t = setTimeout(onComplete, 900);
+      return ()=>clearTimeout(t);
+    }
+  },[state]);
 
   return (
-    <div>
-      <div style={{ fontSize:13, color:'var(--t3)', marginBottom:14 }}>Split £{grand.toFixed(2)} between:</div>
-      <div style={{ display:'flex', gap:6, marginBottom:20 }}>
-        {[2,3,4,5,6,7,8].map(n=>(
-          <button key={n} onClick={()=>setSplits(n)} style={{
-            flex:1, padding:'10px 4px', borderRadius:9, cursor:'pointer', textAlign:'center', fontFamily:'inherit',
-            border:`1.5px solid ${splits===n?'var(--acc)':'var(--bdr)'}`,
-            background:splits===n?'var(--acc-d)':'var(--bg3)',
-          }}>
-            <div style={{ fontSize:16, fontWeight:700, color:splits===n?'var(--acc)':'var(--t1)' }}>{n}</div>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center' }}>
+      {state==='waiting' && (
+        <>
+          {/* Terminal illustration */}
+          <div style={{ position:'relative', width:120, height:120, marginBottom:24 }}>
+            {/* Outer ring — track */}
+            <svg width="120" height="120" style={{ position:'absolute', top:0, left:0 }}>
+              <circle cx="60" cy="60" r="54" fill="none" stroke="var(--bdr2)" strokeWidth="3"/>
+            </svg>
+            {/* Spinning arc */}
+            <svg width="120" height="120" style={{ position:'absolute', top:0, left:0, animation:'spin .9s linear infinite' }}>
+              <circle cx="60" cy="60" r="54" fill="none" stroke="var(--acc)" strokeWidth="3"
+                strokeDasharray="100 240" strokeLinecap="round"/>
+            </svg>
+            {/* Card icon */}
+            <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <div style={{ width:64, height:44, borderRadius:8, background:'var(--bg3)', border:'2px solid var(--bdr2)', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'var(--sh)' }}>
+                <div style={{ height:12, background:'var(--acc)', opacity:.7 }}/>
+                <div style={{ flex:1, display:'flex', alignItems:'flex-end', padding:'4px 6px', gap:3 }}>
+                  {[1,2,3,4].map(i=><div key={i} style={{ flex:1, height:3, borderRadius:1, background:'var(--t4)' }}/>)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ fontSize:38, fontWeight:800, color:'var(--t1)', fontFamily:'var(--font-mono)', letterSpacing:'-.02em', marginBottom:6 }}>
+            £{grand.toFixed(2)}
+          </div>
+          <div style={{ fontSize:15, color:'var(--t2)', fontWeight:600, marginBottom:4 }}>Present card to reader</div>
+          <div style={{ fontSize:12, color:'var(--t4)', marginBottom:8 }}>Stripe Reader S700</div>
+
+          <div style={{ display:'flex', gap:12, marginBottom:28 }}>
+            {['Tap','Chip','Swipe','Apple Pay','Google Pay'].map(m=>(
+              <div key={m} style={{ fontSize:10, fontWeight:600, color:'var(--t4)', padding:'3px 8px', borderRadius:20, border:'1px solid var(--bdr)', background:'var(--bg3)' }}>{m}</div>
+            ))}
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 20px', background:'var(--acc-d)', border:'1px solid var(--acc-b)', borderRadius:22, fontSize:12, color:'var(--acc)', fontWeight:700, marginBottom:24 }}>
+            <div style={{ width:7,height:7,borderRadius:'50%',background:'var(--acc)',animation:'pulse 1.4s ease-in-out infinite'}}/>
+            Waiting for card…
+          </div>
+
+          <div style={{ display:'flex', gap:8, width:'100%' }}>
+            <button className="btn btn-ghost" style={{ flex:1, height:46 }} onClick={onBack}>← Back</button>
+            <button className="btn btn-grn" style={{ flex:2, height:46, fontSize:14, fontWeight:800 }}
+              onClick={()=>setState('approved')}>
+              Simulate payment ✓
+            </button>
+          </div>
+        </>
+      )}
+
+      {state==='approved' && (
+        <div style={{ padding:'20px 0' }}>
+          <div style={{
+            width:88, height:88, borderRadius:'50%',
+            background:'var(--grn-d)', border:'2px solid var(--grn)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:40, marginBottom:20, margin:'0 auto 20px',
+            animation:'slideUp .3s cubic-bezier(.2,.8,.3,1)',
+          }}>✓</div>
+          <div style={{ fontSize:28, fontWeight:800, color:'var(--grn)', marginBottom:6 }}>Payment approved</div>
+          <div style={{ fontSize:15, color:'var(--t2)', fontFamily:'var(--font-mono)' }}>£{grand.toFixed(2)} charged</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Cash transaction ─────────────────────────────────────────────────────────
+function CashTransaction({ grand, onComplete, onBack }) {
+  const [entered, setEntered] = useState('');
+  const tendered = parseFloat(entered) || 0;
+  const change   = Math.max(0, tendered - grand);
+  const isValid  = tendered >= grand;
+
+  const press = (d) => {
+    if (d==='⌫') { setEntered(p=>p.slice(0,-1)); return; }
+    if (d==='.' && entered.includes('.')) return;
+    if (entered.includes('.') && entered.split('.')[1]?.length>=2) return;
+    if (entered.length >= 7) return;
+    setEntered(p=>p+d);
+  };
+
+  const quickAmounts = [
+    ...([5,10,20,50].filter(n=>n>=grand)),
+    Math.ceil(grand),
+    Math.ceil(grand/5)*5,
+  ].filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b).slice(0,5);
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+      {/* Amount due + change display */}
+      <div style={{ marginBottom:14 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+          <div>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:3 }}>Amount due</div>
+            <div style={{ fontSize:30, fontWeight:800, color:'var(--t1)', fontFamily:'var(--font-mono)', letterSpacing:'-.01em' }}>£{grand.toFixed(2)}</div>
+          </div>
+          <div style={{ textAlign:'right' }}>
+            <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:3,
+              color:isValid?'var(--grn)':entered?'var(--red)':'var(--t4)' }}>
+              {isValid?'Change':'Short by'}
+            </div>
+            <div style={{ fontSize:30, fontWeight:800, fontFamily:'var(--font-mono)', letterSpacing:'-.01em',
+              color:isValid?'var(--grn)':entered?'var(--red)':'var(--t4)' }}>
+              {isValid?`£${change.toFixed(2)}`:entered?`£${(grand-tendered).toFixed(2)}`:'—'}
+            </div>
+          </div>
+        </div>
+
+        {/* Tendered display */}
+        <div style={{
+          padding:'12px 16px', borderRadius:14, border:`2px solid ${isValid?'var(--grn-b)':entered?'var(--acc-b)':'var(--bdr2)'}`,
+          background:isValid?'var(--grn-d)':entered?'var(--acc-d)':'var(--bg3)',
+          display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .2s',
+        }}>
+          <div style={{ fontSize:11, color:'var(--t3)', fontWeight:600 }}>
+            {entered ? 'Tendered' : 'Enter amount or tap quick cash'}
+          </div>
+          <div style={{ fontSize:22, fontWeight:800, fontFamily:'var(--font-mono)', color:isValid?'var(--grn)':entered?'var(--acc)':'var(--t4)' }}>
+            {entered ? `£${tendered.toFixed(2)}` : '£—'}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick cash */}
+      <div style={{ display:'flex', gap:5, marginBottom:10 }}>
+        {quickAmounts.map(a=>(
+          <button key={a} onClick={()=>setEntered(String(a))} style={{
+            flex:1, padding:'7px 2px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
+            background:entered===String(a)?'var(--acc-d)':'var(--bg3)',
+            border:`1.5px solid ${entered===String(a)?'var(--acc)':'var(--bdr)'}`,
+            color:entered===String(a)?'var(--acc)':'var(--t2)',
+            fontSize:12, fontWeight:800, transition:'all .1s',
+          }}>£{a}</button>
+        ))}
+        <button onClick={()=>setEntered(grand.toFixed(2))} style={{
+          flex:1.2, padding:'7px 2px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
+          background:entered===grand.toFixed(2)?'var(--acc-d)':'var(--bg3)',
+          border:`1.5px solid ${entered===grand.toFixed(2)?'var(--acc)':'var(--bdr)'}`,
+          color:entered===grand.toFixed(2)?'var(--acc)':'var(--t2)',
+          fontSize:11, fontWeight:800,
+        }}>Exact</button>
+      </div>
+
+      {/* Numpad — bigger keys */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, marginBottom:12 }}>
+        {[7,8,9,4,5,6,1,2,3,'.',0,'⌫'].map((d,i)=>(
+          <button key={i} onClick={()=>press(String(d))} style={{
+            height:56, borderRadius:11, cursor:'pointer', fontFamily:'inherit',
+            background:d==='⌫'?'var(--red-d)':'var(--bg3)',
+            border:`1.5px solid ${d==='⌫'?'var(--red-b)':'var(--bdr)'}`,
+            color:d==='⌫'?'var(--red)':'var(--t1)',
+            fontSize:d==='⌫'?20:22, fontWeight:700,
+            transition:'all .08s',
+          }}
+          onMouseEnter={e=>e.currentTarget.style.background=d==='⌫'?'var(--red)':'var(--bg4)'}
+          onMouseLeave={e=>e.currentTarget.style.background=d==='⌫'?'var(--red-d)':'var(--bg3)'}>
+            {d==='⌫' ? '⌫' : d}
           </button>
         ))}
       </div>
-      <div style={{ background:'var(--bg3)', borderRadius:12, padding:'14px 18px', marginBottom:20 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4, fontSize:13, color:'var(--t3)' }}>
-          <span>Total</span><span>£{grand.toFixed(2)}</span>
-        </div>
-        <div style={{ display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:500 }}>Each person pays</span>
-          <span style={{ fontSize:28, fontWeight:800, color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>£{each.toFixed(2)}</span>
-        </div>
-      </div>
+
       <div style={{ display:'flex', gap:8 }}>
-        <button className="btn btn-ghost" style={{ flex:1 }} onClick={onBack}>← Back</button>
-        <button className="btn btn-grn" style={{ flex:2, height:44 }} onClick={()=>onComplete()}>Mark all paid ✓</button>
+        <button className="btn btn-ghost" style={{ flex:1, height:50 }} onClick={onBack}>← Back</button>
+        <button className="btn btn-grn" style={{ flex:2, height:50, fontSize:15, fontWeight:800 }}
+          disabled={!isValid}
+          onClick={()=>onComplete(tendered)}>
+          {isValid ? `Complete · £${change.toFixed(2)} change` : 'Enter cash amount'}
+        </button>
       </div>
     </div>
   );
 }
 
-// ─── Main CheckoutModal ───────────────────────────────────────────────────────
+// ─── Main checkout modal ──────────────────────────────────────────────────────
 export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
   const [screen, setScreen] = useState('review');
   const [tipAmt, setTipAmt] = useState(0);
-  const [payMethod, setPayMethod] = useState('card');
   const [showSplit, setShowSplit] = useState(false);
 
   const isBarTab = orderType==='bar-tab';
   const skipTip  = isBarTab || orderType==='takeaway' || orderType==='collection';
-
-  const grand = total + tipAmt;
+  const grand    = total + tipAmt;
 
   const complete = (method, tip=tipAmt, tendered=null) => {
-    onComplete({ method: method||payMethod, tip, grand: total+tip, tendered });
+    onComplete({ method: method, tip, grand: total+tip, tendered });
   };
 
   const handleCardPress = () => {
-    setPayMethod('card');
     if (skipTip) setScreen('card_terminal');
     else setScreen('card_tip');
   };
 
-  const handleCashPress = () => {
-    setPayMethod('cash');
-    setScreen('cash');
-  };
-
-  const handleTipConfirm = (tip) => {
-    setTipAmt(tip);
-    setScreen('card_terminal');
-  };
-
-  const handleCashComplete = (tendered) => {
-    complete('cash', 0, tendered);
-  };
-
   const nonVoided = items.filter(i=>!i.voided);
+
+  const contextLabel = isBarTab ? `Bar tab · ${tabName}`
+    : tableId ? `${tableId.replace(/^[tbp]/,'')} · ${orderType}${covers>1?` · ${covers} covers`:''}`
+    : orderType;
+
+  const SCREENS = {
+    review:'Checkout', card_tip:'Gratuity',
+    card_terminal:'Card payment', cash:'Cash payment',
+  };
 
   return (
     <div className="modal-back">
       <div style={{
-        background:'var(--bg2)', border:'1px solid var(--bdr2)', borderRadius:24,
-        width:'100%', maxWidth:520, maxHeight:'94vh',
+        background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:24,
+        width:'100%', maxWidth:500, maxHeight:'94vh',
         display:'flex', flexDirection:'column',
         boxShadow:'var(--sh3)', overflow:'hidden',
       }}>
 
         {/* ── Header ── */}
-        <div style={{ padding:'16px 22px 12px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+        <div style={{ padding:'16px 20px 12px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
           <div>
-            <div style={{ fontSize:17, fontWeight:700, color:'var(--t1)' }}>
-              {screen==='review'?'Checkout'
-              :screen==='card_tip'?'Add tip'
-              :screen==='card_terminal'?'Card payment'
-              :screen==='cash'?'Cash payment'
-              :'Split check'}
-            </div>
-            <div style={{ fontSize:12, color:'var(--t3)', marginTop:2 }}>
-              {isBarTab ? `Bar tab · ${tabName}`
-               : tableId ? `Table ${tableId.replace(/^[tbp]/,'')} · ${orderType}${covers>1?` · ${covers} covers`:''}`
-               : orderType}
-            </div>
+            <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>{SCREENS[screen]||'Checkout'}</div>
+            <div style={{ fontSize:12, color:'var(--t3)', marginTop:2, textTransform:'capitalize' }}>{contextLabel}</div>
           </div>
-          <div style={{ display:'flex', gap:6 }}>
-            {screen!=='review'&&<button className="btn btn-ghost btn-sm" onClick={()=>setScreen('review')}>← Back</button>}
-            <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            {screen!=='review' && (
+              <button className="btn btn-ghost btn-sm" onClick={()=>setScreen('review')}>← Back</button>
+            )}
+            <button onClick={onClose} style={{ width:32, height:32, borderRadius:9, border:'1px solid var(--bdr2)', background:'transparent', color:'var(--t3)', cursor:'pointer', fontFamily:'inherit', fontSize:18, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
           </div>
         </div>
 
-        <div style={{ flex:1, overflowY:'auto', padding:'18px 22px' }}>
+        <div style={{ flex:1, overflowY:'auto', padding:'18px 20px' }}>
 
           {/* ══ REVIEW ══════════════════════════════════════════════ */}
-          {screen==='review'&&(
+          {screen==='review' && (
             <>
               {/* Bill items */}
-              <div style={{ marginBottom:16 }}>
-                {nonVoided.map(item=>{
-                  const disc = item.discount;
+              <div style={{ marginBottom:16, borderRadius:14, border:'1px solid var(--bdr)', overflow:'hidden' }}>
+                {nonVoided.map((item, idx) => {
+                  const disc  = item.discount;
                   const price = disc
                     ? (disc.type==='percent' ? item.price*(1-disc.value/100) : Math.max(0,item.price-disc.value/item.qty))
                     : item.price;
-                  return(
-                    <div key={item.uid} style={{ display:'flex', justifyContent:'space-between', gap:8, paddingBottom:9, marginBottom:9, borderBottom:'1px solid var(--bdr)' }}>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:14, fontWeight:500, color:'var(--t1)' }}>{item.qty>1?`${item.qty}× `:''}{item.name}</div>
-                        {item.mods?.map((m,i)=><div key={i} style={{ fontSize:11, color:'var(--t3)', display:'flex', justifyContent:'space-between', marginTop:1 }}><span>{m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}</span>{m.price>0&&<span>+£{m.price.toFixed(2)}</span>}</div>)}
-                        {item.notes&&<div style={{ fontSize:11, color:'#f97316', marginTop:2 }}>📝 {item.notes}</div>}
-                        {disc&&<div style={{ fontSize:11, color:'var(--grn)', marginTop:2 }}>🏷 {disc.label}</div>}
+                  const isLast = idx === nonVoided.length-1;
+                  return (
+                    <div key={item.uid} style={{ display:'flex', justifyContent:'space-between', gap:12, padding:'11px 14px', borderBottom:isLast?'none':'1px solid var(--bdr)', background:idx%2===0?'var(--bg2)':'var(--bg1)' }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:600, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {item.qty>1 && <span style={{ fontWeight:800, color:'var(--acc)', marginRight:5, fontFamily:'var(--font-mono)' }}>{item.qty}×</span>}
+                          {item.name}
+                        </div>
+                        {item.mods?.filter(m=>m.label).map((m,i)=>(
+                          <div key={i} style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>
+                            {m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}
+                            {m.price>0&&<span style={{ color:'var(--acc)', marginLeft:6, fontFamily:'var(--font-mono)' }}>+£{m.price.toFixed(2)}</span>}
+                          </div>
+                        ))}
+                        {item.notes && <div style={{ fontSize:11, color:'var(--orn)', marginTop:2 }}>📝 {item.notes}</div>}
+                        {disc && <div style={{ fontSize:11, color:'var(--grn)', marginTop:2, fontWeight:600 }}>🏷 {disc.label}</div>}
                       </div>
                       <div style={{ textAlign:'right', flexShrink:0 }}>
-                        <div style={{ fontSize:14, fontWeight:700, color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>£{(price*item.qty).toFixed(2)}</div>
-                        {disc&&<div style={{ fontSize:11, color:'var(--t4)', textDecoration:'line-through', fontFamily:'DM Mono,monospace' }}>£{(item.price*item.qty).toFixed(2)}</div>}
+                        <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>£{(price*item.qty).toFixed(2)}</div>
+                        {disc && <div style={{ fontSize:11, color:'var(--t4)', textDecoration:'line-through', fontFamily:'var(--font-mono)' }}>£{(item.price*item.qty).toFixed(2)}</div>}
                       </div>
                     </div>
                   );
@@ -331,72 +353,79 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
               </div>
 
               {/* Totals */}
-              <div style={{ background:'var(--bg3)', borderRadius:14, padding:'14px 16px', marginBottom:22 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:4 }}><span>Subtotal</span><span style={{ fontFamily:'DM Mono,monospace' }}>£{subtotal.toFixed(2)}</span></div>
-                {service>0
-                  ? <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:4 }}><span>Service charge (12.5%)</span><span style={{ fontFamily:'DM Mono,monospace' }}>£{service.toFixed(2)}</span></div>
-                  : <div style={{ fontSize:12, color:'var(--grn)', marginBottom:4 }}>No service charge · {isBarTab?'bar tab':orderType}</div>
-                }
-                <div style={{ height:1, background:'var(--bdr)', margin:'10px 0' }}/>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:22, fontWeight:800 }}>
-                  <span>Total</span>
-                  <span style={{ color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>£{total.toFixed(2)}</span>
+              <div style={{ background:'var(--bg3)', borderRadius:14, padding:'14px 16px', marginBottom:20, border:'1px solid var(--bdr)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:5 }}>
+                  <span>Subtotal</span>
+                  <span style={{ fontFamily:'var(--font-mono)' }}>£{subtotal.toFixed(2)}</span>
+                </div>
+                {service > 0 ? (
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:5 }}>
+                    <span>Service (12.5%)</span>
+                    <span style={{ fontFamily:'var(--font-mono)' }}>£{service.toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <div style={{ fontSize:12, color:'var(--grn)', fontWeight:600, marginBottom:5 }}>
+                    ✓ No service charge · {isBarTab?'bar tab':orderType}
+                  </div>
+                )}
+                <div style={{ height:1, background:'var(--bdr)', margin:'8px 0' }}/>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+                  <span style={{ fontSize:15, fontWeight:600, color:'var(--t2)' }}>Total due</span>
+                  <span style={{ fontSize:26, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)', letterSpacing:'-.02em' }}>£{total.toFixed(2)}</span>
                 </div>
               </div>
 
-              {/* ── PRIMARY PAYMENT BUTTONS ── */}
+              {/* ── Primary payment buttons ── */}
               <div style={{ display:'flex', gap:10, marginBottom:10 }}>
-                {/* CARD */}
                 <button onClick={handleCardPress} style={{
-                  flex:1, padding:'20px 14px', borderRadius:16, cursor:'pointer', fontFamily:'inherit',
-                  background:'linear-gradient(135deg,#1a2744,#0f1a35)',
-                  border:'1px solid rgba(100,140,255,.3)',
+                  flex:1, padding:'22px 14px', borderRadius:18, cursor:'pointer', fontFamily:'inherit',
+                  background:'var(--card-bg)', border:`1.5px solid var(--card-border)`,
                   display:'flex', flexDirection:'column', alignItems:'center', gap:8,
-                  transition:'all .15s',
+                  transition:'transform .14s, box-shadow .14s',
                 }}
-                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow='0 8px 24px rgba(60,100,255,.2)';}}
+                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='var(--sh2)';}}
                 onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-                  <div style={{ fontSize:34 }}>💳</div>
-                  <div style={{ fontSize:16, fontWeight:800, color:'#e8f0ff' }}>Card</div>
-                  <div style={{ fontSize:11, color:'rgba(200,210,255,.6)' }}>Tap, chip or contactless</div>
-                  {!skipTip&&<div style={{ fontSize:10, color:'rgba(200,210,255,.4)', marginTop:2 }}>Includes tip step</div>}
+                  <div style={{ fontSize:36 }}>💳</div>
+                  <div style={{ fontSize:17, fontWeight:800, color:'var(--card-text)' }}>Card</div>
+                  <div style={{ fontSize:11, color:'var(--card-sub)' }}>Tap, chip, contactless</div>
+                  {!skipTip && <div style={{ fontSize:10, color:'var(--card-sub)', opacity:.7, marginTop:-2 }}>Tip step included</div>}
                 </button>
 
-                {/* CASH */}
-                <button onClick={handleCashPress} style={{
-                  flex:1, padding:'20px 14px', borderRadius:16, cursor:'pointer', fontFamily:'inherit',
-                  background:'linear-gradient(135deg,#162a1a,#0d1f10)',
-                  border:'1px solid rgba(60,180,80,.3)',
+                <button onClick={()=>setScreen('cash')} style={{
+                  flex:1, padding:'22px 14px', borderRadius:18, cursor:'pointer', fontFamily:'inherit',
+                  background:'var(--cash-bg)', border:`1.5px solid var(--cash-border)`,
                   display:'flex', flexDirection:'column', alignItems:'center', gap:8,
-                  transition:'all .15s',
+                  transition:'transform .14s, box-shadow .14s',
                 }}
-                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow='0 8px 24px rgba(40,160,60,.2)';}}
+                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='var(--sh2)';}}
                 onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-                  <div style={{ fontSize:34 }}>💵</div>
-                  <div style={{ fontSize:16, fontWeight:800, color:'#d4f0d8' }}>Cash</div>
-                  <div style={{ fontSize:11, color:'rgba(160,210,170,.6)' }}>Change calculated</div>
-                  <div style={{ fontSize:10, color:'rgba(160,210,170,.4)', marginTop:2 }}>Instant, no tip</div>
+                  <div style={{ fontSize:36 }}>💵</div>
+                  <div style={{ fontSize:17, fontWeight:800, color:'var(--cash-text)' }}>Cash</div>
+                  <div style={{ fontSize:11, color:'var(--cash-sub)' }}>Change calculated</div>
+                  <div style={{ fontSize:10, color:'var(--cash-sub)', opacity:.7, marginTop:-2 }}>Instant, no tip prompt</div>
                 </button>
               </div>
 
               {/* Split — secondary */}
               <button onClick={()=>setShowSplit(true)} style={{
-                width:'100%', padding:'12px', borderRadius:12, cursor:'pointer', fontFamily:'inherit',
-                background:'transparent', border:'1px solid var(--bdr2)',
-                display:'flex', alignItems:'center', justifyContent:'center', gap:10, color:'var(--t3)', fontSize:13, fontWeight:500,
-              }}>
-                <span>⚖</span> Split check between {covers} {covers===1?'guest':'guests'}
+                width:'100%', padding:'13px', borderRadius:13, cursor:'pointer', fontFamily:'inherit',
+                background:'var(--bg3)', border:'1.5px solid var(--bdr2)',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+                color:'var(--t3)', fontSize:13, fontWeight:600, transition:'all .14s',
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--acc-b)';e.currentTarget.style.color='var(--acc)';}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr2)';e.currentTarget.style.color='var(--t3)';}}>
+                <span>⚖</span>
+                Split check · {covers} {covers===1?'guest':'guests'}
               </button>
             </>
           )}
 
-          {/* ══ CARD TIP ══════════════════════════════════════════== */}
-          {screen==='card_tip'&&(
-            <TipPicker total={total} onSelect={handleTipConfirm}/>
+          {screen==='card_tip' && (
+            <TipPicker total={total} onSelect={(tip)=>{ setTipAmt(tip); setScreen('card_terminal'); }}/>
           )}
 
-          {/* ══ CARD TERMINAL ═════════════════════════════════════== */}
-          {screen==='card_terminal'&&(
+          {screen==='card_terminal' && (
             <CardTerminal
               grand={grand}
               onComplete={()=>complete('card')}
@@ -404,30 +433,23 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
             />
           )}
 
-          {/* ══ CASH ════════════════════════════════════════════════ */}
-          {screen==='cash'&&(
+          {screen==='cash' && (
             <CashTransaction
               grand={total}
-              onComplete={handleCashComplete}
+              onComplete={(tendered)=>complete('cash', 0, tendered)}
               onBack={()=>setScreen('review')}
             />
           )}
-
-
         </div>
       </div>
 
-      {/* Split modal — full-featured, separate overlay */}
       {showSplit && (
         <SplitModal
           items={items}
           total={total}
           covers={covers}
-          onComplete={(portions) => {
-            setShowSplit(false);
-            onComplete({ method:'split', tip:0, grand:total, portions });
-          }}
-          onClose={() => setShowSplit(false)}
+          onComplete={(portions)=>{ setShowSplit(false); onComplete({ method:'split', tip:0, grand:total, portions }); }}
+          onClose={()=>setShowSplit(false)}
         />
       )}
     </div>

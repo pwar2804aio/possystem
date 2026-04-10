@@ -603,6 +603,12 @@ export const useStore = create((set, get) => ({
 
   // ── Toast ─────────────────────────────────
   toast: null,
+  theme: localStorage.getItem('rpos-theme') || 'dark',
+  setTheme: (t) => {
+    localStorage.setItem('rpos-theme', t);
+    document.documentElement.setAttribute('data-theme', t);
+    set({ theme: t });
+  },
   showToast: (msg,type='info') => { set({ toast:{ msg,type,key:Date.now() } }); setTimeout(()=>set({toast:null}),2800); },
 
   // ── Allergen pending ──────────────────────

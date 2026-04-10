@@ -7,56 +7,51 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface, BackOfficeSurface } from './surfaces/OtherSurfaces';
 
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 
 const CHANGELOG = [
   {
-    version: '0.6.0', date: 'Apr 2026', label: 'UI revamp — Operator Dark',
+    version: '0.6.1', date: 'Apr 2026', label: 'Light mode + checkout redesign',
     changes: [
-      'Product cards: larger (110px min), price is the hero at 18px bold in category colour, coloured left border per category for instant visual navigation',
-      'Category nav: 60px tap targets with coloured left bar indicator, active glow dot, animated allergen pulse',
-      'Order items: left status border (green = sent, red = voided), Remove/Void as proper pill buttons, cleaner tags row',
-      'Qty steppers: 30×28px buttons with hover states — properly tappable at speed',
-      'Order panel: richer empty state, better totals typography, total at 22px bold',
-      'Send/Pay: 40px height, Pay wider than Send for visual hierarchy',
-      'Shift bar: green live dot, mono stats, slimmer at 42px',
-      'Sidebar: 22px icons with glow on active state',
-      'CSS system: richer backgrounds, better shadows, --font-mono throughout, btn hover scale effect',
-      'Modals: backdrop blur, slide-up animation',
-      'Quick Screen: "AI-curated" header with live indicator',
-      'All borders on --bdr (not --bdr2) — more consistent depth',
+      'Light mode — full warm-cream theme, toggle ☀️/🌙 in the shift bar, persisted across sessions',
+      'Checkout: alternating row shading on bill items, qty × shown in amber, cleaner totals',
+      'Checkout: Card/Cash buttons now use CSS variables — fully light/dark-mode aware',
+      'Tip picker: £ amount is the hero, % shown as secondary label below',
+      'Card terminal: custom SVG spinner with amber arc, card illustration, payment method pills',
+      'Cash screen: side-by-side due/change display at top, bigger 56px numpad keys with hover states',
+      'Checkout header: cleaner with × close button replacing Cancel text',
+      'SplitModal: hover state on Split button — amber border on hover',
+    ],
+  },
+  {
+    version: '0.6.0', date: 'Apr 2026', label: 'Operator Dark UI revamp',
+    changes: [
+      'Product cards: larger, price as hero in category colour, coloured left border',
+      'Category nav: 60px buttons, colour bar indicator, active glow dot',
+      'Order items: status left border, proper Void/Remove pill buttons, bigger qty steppers',
+      'Send/Pay: 40px height, Pay wider for visual hierarchy',
+      'CSS system: --font-mono throughout, btn scale on press, modal blur + slide-up animation',
     ],
   },
   {
     version: '0.5.3', date: 'Apr 2026', label: 'Orders list view',
-    changes: [
-      'Floor plan: three tabs — Floor plan, My orders, All open orders',
-      'My orders filters to the logged-in server, urgency colours green/amber/red by idle time',
-      'Tap any row to open that table in POS',
-    ],
+    changes: ['Floor plan: My orders / All open orders tabs, urgency colours, tap to open in POS'],
   },
   {
     version: '0.5.2', date: 'Apr 2026', label: 'Full split bill',
-    changes: [
-      '4 modes: Even, By seat, By item, Custom amounts',
-      'Each portion tendered independently with card or cash',
-    ],
+    changes: ['Even, By seat, By item, Custom amounts — each portion tendered independently'],
   },
   {
     version: '0.5.1', date: 'Apr 2026', label: 'Fast checkout',
-    changes: [
-      'Card and Cash primary buttons, tip picker, 12-key cash numpad with live change',
-    ],
+    changes: ['Card/Cash primary buttons, tip picker, cash numpad with live change'],
   },
   {
     version: '0.5.0', date: 'Apr 2026', label: 'Voids, discounts & history',
-    changes: [
-      'Void items/checks with manager PIN, discounts, print, 4-step refund with tender',
-    ],
+    changes: ['Manager PIN voids, discounts, print, 4-step refund with card/cash tender'],
   },
   {
     version: '0.4.1', date: 'Apr 2026', label: 'Table sessions',
-    changes: ['Tables own sessions, floor plan, seat guests, live table status'],
+    changes: ['Tables own sessions, floor plan, seat guests, live status'],
   },
   {
     version: '0.4.0', date: 'Apr 2026', label: 'Bar tabs',
@@ -72,19 +67,25 @@ const CHANGELOG = [
   },
   {
     version: '0.1.0', date: 'Mar 2026', label: 'Foundation',
-    changes: ['POS, Quick Screen, allergens, KDS, floor plan, PIN login'],
+    changes: ['POS, Quick Screen, 14 allergens, KDS, floor plan, PIN login'],
   },
 ];
 
 
 
+
 export default function App() {
-  const { staff, surface, setSurface, toast, shift } = useStore();
+  const { staff, surface, setSurface, toast, shift, theme, setTheme } = useStore();
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+
+  // Apply theme on mount and when it changes
+  useState(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  });
   if (!staff) return <PINScreen />;
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
-      <ShiftBar shift={shift} version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} />
+      <ShiftBar shift={shift} version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} />
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
         <Sidebar surface={surface} setSurface={setSurface} />
         <div style={{ display:'flex', flex:1, overflow:'hidden', minWidth:0 }}>
@@ -109,7 +110,7 @@ const NAV = [
   { id:'backoffice', label:'Office',icon:'⚙' },
 ];
 
-function ShiftBar({ shift, version, onWhatsNew }) {
+function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme }) {
   return (
     <div style={{ height:42, display:'flex', alignItems:'center', background:'var(--bg1)', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
       <div style={{ width:'var(--nav)', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', borderRight:'1px solid var(--bdr)', flexShrink:0 }}>
@@ -131,6 +132,16 @@ function ShiftBar({ shift, version, onWhatsNew }) {
         <div style={{ fontSize:11, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>
           {new Date().toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
         </div>
+        <button onClick={onToggleTheme} style={{
+          display:'flex', alignItems:'center', justifyContent:'center',
+          width:32, height:28, borderRadius:9, cursor:'pointer',
+          background:'var(--bg3)', border:'1px solid var(--bdr)', fontFamily:'inherit',
+          fontSize:15, color:'var(--t3)', transition:'all .14s',
+        }}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--bdr3)';e.currentTarget.style.color='var(--t1)';}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr)';e.currentTarget.style.color='var(--t3)';}}>
+          {theme==='dark' ? '☀️' : '🌙'}
+        </button>
         <button onClick={onWhatsNew} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, cursor:'pointer', background:'var(--bg3)', border:'1px solid var(--bdr)', fontFamily:'inherit', fontSize:11, fontWeight:700, color:'var(--t3)', transition:'all .14s' }}
           onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--acc-b)';e.currentTarget.style.color='var(--acc)';}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr)';e.currentTarget.style.color='var(--t3)';}}>
