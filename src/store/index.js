@@ -324,8 +324,9 @@ export const useStore = create((set, get) => ({
   // Type:           simple | modifiers | variants | pizza | bundle
   // Visibility:     { pos, kiosk, online, onlineDelivery }
   //
-  menuItems: MENU_ITEMS.map(item => ({
+  menuItems: MENU_ITEMS.map((item, idx) => ({
     ...item,
+    sortOrder: item.sortOrder ?? idx,  // assign sequential sortOrder if not set
     menuName:    item.menuName    || item.name,
     receiptName: item.receiptName || item.name,
     kitchenName: item.kitchenName || item.name,

@@ -98,18 +98,39 @@ function MenuTab() {
   const selCat  = menuCategories.find(c=>c.id===selCatId);
   const selItem = menuItems.find(i=>i.id===selItemId);
 
-  // ── Category drag: drag to reorder or drop onto another to nest ───────────
+  // ── Category drag ─────────────────────────────────────────────────────────
+  // Hold Shift while dragging: force nest (make subcategory)
+  // Normal drag onto same-level category: reorder
+  // Drag onto different-level category: nest
+  // Drag onto root zone: un-nest
   const onCatDS = (e, id) => { setCatDragId(id); e.dataTransfer.effectAllowed='move'; };
   const onCatDO = (e, id) => { e.preventDefault(); if(id!==catDragId) setCatDropId(id); };
   const onCatDrop = (e, targetId) => {
     e.preventDefault();
     if (!catDragId||catDragId===targetId) { setCatDragId(null); setCatDropId(null); return; }
+
+    const dragged = menuCategories.find(c=>c.id===catDragId);
+    const target  = menuCategories.find(c=>c.id===targetId);
+
     if (targetId==='root') {
+      // Un-nest: move to root
       updateCategory(catDragId, { parentId:null });
       showToast('Moved to root','success');
+    } else if (!dragged||!target) {
+      // fallthrough
+    } else if (dragged.parentId===target.parentId) {
+      // Same level → REORDER
+      const sameLevel = menuCategories.filter(c=>c.parentId===dragged.parentId).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+      const without   = sameLevel.filter(c=>c.id!==catDragId);
+      const targetIdx = without.findIndex(c=>c.id===targetId);
+      const insert    = targetIdx===-1 ? without.length : targetIdx;
+      const reordered = [...without.slice(0,insert), dragged, ...without.slice(insert)];
+      reordered.forEach((cat,idx)=>{ if((cat.sortOrder||0)!==idx) updateCategory(cat.id,{sortOrder:idx}); });
+      showToast('Reordered','success');
     } else {
+      // Different level → NEST as subcategory of target
       const wouldCircle = menuCategories.find(c=>c.id===targetId)?.parentId===catDragId;
-      if (wouldCircle) showToast('Cannot nest that way','error');
+      if (wouldCircle) { showToast('Cannot nest that way','error'); }
       else { updateCategory(catDragId, { parentId:targetId }); showToast('Nested as subcategory','success'); }
     }
     markBOChange(); setCatDragId(null); setCatDropId(null);
@@ -178,11 +199,18 @@ function MenuTab() {
           {roots.map(cat => {
             const children = menuCategories.filter(c=>c.parentId===cat.id);
             const itemCount = menuItems.filter(i=>!i.archived&&(i.cat===cat.id||children.some(s=>s.id===i.cat))).length;
-            const isActive = selCatId===cat.id;
-            const isDrop   = catDropId===cat.id;
-            const color    = cat.color||'#3b82f6';
+            const isActive   = selCatId===cat.id;
+            const isDrop     = catDropId===cat.id;
+            const isDragging = catDragId===cat.id;
+            const color      = cat.color||'#3b82f6';
+            // Is this a reorder drop or a nest drop?
+            const draggedCat = menuCategories.find(c=>c.id===catDragId);
+            const isReorder  = isDrop && draggedCat?.parentId === cat.parentId;
+            const isNest     = isDrop && !isReorder;
             return (
-              <div key={cat.id}>
+              <div key={cat.id} style={{ opacity:isDragging?.3:1 }}>
+                {/* Drop indicator line for reordering */}
+                {isReorder && <div style={{ height:3, background:'var(--acc)', borderRadius:2, margin:'1px 4px' }}/>}
                 <div
                   draggable
                   onDragStart={e=>onCatDS(e,cat.id)}
@@ -191,7 +219,10 @@ function MenuTab() {
                   onDragEnd={onCatEnd}
                   onDrop={e=>onCatDrop(e,cat.id)}
                   onClick={()=>{ setSelCatId(cat.id); setSelItemId(null); }}
-                  style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:9, marginBottom:2, cursor:'pointer', userSelect:'none', border:`1.5px solid ${isDrop?'var(--acc)':isActive?color+'55':'transparent'}`, background:isDrop?'var(--acc-d)':isActive?color+'15':'transparent', transition:'all .1s' }}>
+                  style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:9, marginBottom:2, cursor:'grab', userSelect:'none',
+                    border:`1.5px solid ${isNest?'var(--acc)':isActive?color+'55':'transparent'}`,
+                    background:isNest?'var(--acc-d)':isActive?color+'15':'transparent',
+                    transition:'all .1s' }}>
                   <span style={{ fontSize:9, color:'var(--t4)', cursor:'grab' }}>⣿</span>
                   <div style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }}/>
                   <span style={{ fontSize:16 }}>{cat.icon}</span>
@@ -291,13 +322,15 @@ function MenuTab() {
                 const is86     = eightySixIds.includes(item.id);
 
                 return (
-                  <div key={item.id}
+                  <div key={item.id}>
+                    {isOver && !isChild && <div style={{ height:3, background:'var(--acc)', borderRadius:2, margin:'0 2px 2px' }}/>}
+                    <div
                     onDragOver={e=>{ e.preventDefault(); if(itemDragId&&!isChild) setItemOverId(item.id); }}
                     onDragLeave={()=>setItemOverId(null)}
                     onDrop={e=>{ e.preventDefault(); onItemDrop(e,item.id); }}
                     onDragEnd={onItemEnd}
                     onClick={()=>setSelItemId(active?null:item.id)}
-                    style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 10px', borderRadius:9, marginBottom:3, cursor:'pointer', marginLeft:isChild?16:0, border:`1.5px solid ${isOver?'var(--grn)':active?'var(--acc)':'var(--bdr)'}`, background:isOver?'var(--grn-d)':active?'var(--acc-d)':isSub?'var(--bg2)':'var(--bg3)', opacity:(itemDragId===item.id||is86)?.4:1 }}>
+                    style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 10px', borderRadius:9, marginBottom:3, cursor:'pointer', marginLeft:isChild?16:0, border:`1.5px solid ${active?'var(--acc)':'var(--bdr)'}`, background:active?'var(--acc-d)':isSub?'var(--bg2)':'var(--bg3)', opacity:(itemDragId===item.id||is86)?.4:1 }}>
 
                     {/* Drag handle */}
                     {!isChild&&!isSub&&(
@@ -326,6 +359,7 @@ function MenuTab() {
                     <span style={{ fontSize:12, fontWeight:700, color:active?'var(--acc)':'var(--t2)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
                       {isParent?'var':p.base>0?`£${p.base.toFixed(2)}`:isSub&&p.base>0?`+£${p.base.toFixed(2)}`:'free'}
                     </span>
+                  </div>
                   </div>
                 );
               })}

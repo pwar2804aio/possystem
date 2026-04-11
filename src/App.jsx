@@ -14,9 +14,18 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.4';
+const VERSION = '1.0.5';
 
 const CHANGELOG = [
+  {
+    version: '1.0.5', date: 'Apr 2026', label: 'Menu Manager drag-and-drop actually works',
+    changes: [
+      'Category drag: same-level drag now REORDERS (updates sortOrder) — not just nests. Dragging onto a different-level category nests it. Blue indicator line shows insert position.',
+      'Seed items now get sequential sortOrder (0,1,2…) at store init — previously all had undefined, so reordering never changed display order.',
+      'Item drag indicator: blue line appears between items showing exactly where the item will land.',
+      'POS catItems sort uses sortOrder correctly — changes made in Menu Manager reflect immediately on POS item grid.',
+    ],
+  },
   {
     version: '1.0.4', date: 'Apr 2026', label: 'Menu Manager complete redesign — 3-panel contextual layout',
     changes: [
