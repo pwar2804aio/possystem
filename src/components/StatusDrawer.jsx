@@ -17,7 +17,8 @@ export default function StatusDrawer({ onClose }) {
 
   const timeSince = (ts) => {
     if (!ts) return 'never';
-    const mins = Math.floor((Date.now() - ts) / 60000);
+    const t = ts instanceof Date ? ts.getTime() : typeof ts === 'string' ? new Date(ts).getTime() : Number(ts);
+    const mins = Math.floor((Date.now() - t) / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;
     return `${Math.floor(mins/60)}h ${mins%60}m ago`;

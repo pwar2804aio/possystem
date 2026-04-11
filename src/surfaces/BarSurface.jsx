@@ -23,7 +23,9 @@ const STATUS_META = {
 };
 
 function timeOpen(date) {
-  const mins = Math.floor((Date.now() - new Date(date)) / 60000);
+  if (!date) return '0m';
+  const t = date instanceof Date ? date.getTime() : typeof date === 'string' ? new Date(date).getTime() : Number(date);
+  const mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
   if (mins < 60) return `${mins}m`;
   return `${Math.floor(mins/60)}h ${mins%60}m`;
 }
@@ -135,7 +137,7 @@ const labelStyle = { display:'block', fontSize:11, fontWeight:700, color:'var(--
 
 // ─── Main Bar Surface ─────────────────────────────────────────────────────────
 export default function BarSurface() {
-  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem } = useStore();
+  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, menuItems: storeMenuItems } = useStore();
 
   const [showOpenModal, setShowOpenModal]   = useState(false);
   const [cat, setCat]                       = useState('cocktails');
@@ -153,13 +155,18 @@ export default function BarSurface() {
   const activeTab = tabs.find(t=>t.id===activeTabId);
   const filteredTabs = tabs.filter(t=>showTabFilter==='active' ? t.status!=='closed' : true);
 
+  const ITEMS = (storeMenuItems || MENU_ITEMS).filter(i => !i.archived && i.type !== 'subitem');
   const catMeta = CAT_META[cat] || CAT_META.cocktails;
-  const rawItems = cat==='quick' ? QUICK_IDS.map(id=>MENU_ITEMS.find(i=>i.id===id)).filter(Boolean) : MENU_ITEMS.filter(i=>i.cat===cat);
+  const rawItems = useMemo(()=>{
+    if (cat==='all') return ITEMS.filter(i=>!eightySixIds.includes(i.id));
+    if (cat==='quick') return QUICK_IDS.map(id=>ITEMS.find(i=>i.id===id)).filter(i=>i&&!eightySixIds.includes(i.id));
+    return ITEMS.filter(i=>!eightySixIds.includes(i.id)&&(i.cat===cat||(i.cats||[]).includes(cat)));
+  },[cat,ITEMS,eightySixIds]);
   const displayItems = useMemo(()=>{
-    if (!search.trim()) return rawItems;
+    if (!search.trim()) return rawItems.sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
     const q=search.toLowerCase();
-    return MENU_ITEMS.filter(i=>i.name.toLowerCase().includes(q)||i.description?.toLowerCase().includes(q));
-  },[cat,search]);
+    return ITEMS.filter(i=>!eightySixIds.includes(i.id)&&((i.menuName||i.name||'').toLowerCase().includes(q)||i.description?.toLowerCase().includes(q)));
+  },[cat,search,rawItems,ITEMS,eightySixIds]);
 
   const roundTotal = roundItems.reduce((s,i)=>s+i.price*i.qty,0);
   const roundCount = roundItems.reduce((s,i)=>s+i.qty,0);
@@ -438,16 +445,16 @@ export default function BarSurface() {
             {!activeTab&&<button onClick={()=>setShowOpenModal(true)} className="btn btn-acc btn-sm">+ New tab</button>}
           </div>
           <div style={{ display:'flex',gap:4,overflowX:'auto',paddingBottom:2 }}>
-            {CATEGORIES.map(c=>{
-              const m=CAT_META[c.id]||{};
+            {[{id:'all',label:'All',icon:'🍽',color:'var(--acc)'},...(menuCategories||[]).filter(c=>!c.parentId&&!c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0))].map(c=>{
+              const color = c.color||'var(--acc)';
               const isActive=cat===c.id&&!search;
               return(
                 <button key={c.id} onClick={()=>{setCat(c.id);setSearch('');}} style={{
                   padding:'4px 11px',borderRadius:20,fontSize:11,fontWeight:600,
-                  whiteSpace:'nowrap',cursor:'pointer',border:`1px solid ${isActive?m.color+'88':'var(--bdr)'}`,
-                  background:isActive?(m.color+'18'):'transparent',
-                  color:isActive?m.color:'var(--t3)',fontFamily:'inherit',
-                }}>{m.icon} {c.label}</button>
+                  whiteSpace:'nowrap',cursor:'pointer',border:`1px solid ${isActive?color+'88':'var(--bdr)'}`,
+                  background:isActive?(color+'18'):'transparent',
+                  color:isActive?color:'var(--t3)',fontFamily:'inherit',
+                }}>{c.icon} {c.label}</button>
               );
             })}
           </div>

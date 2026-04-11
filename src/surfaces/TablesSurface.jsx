@@ -11,10 +11,12 @@ const STATUS = {
 
 function mins(ts) {
   if (!ts) return 0;
-  return Math.floor((Date.now() - ts) / 60000);
+  const t = ts instanceof Date ? ts.getTime() : typeof ts === 'string' ? new Date(ts).getTime() : ts;
+  return Math.floor((Date.now() - t) / 60000);
 }
 function fmt(ts) {
   const m = mins(ts);
+  if (m < 0) return '0m';
   if (m < 60) return `${m}m`;
   return `${Math.floor(m/60)}h ${m%60}m`;
 }

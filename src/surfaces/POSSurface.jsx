@@ -166,7 +166,7 @@ export default function POSSurface() {
         setModalItem({
           ...item,
           type: 'variants',
-          variantLabel: item.variantLabel || 'Option',
+          variantLabel: item.variantLabel || 'Size',
           variants: variantChildren.map(c => ({
             id: c.id,
             label: c.menuName || c.name,
@@ -642,7 +642,7 @@ export default function POSSurface() {
                           </div>
                           <div style={{display:'flex',gap:3,alignItems:'center',flexShrink:0}}>
                             {item.type!=='simple'&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:5,background:'var(--bg4)',color:'var(--t3)',letterSpacing:.02}}>
-                              {item.type==='variants'?'▾ sizes':item.type==='modifiers'?'⊕ opts':'⬛ build'}
+                              {item.type==='variants'?'▾ sizes':item.type==='modifiers'?'⊕ opts':'⊕ opts'}
                             </span>}
                             <button
                               onClick={e=>{e.stopPropagation();toggle86(item.id);showToast(is86?`${item.name} un-86'd`:`${item.name} 86'd`,'warning');}}

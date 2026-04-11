@@ -357,6 +357,12 @@ export function KDSSurface() {
   const [filter, setFilter] = useState(defaultFilter);
   const [, setTick] = useState(0);
 
+  // Tick every 30s to update live timers
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+
   const urgency = (m) => m>=25?'urgent':m>=12?'warning':'ok';
   const fmt = (m) => m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
   const URG = {
@@ -364,6 +370,12 @@ export function KDSSurface() {
     warning: { color:'var(--acc)',  bg:'rgba(232,160,32,.08)', border:'rgba(232,160,32,.25)', pulse:false },
     ok:      { color:'var(--grn)',  bg:'transparent',          border:'var(--bdr)',            pulse:false },
   };
+
+  function getLiveMinutes(ticket) {
+    if (!ticket.sentAt) return ticket.minutes||0;
+    const ts = ticket.sentAt instanceof Date ? ticket.sentAt.getTime() : typeof ticket.sentAt === 'string' ? new Date(ticket.sentAt).getTime() : Number(ticket.sentAt);
+    return Math.max(0, Math.floor((Date.now() - ts) / 60000));
+  }
 
   const stations = ['all', ...new Set(kdsTickets.map(t=>t.centreId||t.station||'pc1').filter(Boolean))];
   const displayed = kdsTickets.filter(t => filter==='all' || (t.centreId||t.station||'pc1')===filter);
@@ -418,7 +430,7 @@ export function KDSSurface() {
           </div>
         )}
         {displayed.map(ticket=>{
-          const liveMin = ticket.sentAt ? Math.floor((Date.now()-ticket.sentAt)/60000) : (ticket.minutes||0);
+          const liveMin = ticket.sentAt ? Math.floor((Date.now()-(ticket.sentAt instanceof Date ? ticket.sentAt.getTime() : Number(ticket.sentAt)))/60000) : (ticket.minutes||0);
           const urg = urgency(liveMin);
           const u   = URG[urg];
           const stationLabel = CENTRE_LABELS[ticket.centreId||ticket.station] || ticket.station || 'Kitchen';

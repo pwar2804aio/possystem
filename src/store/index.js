@@ -39,12 +39,12 @@ function buildInitialTables() {
       { uid:'d1', itemId:'m-soup',    name:'Soup of the day',  price:6.5,  qty:2, mods:[], notes:'', allergens:['gluten','milk'], course:1, fired:true, status:'sent', seat:'shared' },
       { uid:'d2', itemId:'m-salmon',  name:'Grilled salmon',   price:19.0, qty:2, mods:[], notes:'', allergens:['fish','milk'],   course:2, fired:true, status:'sent', seat:'shared' },
       { uid:'d3', itemId:'m-hwine-250',name:'House white 250ml',price:8.5, qty:1, mods:[], notes:'', allergens:['sulphites'],    course:0, fired:true, status:'sent', seat:'shared' },
-    ], firedCourses:[0,1], sentAt:new Date(Date.now()-18*60000), server:'Sarah', covers:2, seatedAt:Date.now()-22*60000, note:'', orderNote:'' } };
+    ], firedCourses:[0,1], sentAt:Date.now()-18*60000, server:'Sarah', covers:2, seatedAt:Date.now()-22*60000, note:'', orderNote:'' } };
     if (t.id==='t5') return { ...base, status:'occupied', session:{ id:'ORD-DEMO2', items:[
       { uid:'d4', itemId:'m-rib8',    name:'8oz Ribeye',       price:28.0, qty:1, mods:[{label:'Side: Chips',price:0},{label:'Sauce: Peppercorn',price:0}], notes:'', allergens:['milk'], course:2, fired:true, status:'sent', seat:'shared' },
       { uid:'d5', itemId:'m-sir6',    name:'6oz Sirloin',      price:22.0, qty:1, mods:[{label:'Side: Side salad',price:0},{label:'Cooking: Medium rare',price:0}], notes:'', allergens:['milk'], course:2, fired:true, status:'sent', seat:'shared' },
       { uid:'d6', itemId:'m-hrwine-175',name:'House red 175ml',price:6.5,  qty:2, mods:[], notes:'', allergens:['sulphites'], course:0, fired:true, status:'sent', seat:'shared' },
-    ], firedCourses:[0,2], sentAt:new Date(Date.now()-35*60000), server:'Tom', covers:2, seatedAt:Date.now()-40*60000, note:'', orderNote:'' } };
+    ], firedCourses:[0,2], sentAt:Date.now()-35*60000, server:'Tom', covers:2, seatedAt:Date.now()-40*60000, note:'', orderNote:'' } };
     if (t.id==='t3') return { ...base, status:'reserved', reservation:{ name:'Johnson party', phone:'07700 900111', time:'7:30 PM', partySize:2 } };
     if (t.id==='p2') return { ...base, status:'reserved', reservation:{ name:'Chen table',   phone:'07700 900222', time:'8:00 PM', partySize:4 } };
     return base;
@@ -834,7 +834,7 @@ export const useStore = create((set, get) => ({
           const firedCourses=[...new Set([...(t.session.firedCourses||[]),...fired])];
           const items=t.session.items.map(i=>firedCourses.includes(i.course)?{...i,fired:true,status:'sent'}:i);
           const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
-          return {...t, status:'occupied', session:{...t.session, items, firedCourses, sentAt:t.session.sentAt||new Date(), server:staff?.name||t.session.server, subtotal, total:subtotal*1.125 }};
+          return {...t, status:'occupied', session:{...t.session, items, firedCourses, sentAt:t.session.sentAt||Date.now(), server:staff?.name||t.session.server, subtotal, total:subtotal*1.125 }};
         }),
         kdsTickets: [...s.kdsTickets, ...newTickets],
       }));
@@ -853,7 +853,7 @@ export const useStore = create((set, get) => ({
         customer: customer ? { ...customer } : { name: customer?.name || label },
         items: order.items.filter(i => !i.voided),
         total: order.items.reduce((s, i) => s + i.price * i.qty, 0),
-        status: 'received', createdAt: order.createdAt || new Date(), sentAt: new Date(),
+        status: 'received', createdAt: order.createdAt || Date.now(), sentAt: Date.now(),
         collectionTime: customer?.collectionTime, isASAP: customer?.isASAP, staff: staff?.name,
       };
       const alreadyQueued = get().orderQueue.find(o => o.ref === ref);
@@ -863,7 +863,7 @@ export const useStore = create((set, get) => ({
         addToQueue(queueEntry);
       }
       set(s => ({
-        walkInOrder: { ...(s.walkInOrder||{}), ref, sentAt: new Date(), items: (s.walkInOrder?.items||[]).map(i => [0,1].includes(i.course) ? {...i, fired:true, status:'sent'} : i) },
+        walkInOrder: { ...(s.walkInOrder||{}), ref, sentAt: Date.now(), items: (s.walkInOrder?.items||[]).map(i => [0,1].includes(i.course) ? {...i, fired:true, status:'sent'} : i) },
         kdsTickets: [...s.kdsTickets, ...newTickets],
       }));
       import('../lib/db.js').then(({ insertKDSTicket }) => newTickets.forEach(t => insertKDSTicket(t)));
@@ -1043,7 +1043,7 @@ export const useStore = create((set, get) => ({
   },
   setActiveTab: id => set({ activeTabId:id }),
   addRoundToTab: (tabId, items, note='') => {
-    const round = { id:uid(), sentAt:new Date(), items:items.map(i=>({...i})), subtotal:items.reduce((s,i)=>s+i.price*i.qty,0), note };
+    const round = { id:uid(), sentAt:Date.now(), items:items.map(i=>({...i})), subtotal:items.reduce((s,i)=>s+i.price*i.qty,0), note };
     set(s=>({ tabs:s.tabs.map(t=>{ if(t.id!==tabId)return t; const rounds=[...t.rounds,round]; return{...t,rounds,status:'running',total:rounds.reduce((s,r)=>s+r.subtotal,0)}; }) }));
     return round;
   },
@@ -1052,25 +1052,25 @@ export const useStore = create((set, get) => ({
   closeTab: tabId => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status:'closed'}:t), activeTabId:s.activeTabId===tabId?null:s.activeTabId })),
   voidTabRound: (tabId,roundId) => set(s=>({ tabs:s.tabs.map(t=>{ if(t.id!==tabId)return t; const rounds=t.rounds.filter(r=>r.id!==roundId); return{...t,rounds,total:rounds.reduce((s,r)=>s+r.subtotal,0)}; }) })),
   seedTabs: () => set({ tabs:[
-    { id:'t-demo1', ref:'TAB-001', name:'Maria G.', seatId:'B1', tableId:null, openedBy:'Maria', openedAt:new Date(Date.now()-22*60000), status:'running', preAuth:false, preAuthAmount:0, note:'Birthday drinks', total:29.8,
+    { id:'t-demo1', ref:'TAB-001', name:'Maria G.', seatId:'B1', tableId:null, openedBy:'Maria', openedAt:Date.now()-22*60000, status:'running', preAuth:false, preAuthAmount:0, note:'Birthday drinks', total:29.8,
       rounds:[
-        { id:'r1', sentAt:new Date(Date.now()-20*60000), subtotal:17.4, note:'', items:[
+        { id:'r1', sentAt:Date.now()-20*60000, subtotal:17.4, note:'', items:[
           {uid:'ri1',name:'Lager — Pint',price:5.8,qty:2,mods:[],notes:''},
           {uid:'ri2',name:'Sparkling water',price:2.8,qty:1,mods:[],notes:'No ice'},
         ]},
-        { id:'r2', sentAt:new Date(Date.now()-8*60000), subtotal:12.4, note:'', items:[
+        { id:'r2', sentAt:Date.now()-8*60000, subtotal:12.4, note:'', items:[
           {uid:'ri3',name:'Stout — Pint',price:6.2,qty:1,mods:[],notes:''},
           {uid:'ri4',name:'House white 250ml',price:8.5,qty:1,mods:[],notes:'Extra cold'},
         ]},
       ]},
-    { id:'t-demo2', ref:'TAB-002', name:'Table 4 bar', seatId:null, tableId:'t4', openedBy:'Tom', openedAt:new Date(Date.now()-45*60000), status:'running', preAuth:false, preAuthAmount:0, note:'', total:35.2,
+    { id:'t-demo2', ref:'TAB-002', name:'Table 4 bar', seatId:null, tableId:'t4', openedBy:'Tom', openedAt:Date.now()-45*60000, status:'running', preAuth:false, preAuthAmount:0, note:'', total:35.2,
       rounds:[
-        { id:'r3', sentAt:new Date(Date.now()-40*60000), subtotal:20.7, note:'', items:[
+        { id:'r3', sentAt:Date.now()-40*60000, subtotal:20.7, note:'', items:[
           {uid:'ri5',name:'Lager — Pint',price:5.8,qty:2,mods:[],notes:''},
           {uid:'ri6',name:'House red 175ml',price:6.5,qty:1,mods:[],notes:''},
           {uid:'ri7',name:'Coke',price:3.5,qty:1,mods:[],notes:''},
         ]},
-        { id:'r4', sentAt:new Date(Date.now()-15*60000), subtotal:14.5, note:'', items:[
+        { id:'r4', sentAt:Date.now()-15*60000, subtotal:14.5, note:'', items:[
           {uid:'ri8',name:'Stout — Pint',price:6.2,qty:1,mods:[],notes:''},
           {uid:'ri9',name:'House white 250ml',price:8.5,qty:1,mods:[],notes:''},
         ]},

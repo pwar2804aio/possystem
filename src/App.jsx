@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.3';
+const VERSION = '1.1.4';
 
 const CHANGELOG = [
   {
@@ -24,6 +24,17 @@ const CHANGELOG = [
       'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
       'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
       'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
+  {
+    version: '1.1.4', date: 'Apr 2026', label: 'KDS crash fixed, NaN time fixed, variant labels',
+    changes: [
+      'CRITICAL: KDS crashed entire app on click — getLiveMinutes was a const arrow function but was referenced before its declaration in the minified bundle. Changed to a hoisted function declaration.',
+      'KDS tick timer (setInterval/useEffect) was missing — timers now update every 30 seconds.',
+      'Floor plan "Order sent: NaNh NaNm ago" fixed — sentAt was stored as Date object which serialised to string, then Date.now()-string = NaN. All sentAt values now stored as numeric timestamps.',
+      'Variant picker label changed from "Choose option" to "Choose size/serving" — default variantLabel changed from Option to Size.',
+      'Lager/Stout get variantLabel: Size, House white/red get variantLabel: Serving in seed data.',
+      'Demo table sentAt timestamps fixed to plain numbers (no Date objects).',
     ],
   },
   {
