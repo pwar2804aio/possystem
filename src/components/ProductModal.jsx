@@ -264,18 +264,32 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
 
   const allModGroups = buildGroups();
 
-  const getSelType = (group) => group.selectionType || (group.max > 1 ? 'multiple' : 'single');
+  const getSelType = (group) => {
+    if (group.selectionType) return group.selectionType;
+    if (group.max === 1) return 'single';
+    return 'multiple';
+  };
   const isRequired = (group) => group.min > 0 || group.required;
 
-  const toggleSingle = (groupId, opt) => setSelections(s => ({ ...s, [groupId]: s[groupId]?.id === opt.id ? null : opt }));
-  const toggleMulti  = (groupId, opt) => setSelections(s => {
+  // Single select: toggle one option
+  const toggleSingle = (groupId, opt) => setSelections(s => ({
+    ...s, [groupId]: s[groupId]?.id === opt.id ? null : opt
+  }));
+
+  // Multi select: each press adds one more (allows duplicates), up to max
+  const addMulti = (groupId, opt) => setSelections(s => {
     const cur = s[groupId] || [];
-    const has = cur.find(o => o.id === opt.id);
     const group = allModGroups.find(g => g.id === groupId);
-    const maxSel = group?.max || 99;
-    if (!has && cur.length >= maxSel) return s;
-    return { ...s, [groupId]: has ? cur.filter(o => o.id !== opt.id) : [...cur, opt] };
+    const maxSel = group?.max >= 99 ? 999 : (group?.max || 999);
+    if (cur.length >= maxSel) return s;
+    return { ...s, [groupId]: [...cur, { ...opt, _uid: Date.now() + Math.random() }] };
   });
+
+  // Remove one instance of an option
+  const removeMulti = (groupId, uid) => setSelections(s => ({
+    ...s, [groupId]: (s[groupId] || []).filter(o => o._uid !== uid)
+  }));
+
   const toggleInst = (groupId, opt) => setInstSel(s => ({ ...s, [groupId]: s[groupId] === opt ? null : opt }));
 
   const allRequired = allModGroups
@@ -291,7 +305,13 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
   const price = (basePrice + extraCost) * qty;
 
   const buildDisplayName = () => {
-    const modParts  = Object.values(selections).flat().filter(Boolean).map(m => m.label);
+    // Count occurrences of each mod label
+    const allMods = Object.values(selections).flat().filter(Boolean);
+    const labelCounts = {};
+    allMods.forEach(m => { labelCounts[m.label] = (labelCounts[m.label]||0) + 1; });
+    const modParts = [...new Set(allMods.map(m => m.label))].map(label =>
+      labelCounts[label] > 1 ? `${labelCounts[label]}× ${label}` : label
+    );
     const instParts = Object.values(instSelections).filter(Boolean);
     const all = [...modParts, ...instParts];
     return all.length ? `${item.menuName || item.name} — ${all.join(', ')}` : (item.menuName || item.name);
@@ -323,58 +343,63 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
         const options = group.options || [];
         const selType = getSelType(group);
         const required = isRequired(group);
-        const maxSel = group.max || (selType === 'single' ? 1 : 99);
+        const maxSel = group.max >= 99 || !group.max ? 999 : group.max;
         const cur = selections[group.id];
         const selectedCount = Array.isArray(cur) ? cur.length : (cur ? 1 : 0);
+        const isUnlimited = !group.max || group.max >= 99;
 
         return (
           <div key={group.id} style={{ marginBottom:20 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexWrap:'wrap' }}>
               <span className="label-xs">{group.label || group.name || 'Options'}</span>
               {required && <span style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>Required</span>}
               {!required && <span style={{ fontSize:11, color:'var(--t4)' }}>Optional</span>}
-              {selType !== 'single' && <span style={{ fontSize:11, color:'var(--t3)' }}>Pick up to {maxSel}</span>}
-              {selType !== 'single' && selectedCount > 0 && <span style={{ fontSize:11, color:'var(--acc)', fontWeight:700 }}>{selectedCount} selected</span>}
+              {selType === 'single' && <span style={{ fontSize:11, color:'var(--t3)' }}>Pick one</span>}
+              {selType !== 'single' && !isUnlimited && <span style={{ fontSize:11, color:'var(--t3)' }}>Up to {maxSel}</span>}
+              {selType !== 'single' && isUnlimited && <span style={{ fontSize:11, color:'var(--t3)' }}>Add as many as you like</span>}
+              {selectedCount > 0 && <span style={{ fontSize:11, color:'var(--acc)', fontWeight:700 }}>{selectedCount} selected</span>}
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               {options.map(opt => {
-                const isSelected = selType === 'single'
-                  ? cur?.id === opt.id
-                  : !!(cur || []).find(o => o.id === opt.id);
-                const atMax = selType !== 'single' && !isSelected && selectedCount >= maxSel;
-                return (
-                  <button key={opt.id}
-                    onClick={() => {
-                      if (atMax) return;
-                      selType === 'single' ? toggleSingle(group.id, opt) : toggleMulti(group.id, opt);
-                    }}
-                    style={{
-                      padding:'11px 14px', borderRadius:10, cursor: atMax ? 'not-allowed' : 'pointer',
-                      border:`1.5px solid ${isSelected ? 'var(--acc)' : 'var(--bdr)'}`,
-                      background: isSelected ? 'var(--acc-d)' : atMax ? 'var(--bg2)' : 'var(--bg3)',
-                      display:'flex', alignItems:'center', justifyContent:'space-between',
-                      transition:'all .12s', fontFamily:'inherit', opacity: atMax ? .5 : 1,
-                    }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{
-                        width:18, height:18,
-                        borderRadius: selType === 'single' ? '50%' : 4,
-                        border:`2px solid ${isSelected ? 'var(--acc)' : 'var(--bdr2)'}`,
-                        background: isSelected ? 'var(--acc)' : 'transparent',
-                        display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                      }}>
-                        {isSelected && <div style={{ width:6, height:6, borderRadius: selType === 'single' ? '50%' : 1, background:'#0e0f14' }}/>}
+                if (selType === 'single') {
+                  const isSelected = cur?.id === opt.id;
+                  return (
+                    <button key={opt.id} onClick={() => toggleSingle(group.id, opt)}
+                      style={{ padding:'11px 14px', borderRadius:10, cursor:'pointer', border:`1.5px solid ${isSelected?'var(--acc)':'var(--bdr)'}`, background:isSelected?'var(--acc-d)':'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .12s', fontFamily:'inherit' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <div style={{ width:18, height:18, borderRadius:'50%', border:`2px solid ${isSelected?'var(--acc)':'var(--bdr2)'}`, background:isSelected?'var(--acc)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          {isSelected && <div style={{ width:6, height:6, borderRadius:'50%', background:'#0e0f14' }}/>}
+                        </div>
+                        <span style={{ fontSize:14, fontWeight:500, color:isSelected?'var(--acc)':'var(--t1)' }}>{opt.label}</span>
                       </div>
-                      <span style={{ fontSize:14, fontWeight:500, color: isSelected ? 'var(--acc)' : 'var(--t1)' }}>{opt.label}</span>
+                      <span style={{ fontSize:13, fontWeight:600, color:isSelected?'var(--acc)':'var(--t3)' }}>
+                        {opt.price > 0 ? `+£${opt.price.toFixed(2)}` : isSelected ? '✓' : ''}
+                      </span>
+                    </button>
+                  );
+                } else {
+                  // Multi-select: show qty controls, allow multiples of same item
+                  const instances = (cur || []).filter(o => o.id === opt.id);
+                  const qty = instances.length;
+                  const atMax = selectedCount >= maxSel;
+                  return (
+                    <div key={opt.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', borderRadius:10, border:`1.5px solid ${qty>0?'var(--acc)':'var(--bdr)'}`, background:qty>0?'var(--acc-d)':'var(--bg3)', transition:'all .12s' }}>
+                      <span style={{ fontSize:14, fontWeight:500, color:qty>0?'var(--acc)':'var(--t1)', flex:1 }}>{opt.label}</span>
+                      <span style={{ fontSize:13, color:qty>0?'var(--acc)':'var(--t3)', marginRight:8 }}>
+                        {opt.price > 0 ? `+£${opt.price.toFixed(2)}` : 'free'}
+                      </span>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        {qty > 0 && (
+                          <button onClick={() => removeMulti(group.id, instances[instances.length-1]._uid)}
+                            style={{ width:28, height:28, borderRadius:7, border:'1.5px solid var(--acc-b)', background:'var(--bg1)', color:'var(--acc)', cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+                        )}
+                        {qty > 0 && <span style={{ fontSize:13, fontWeight:800, color:'var(--acc)', minWidth:16, textAlign:'center' }}>{qty}</span>}
+                        <button onClick={() => !atMax && addMulti(group.id, opt)} disabled={atMax}
+                          style={{ width:28, height:28, borderRadius:7, border:`1.5px solid ${atMax?'var(--bdr)':'var(--acc)'}`, background:atMax?'var(--bg2)':'var(--acc)', color:atMax?'var(--t4)':'#0b0c10', cursor:atMax?'not-allowed':'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', opacity:atMax?.4:1 }}>+</button>
+                      </div>
                     </div>
-                    {opt.price > 0 && (
-                      <span style={{ fontSize:13, fontWeight:600, color: isSelected ? 'var(--acc)' : 'var(--t3)' }}>+£{opt.price.toFixed(2)}</span>
-                    )}
-                    {opt.price === 0 && isSelected && (
-                      <span style={{ fontSize:12, color:'var(--acc)' }}>✓</span>
-                    )}
-                  </button>
-                );
+                  );
+                }
               })}
               {options.length === 0 && (
                 <div style={{ fontSize:12, color:'var(--t4)', padding:'8px 12px', background:'var(--bg3)', borderRadius:8 }}>

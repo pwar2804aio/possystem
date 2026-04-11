@@ -125,16 +125,13 @@ export default function POSSurface() {
   const catItems = useMemo(() => {
     if (cat === 'quick') return quickItems;
     const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
-    if (subCat) {
-      // Specific subcategory selected
-      return base.filter(i => i.cat === subCat);
-    }
+    const inCat = (i, id) => i.cat === id || (i.cats||[]).includes(id);
+    if (subCat) return base.filter(i => inCat(i, subCat));
     if (subCategories.length > 0) {
-      // Parent with subcategories — show items in parent + all subcategories
       const subIds = subCategories.map(s => s.id);
-      return base.filter(i => i.cat === cat || subIds.includes(i.cat));
+      return base.filter(i => inCat(i, cat) || subIds.some(sid => inCat(i, sid)));
     }
-    return base.filter(i => i.cat === cat);
+    return base.filter(i => inCat(i, cat));
   }, [cat, subCat, subCategories, MENU_ITEMS, quickItems]);
 
   const displayItems = useMemo(() => {

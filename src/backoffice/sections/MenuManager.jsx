@@ -346,6 +346,28 @@ function ItemsTab() {
   const is86 = selId && eightySixIds.includes(selId);
 
   // Drag to make variant
+  const [reorderDragId, setReorderDragId] = useState(null);
+  const [reorderOverId, setReorderOverId] = useState(null);
+
+  const onReorderStart = (e, id) => {
+    setReorderDragId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.stopPropagation();
+  };
+  const onReorderOver  = (e, id) => { e.preventDefault(); e.stopPropagation(); if(id!==reorderDragId) setReorderOverId(id); };
+  const onReorderDrop  = (e, targetId) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!reorderDragId || reorderDragId === targetId) { setReorderDragId(null); setReorderOverId(null); return; }
+    // Swap sortOrder values to reorder
+    const dragItem   = all.find(i => i.id === reorderDragId);
+    const targetItem = all.find(i => i.id === targetId);
+    if (!dragItem || !targetItem) { setReorderDragId(null); setReorderOverId(null); return; }
+    updateMenuItem(reorderDragId, { sortOrder: targetItem.sortOrder ?? 0 });
+    updateMenuItem(targetId, { sortOrder: dragItem.sortOrder ?? 0 });
+    markBOChange();
+    setReorderDragId(null); setReorderOverId(null);
+  };
+
   const onDS = (e,id) => { setDragId(id); e.dataTransfer.effectAllowed='move'; };
   const onDO = (e,id) => { e.preventDefault(); if(id!==dragId) setDropId(id); };
   const onDrop = (e, targetId) => {
@@ -354,18 +376,15 @@ function ItemsTab() {
     const dragged = all.find(i=>i.id===dragId);
     const target  = all.find(i=>i.id===targetId);
     if (!dragged||!target) { setDragId(null); setDropId(null); return; }
-    // Can't make a subitem a variant parent or child
     if (dragged.type==='subitem'||target.type==='subitem') { showToast('Subitems cannot be variants','error'); setDragId(null); setDropId(null); return; }
-    // Can't nest a parent (that already has children) under another
     if (all.some(i=>i.parentId===dragId)) { showToast('Remove this item\'s variants first before linking it','error'); setDragId(null); setDropId(null); return; }
-    // Make dragged a variant child of target (set target as parent)
-    const parentId = target.parentId ? target.parentId : target.id; // if target is itself a child, use its parent
+    const parentId = target.parentId ? target.parentId : target.id;
     updateMenuItem(dragId, { parentId });
     markBOChange();
     showToast(`${dragged.menuName||dragged.name} → variant of ${target.menuName||target.name}`, 'success');
     setDragId(null); setDropId(null);
   };
-  const onDL = () => setDropId(null);
+  const onDL = () => { setDropId(null); setReorderOverId(null); };
 
   const addItem = (type='simple') => {
     const n = addMenuItem({ name:`New ${type}`, menuName:`New ${type}`, receiptName:`New ${type}`, kitchenName:`New ${type}`, type, allergens:[], pricing:{base:0,dineIn:null,takeaway:null,collection:null,delivery:null} });
@@ -413,7 +432,7 @@ function ItemsTab() {
             const p = item.pricing||{base:item.price||0};
 
             return (
-              <div key={item.id} style={{ marginLeft:isChild?24:0, marginBottom:4, opacity:isDrag?.3:1 }}>
+              <div key={item.id} style={{ marginLeft:isChild?24:0, marginBottom:4, opacity:isDrag||reorderDragId===item.id?.3:1 }}>
                 <div
                   draggable={!isSub}
                   onDragStart={e=>!isSub&&onDS(e,item.id)}
@@ -423,13 +442,23 @@ function ItemsTab() {
                   onClick={()=>setSelId(active?null:item.id)}
                   style={{
                     display:'flex', alignItems:'center', gap:10, padding:'9px 12px',
-                    borderRadius:10, cursor: isSub?'pointer':'grab',
-                    border:`${active?'2px':'1px'} solid ${isDrop?'var(--acc)':active?'var(--acc)':isSub?'var(--bdr)':'var(--bdr)'}`,
-                    background:isDrop?'var(--acc-d)':active?'var(--acc-d)':isSub?'var(--bg2)':'var(--bg3)',
+                    borderRadius:10, cursor: isSub?'pointer':'default',
+                    border:`${active?'2px':'1px'} solid ${reorderOverId===item.id?'var(--grn)':isDrop?'var(--acc)':active?'var(--acc)':isSub?'var(--bdr)':'var(--bdr)'}`,
+                    background:reorderOverId===item.id?'var(--grn-d)':isDrop?'var(--acc-d)':active?'var(--acc-d)':isSub?'var(--bg2)':'var(--bg3)',
                     opacity:is86?.5:1,
                   }}>
-                  {!isSub && <span style={{ fontSize:9, color:'var(--t4)', flexShrink:0 }}>⣿</span>}
-                  {isChild && <span style={{ fontSize:11, color:'var(--t4)', flexShrink:0 }}>↳</span>}
+                  {/* Reorder handle — drag to change order on POS */}
+                  {!isSub && !isChild && (
+                    <span
+                      draggable
+                      onDragStart={e=>onReorderStart(e,item.id)}
+                      onDragOver={e=>onReorderOver(e,item.id)}
+                      onDrop={e=>onReorderDrop(e,item.id)}
+                      onClick={e=>e.stopPropagation()}
+                      title="Drag to reorder on POS"
+                      style={{ fontSize:10, color:'var(--t4)', cursor:'grab', flexShrink:0, padding:'0 2px', lineHeight:1 }}>⣿</span>
+                  )}
+                  {!isSub && isChild && <span style={{ fontSize:11, color:'var(--t4)', flexShrink:0 }}>↳</span>}
 
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -533,9 +562,10 @@ function ItemEditor({ item, onUpdate, onArchive, onClose, is86, onToggle86 }) {
 
         {/* Category */}
         <div style={{ marginBottom:10 }}>
-          <span style={lbl}>Category</span>
-          <select value={item.cat||''} onChange={e=>f('cat',e.target.value)} style={{ ...inp, cursor:'pointer' }}>
-            <option value="">— none —</option>
+          <span style={lbl}>Categories <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0, color:'var(--t4)' }}>(select multiple)</span></span>
+          {/* Primary category — determines which section item appears in on POS */}
+          <select value={item.cat||''} onChange={e=>f('cat',e.target.value)} style={{ ...inp, cursor:'pointer', marginBottom:6 }}>
+            <option value="">— no primary category —</option>
             {rootCats.map(c=>(
               <optgroup key={c.id} label={`${c.icon||''} ${c.label}`}>
                 <option value={c.id}>{c.icon} {c.label}</option>
@@ -543,6 +573,24 @@ function ItemEditor({ item, onUpdate, onArchive, onClose, is86, onToggle86 }) {
               </optgroup>
             ))}
           </select>
+          {/* Additional categories */}
+          <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+            {[...rootCats, ...subCats].filter(c => c.id !== item.cat).map(c => {
+              const inCats = (item.cats||[]).includes(c.id);
+              return (
+                <button key={c.id} onClick={() => {
+                  const cur = item.cats||[];
+                  onUpdate({ cats: inCats ? cur.filter(id=>id!==c.id) : [...cur, c.id] });
+                }} style={{ padding:'3px 9px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:10, fontWeight:inCats?700:400, border:`1px solid ${inCats?'var(--acc)':'var(--bdr)'}`, background:inCats?'var(--acc-d)':'var(--bg3)', color:inCats?'var(--acc)':'var(--t4)' }}>
+                  {c.icon} {c.label}
+                </button>
+              );
+            })}
+          </div>
+          {(item.cats||[]).length > 0 && (
+            <div style={{ fontSize:10, color:'var(--t4)', marginTop:4 }}>Also in: {(item.cats||[]).map(id => ([...rootCats,...subCats].find(c=>c.id===id)?.label||id)).join(', ')}</div>
+          )}
+
         </div>
 
         {/* Pricing */}
@@ -689,11 +737,11 @@ function ModifiersTab() {
             {/* Max selections */}
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ fontSize:12, color:'var(--t2)', fontWeight:600 }}>Max selections:</span>
-              <button onClick={() => updGroup({ max:1 })} style={{ padding:'4px 10px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:sel.max===1?800:500, border:`1px solid ${sel.max===1?'var(--acc)':'var(--bdr)'}`, background:sel.max===1?'var(--acc-d)':'var(--bg3)', color:sel.max===1?'var(--acc)':'var(--t3)' }}>1 (pick one)</button>
-              <button onClick={() => updGroup({ max:99 })} style={{ padding:'4px 10px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:maxUnlimited&&sel.max!==1?800:500, border:`1px solid ${maxUnlimited&&sel.max!==1?'var(--acc)':'var(--bdr)'}`, background:maxUnlimited&&sel.max!==1?'var(--acc-d)':'var(--bg3)', color:maxUnlimited&&sel.max!==1?'var(--acc)':'var(--t3)' }}>Unlimited</button>
+              <button onClick={() => updGroup({ max:1, selectionType:'single' })} style={{ padding:'4px 10px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:sel.max===1?800:500, border:`1px solid ${sel.max===1?'var(--acc)':'var(--bdr)'}`, background:sel.max===1?'var(--acc-d)':'var(--bg3)', color:sel.max===1?'var(--acc)':'var(--t3)' }}>1 (pick one)</button>
+              <button onClick={() => updGroup({ max:99, selectionType:'multiple' })} style={{ padding:'4px 10px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:maxUnlimited&&sel.max!==1?800:500, border:`1px solid ${maxUnlimited&&sel.max!==1?'var(--acc)':'var(--bdr)'}`, background:maxUnlimited&&sel.max!==1?'var(--acc-d)':'var(--bg3)', color:maxUnlimited&&sel.max!==1?'var(--acc)':'var(--t3)' }}>Unlimited</button>
               <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                 <span style={{ fontSize:11, color:'var(--t4)' }}>Custom:</span>
-                <input type="number" min="1" max="20" style={{ ...inp, width:52, padding:'4px 8px', fontSize:12 }} value={!maxUnlimited&&sel.max!==1?sel.max:''} placeholder="N" onChange={e => updGroup({ max:parseInt(e.target.value)||1 })}/>
+                <input type="number" min="2" max="20" style={{ ...inp, width:52, padding:'4px 8px', fontSize:12 }} value={!maxUnlimited&&sel.max!==1?sel.max:''} placeholder="N" onChange={e => updGroup({ max:parseInt(e.target.value)||2, selectionType:'multiple' })}/>
               </div>
             </div>
           </div>
