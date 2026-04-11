@@ -27,6 +27,14 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '1.1.1', date: 'Apr 2026', label: 'Black screen fix: QUICK_IDS missing import',
+    changes: [
+      'CRITICAL FIX: store referenced QUICK_IDS but it was never imported from seed — ReferenceError crashed the entire app at module load before React could mount (black screen).',
+      'PINScreen now reads from store.staffMembers — staff added in Staff Manager appear on the login screen.',
+      'Kiosk surface now reads categories and items from store, respects quickScreenIds, filters by visibility.kiosk, sorts by sortOrder.',
+    ],
+  },
+  {
     version: '1.1.0', date: 'Apr 2026', label: 'Quick Screen manager, Staff manager, EOD Z-read',
     changes: [
       'Quick Screen manager (⚡ tab in Menu Manager): 4×4 drag-and-drop grid — drag items from the picker panel onto slots. Reorder by dragging within the grid. Remove with ✕. Auto-fill and Clear all buttons. Changes reflect on POS ⚡ tab instantly.',

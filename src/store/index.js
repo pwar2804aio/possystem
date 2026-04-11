@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { INITIAL_KDS, SHIFT, MENU_ITEMS, CATEGORIES, STAFF as STAFF_SEED } from '../data/seed';
+import { INITIAL_KDS, SHIFT, MENU_ITEMS, CATEGORIES, STAFF as STAFF_SEED, QUICK_IDS } from '../data/seed';
 
 // ─── ID helpers ──────────────────────────────────────────────────────────────
 let _itemUid = 1;
