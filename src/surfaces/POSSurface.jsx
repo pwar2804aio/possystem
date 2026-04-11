@@ -108,6 +108,36 @@ export default function POSSurface() {
     return [...fromIds, ...pad];
   }, [quickScreenIds, MENU_ITEMS, eightySixIds]);
 
+  // When the main category changes, reset the subcategory selection
+  useEffect(() => { setSubCat(null); }, [cat]);
+
+  // Find subcategories of the active category
+  const subCategories = useMemo(() =>
+    menuCategories.filter(c => c.parentId === cat).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0)),
+  [cat, menuCategories]);
+
+  const catItems = useMemo(() => {
+    if (cat === 'quick') return quickItems;
+    const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId)
+      .slice().sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
+    const inCat = (i, id) => i.cat === id || (i.cats||[]).includes(id);
+    if (subCat) return base.filter(i => inCat(i, subCat));
+    if (subCategories.length > 0) {
+      const subIds = subCategories.map(s => s.id);
+      return base.filter(i => inCat(i, cat) || subIds.some(sid => inCat(i, sid)));
+    }
+    return base.filter(i => inCat(i, cat));
+  }, [cat, subCat, subCategories, MENU_ITEMS, quickItems]);
+
+  const displayItems = useMemo(() => {
+    if (!search.trim()) return catItems;
+    const q = search.toLowerCase();
+    return MENU_ITEMS.filter(i =>
+      !i.archived && i.type !== 'subitem' && !i.parentId &&
+      ((i.menuName||i.name||'').toLowerCase().includes(q) || i.description?.toLowerCase().includes(q))
+    );
+  }, [cat, search, catItems, MENU_ITEMS]);
+
   const byCourse = useMemo(()=>{
     const g = {};
     items.forEach(item => { const c=item.course??1; if(!g[c])g[c]=[]; g[c].push(item); });

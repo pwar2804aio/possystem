@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.2';
+const VERSION = '1.1.3';
 
 const CHANGELOG = [
   {
@@ -24,6 +24,13 @@ const CHANGELOG = [
       'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
       'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
       'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
+  {
+    version: '1.1.3', date: 'Apr 2026', label: 'POS white screen fixed — missing computed values restored',
+    changes: [
+      'CRITICAL FIX: subCategories, catItems and displayItems useMemos were accidentally deleted from POSSurface during a Python string replacement. POS rendered with undefined references causing a white screen.',
+      'All three computed values restored: subCategories (pills strip), catItems (items in selected category), displayItems (search results or category items).',
     ],
   },
   {
