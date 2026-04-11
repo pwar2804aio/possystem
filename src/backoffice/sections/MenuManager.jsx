@@ -321,27 +321,35 @@ function ItemsTab() {
   const { menuItems, addMenuItem, updateMenuItem, archiveMenuItem, markBOChange, showToast, eightySixIds, toggle86 } = useStore();
   const [selId, setSelId]   = useState(null);
   const [search, setSearch] = useState('');
-  const [showType, setType] = useState('all'); // all | item | subitem
+  const [showType, setType] = useState('all'); // all | item | subitem | variants | modifiable
+  const [catFilter, setCatFilter] = useState('');   // '' = all categories
   const [dragId, setDragId] = useState(null);
   const [dropId, setDropId] = useState(null);
+  const { menuCategories } = useStore();
 
   const all = menuItems.filter(i => !i.archived);
 
   const display = useMemo(() => {
     let list = all;
-    if (showType !== 'all') list = list.filter(i => (i.type||'simple') === showType || (showType==='item' && i.type!=='subitem'));
-    if (search) { const q=search.toLowerCase(); list=list.filter(i=>(i.menuName||i.name||'').toLowerCase().includes(q)); }
-    // Sort: parents first, then children under their parent
-    const parents  = list.filter(i=>!i.parentId).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-    const result   = [];
+    // Type filter
+    if (showType === 'item')       list = list.filter(i => i.type !== 'subitem');
+    else if (showType === 'subitem')    list = list.filter(i => i.type === 'subitem');
+    else if (showType === 'variants')   list = list.filter(i => i.type === 'variants' || !!i.parentId);
+    else if (showType === 'modifiable') list = list.filter(i => i.type === 'modifiable' || (i.assignedModifierGroups||[]).length > 0);
+    // Category filter
+    if (catFilter) list = list.filter(i => i.cat === catFilter || (i.cats||[]).includes(catFilter));
+    // Search
+    if (search) { const q=search.toLowerCase(); list=list.filter(i=>(i.menuName||i.name||'').toLowerCase().includes(q)||(i.description||'').toLowerCase().includes(q)); }
+    // Sort: parents first, then children under their parent, by sortOrder
+    const parents = list.filter(i=>!i.parentId).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+    const result  = [];
     parents.forEach(p => {
       result.push({ ...p, _isParent: all.filter(c=>c.parentId===p.id&&!c.archived).length > 0 });
-      all.filter(c=>c.parentId===p.id&&!c.archived).forEach(c => result.push({ ...c, _isChild:true }));
+      all.filter(c=>c.parentId===p.id&&!c.archived).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)).forEach(c => result.push({ ...c, _isChild:true }));
     });
-    // Also add children whose parents aren't in display (e.g. filtered out)
     list.filter(i=>i.parentId&&!parents.find(p=>p.id===i.parentId)).forEach(i=>result.push(i));
     return result;
-  }, [all, showType, search]);
+  }, [all, showType, catFilter, search]);
 
   const selItem = all.find(i=>i.id===selId);
   const is86 = selId && eightySixIds.includes(selId);
@@ -414,21 +422,38 @@ function ItemsTab() {
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
       {/* List */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-        <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', display:'flex', gap:8, alignItems:'center', flexShrink:0 }}>
-          <div style={{ position:'relative', flex:1, maxWidth:280 }}>
-            <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t4)', fontSize:12 }}>🔍</span>
-            <input style={{ ...inp, paddingLeft:28 }} placeholder="Search items…" value={search} onChange={e=>setSearch(e.target.value)}/>
+        <div style={{ padding:'8px 14px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+          {/* Row 1: search + add buttons */}
+          <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:6 }}>
+            <div style={{ position:'relative', flex:1, maxWidth:280 }}>
+              <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t4)', fontSize:12 }}>🔍</span>
+              <input style={{ ...inp, paddingLeft:28 }} placeholder="Search name or description…" value={search} onChange={e=>setSearch(e.target.value)}/>
+            </div>
+            <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
+              <button onClick={()=>addItem('subitem')} style={{ padding:'6px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t3)', fontSize:12, fontWeight:600 }}>
+                + Sub item
+              </button>
+              <button onClick={()=>addItem('simple')} style={{ padding:'6px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700 }}>
+                + Item
+              </button>
+            </div>
           </div>
-          {[['all','All'],['item','Items'],['subitem','Sub items']].map(([v,l])=>(
-            <button key={v} onClick={()=>setType(v)} style={{ padding:'5px 11px', borderRadius:18, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:showType===v?800:500, border:`1.5px solid ${showType===v?'var(--acc)':'var(--bdr)'}`, background:showType===v?'var(--acc-d)':'var(--bg3)', color:showType===v?'var(--acc)':'var(--t3)' }}>{l}</button>
-          ))}
-          <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
-            <button onClick={()=>addItem('subitem')} style={{ padding:'6px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t3)', fontSize:12, fontWeight:600 }}>
-              + Sub item
-            </button>
-            <button onClick={()=>addItem('simple')} style={{ padding:'6px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700 }}>
-              + Item
-            </button>
+          {/* Row 2: type filters + category filter */}
+          <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+            {[['all','All'],['item','Items only'],['subitem','Sub items'],['variants','Variants'],['modifiable','With modifiers']].map(([v,l])=>(
+              <button key={v} onClick={()=>setType(v)} style={{ padding:'3px 10px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:10, fontWeight:showType===v?800:500, border:`1px solid ${showType===v?'var(--acc)':'var(--bdr)'}`, background:showType===v?'var(--acc-d)':'transparent', color:showType===v?'var(--acc)':'var(--t4)' }}>{l}</button>
+            ))}
+            <div style={{ height:16, width:1, background:'var(--bdr)', margin:'0 2px' }}/>
+            <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ ...inp, padding:'3px 8px', fontSize:10, width:'auto', height:'auto', cursor:'pointer', color:catFilter?'var(--acc)':'var(--t4)', borderColor:catFilter?'var(--acc)':'var(--bdr)' }}>
+              <option value="">All categories</option>
+              {menuCategories.filter(c=>!c.isSpecial).map(c=>
+                <option key={c.id} value={c.id}>{c.parentId?'  └ ':''}{c.icon} {c.label}</option>
+              )}
+            </select>
+            {(catFilter||showType!=='all'||search) && (
+              <button onClick={()=>{setCatFilter('');setType('all');setSearch('');}} style={{ padding:'3px 8px', borderRadius:16, cursor:'pointer', fontFamily:'inherit', fontSize:10, background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontWeight:700 }}>✕ Clear</button>
+            )}
+            <span style={{ marginLeft:'auto', fontSize:10, color:'var(--t4)' }}>{display.length} item{display.length!==1?'s':''}</span>
           </div>
         </div>
 
@@ -485,7 +510,23 @@ function ItemsTab() {
                       {isParent && <span style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:10, background:'var(--acc-d)', color:'var(--acc)', border:'1px solid var(--acc-b)', flexShrink:0 }}>▾ variants</span>}
                       {is86     && <span style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:10, background:'var(--red-d)', color:'var(--red)', border:'1px solid var(--red-b)', flexShrink:0 }}>86'd</span>}
                     </div>
-                    {item.cat && <div style={{ fontSize:10, color:'var(--t4)', marginTop:1 }}>{useStore.getState().menuCategories.find(c=>c.id===item.cat)?.label||item.cat}</div>}
+                    <div style={{ display:'flex', gap:6, marginTop:2, flexWrap:'wrap', alignItems:'center' }}>
+                      {item.cat && (
+                        <span style={{ fontSize:9, color:'var(--t4)' }}>
+                          {menuCategories.find(c=>c.id===item.cat)?.icon} {menuCategories.find(c=>c.id===item.cat)?.label||item.cat}
+                          {(item.cats||[]).length>0 && ` +${item.cats.length}`}
+                        </span>
+                      )}
+                      {(item.allergens||[]).length>0 && (
+                        <span style={{ fontSize:9, color:'var(--red)', fontWeight:600 }}>⚠ {item.allergens.length}</span>
+                      )}
+                      {(item.assignedModifierGroups||[]).length>0 && (
+                        <span style={{ fontSize:9, color:'var(--acc)' }}>⊕ {item.assignedModifierGroups.length} mod{item.assignedModifierGroups.length>1?'s':''}</span>
+                      )}
+                      {(item.assignedInstructionGroups||[]).length>0 && (
+                        <span style={{ fontSize:9, color:'var(--grn)' }}>📝 {item.assignedInstructionGroups.length}</span>
+                      )}
+                    </div>
                   </div>
 
                   <span style={{ fontSize:13, fontWeight:800, color: active?'var(--acc)':'var(--t2)', fontFamily:'var(--font-mono)', flexShrink:0 }}>

@@ -14,9 +14,18 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.2';
+const VERSION = '1.0.3';
 
 const CHANGELOG = [
+  {
+    version: '1.0.3', date: 'Apr 2026', label: 'Items tab filters + richer item info',
+    changes: [
+      'Items tab: 5 filter pills — All, Items only, Sub items, Variants, With modifiers. Category filter dropdown. Clear all button. Live item count.',
+      'Search now searches description as well as name.',
+      'Each item row now shows: category icon+name, allergen count (⚠ N), modifier group count (⊕ N mods), instruction group count (📝 N).',
+      'Items in multiple categories show "+N" next to the primary category label.',
+    ],
+  },
   {
     version: '1.0.2', date: 'Apr 2026', label: 'Drag-and-drop fixed across Menu Manager',
     changes: [
