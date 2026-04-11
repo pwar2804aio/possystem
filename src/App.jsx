@@ -14,9 +14,17 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.5';
+const VERSION = '1.0.6';
 
 const CHANGELOG = [
+  {
+    version: '1.0.6', date: 'Apr 2026', label: 'POS now reflects Menu Manager changes instantly',
+    changes: [
+      'POS item grid now sorts by sortOrder on every render — drag-to-reorder in Menu Manager is reflected immediately on the POS without a page reload.',
+      'catItems useMemo adds .sort((a,b) => (a.sortOrder??999)-(b.sortOrder??999)) so new order is picked up as soon as store updates.',
+      'Both POS and Menu Manager share the same Zustand store — changes are reactive with no manual "Push to POS" required for menu edits.',
+    ],
+  },
   {
     version: '1.0.5', date: 'Apr 2026', label: 'Menu Manager drag-and-drop actually works',
     changes: [

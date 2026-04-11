@@ -124,7 +124,8 @@ export default function POSSurface() {
 
   const catItems = useMemo(() => {
     if (cat === 'quick') return quickItems;
-    const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
+    const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId)
+      .slice().sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
     const inCat = (i, id) => i.cat === id || (i.cats||[]).includes(id);
     if (subCat) return base.filter(i => inCat(i, subCat));
     if (subCategories.length > 0) {
