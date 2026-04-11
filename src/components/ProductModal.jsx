@@ -330,7 +330,7 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
         return (
           <div key={group.id} style={{ marginBottom:20 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-              <span className="label-xs">{group.label}</span>
+              <span className="label-xs">{group.label || group.name || 'Options'}</span>
               {required && <span style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>Required</span>}
               {!required && <span style={{ fontSize:11, color:'var(--t4)' }}>Optional</span>}
               {selType !== 'single' && <span style={{ fontSize:11, color:'var(--t3)' }}>Pick up to {maxSel}</span>}

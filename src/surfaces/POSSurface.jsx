@@ -559,42 +559,14 @@ export default function POSSurface() {
                   <button onClick={()=>setSearch('')} style={{fontSize:11,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:600,padding:0}}>✕ Clear</button>
                 </div>
               )}
-            {/* Subcategory strip — shown when active category has subcategories */}
+            {/* Subcategory pills */}
             {!search && cat !== 'quick' && subCategories.length > 0 && (
               <div style={{ display:'flex', gap:4, padding:'6px 0 10px', flexWrap:'wrap' }}>
-                <button
-                  onClick={() => setSubCat(null)}
-                  style={{
-                    padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
-                    fontSize:11, fontWeight:!subCat ? 800 : 500, border:'none',
-                    background:!subCat ? 'var(--acc)' : 'var(--bg3)',
-                    color:!subCat ? '#0b0c10' : 'var(--t3)',
-                  }}>
-                  All
-                </button>
+                <button onClick={() => setSubCat(null)} style={{ padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:!subCat?800:500, border:'none', background:!subCat?'var(--acc)':'var(--bg3)', color:!subCat?'#0b0c10':'var(--t3)' }}>All</button>
                 {subCategories.map(sc => {
-                  const active = subCat === sc.id;
-                  const color = sc.color || 'var(--acc)';
-                  return (
-                    <button key={sc.id} onClick={() => setSubCat(sc.id)} style={{
-                      padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
-                      fontSize:11, fontWeight:active ? 800 : 500,
-                      border:`1.5px solid ${active ? color : 'var(--bdr)'}`,
-                      background:active ? `${color}20` : 'var(--bg3)',
-                      color:active ? color : 'var(--t3)',
-                    }}>
-                      {sc.icon && <span style={{ marginRight:4 }}>{sc.icon}</span>}
-                      {sc.label}
-                    </button>
-                  );
+                  const a = subCat === sc.id, cl = sc.color||'var(--acc)';
+                  return (<button key={sc.id} onClick={() => setSubCat(sc.id)} style={{ padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:a?800:500, border:`1.5px solid ${a?cl:'var(--bdr)'}`, background:a?`${cl}20`:'var(--bg3)', color:a?cl:'var(--t3)' }}>{sc.icon&&<span style={{marginRight:4}}>{sc.icon}</span>}{sc.label}</button>);
                 })}
-              </div>
-            )}
-            {/* Subcategory pills */}
-            {!search&&cat!=='quick'&&subCategories.length>0&&(
-              <div style={{display:'flex',gap:4,flexWrap:'wrap',paddingBottom:10}}>
-                <button onClick={()=>setSubCat(null)} style={{padding:'4px 12px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:!subCat?800:500,border:'none',background:!subCat?'var(--acc)':'var(--bg3)',color:!subCat?'#0b0c10':'var(--t3)'}}>All</button>
-                {subCategories.map(sc=>{const a=subCat===sc.id;const cl=sc.color||'var(--acc)';return(<button key={sc.id} onClick={()=>setSubCat(sc.id)} style={{padding:'4px 12px',borderRadius:20,cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:a?800:500,border:`1.5px solid ${a?cl:'var(--bdr)'}`,background:a?`${cl}20`:'var(--bg3)',color:a?cl:'var(--t3)'}}>{sc.icon&&<span style={{marginRight:4}}>{sc.icon}</span>}{sc.label}</button>);})}
               </div>
             )}
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
@@ -853,9 +825,12 @@ export default function POSSurface() {
             } else if (result.type === 'dine-in' && result.action === 'split') {
               // Create a new separate check on the same table (T1.2)
               store.splitTableCheck(result.tableId, items, store.staff?.name);
+              // splitTableCheck sets activeTableId to the new child — send to kitchen now
+              store.sendToKitchen();
               store.clearWalkIn();
+              setActiveTableId(null);
               setSurface('tables');
-              showToast(`New check created at ${result.tableLabel}`, 'success');
+              showToast(`New check at ${result.tableLabel} — sent to kitchen`, 'success');
 
             } else if (result.type === 'bar' && result.action === 'new') {
               const tab = store.openTab({ name: result.tabName });

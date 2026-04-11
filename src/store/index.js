@@ -572,18 +572,27 @@ export const useStore = create((set, get) => ({
   clearTable: (tableId, paymentInfo = {}) => {
     get().recordClosedCheck(tableId, paymentInfo);
     const table = get().tables.find(t => t.id === tableId);
-    // If this is a child table, also clean up the parent's childIds list
+
     if (table?.parentId) {
-      set(s => ({
-        tables: s.tables
-          .filter(t => t.id !== tableId)
-          .map(t => t.id === table.parentId
-            ? { ...t, childIds: (t.childIds||[]).filter(id => id !== tableId) }
-            : t
-          ),
-      }));
+      // Child table (T1.2) — remove it, update parent childIds
+      set(s => {
+        const remaining = s.tables.filter(t => t.id !== tableId);
+        const parent = remaining.find(t => t.id === table.parentId);
+        const newChildIds = (parent?.childIds || []).filter(id => id !== tableId);
+        // If parent has no more children and no active session, set to available
+        const parentHasSession = parent?.session?.items?.some(i => !i.voided);
+        return {
+          tables: remaining.map(t => {
+            if (t.id !== table.parentId) return t;
+            if (newChildIds.length === 0 && !parentHasSession) {
+              return { ...t, status:'available', session:null, childIds:[] };
+            }
+            return { ...t, childIds: newChildIds };
+          }),
+        };
+      });
     } else {
-      // If parent, clear children too
+      // Parent table — clear it and all its children
       const childIds = table?.childIds || [];
       set(s => ({
         tables: s.tables
@@ -591,7 +600,7 @@ export const useStore = create((set, get) => ({
           .map(t => t.id === tableId ? { ...t, status:'available', session:null, childIds:[] } : t),
       }));
     }
-    set(s => ({ activeTableId: s.activeTableId===tableId ? null : s.activeTableId }));
+    set(s => ({ activeTableId: s.activeTableId === tableId ? null : s.activeTableId }));
   },
 
   // Add/remove reservation

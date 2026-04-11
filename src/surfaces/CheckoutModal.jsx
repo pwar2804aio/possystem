@@ -282,6 +282,17 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
 
   const nonVoided = items.filter(i=>!i.voided);
 
+  // Group by course for the bill display
+  const COURSE_LABELS = { 0:'Immediate', 1:'Course 1', 2:'Course 2', 3:'Course 3' };
+  const courseGroups = nonVoided.reduce((acc, item) => {
+    const c = item.course ?? 1;
+    if (!acc[c]) acc[c] = [];
+    acc[c].push(item);
+    return acc;
+  }, {});
+  const courseNums = Object.keys(courseGroups).map(Number).sort();
+  const showCourses = courseNums.length > 1;
+
   const contextLabel = isBarTab ? `Bar tab · ${tabName}`
     : tableId ? `${tableId.replace(/^[tbp]/,'')} · ${orderType}${covers>1?` · ${covers} covers`:''}`
     : orderType;
@@ -319,14 +330,21 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
           {/* ══ REVIEW ══════════════════════════════════════════════ */}
           {screen==='review' && (
             <>
-              {/* Bill items */}
+              {/* Bill items — grouped by course */}
               <div style={{ marginBottom:16, borderRadius:14, border:'1px solid var(--bdr)', overflow:'hidden' }}>
-                {nonVoided.map((item, idx) => {
+                {courseNums.map(cNum => (
+                  <div key={cNum}>
+                    {showCourses && (
+                      <div style={{ padding:'6px 14px', background:'var(--bg3)', borderBottom:'1px solid var(--bdr)', fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>
+                        {COURSE_LABELS[cNum] || `Course ${cNum}`}
+                      </div>
+                    )}
+                    {courseGroups[cNum].map((item, idx) => {
                   const disc  = item.discount;
                   const price = disc
                     ? (disc.type==='percent' ? item.price*(1-disc.value/100) : Math.max(0,item.price-disc.value/item.qty))
                     : item.price;
-                  const isLast = idx === nonVoided.length-1;
+                  const isLast = idx === courseGroups[cNum].length - 1;
                   return (
                     <div key={item.uid} style={{ display:'flex', justifyContent:'space-between', gap:12, padding:'11px 14px', borderBottom:isLast?'none':'1px solid var(--bdr)', background:idx%2===0?'var(--bg2)':'var(--bg1)' }}>
                       <div style={{ flex:1, minWidth:0 }}>
@@ -354,7 +372,9 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                       </div>
                     </div>
                   );
-                })}
+                    })}
+                  </div>
+                ))}
               </div>
 
               {/* Totals */}
