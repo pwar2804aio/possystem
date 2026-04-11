@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.1';
+const VERSION = '1.1.2';
 
 const CHANGELOG = [
   {
@@ -24,6 +24,16 @@ const CHANGELOG = [
       'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
       'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
       'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
+  {
+    version: '1.1.2', date: 'Apr 2026', label: 'Login screen fixed — staff cards clickable, demo bypass',
+    changes: [
+      'Staff without a PIN set can now tap their card to log straight in (no PIN required).',
+      'Staff with a PIN set show a 🔐 indicator and open the numpad when tapped.',
+      'If no staff are configured (Back Office not set up yet), a "Enter as Demo" bypass button appears.',
+      'Back button on PIN entry returns to staff selection.',
+      'Staff card colour from store used for selection highlight.',
     ],
   },
   {
