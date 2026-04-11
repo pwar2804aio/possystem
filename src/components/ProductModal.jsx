@@ -229,10 +229,10 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
         if (def) all.push({
           id: def.id,
           label: def.name,
-          selectionType: def.max > 1 ? 'multiple' : 'single',
+          selectionType: def.selectionType || (def.max === 1 ? 'single' : 'multiple'),
           min: assignment.min ?? def.min ?? 0,
           max: assignment.max ?? def.max ?? 1,
-          options: def.options || [],
+          options: (def.options || []).map(o => ({ ...o, label: o.label || o.name })),
           _type: 'modifier',
         });
       });
@@ -308,8 +308,8 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
     // Count occurrences of each mod label
     const allMods = Object.values(selections).flat().filter(Boolean);
     const labelCounts = {};
-    allMods.forEach(m => { labelCounts[m.label] = (labelCounts[m.label]||0) + 1; });
-    const modParts = [...new Set(allMods.map(m => m.label))].map(label =>
+    allMods.forEach(m => { const k=m.label||m.name||''; labelCounts[k] = (labelCounts[k]||0) + 1; });
+    const modParts = [...new Set(allMods.map(m => m.label||m.name||''))].map(label =>
       labelCounts[label] > 1 ? `${labelCounts[label]}× ${label}` : label
     );
     const instParts = Object.values(instSelections).filter(Boolean);
@@ -322,7 +322,7 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
       if (!val) return [];
       const group = allModGroups.find(g => g.id === gid);
       const arr = Array.isArray(val) ? val : [val];
-      return arr.filter(Boolean).map(m => ({ groupLabel: group?.label, label: m.label, price: m.price || 0 }));
+      return arr.filter(Boolean).map(m => ({ groupLabel: group?.label||group?.name, label: m.label||m.name||'', price: m.price || 0 }));
     });
     // Add instructions as zero-price mods for kitchen printing
     Object.entries(instSelections).forEach(([gid, val]) => {
@@ -370,7 +370,7 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
                         <div style={{ width:18, height:18, borderRadius:'50%', border:`2px solid ${isSelected?'var(--acc)':'var(--bdr2)'}`, background:isSelected?'var(--acc)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                           {isSelected && <div style={{ width:6, height:6, borderRadius:'50%', background:'#0e0f14' }}/>}
                         </div>
-                        <span style={{ fontSize:14, fontWeight:500, color:isSelected?'var(--acc)':'var(--t1)' }}>{opt.label}</span>
+                        <span style={{ fontSize:14, fontWeight:500, color:isSelected?'var(--acc)':'var(--t1)' }}>{opt.label||opt.name}</span>
                       </div>
                       <span style={{ fontSize:13, fontWeight:600, color:isSelected?'var(--acc)':'var(--t3)' }}>
                         {opt.price > 0 ? `+£${opt.price.toFixed(2)}` : isSelected ? '✓' : ''}
@@ -384,7 +384,7 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
                   const atMax = selectedCount >= maxSel;
                   return (
                     <div key={opt.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px', borderRadius:10, border:`1.5px solid ${qty>0?'var(--acc)':'var(--bdr)'}`, background:qty>0?'var(--acc-d)':'var(--bg3)', transition:'all .12s' }}>
-                      <span style={{ fontSize:14, fontWeight:500, color:qty>0?'var(--acc)':'var(--t1)', flex:1 }}>{opt.label}</span>
+                      <span style={{ fontSize:14, fontWeight:500, color:qty>0?'var(--acc)':'var(--t1)', flex:1 }}>{opt.label||opt.name}</span>
                       <span style={{ fontSize:13, color:qty>0?'var(--acc)':'var(--t3)', marginRight:8 }}>
                         {opt.price > 0 ? `+£${opt.price.toFixed(2)}` : 'free'}
                       </span>

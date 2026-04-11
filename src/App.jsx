@@ -14,9 +14,18 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.7';
+const VERSION = '1.0.8';
 
 const CHANGELOG = [
+  {
+    version: '1.0.8', date: 'Apr 2026', label: 'Modifier options no longer show undefined',
+    changes: [
+      'Modifier options store name as opt.name (new format) but POS ordering modal was reading opt.label — all option labels showed as undefined.',
+      'Fix: opt.label||opt.name throughout ProductModal — display, buildDisplayName, handleAdd all updated.',
+      'Options now also have label aliased from name at build-groups time so both old and new format options work.',
+      'selectionType now reads stored value first (single/multiple), falling back to max-based detection.',
+    ],
+  },
   {
     version: '1.0.7', date: 'Apr 2026', label: 'Menu Manager — complete rethink matching Toast/Square model',
     changes: [
