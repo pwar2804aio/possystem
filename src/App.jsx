@@ -14,9 +14,21 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.6';
+const VERSION = '1.0.7';
 
 const CHANGELOG = [
+  {
+    version: '1.0.7', date: 'Apr 2026', label: 'Menu Manager — complete rethink matching Toast/Square model',
+    changes: [
+      'Items panel is now a GRID matching the POS — same card style, same colour bars, same proportions. Drag cards to reorder, order reflects on POS instantly.',
+      'Variants managed inside the item editor (Variants tab) — type a name and price, click Add variant. No more dragging items onto each other. Works like Square/Toast.',
+      'Sub items removed from the main menu flow. Modifier group options are now plain name+price pairs typed directly in the Modifier groups tab — no separate sub-item records needed.',
+      'Category drag: same-level drag reorders, cross-level drag nests as subcategory. Drop indicator line shows insert position.',
+      'Search across all items from the item grid toolbar — find anything without leaving the current category view.',
+      'Item editor: Details / Variants / Modifiers / Pricing / Allergens all in one slide-in panel.',
+      'Modifier group option editor: add options with name+price inline — no sub-item picker step required.',
+    ],
+  },
   {
     version: '1.0.6', date: 'Apr 2026', label: 'POS now reflects Menu Manager changes instantly',
     changes: [
