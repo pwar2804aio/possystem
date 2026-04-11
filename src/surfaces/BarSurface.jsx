@@ -279,7 +279,7 @@ export default function BarSurface() {
                 </div>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:8 }}>
                   <span style={{ fontSize:11,fontWeight:700,padding:'2px 7px',borderRadius:20,background:sm.bg,color:sm.color }}>{sm.label}</span>
-                  <span style={{ fontSize:15,fontWeight:800,color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{tab.total.toFixed(2)}</span>
+                  <span style={{ fontSize:15,fontWeight:800,color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{(tab.total||0).toFixed(2)}</span>
                 </div>
               </div>
             );
@@ -320,7 +320,7 @@ export default function BarSurface() {
                   </div>
                 </div>
                 <div style={{ marginLeft:'auto',textAlign:'right',flexShrink:0 }}>
-                  <div style={{ fontSize:20,fontWeight:800,color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{activeTab.total.toFixed(2)}</div>
+                  <div style={{ fontSize:20,fontWeight:800,color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{(activeTab.total||0).toFixed(2)}</div>
                   <div style={{ fontSize:11,color:'var(--t3)' }}>{activeTab.rounds.reduce((s,r)=>s+r.items.reduce((s2,i)=>s2+i.qty,0),0)} items · {activeTab.rounds.length} rounds</div>
                 </div>
               </div>
@@ -382,7 +382,7 @@ export default function BarSurface() {
                         Round {rNum} · {new Date(round.sentAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
                       </div>
                       <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-                        <span style={{ fontSize:13,fontWeight:700,color:'var(--t2)',fontFamily:'DM Mono,monospace' }}>£{round.subtotal.toFixed(2)}</span>
+                        <span style={{ fontSize:13,fontWeight:700,color:'var(--t2)',fontFamily:'DM Mono,monospace' }}>£{(round.subtotal||0).toFixed(2)}</span>
                         <button onClick={()=>setVoidConfirm({ tabId:activeTab.id, roundId:round.id, rNum })} style={{ fontSize:10,color:'var(--red)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0 }}>Void</button>
                       </div>
                     </div>
@@ -394,7 +394,7 @@ export default function BarSurface() {
                             {item.mods?.length>0&&<span style={{ color:'var(--t3)',marginLeft:5 }}>({item.mods.map(m=>m.label).join(', ')})</span>}
                             {item.notes&&<span style={{ color:'#f97316',marginLeft:5,fontStyle:'italic' }}>· {item.notes}</span>}
                           </div>
-                          <span style={{ color:'var(--t3)',fontFamily:'DM Mono,monospace' }}>£{(item.price*item.qty).toFixed(2)}</span>
+                          <span style={{ color:'var(--t3)',fontFamily:'DM Mono,monospace' }}>£{((item.price||0)*(item.qty||1)).toFixed(2)}</span>
                         </div>
                       ))}
                       {round.note&&<div style={{ fontSize:11,color:'#f97316',marginTop:4,fontStyle:'italic' }}>📝 {round.note}</div>}
@@ -408,11 +408,11 @@ export default function BarSurface() {
             <div style={{ padding:'10px 12px', borderTop:'1px solid var(--bdr)', background:'var(--bg2)', flexShrink:0 }}>
               <div style={{ display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:2 }}>
                 <span>{activeTab.rounds.length} rounds · {activeTab.rounds.reduce((s,r)=>s+r.items.reduce((s2,i)=>s2+i.qty,0),0)} items</span>
-                <span style={{ fontFamily:'DM Mono,monospace' }}>{activeTab.rounds.length>0?`Avg round £${(activeTab.total/activeTab.rounds.length).toFixed(2)}`:'No rounds yet'}</span>
+                <span style={{ fontFamily:'DM Mono,monospace' }}>{activeTab.rounds.length>0?`Avg round £${((activeTab.total||0)/(activeTab.rounds.length||1)).toFixed(2)}`:'No rounds yet'}</span>
               </div>
               <div style={{ display:'flex',justifyContent:'space-between',fontSize:19,fontWeight:800,marginBottom:10,paddingTop:8,borderTop:'1px solid var(--bdr3)' }}>
                 <span>Total</span>
-                <span style={{ color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{(activeTab.total+roundTotal).toFixed(2)}</span>
+                <span style={{ color:'var(--acc)',fontFamily:'DM Mono,monospace' }}>£{((activeTab.total||0)+roundTotal).toFixed(2)}</span>
               </div>
               <div style={{ display:'flex',gap:6 }}>
                 {roundItems.length>0 && (
@@ -422,7 +422,7 @@ export default function BarSurface() {
                 )}
                 {activeTab.status!=='closed' && activeTab.total > 0 && (
                   <button onClick={()=>handleCloseTab(activeTab)} style={{ flex:roundItems.length>0?1:2,height:38,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:13,fontWeight:700 }}>
-                    {roundItems.length>0 ? 'Pay' : `Close tab · £${activeTab.total.toFixed(2)}`}
+                    {roundItems.length>0 ? 'Pay' : `Close tab · £${(activeTab.total||0).toFixed(2)}`}
                   </button>
                 )}
                 <button onClick={()=>setActiveTab(null)} style={{ width:38,height:38,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t3)',fontSize:18 }}>←</button>
@@ -471,7 +471,7 @@ export default function BarSurface() {
             {displayItems.map(item=>{
               const storeCat = (menuCategories||[]).find(c=>c.id===item.cat); const m={color:storeCat?.color||'var(--acc)',icon:storeCat?.icon||'🍸'};
               const is86=eightySixIds.includes(item.id);
-              const fromPrice=item.type==='variants'?Math.min(...item.variants.map(v=>v.price)):item.price;
+              const fromPrice=item.type==='variants'&&item.variants?.length?Math.min(...item.variants.map(v=>v.price??0)):(item.pricing?.base??item.price??0);
               const inRound=roundItems.filter(r=>r.itemId===item.id).reduce((s,r)=>s+r.qty,0);
               return(
                 <button key={item.id} onClick={()=>handleItemTap(item)} style={{
@@ -488,7 +488,7 @@ export default function BarSurface() {
                     <div style={{ fontSize:12,fontWeight:700,color:'var(--t1)',lineHeight:1.3,marginBottom:3,flex:1 }}>{item.name}</div>
                     {item.description&&<div style={{ fontSize:10,color:'var(--t3)',lineHeight:1.3,marginBottom:4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{item.description}</div>}
                     <div style={{ fontSize:14,fontWeight:800,color:m.color,fontFamily:'DM Mono,monospace',marginTop:'auto' }}>
-                      {item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}
+                      {item.type==='variants'?`from £${(fromPrice||0).toFixed(2)}`:`£${(fromPrice||0).toFixed(2)}`}
                     </div>
                     {item.type!=='simple'&&<div style={{ fontSize:9,color:'var(--t3)',marginTop:2 }}>{item.type==='variants'?'▼ sizes':item.type==='modifiers'?'⊕ options':'🍕 build'}</div>}
                   </div>
@@ -573,7 +573,7 @@ function RoundItem({ item, onQty, onRemove }) {
             <input value={note} onChange={e=>setNote(e.target.value)} onBlur={()=>{item.notes=note;setEditNote(false);}} onKeyDown={e=>e.key==='Enter'&&(item.notes=note,setEditNote(false))} placeholder="Item note..." autoFocus style={{ marginTop:3,width:'100%',background:'var(--bg4)',border:'1px solid var(--acc-b)',borderRadius:5,padding:'3px 7px',color:'var(--t1)',fontSize:11,fontFamily:'inherit',outline:'none' }}/>
           )}
         </div>
-        <div style={{ fontSize:12,fontWeight:700,color:'var(--acc)',fontFamily:'DM Mono,monospace',whiteSpace:'nowrap' }}>£{(item.price*item.qty).toFixed(2)}</div>
+        <div style={{ fontSize:12,fontWeight:700,color:'var(--acc)',fontFamily:'DM Mono,monospace',whiteSpace:'nowrap' }}>£{((item.price||0)*(item.qty||1)).toFixed(2)}</div>
       </div>
       <div style={{ display:'flex',alignItems:'center',gap:8,marginTop:4 }}>
         <div style={{ display:'flex',alignItems:'center',gap:1,background:'var(--bg4)',border:'1px solid var(--bdr)',borderRadius:6,overflow:'hidden' }}>

@@ -152,7 +152,7 @@ export const useStore = create((set, get) => ({
   // ── Organisations & Locations ──────────────────────────────────────────────
   currentLocationId: 'loc-demo',
   locations: [
-    { id:'loc-demo', name:'The Anchor — High Street', address:'1 High Street, London EC1A 1BB', timezone:'Europe/London', currency:'GBP', vat:20, serviceCharge:12.5, plan:'standard', isActive:true, receiptHeader:'', receiptFooter:'Thank you for dining with us!', createdAt:new Date() },
+    { id:'loc-demo', name:'The Anchor — High Street', address:'1 High Street, London EC1A 1BB', timezone:'Europe/London', currency:'GBP', vat:20, serviceCharge:12.5, plan:'standard', isActive:true, receiptHeader:'', receiptFooter:'Thank you for dining with us!', createdAt:Date.now() },
   ],
   setCurrentLocation: id => set({ currentLocationId: id }),
   addLocation: loc => set(s => ({ locations: [...s.locations, loc] })),
@@ -1037,7 +1037,7 @@ export const useStore = create((set, get) => ({
   tabs: [],
   activeTabId: null,
   openTab: ({ name, seatId=null, tableId=null, preAuth=false, preAuthAmount=50, note='' }) => {
-    const tab = { id:`tab-${Date.now()}`, ref:`TAB-${_tabNum++}`, name:name.trim(), seatId, tableId, openedBy:get().staff?.name||'Staff', openedAt:new Date(), status:'open', preAuth, preAuthAmount, rounds:[], note, total:0 };
+    const tab = { id:`tab-${Date.now()}`, ref:`TAB-${_tabNum++}`, name:name.trim(), seatId, tableId, openedBy:get().staff?.name||'Staff', openedAt:Date.now(), status:'open', preAuth, preAuthAmount, rounds:[], note, total:0 };
     set(s=>({ tabs:[tab,...s.tabs], activeTabId:tab.id }));
     return tab;
   },
@@ -1082,17 +1082,17 @@ export const useStore = create((set, get) => ({
     { id:'cc1', ref:'#1042', tableId:'t1', tableLabel:'T1', server:'Sarah', covers:2, orderType:'dine-in', customer:null,
       items:[{uid:'cc1i1',name:'Carbonara pasta',price:14.5,qty:2,mods:[],notes:'',allergens:[]},{uid:'cc1i2',name:'House red wine — 250ml',price:10.5,qty:2,mods:[],notes:'',allergens:[]}],
       discounts:[], subtotal:50, service:6.25, tip:7.50, total:63.75, method:'card',
-      closedAt:new Date(Date.now()-25*60000), status:'paid', refunds:[] },
+      closedAt:Date.now()-25*60000, status:'paid', refunds:[] },
     { id:'cc2', ref:'#1041', tableId:'t3', tableLabel:'T3', server:'Tom', covers:4, orderType:'dine-in', customer:null,
       items:[{uid:'cc2i1',name:'Ribeye steak 8oz',price:32,qty:2,mods:[{label:'Cooking: Medium rare',price:0}],notes:'',allergens:[]},{uid:'cc2i2',name:'Chicken supreme',price:22,qty:1,mods:[],notes:'',allergens:[]},{uid:'cc2i3',name:'Tiramisu',price:8.5,qty:2,mods:[],notes:'',allergens:[]}],
       discounts:[], subtotal:103, service:12.88, tip:15, total:130.88, method:'card',
-      closedAt:new Date(Date.now()-62*60000), status:'partial_refund',
-      refunds:[{id:'r1',timestamp:new Date(Date.now()-30*60000),manager:'Alex',managerId:'s1',reason:'Quality issue',isFullRefund:false,items:[{uid:'cc2i3',name:'Tiramisu',price:8.5,qty:2,refundQty:1}],amount:8.5}] },
+      closedAt:Date.now()-62*60000, status:'partial_refund',
+      refunds:[{id:'r1',timestamp:Date.now()-30*60000,manager:'Alex',managerId:'s1',reason:'Quality issue',isFullRefund:false,items:[{uid:'cc2i3',name:'Tiramisu',price:8.5,qty:2,refundQty:1}],amount:8.5}] },
     { id:'cc3', ref:'#1040', tableId:null, tableLabel:null, server:'Alex', covers:1, orderType:'collection',
       customer:{name:'James Wilson',phone:'07700 900123',collectionTime:'6:30 PM'},
       items:[{uid:'cc3i1',name:'Pepperoni pizza',price:14,qty:1,mods:[],notes:'Extra cheese',allergens:[]},{uid:'cc3i2',name:'Garlic bread',price:4.5,qty:1,mods:[],notes:'',allergens:[]}],
       discounts:[], subtotal:18.5, service:0, tip:0, total:18.5, method:'card',
-      closedAt:new Date(Date.now()-90*60000), status:'paid', refunds:[] },
+      closedAt:Date.now()-90*60000, status:'paid', refunds:[] },
   ],
 
   recordClosedCheck: (tableId, paymentInfo = {}) => {
@@ -1117,7 +1117,7 @@ export const useStore = create((set, get) => ({
       tip:        paymentInfo.tip || 0,
       total:      paymentInfo.grand || session.total || 0,
       method:     paymentInfo.method || 'card',
-      closedAt:   new Date(),
+      closedAt:   Date.now(),
       status:     'paid',   // paid | partial_refund | refunded
       refunds:    [],
     };
@@ -1146,7 +1146,7 @@ export const useStore = create((set, get) => ({
       tip: paymentInfo.tip || 0,
       total: paymentInfo.grand || subtotal,
       method: paymentInfo.method || 'card',
-      closedAt: new Date(),
+      closedAt: Date.now(),
       status: 'paid',
       refunds: [],
     };
@@ -1161,7 +1161,7 @@ export const useStore = create((set, get) => ({
         if (chk.id !== checkId) return chk;
         const refund = {
           id: `ref-${Date.now()}`,
-          timestamp: new Date(),
+          timestamp: Date.now(),
           manager: manager.name,
           managerId: manager.id,
           reason,
@@ -1196,7 +1196,7 @@ export const useStore = create((set, get) => ({
         return { ...t, session:{ ...t.session, items, subtotal, total:subtotal*1.125 } };
       }),
       voidLog: [{
-        id:`void-${Date.now()}`, timestamp:new Date(), type:'item',
+        id:`void-${Date.now()}`, timestamp:Date.now(), type:'item',
         tableId, tableLabel:table.label,
         items:[{ name:item.name, price:item.price, qty:item.qty }],
         totalValue: item.price * item.qty,
@@ -1220,7 +1220,7 @@ export const useStore = create((set, get) => ({
         return { ...t, status:'available', session:null };
       }),
       voidLog: [{
-        id:`void-${Date.now()}`, timestamp:new Date(), type:'check',
+        id:`void-${Date.now()}`, timestamp:Date.now(), type:'check',
         tableId, tableLabel:table.label,
         items: session.items.map(i => ({ name:i.name, price:i.price, qty:i.qty })),
         totalValue, reason, manager:manager.name, managerId:manager.id,

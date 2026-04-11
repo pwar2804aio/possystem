@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.5';
+const VERSION = '1.1.6';
 
 const CHANGELOG = [
   {
@@ -24,6 +24,14 @@ const CHANGELOG = [
       'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
       'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
       'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
+  {
+    version: '1.1.6', date: 'Apr 2026', label: 'Bar crash fix: toFixed on undefined total',
+    changes: [
+      'Bar crash fixed: tab.total, activeTab.total, round.subtotal and item prices guarded with ||0 fallback before .toFixed() calls — old localStorage state from previous sessions had tabs without a total field.',
+      'openedAt and all action timestamps (closedAt, timestamp, createdAt) changed from new Date() to Date.now() throughout the store for consistent numeric timestamp storage.',
+      'Bar fromPrice guard: item.variants checked for existence before Math.min spread.',
     ],
   },
   {
