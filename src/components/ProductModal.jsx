@@ -216,9 +216,8 @@ function VariantsModal({ item, activeAllergens, onConfirm, onCancel }) {
     const modParts = mods.filter(m=>!m._instruction).map(m=>m.label);
     const instParts= Object.values(instSel).filter(Boolean);
     const extras   = [...modParts,...instParts];
-    const displayName = extras.length
-      ? `${item.menuName||item.name} — ${selected.label}${extras.length?` · ${extras.join(', ')}`:''}` 
-      : `${item.menuName||item.name} — ${selected.label}`;
+    // displayName = "Lager — Pint" — mods render on separate lines below, not in the name
+    const displayName = `${item.menuName||item.name} — ${selected.label}`;
 
     onConfirm(target, mods, null, { notes:notes.trim(), qty, linePrice:price, displayName });
   };
@@ -487,8 +486,11 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
       labelCounts[label] > 1 ? `${labelCounts[label]}× ${label}` : label
     );
     const instParts = Object.values(instSelections).filter(Boolean);
-    const all = [...modParts, ...instParts];
-    return all.length ? `${item.menuName || item.name} — ${all.join(', ')}` : (item.menuName || item.name);
+    // Name shows "ItemName — VariantLabel" (if variant selected), mods show on separate rows
+    const variantPart = selected ? ` — ${selected.label}` : '';
+    // Only instruction notes go in the name (they have no separate display row)
+    const nameExtras = instParts.length ? ` · ${instParts.join(', ')}` : '';
+    return `${item.menuName || item.name}${variantPart}${nameExtras}`;
   };
 
   const handleAdd = () => {

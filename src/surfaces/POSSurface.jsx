@@ -804,16 +804,24 @@ export default function POSSurface() {
               showToast(`Delivery for ${result.name} sent`, 'success');
 
             } else if (result.type === 'dine-in' && result.action === 'new') {
-              // Seat items at a free table — store action handles clearing walkIn and setting active table
+              // Seat items at a free table, then immediately send to kitchen
               store.seatTableWithItems(result.tableId, items, { server: store.staff?.name, covers: 1 });
+              // seatTableWithItems sets the active table — send to kitchen right away
+              store.sendToKitchen();
+              store.clearWalkIn();
+              store.setActiveTableId(null);
               setSurface('tables');
-              showToast(`Seated at ${result.tableLabel}`, 'success');
+              showToast(`${result.tableLabel} — seated & sent to kitchen`, 'success');
 
             } else if (result.type === 'dine-in' && result.action === 'merge') {
-              // Add items to an occupied table's existing check
+              // Add items to an occupied table's existing check, then send to kitchen
               store.mergeItemsToTable(result.tableId, items);
+              // mergeItemsToTable sets activeTableId to the target table
+              store.sendToKitchen();
+              store.clearWalkIn();
+              store.setActiveTableId(null);
               setSurface('tables');
-              showToast(`Added to ${result.tableLabel}`, 'success');
+              showToast(`Added to ${result.tableLabel} — sent to kitchen`, 'success');
 
             } else if (result.type === 'dine-in' && result.action === 'split') {
               // Create a new separate check on the same table (T1.2)

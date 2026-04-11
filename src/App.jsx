@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.7';
+const VERSION = '1.1.8';
 
 const CHANGELOG = [
   {
@@ -24,6 +24,15 @@ const CHANGELOG = [
       'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
       'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
       'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
+  {
+    version: '1.1.8', date: 'Apr 2026', label: 'Send-to-table auto-fires kitchen, variant names, mod display',
+    changes: [
+      'Seat at table / Add to occupied table now automatically sends to kitchen. Previously items landed on the table but the operator had to reopen the check and click Send again. Now the send modal → choose table flow completes in one step.',
+      'Variant name now shows in order panel: "Stout — Pint" instead of just "Stout". The displayName is built as "ItemName — VariantLabel" so the selected size/serving is always visible on the order line.',
+      'Modifiers no longer appear on the item name line. Previously mods were concatenated into the name ("Ribeye — Chips, Peppercorn") AND also shown as separate rows below — double display. Now the name shows only the variant label, and modifiers show exclusively on their own rows underneath.',
+      'Instruction group selections (e.g. cooking preference) are still included in the name when relevant, since they have no separate display row in the order panel.',
     ],
   },
   {
