@@ -1,191 +1,197 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useStore } from '../../store';
 
+const DENOMS = [
+  { label:'£50 notes',  value:50.00 },
+  { label:'£20 notes',  value:20.00 },
+  { label:'£10 notes',  value:10.00 },
+  { label:'£5 notes',   value:5.00  },
+  { label:'£2 coins',   value:2.00  },
+  { label:'£1 coins',   value:1.00  },
+  { label:'50p coins',  value:0.50  },
+  { label:'20p coins',  value:0.20  },
+  { label:'10p coins',  value:0.10  },
+  { label:'5p coins',   value:0.05  },
+  { label:'2p coins',   value:0.02  },
+  { label:'1p coins',   value:0.01  },
+];
+
+const inp = { background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:9, padding:'7px 10px', color:'var(--t1)', fontSize:13, fontFamily:'var(--font-mono)', outline:'none', boxSizing:'border-box' };
+
 export default function EODClose() {
-  const { closedChecks, shift, eightySixIds, dailyCounts, showToast, staff } = useStore();
-  const [step, setStep] = useState('summary'); // summary | confirm | done
-  const [cashFloat, setCashFloat] = useState('');
-  const [notes, setNotes] = useState('');
-  const [closedAt] = useState(new Date());
+  const { closedChecks, orderQueue, shift, showToast } = useStore();
+  const [counts, setCounts]   = useState(Object.fromEntries(DENOMS.map(d=>[d.value,0])));
+  const [float, setFloat]     = useState('200.00');
+  const [zDone, setZDone]     = useState(false);
+  const [step, setStep]       = useState('declare'); // declare | review | done
 
-  const revenue  = closedChecks.reduce((s,c) => s+c.total, 0);
-  const covers   = closedChecks.reduce((s,c) => s+(c.covers||1), 0);
-  const tips     = closedChecks.reduce((s,c) => s+(c.tip||0), 0);
-  const refunds  = closedChecks.reduce((s,c) => s+c.refunds.reduce((r,rf)=>r+rf.amount,0), 0);
-  const cash     = closedChecks.filter(c=>c.method==='cash').reduce((s,c)=>s+c.total,0);
-  const card     = closedChecks.filter(c=>c.method!=='cash').reduce((s,c)=>s+c.total,0);
-  const itemsSold = closedChecks.reduce((s,c)=>s+(c.items?.length||0),0);
-  const still86  = eightySixIds.length;
-  const countsSet = Object.keys(dailyCounts).length;
-  const fmt = v => `£${v.toFixed(2)}`;
+  // ── Summary from today's closed checks ──────────────────────────────────
+  const today = useMemo(() => {
+    const sod = new Date(); sod.setHours(0,0,0,0);
+    const checks = closedChecks.filter(c => new Date(c.closedAt) >= sod);
+    const revenue  = checks.reduce((s,c)=>s+c.total,0);
+    const cash     = checks.filter(c=>c.method==='cash').reduce((s,c)=>s+c.total,0);
+    const card     = checks.filter(c=>c.method!=='cash').reduce((s,c)=>s+c.total,0);
+    const tips     = checks.reduce((s,c)=>s+(c.tip||0),0);
+    const refunds  = checks.reduce((s,c)=>s+(c.refunds||[]).reduce((r,rf)=>r+rf.amount,0),0);
+    const covers   = checks.reduce((s,c)=>s+(c.covers||1),0);
+    const takeaway = orderQueue.filter(o=>o.type==='takeaway'&&o.status==='collected').length;
+    return { revenue, cash, card, tips, refunds, covers, checks:checks.length, takeaway };
+  }, [closedChecks, orderQueue]);
 
-  const handleClose = () => {
-    // In Phase 2 this writes an EOD record to Supabase
-    // For now: clear daily counts and 86 list, mark shift as closed
-    showToast('Shift closed — EOD report saved', 'success');
+  const cashInDrawer  = DENOMS.reduce((s,d)=>s+(counts[d.value]||0)*d.value, 0);
+  const expectedCash  = today.cash + parseFloat(float||0);
+  const variance      = cashInDrawer - expectedCash;
+  const floatAmt      = parseFloat(float||0);
+
+  const fmt  = n => `£${Math.abs(n).toFixed(2)}`;
+  const fmtS = n => `${n>=0?'+':'−'}${fmt(n)}`;
+
+  const setCount = (val, n) => setCounts(c=>({...c,[val]:Math.max(0,parseInt(n)||0)}));
+
+  const doZRead = () => {
     setStep('done');
+    setZDone(true);
+    showToast('Z-read complete — till cleared', 'success');
   };
 
-  if (step === 'done') {
-    return (
-      <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:40 }}>
-        <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
-        <div style={{ fontSize:22, fontWeight:800, color:'var(--t1)', marginBottom:8 }}>Shift closed</div>
-        <div style={{ fontSize:14, color:'var(--t3)', marginBottom:32, textAlign:'center', maxWidth:380 }}>
-          EOD report saved for {shift.name} — {closedAt.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })}
-        </div>
-        <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:16, padding:'24px 32px', width:'100%', maxWidth:440 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            {[
-              { label:'Net revenue', value:fmt(revenue-refunds) },
-              { label:'Covers', value:covers },
-              { label:'Checks', value:closedChecks.length },
-              { label:'Avg check', value:fmt(closedChecks.length ? revenue/closedChecks.length : 0) },
-              { label:'Tips', value:fmt(tips) },
-              { label:'Cash taken', value:fmt(cash) },
-            ].map(s => (
-              <div key={s.label} style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:10 }}>
-                <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>{s.label}</div>
-                <div style={{ fontSize:18, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)', marginTop:4 }}>{s.value}</div>
-              </div>
-            ))}
-          </div>
-          {notes && <div style={{ marginTop:14, fontSize:12, color:'var(--t3)', padding:'10px 12px', background:'var(--bg3)', borderRadius:10 }}><strong>Notes:</strong> {notes}</div>}
-        </div>
-        <button className="btn btn-ghost" style={{ marginTop:24 }} onClick={() => setStep('summary')}>← Back to summary</button>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ flex:1, overflowY:'auto', padding:28, maxWidth:700 }}>
-      <div style={{ marginBottom:24 }}>
-        <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)', marginBottom:4 }}>End of day — {shift.name}</div>
-        <div style={{ fontSize:13, color:'var(--t3)' }}>
-          {closedAt.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
-          {' · '}Shift opened: {shift.opened}
+    <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
+
+      {/* ── Left: Cash declaration ─────────────────────────── */}
+      <div style={{ width:320, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden', flexShrink:0 }}>
+        <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+          <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', marginBottom:2 }}>Cash declaration</div>
+          <div style={{ fontSize:11, color:'var(--t3)' }}>Count the physical cash in the drawer</div>
+        </div>
+
+        <div style={{ flex:1, overflowY:'auto', padding:'10px 12px' }}>
+          {/* Opening float */}
+          <div style={{ marginBottom:12, padding:'8px 10px', background:'var(--bg3)', borderRadius:10, border:'1px solid var(--bdr)' }}>
+            <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6 }}>Opening float</div>
+            <div style={{ position:'relative' }}>
+              <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', fontWeight:700, color:'var(--t3)' }}>£</span>
+              <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:22, width:'100%' }} value={float} onChange={e=>setFloat(e.target.value)}/>
+            </div>
+          </div>
+
+          {/* Denomination counts */}
+          <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 }}>Count by denomination</div>
+          {DENOMS.map(d => {
+            const qty   = counts[d.value]||0;
+            const total = qty * d.value;
+            return (
+              <div key={d.value} style={{ display:'grid', gridTemplateColumns:'1fr 80px 70px', gap:6, alignItems:'center', marginBottom:5 }}>
+                <div style={{ fontSize:12, color:'var(--t2)', fontWeight:500 }}>{d.label}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                  <button onClick={()=>setCount(d.value,qty-1)} style={{ width:24,height:24,borderRadius:5,border:'1px solid var(--bdr2)',background:'var(--bg3)',color:'var(--t2)',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center' }}>−</button>
+                  <input type="number" min="0" style={{ ...inp, width:44, padding:'4px 6px', textAlign:'center', fontSize:13 }} value={qty||''} placeholder="0" onChange={e=>setCount(d.value,e.target.value)}/>
+                  <button onClick={()=>setCount(d.value,qty+1)} style={{ width:24,height:24,borderRadius:5,border:'1px solid var(--bdr2)',background:'var(--bg3)',color:'var(--t2)',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center' }}>+</button>
+                </div>
+                <div style={{ fontSize:12, fontWeight:700, color:total>0?'var(--acc)':'var(--t4)', textAlign:'right', fontFamily:'var(--font-mono)' }}>
+                  {total>0?fmt(total):'-'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Cash total */}
+        <div style={{ padding:'10px 14px', borderTop:'1px solid var(--bdr)', background:'var(--bg2)', flexShrink:0 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+            <span style={{ fontSize:12, color:'var(--t3)' }}>Cash in drawer</span>
+            <span style={{ fontSize:18, fontWeight:900, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>{fmt(cashInDrawer)}</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+            <span style={{ fontSize:11, color:'var(--t4)' }}>Expected (float + cash sales)</span>
+            <span style={{ fontSize:12, fontWeight:600, color:'var(--t3)', fontFamily:'var(--font-mono)' }}>{fmt(expectedCash)}</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:8, background:Math.abs(variance)<0.01?'var(--grn-d)':variance>0?'var(--acc-d)':'var(--red-d)', border:`1px solid ${Math.abs(variance)<0.01?'var(--grn-b)':variance>0?'var(--acc-b)':'var(--red-b)'}` }}>
+            <span style={{ fontSize:11, fontWeight:700, color:Math.abs(variance)<0.01?'var(--grn)':variance>0?'var(--acc)':'var(--red)' }}>Variance</span>
+            <span style={{ fontSize:14, fontWeight:900, fontFamily:'var(--font-mono)', color:Math.abs(variance)<0.01?'var(--grn)':variance>0?'var(--acc)':'var(--red)' }}>
+              {Math.abs(variance)<0.01 ? '✓ Balanced' : `${variance>0?'Over':'Short'} ${fmt(variance)}`}
+            </span>
+          </div>
         </div>
       </div>
 
-      {step === 'summary' && (
-        <>
-          {/* Revenue summary */}
-          <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:14, padding:'20px 22px', marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:16 }}>Revenue summary</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:16 }}>
-              {[
-                { label:'Gross revenue', value:fmt(revenue), color:'var(--t1)' },
-                { label:'Refunds',       value:fmt(refunds),  color:refunds>0?'var(--red)':'var(--t1)' },
-                { label:'Net revenue',   value:fmt(revenue-refunds), color:'var(--acc)', large:true },
-              ].map(s => (
-                <div key={s.label} style={{ padding:'12px 14px', background:'var(--bg3)', borderRadius:10 }}>
-                  <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>{s.label}</div>
-                  <div style={{ fontSize:s.large?26:18, fontWeight:800, color:s.color, fontFamily:'var(--font-mono)' }}>{s.value}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8 }}>
-              {[
-                { label:'Covers',   value:covers },
-                { label:'Checks',   value:closedChecks.length },
-                { label:'Items sold', value:itemsSold },
-                { label:'Tips',     value:fmt(tips) },
-                { label:'Card',     value:fmt(card) },
-                { label:'Cash',     value:fmt(cash) },
-                { label:'Avg/check',value:fmt(closedChecks.length ? revenue/closedChecks.length : 0) },
-                { label:'Avg/cover',value:fmt(covers ? revenue/covers : 0) },
-              ].map(s => (
-                <div key={s.label} style={{ padding:'8px 10px', background:'var(--bg3)', borderRadius:8 }}>
-                  <div style={{ fontSize:9, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>{s.label}</div>
-                  <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)', fontFamily:'var(--font-mono)', marginTop:3 }}>{s.value}</div>
-                </div>
-              ))}
-            </div>
+      {/* ── Right: Z-Read summary ──────────────────────────── */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', marginBottom:1 }}>End of Day — Z-Read</div>
+            <div style={{ fontSize:11, color:'var(--t3)' }}>{new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
           </div>
-
-          {/* Checklist */}
-          <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:14, padding:'18px 22px', marginBottom:16 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:14 }}>EOD checklist</div>
-            {[
-              { ok: closedChecks.length > 0, label:`${closedChecks.length} checks closed`, desc:'All tables settled and checked out' },
-              { ok: true, label:'Cash drawer counted', desc:'Reconcile cash against system total', warn:cash > 0, warnText:`System shows ${fmt(cash)} cash` },
-              { ok: still86 === 0, label:`86 list ${still86 > 0 ? `has ${still86} item${still86!==1?'s':''} — clear before close' ` : 'clear'}`, desc:'Review and reset 86\'d items for next service' },
-              { ok: true, label:'Reports reviewed', desc:'Confirm revenue and check log are correct' },
-            ].map((item, i) => (
-              <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--bdr)' }}>
-                <div style={{ width:22, height:22, borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, background:item.ok?'var(--grn-d)':'var(--acc-d)', border:`1.5px solid ${item.ok?'var(--grn-b)':'var(--acc-b)'}` }}>
-                  <span style={{ color:item.ok?'var(--grn)':'var(--acc)' }}>{item.ok?'✓':'!'}</span>
-                </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>{item.label}</div>
-                  <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>{item.warnText || item.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Cash float + notes */}
-          <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:14, padding:'18px 22px', marginBottom:24 }}>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:14 }}>Closing notes</div>
-            <div style={{ marginBottom:12 }}>
-              <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Cash float counted (£)</label>
-              <input type="number" step="0.01" min="0" placeholder="e.g. 150.00"
-                style={{ width:'100%', background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:10, padding:'9px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
-                value={cashFloat} onChange={e=>setCashFloat(e.target.value)}/>
-              {cashFloat && Math.abs(parseFloat(cashFloat)-cash) > 0.01 && (
-                <div style={{ fontSize:11, color:'var(--acc)', marginTop:4 }}>
-                  ⚠ Variance: {fmt(Math.abs(parseFloat(cashFloat)-cash))} vs system ({fmt(cash)})
-                </div>
-              )}
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Manager notes</label>
-              <textarea placeholder="Any incidents, issues, or notes for next service…"
-                style={{ width:'100%', background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:10, padding:'9px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', resize:'none', height:72, boxSizing:'border-box' }}
-                value={notes} onChange={e=>setNotes(e.target.value)}/>
-            </div>
-          </div>
-
-          <button onClick={()=>setStep('confirm')} style={{
-            width:'100%', padding:'14px', borderRadius:12, cursor:'pointer', fontFamily:'inherit',
-            background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:15, fontWeight:800,
-            display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-          }}>
-            Review and close shift →
-          </button>
-        </>
-      )}
-
-      {step === 'confirm' && (
-        <div style={{ background:'var(--bg1)', border:'2px solid var(--acc-b)', borderRadius:16, padding:'28px 28px' }}>
-          <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)', marginBottom:8 }}>Confirm end of day</div>
-          <div style={{ fontSize:13, color:'var(--t3)', marginBottom:24, lineHeight:1.6 }}>
-            You're about to close <strong>{shift.name}</strong>. This will:
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:28 }}>
-            {[
-              `Save EOD report with ${fmt(revenue-refunds)} net revenue across ${closedChecks.length} checks`,
-              `Reset all ${still86} 86\'d items for next service`,
-              `Clear ${countsSet} daily count${countsSet!==1?'s':''} (portions sold today)`,
-              'Lock today\'s check log — no further changes possible',
-            ].map((line, i) => (
-              <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, fontSize:13, color:'var(--t2)' }}>
-                <span style={{ color:'var(--acc)', fontWeight:700, flexShrink:0, marginTop:1 }}>→</span>
-                {line}
-              </div>
-            ))}
-          </div>
-          <div style={{ display:'flex', gap:10 }}>
-            <button className="btn btn-ghost" style={{ flex:1 }} onClick={()=>setStep('summary')}>← Back</button>
-            <button style={{
-              flex:2, padding:'12px', borderRadius:10, cursor:'pointer', fontFamily:'inherit',
-              background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:14, fontWeight:800,
-            }} onClick={handleClose}>
-              Close shift — {closedAt.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'})}
+          {!zDone && (
+            <button onClick={doZRead} style={{ padding:'8px 18px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--red)', border:'none', color:'#fff', fontSize:13, fontWeight:800 }}>
+              🔒 Run Z-Read & Close
             </button>
-          </div>
+          )}
+          {zDone && <div style={{ padding:'8px 16px', borderRadius:10, background:'var(--grn-d)', border:'1px solid var(--grn-b)', color:'var(--grn)', fontSize:13, fontWeight:800 }}>✓ Z-Read complete</div>}
         </div>
-      )}
+
+        <div style={{ flex:1, overflowY:'auto', padding:'16px' }}>
+          {/* Revenue summary */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
+            {[
+              { label:'Total revenue',  value:fmt(today.revenue),   color:'var(--acc)', icon:'💰' },
+              { label:'Cash',           value:fmt(today.cash),      color:'var(--grn)', icon:'💵' },
+              { label:'Card / other',   value:fmt(today.card),      color:'#3b82f6',    icon:'💳' },
+            ].map(({ label, value, color, icon }) => (
+              <div key={label} style={{ padding:'12px 14px', background:'var(--bg2)', borderRadius:12, border:'1px solid var(--bdr)' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:5 }}>{icon} {label}</div>
+                <div style={{ fontSize:20, fontWeight:900, color, fontFamily:'var(--font-mono)' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Detail table */}
+          <div style={{ background:'var(--bg1)', borderRadius:12, border:'1px solid var(--bdr)', overflow:'hidden', marginBottom:16 }}>
+            <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', fontSize:11, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', background:'var(--bg2)' }}>Sales breakdown</div>
+            {[
+              ['Checks processed',   today.checks.toString()],
+              ['Covers served',      today.covers.toString()],
+              ['Takeaway orders',    today.takeaway.toString()],
+              ['Average check',      today.checks>0 ? fmt(today.revenue/today.checks) : '—'],
+              ['Average per cover',  today.covers>0 ? fmt(today.revenue/today.covers) : '—'],
+              ['Tips collected',     fmt(today.tips)],
+              ['Refunds issued',     fmt(today.refunds)],
+              ['Net revenue',        fmt(today.revenue - today.refunds)],
+            ].map(([label, value], i) => (
+              <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'9px 14px', borderBottom:i<7?'1px solid var(--bdr)':'none', background:i%2===0?'transparent':'var(--bg2)' }}>
+                <span style={{ fontSize:12, color:'var(--t3)' }}>{label}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Cash reconciliation */}
+          <div style={{ background:'var(--bg1)', borderRadius:12, border:'1px solid var(--bdr)', overflow:'hidden', marginBottom:16 }}>
+            <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', fontSize:11, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', background:'var(--bg2)' }}>Cash reconciliation</div>
+            {[
+              ['Opening float',      fmt(floatAmt)],
+              ['Cash sales today',   fmt(today.cash)],
+              ['Expected in drawer', fmt(expectedCash)],
+              ['Counted cash',       fmt(cashInDrawer)],
+              ['Variance',           Math.abs(variance)<0.01 ? '✓ Balanced' : fmtS(variance)],
+              ['Banking (drawer − new float)', cashInDrawer>floatAmt ? fmt(cashInDrawer-floatAmt) : '—'],
+            ].map(([label, value], i) => (
+              <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'9px 14px', borderBottom:i<5?'1px solid var(--bdr)':'none', background:i%2===0?'transparent':'var(--bg2)' }}>
+                <span style={{ fontSize:12, color:'var(--t3)' }}>{label}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:label==='Variance'?(Math.abs(variance)<0.01?'var(--grn)':variance>0?'var(--acc)':'var(--red)'):'var(--t1)', fontFamily:'var(--font-mono)' }}>{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {zDone && (
+            <div style={{ padding:'14px 16px', background:'var(--grn-d)', borderRadius:12, border:'1px solid var(--grn-b)', textAlign:'center' }}>
+              <div style={{ fontSize:20, marginBottom:6 }}>✓</div>
+              <div style={{ fontSize:14, fontWeight:800, color:'var(--grn)', marginBottom:4 }}>Z-Read complete</div>
+              <div style={{ fontSize:11, color:'var(--grn)', opacity:.8 }}>Till cleared · Totals reset for next trading day</div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

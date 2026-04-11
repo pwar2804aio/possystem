@@ -42,6 +42,7 @@ export default function POSSurface() {
     deviceConfig,
     menuItems: storeMenuItems,
     menuCategories,
+    quickScreenIds,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
@@ -99,54 +100,17 @@ export default function POSSurface() {
   // For bar terminal (assignedSection='bar'), show bar/drinks items first
   const assignedSection = deviceConfig?.assignedSection;
   const quickItems = useMemo(() => {
-    const available = MENU_ITEMS.filter(i => !eightySixIds.includes(i.id) && !i.archived);
-    // If terminal has an assigned section, prioritise items relevant to that section
-    if (assignedSection === 'bar') {
-      const barCats = ['cocktails','spirits','wines','beers','soft_drinks','shots'];
-      const barFirst = available.filter(i => barCats.includes(i.cat));
-      const others   = available.filter(i => !barCats.includes(i.cat));
-      return [...barFirst, ...others].slice(0, 16);
-    }
-    // Default: use QUICK_IDS ordering but filter out 86'd items, pad with popular from other cats
-    const fromQuick = QUICK_IDS.map(id => MENU_ITEMS.find(i => i.id === id)).filter(i => i && !eightySixIds.includes(i.id));
-    if (fromQuick.length >= 12) return fromQuick.slice(0, 16);
-    const pad = available.filter(i => !QUICK_IDS.includes(i.id)).slice(0, 16 - fromQuick.length);
-    return [...fromQuick, ...pad];
-  }, [MENU_ITEMS, eightySixIds, assignedSection]);
-
-  // When the main category changes, reset the subcategory selection
-  useEffect(() => { setSubCat(null); }, [cat]);
-
-  // Find subcategories of the active category
-  const subCategories = useMemo(() =>
-    menuCategories.filter(c => c.parentId === cat).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0)),
-  [cat, menuCategories]);
-
-  const catItems = useMemo(() => {
-    if (cat === 'quick') return quickItems;
-    const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId)
-      .slice().sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
-    const inCat = (i, id) => i.cat === id || (i.cats||[]).includes(id);
-    if (subCat) return base.filter(i => inCat(i, subCat));
-    if (subCategories.length > 0) {
-      const subIds = subCategories.map(s => s.id);
-      return base.filter(i => inCat(i, cat) || subIds.some(sid => inCat(i, sid)));
-    }
-    return base.filter(i => inCat(i, cat));
-  }, [cat, subCat, subCategories, MENU_ITEMS, quickItems]);
-
-  const displayItems = useMemo(() => {
-    if (!search.trim()) return catItems;
-    const q = search.toLowerCase();
-    return MENU_ITEMS.filter(i =>
-      !i.archived && i.type !== 'subitem' && !i.parentId &&
-      ((i.menuName||i.name||'').toLowerCase().includes(q) || i.description?.toLowerCase().includes(q))
-    );
-  }, [cat, search, catItems, MENU_ITEMS]);
+    const ids = quickScreenIds && quickScreenIds.length ? quickScreenIds : QUICK_IDS;
+    const available = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
+    const fromIds = ids.map(id => MENU_ITEMS.find(i => i.id === id)).filter(i => i && !eightySixIds.includes(i.id) && !i.archived);
+    if (fromIds.length >= 12) return fromIds.slice(0, 16);
+    const pad = available.filter(i => !ids.includes(i.id) && !eightySixIds.includes(i.id)).slice(0, 16 - fromIds.length);
+    return [...fromIds, ...pad];
+  }, [quickScreenIds, MENU_ITEMS, eightySixIds]);
 
   const byCourse = useMemo(()=>{
-    const g={};
-    items.forEach(item=>{ const c=item.course??1; if(!g[c])g[c]=[]; g[c].push(item); });
+    const g = {};
+    items.forEach(item => { const c=item.course??1; if(!g[c])g[c]=[]; g[c].push(item); });
     return g;
   },[items]);
   const courseNums = Object.keys(byCourse).map(Number).sort();

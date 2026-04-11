@@ -36,7 +36,7 @@ export default function MenuManager() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       <nav style={{ display:'flex', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-        {[['menu','🍽 Menu'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
+        {[['menu','🍽 Menu'],['quick','⚡ Quick Screen'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{ padding:'0 20px', height:46, cursor:'pointer', fontFamily:'inherit', border:'none', borderBottom:`3px solid ${tab===id?'var(--acc)':'transparent'}`, background:'transparent', color:tab===id?'var(--acc)':'var(--t3)', fontSize:13, fontWeight:tab===id?800:500 }}>
             {label}
           </button>
@@ -44,6 +44,7 @@ export default function MenuManager() {
       </nav>
       <div style={{ flex:1, overflow:'hidden' }}>
         {tab==='menu'         && <MenuTab />}
+        {tab==='quick'        && <QuickScreenManager />}
         {tab==='modifiers'    && <ModifiersTab />}
         {tab==='instructions' && <InstructionsTab />}
       </div>
@@ -897,6 +898,200 @@ function CatModal({ cat, roots, onSave, onDelete, onClose }) {
           <button onClick={()=>{if(confirm('Delete?'))onDelete();}} style={{ padding:'8px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:600 }}>Delete</button>
           <button onClick={onClose} style={{ flex:1, padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12 }}>Cancel</button>
           <button onClick={()=>onSave({...f,parentId:f.parentId||null})} disabled={!f.label.trim()} style={{ flex:2, padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:800, opacity:f.label.trim()?1:.4 }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QUICK SCREEN MANAGER
+// Drag items from the full menu onto a 16-slot grid — order and selection
+// persists to store and reflects on POS ⚡ tab immediately
+// ═══════════════════════════════════════════════════════════════════════════
+function QuickScreenManager() {
+  const { menuItems, menuCategories, quickScreenIds, setQuickScreenIds, showToast, markBOChange } = useStore();
+  const [catFilter, setCatFilter]   = useState('');
+  const [search, setSearch]         = useState('');
+  const [dragSrc, setDragSrc]       = useState(null); // {type:'slot'|'list', id, slotIdx}
+  const [overSlot, setOverSlot]     = useState(null);
+
+  const SLOTS = 16;
+
+  // Current Quick Screen — array of item IDs, length ≤ SLOTS, some may be null (empty)
+  const slots = Array.from({ length: SLOTS }, (_, i) => quickScreenIds[i] || null);
+
+  // All orderable items for the picker panel
+  const allItems = menuItems.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
+  const roots    = menuCategories.filter(c => !c.parentId && !c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+
+  const listItems = allItems
+    .filter(i => {
+      if (catFilter && i.cat !== catFilter && !(i.cats||[]).includes(catFilter)) return false;
+      if (search) return (i.menuName||i.name||'').toLowerCase().includes(search.toLowerCase());
+      return true;
+    })
+    .sort((a,b) => (a.sortOrder??999)-(b.sortOrder??999));
+
+  const onSlot = idx => quickScreenIds[idx] ? menuItems.find(m => m.id === quickScreenIds[idx]) : null;
+  const catFor = item => menuCategories.find(c => c.id === item?.cat);
+
+  // Save updated ids to store
+  const save = (newIds) => {
+    setQuickScreenIds(newIds.filter(Boolean));
+    markBOChange();
+  };
+
+  // Remove item from a slot
+  const clearSlot = (idx) => {
+    const next = [...slots];
+    next[idx] = null;
+    save(next);
+  };
+
+  // Drop: from list onto slot
+  const onSlotDrop = (e, idx) => {
+    e.preventDefault();
+    if (!dragSrc) { setOverSlot(null); return; }
+
+    const next = [...slots];
+
+    if (dragSrc.type === 'list') {
+      // Adding from picker
+      if (next.includes(dragSrc.id)) {
+        showToast('Already on Quick Screen', 'warning');
+        setDragSrc(null); setOverSlot(null); return;
+      }
+      next[idx] = dragSrc.id;
+    } else if (dragSrc.type === 'slot') {
+      // Reordering within grid
+      const srcIdx = dragSrc.slotIdx;
+      const tmp = next[srcIdx];
+      next[srcIdx] = next[idx];
+      next[idx] = tmp;
+    }
+
+    save(next);
+    setDragSrc(null); setOverSlot(null);
+  };
+
+  return (
+    <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
+
+      {/* ── Left: 4×4 Quick Screen grid ─────────────────────────────── */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', borderRight:'1px solid var(--bdr)' }}>
+        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom:2 }}>
+            <span style={{ fontSize:15, fontWeight:800, color:'var(--t1)' }}>⚡ Quick Screen</span>
+            <span style={{ fontSize:11, color:'var(--t4)' }}>{quickScreenIds.filter(Boolean).length}/{SLOTS} slots used</span>
+          </div>
+          <div style={{ fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>
+            Drag items from the right panel onto a slot. Drag within the grid to reorder. Click ✕ to remove. Changes reflect on POS instantly.
+          </div>
+        </div>
+
+        <div style={{ flex:1, overflowY:'auto', padding:'16px' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+            {slots.map((itemId, idx) => {
+              const item  = itemId ? menuItems.find(m => m.id === itemId) : null;
+              const cat   = catFor(item);
+              const color = cat?.color || 'var(--acc)';
+              const isOver  = overSlot === idx;
+              const isDragging = dragSrc?.type==='slot' && dragSrc?.slotIdx===idx;
+
+              return (
+                <div key={idx}
+                  onDragOver={e => { e.preventDefault(); setOverSlot(idx); }}
+                  onDragLeave={() => setOverSlot(null)}
+                  onDrop={e => onSlotDrop(e, idx)}
+                  style={{
+                    aspectRatio:'1/.75', borderRadius:14, border:`2px ${isOver?'solid':'dashed'} ${isOver?'var(--acc)':item?'var(--bdr)':'var(--bdr)'}`,
+                    background:isOver?'var(--acc-d)':item?'var(--bg2)':'var(--bg3)',
+                    position:'relative', overflow:'hidden', opacity:isDragging?.3:1,
+                    transition:'all .1s', cursor:item?'grab':'default',
+                  }}
+                  draggable={!!item}
+                  onDragStart={e => { if(item){ setDragSrc({type:'slot', id:itemId, slotIdx:idx}); e.dataTransfer.effectAllowed='move'; } }}
+                  onDragEnd={() => { setDragSrc(null); setOverSlot(null); }}>
+
+                  {item ? (<>
+                    {/* Colour bar */}
+                    <div style={{ position:'absolute', left:0, top:0, bottom:0, width:4, background:color }}/>
+                    {/* Remove btn */}
+                    <button onClick={()=>clearSlot(idx)} style={{ position:'absolute', top:4, right:4, width:18, height:18, borderRadius:'50%', border:'none', background:'rgba(0,0,0,.35)', color:'#fff', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>✕</button>
+                    {/* Slot number */}
+                    <div style={{ position:'absolute', bottom:4, right:6, fontSize:9, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>{idx+1}</div>
+                    <div style={{ padding:'8px 8px 6px 12px', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                      <div>
+                        <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)', lineHeight:1.3, marginBottom:2 }}>{item.menuName||item.name}</div>
+                        <div style={{ fontSize:9, color:'var(--t4)' }}>{cat?.icon} {cat?.label}</div>
+                      </div>
+                      <div style={{ fontSize:13, fontWeight:800, color:color, fontFamily:'var(--font-mono)' }}>
+                        £{(item.pricing?.base??item.price??0).toFixed(2)}
+                      </div>
+                    </div>
+                  </>) : (
+                    <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:4 }}>
+                      <span style={{ fontSize:18, opacity:.15 }}>+</span>
+                      <span style={{ fontSize:9, color:'var(--t4)' }}>Slot {idx+1}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Quick clear + tips */}
+          <div style={{ marginTop:16, display:'flex', gap:8 }}>
+            <button onClick={()=>{ save([]); showToast('Quick Screen cleared','info'); }} style={{ padding:'6px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:600 }}>Clear all</button>
+            <button onClick={()=>{ const ids=allItems.slice(0,SLOTS).map(i=>i.id); save(ids); showToast('Filled with first '+ids.length+' items','success'); }} style={{ padding:'6px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600 }}>Auto-fill from menu</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right: Item picker ───────────────────────────────────────── */}
+      <div style={{ width:280, display:'flex', flexDirection:'column', overflow:'hidden', flexShrink:0 }}>
+        <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--t2)', marginBottom:8 }}>Drag items onto the grid →</div>
+          <div style={{ position:'relative', marginBottom:6 }}>
+            <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)' }}>🔍</span>
+            <input style={{ ...inp, paddingLeft:28, fontSize:12, padding:'5px 5px 5px 28px' }} placeholder="Search items…" value={search} onChange={e=>setSearch(e.target.value)}/>
+          </div>
+          <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ ...inp, fontSize:11, padding:'4px 8px', cursor:'pointer' }}>
+            <option value="">All categories</option>
+            {roots.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+          </select>
+        </div>
+
+        <div style={{ flex:1, overflowY:'auto', padding:'6px 8px' }}>
+          {listItems.map(item => {
+            const onScreen = quickScreenIds.includes(item.id);
+            const cat      = catFor(item);
+            const color    = cat?.color || 'var(--acc)';
+            return (
+              <div key={item.id}
+                draggable={!onScreen}
+                onDragStart={e=>{ if(!onScreen){ setDragSrc({type:'list',id:item.id}); e.dataTransfer.effectAllowed='move'; } }}
+                onDragEnd={()=>setDragSrc(null)}
+                style={{
+                  display:'flex', alignItems:'center', gap:8, padding:'7px 9px', marginBottom:4,
+                  borderRadius:9, border:`1.5px solid ${onScreen?'var(--grn-b)':'var(--bdr)'}`,
+                  background:onScreen?'var(--grn-d)':'var(--bg3)',
+                  cursor:onScreen?'default':'grab', opacity:onScreen?.7:1,
+                  userSelect:'none',
+                }}>
+                <div style={{ width:4, height:32, borderRadius:2, background:color, flexShrink:0 }}/>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:onScreen?'var(--grn)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.menuName||item.name}</div>
+                  <div style={{ fontSize:9, color:'var(--t4)' }}>{cat?.icon} {cat?.label}</div>
+                </div>
+                <span style={{ fontSize:12, fontWeight:700, color:onScreen?'var(--grn)':color, fontFamily:'var(--font-mono)', flexShrink:0 }}>
+                  {onScreen ? '✓' : `£${(item.pricing?.base??item.price??0).toFixed(2)}`}
+                </span>
+              </div>
+            );
+          })}
+          {listItems.length===0 && <div style={{ textAlign:'center', padding:'20px 0', color:'var(--t4)', fontSize:11 }}>No items found</div>}
         </div>
       </div>
     </div>

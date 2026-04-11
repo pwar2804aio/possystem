@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { INITIAL_KDS, SHIFT, MENU_ITEMS, CATEGORIES } from '../data/seed';
+import { INITIAL_KDS, SHIFT, MENU_ITEMS, CATEGORIES, STAFF as STAFF_SEED } from '../data/seed';
 
 // ─── ID helpers ──────────────────────────────────────────────────────────────
 let _itemUid = 1;
@@ -73,6 +73,10 @@ export const useStore = create((set, get) => ({
 
   // ── Auth ──────────────────────────────────
   staff: null,
+  staffMembers: STAFF_SEED,
+  addStaffMember:    s    => set(st => ({ staffMembers: [...st.staffMembers, { ...s, id:`s-${Date.now()}` }] })),
+  updateStaffMember: (id,patch) => set(st => ({ staffMembers: st.staffMembers.map(s => s.id===id ? {...s,...patch} : s) })),
+  removeStaffMember: id  => set(st => ({ staffMembers: st.staffMembers.filter(s => s.id!==id) })),
   login:  s => set({ staff:s }),
   logout: () => set({ staff:null, activeTableId:null, orderType:'dine-in', customer:null }),
 
@@ -324,6 +328,10 @@ export const useStore = create((set, get) => ({
   // Type:           simple | modifiers | variants | pizza | bundle
   // Visibility:     { pos, kiosk, online, onlineDelivery }
   //
+  // Quick Screen — list of item IDs shown on the ⚡ Quick tab, ordered
+  quickScreenIds: QUICK_IDS,
+  setQuickScreenIds: (ids) => set({ quickScreenIds: ids }),
+
   menuItems: MENU_ITEMS.map((item, idx) => ({
     ...item,
     sortOrder: item.sortOrder ?? idx,  // assign sequential sortOrder if not set

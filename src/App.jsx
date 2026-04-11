@@ -14,9 +14,18 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.9';
+const VERSION = '1.1.0';
 
 const CHANGELOG = [
+  {
+    version: '1.1.0', date: 'Apr 2026', label: 'Quick Screen manager, Staff manager, EOD Z-read',
+    changes: [
+      'Quick Screen manager (⚡ tab in Menu Manager): 4×4 drag-and-drop grid — drag items from the picker panel onto slots. Reorder by dragging within the grid. Remove with ✕. Auto-fill and Clear all buttons. Changes reflect on POS ⚡ tab instantly.',
+      'Staff Manager rebuilt: list + editor layout. Add staff with role, colour, 4-digit PIN (numpad). Set per-staff permissions (void, discount, refund, cash up, reports, EOD, manage staff). Reset to role defaults button. All data persists to store.',
+      'EOD Z-read rebuilt: cash declaration with denomination counts (+/- buttons per note/coin type), opening float, variance calculation (over/short), banking amount. Z-Read summary with full revenue breakdown, cash reconciliation, and net totals.',
+      'Store: quickScreenIds state + setQuickScreenIds action. staffMembers state with add/update/remove. Reads from seed data as initial state.',
+    ],
+  },
   {
     version: '1.0.9', date: 'Apr 2026', label: 'Variants: modifiers work after variant pick, better labels, POS preview',
     changes: [
