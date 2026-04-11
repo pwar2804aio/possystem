@@ -40,6 +40,15 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '1.1.9', date: 'Apr 2026', label: 'Modifier modal stays open bug fixed',
+    changes: [
+      'CRITICAL: Modifier modal selections (Side choice, Sauce etc.) were being reset to empty whenever any Zustand state update triggered a POSSurface re-render. Root cause: MENU_ITEMS was recreated via .map() on every render, giving items new object references. ProductModal saw a different prop object and remounted, losing useState selections.',
+      'Fix 1: MENU_ITEMS wrapped in useMemo([rawItems, orderType]) so item references stay stable across renders.',
+      'Fix 2: ProductModal given key={modalItem.id} so it only remounts when a genuinely different item is opened, never on parent re-renders with the same item open.',
+      'Result: Clicking Chips then Peppercorn sauce then Add to order now works correctly — item is added with all modifiers and modal closes.',
+    ],
+  },
+  {
     version: '1.1.8', date: 'Apr 2026', label: 'Send-to-table auto-fires kitchen, variant names, mod display',
     changes: [
       'Seat at table / Add to occupied table now automatically sends to kitchen. Previously items landed on the table but the operator had to reopen the check and click Send again. Now the send modal → choose table flow completes in one step.',
