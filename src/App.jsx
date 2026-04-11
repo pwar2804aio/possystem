@@ -14,9 +14,18 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 
 const CHANGELOG = [
+  {
+    version: '1.1.1', date: 'Apr 2026', label: 'Store-driven login, kiosk and quick screen fixes',
+    changes: [
+      'PIN login screen now reads from store staffMembers — staff added in Staff Manager appear on the login screen immediately.',
+      'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
+      'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
+      'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
   {
     version: '1.1.0', date: 'Apr 2026', label: 'Quick Screen manager, Staff manager, EOD Z-read',
     changes: [

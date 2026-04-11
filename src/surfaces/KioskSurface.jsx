@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../store';
-import { CATEGORIES, MENU_ITEMS as SEED_ITEMS, CAT_META, ALLERGENS } from '../data/seed';
+import { MENU_ITEMS as SEED_ITEMS, ALLERGENS } from '../data/seed';
 
 export default function KioskSurface() {
-  const { eightySixIds, addItem, getPOSItems, getPOSTotals, clearWalkIn, sendToKitchen, showToast, menuItems: storeItems } = useStore();
+  const { eightySixIds, addItem, getPOSItems, getPOSTotals, clearWalkIn, sendToKitchen, showToast, menuItems: storeItems, menuCategories, quickScreenIds } = useStore();
   const MENU_ITEMS = storeItems || SEED_ITEMS;
 
   const [cat, setCat]         = useState('quick');
@@ -17,13 +17,17 @@ export default function KioskSurface() {
   const totals = getPOSTotals();
 
   const displayItems = useMemo(() => {
-    const available = MENU_ITEMS.filter(i => !eightySixIds.includes(i.id) && !i.archived);
-    if (search) return available.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
-    if (cat === 'quick') return available.slice(0, 16);
-    return available.filter(i => i.cat === cat);
-  }, [cat, search, MENU_ITEMS, eightySixIds]);
+    const available = MENU_ITEMS.filter(i => !eightySixIds.includes(i.id) && !i.archived && i.type !== 'subitem' && !i.parentId && i.visibility?.kiosk !== false);
+    if (search) return available.filter(i => (i.menuName||i.name||'').toLowerCase().includes(search.toLowerCase()));
+    if (cat === 'quick') {
+      const ids = quickScreenIds && quickScreenIds.length ? quickScreenIds : [];
+      const fromIds = ids.map(id => available.find(i => i.id === id)).filter(Boolean);
+      return fromIds.length ? fromIds : available.slice(0, 16);
+    }
+    return available.filter(i => i.cat === cat || (i.cats||[]).includes(cat)).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
+  }, [cat, search, MENU_ITEMS, eightySixIds, quickScreenIds]);
 
-  const cats = CATEGORIES.filter(c => !c.isSpecial);
+  const cats = menuCategories ? menuCategories.filter(c => !c.isSpecial && !c.parentId).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)) : [];
 
   const handleAdd = (item) => {
     if (item.modifierGroups?.length) {
@@ -109,7 +113,6 @@ export default function KioskSurface() {
           {!search && (
             <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:12 }}>
               {[{id:'quick',label:'Popular',icon:'⭐'},...cats].map(c => {
-                const m = CAT_META[c.id]||{};
                 const active = cat===c.id;
                 return (
                   <button key={c.id} onClick={()=>setCat(c.id)} style={{
@@ -117,7 +120,7 @@ export default function KioskSurface() {
                     background: active?'var(--acc)':'var(--bg3)',
                     border:`1px solid ${active?'var(--acc)':'var(--bdr)'}`,
                     color: active?'#0b0c10':'var(--t2)', fontSize:13, fontWeight: active?700:400, flexShrink:0,
-                  }}>{m.icon||c.icon} {c.label}</button>
+                  }}>{c.icon} {c.label}</button>
                 );
               })}
             </div>

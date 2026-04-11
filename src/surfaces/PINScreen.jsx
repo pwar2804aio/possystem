@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { STAFF } from '../data/seed';
 import { useStore } from '../store';
 
 export default function PINScreen() {
-  const login = useStore(s => s.login);
+  const { login, staffMembers } = useStore();
+  const staff = staffMembers && staffMembers.length ? staffMembers : [];
   const [sel, setSel] = useState(null);
   const [pin, setPin] = useState('');
   const [shake, setShake] = useState(false);
@@ -49,7 +49,7 @@ export default function PINScreen() {
 
       {/* Staff cards */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 420 }}>
-        {STAFF.map(s => (
+        {staff.map(s => (
           <button key={s.id} onClick={() => { setSel(s); setPin(''); }}
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
