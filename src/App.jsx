@@ -14,9 +14,20 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.8';
+const VERSION = '1.0.9';
 
 const CHANGELOG = [
+  {
+    version: '1.0.9', date: 'Apr 2026', label: 'Variants: modifiers work after variant pick, better labels, POS preview',
+    changes: [
+      'Variants tab in item editor now shows modifier groups — assign once to the parent and they appear after every variant is picked (Step 1: size → Step 2: options).',
+      'Instruction groups also assignable from Variants tab.',
+      'variantLabel is now prominent — preset buttons (Size, Type, Cut, Style, Strength, Format, Serving, Portion, Blend, Roast) plus free-text custom label.',
+      'POS variant picker: item name shown prominently, "Choose size/type/cut" heading uses the real label. Step indicator only appears when modifiers follow.',
+      'Step 2 (modifier step) shows selected variant with a green tick badge for clarity.',
+      'POS preview in Variants tab shows how the picker will look, and confirms which modifier groups follow.',
+    ],
+  },
   {
     version: '1.0.8', date: 'Apr 2026', label: 'Modifier options no longer show undefined',
     changes: [

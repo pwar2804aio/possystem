@@ -472,28 +472,117 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
         )}
 
         {section==='variants' && (
-          <div>
-            <div style={{ display:'flex', alignItems:'center', marginBottom:12 }}>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>Sizes / variations</div>
-                <div style={{ fontSize:10, color:'var(--t3)', marginTop:2 }}>e.g. Pint & Half, or Small/Medium/Large. Customer picks one on the POS.</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {/* What to call the picker — shown as header in POS modal */}
+            <div>
+              <span style={lbl}>What are these variants called?</span>
+              <div style={{ fontSize:10, color:'var(--t3)', marginBottom:7 }}>This label appears as the heading in the POS picker — e.g. "Size", "Cut", "Style". Pick one or type your own.</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:7 }}>
+                {['Size','Type','Cut','Style','Strength','Format','Serving','Portion','Blend','Roast'].map(l=>{
+                  const act=(item.variantLabel||'Size')===l;
+                  return <button key={l} onClick={()=>onUpdate({variantLabel:l})} style={{ padding:'4px 10px', borderRadius:14, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)' }}>{l}</button>;
+                })}
               </div>
+              <input style={{ ...inp, fontSize:12 }} value={item.variantLabel||''} onChange={e=>onUpdate({variantLabel:e.target.value})} placeholder="Custom label e.g. Colour, Region, Weight…"/>
             </div>
-            {variants.length===0 && <div style={{ padding:'10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t4)', marginBottom:12 }}>No variants yet. Click "+ Add variant" to add sizes or types.</div>}
-            {variants.map(v=>{
-              const vp=v.pricing||{base:v.price||0};
-              return (
-                <div key={v.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:6, alignItems:'center', padding:'7px 9px', marginBottom:5, borderRadius:8, background:'var(--bg3)', border:'1px solid var(--bdr)' }}>
-                  <input style={{ ...inp, fontSize:12, padding:'5px 8px' }} value={v.menuName||v.name} onChange={e=>updateVariant(v.id,{menuName:e.target.value,name:e.target.value,receiptName:e.target.value,kitchenName:e.target.value})} placeholder="e.g. Pint"/>
-                  <div style={{ position:'relative', width:76 }}>
-                    <span style={{ position:'absolute', left:7, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)' }}>£</span>
-                    <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:18, fontSize:12, padding:'5px 5px 5px 18px', width:76 }} value={vp.base||''} placeholder="0.00" onChange={e=>updateVariant(v.id,{pricing:{...vp,base:parseFloat(e.target.value)||0},price:parseFloat(e.target.value)||0})}/>
-                  </div>
-                  <button onClick={()=>removeVariant(v.id)} style={{ width:26, height:26, borderRadius:6, border:'1px solid var(--red-b)', background:'var(--red-d)', color:'var(--red)', cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+
+            {/* Modifier groups on ALL variants — assign here once, applies to every variant */}
+            <div style={{ padding:'10px 11px', background:'var(--bg3)', borderRadius:10, border:'1px solid var(--bdr)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--t2)', marginBottom:4 }}>Modifiers for all variants</div>
+              <div style={{ fontSize:10, color:'var(--t3)', marginBottom:8, lineHeight:1.5 }}>
+                Tick modifier groups here — they appear on the POS <strong>after</strong> the customer picks a variant (e.g. pick Pint → then choose Sides).
+                Assign to the <em>parent item</em> and it applies to every variant.
+              </div>
+              {(modifierGroupDefs||[]).length===0
+                ? <div style={{ fontSize:10, color:'var(--t4)' }}>No modifier groups yet — create them in the Modifier groups tab.</div>
+                : (modifierGroupDefs||[]).map(g=>{
+                    const asgn=(item.assignedModifierGroups||[]).find(ag=>ag.groupId===g.id);
+                    return (
+                      <div key={g.id} style={{ marginBottom:5 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 9px', borderRadius:8, border:`1.5px solid ${asgn?'var(--acc)':'var(--bdr)'}`, background:asgn?'var(--acc-d)':'var(--bg2)', cursor:'pointer' }} onClick={()=>toggleModGroup(g.id)}>
+                          <div style={{ width:16,height:16,borderRadius:3,border:`2px solid ${asgn?'var(--acc)':'var(--bdr2)'}`,background:asgn?'var(--acc)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                            {asgn&&<div style={{ width:6,height:6,borderRadius:1,background:'#0b0c10' }}/>}
+                          </div>
+                          <span style={{ fontSize:11, fontWeight:asgn?700:500, color:asgn?'var(--acc)':'var(--t1)', flex:1 }}>{g.name}</span>
+                          <span style={{ fontSize:9, color:'var(--t4)' }}>{(g.options||[]).length} opts</span>
+                          {asgn && <span style={{ fontSize:9, color:'var(--acc)', fontWeight:700 }}>{(asgn.min||0)>0?'required':'optional'}</span>}
+                        </div>
+                        {asgn && (
+                          <div style={{ display:'flex', gap:10, padding:'3px 9px 5px', background:'var(--acc-d)', borderRadius:'0 0 7px 7px' }} onClick={e=>e.stopPropagation()}>
+                            <label style={{ fontSize:10, display:'flex', alignItems:'center', gap:3, cursor:'pointer', color:'var(--t2)' }}>
+                              <input type="checkbox" checked={(asgn.min||0)>0} onChange={e=>{const cur=item.assignedModifierGroups||[];onUpdate({assignedModifierGroups:cur.map(ag=>ag.groupId===g.id?{...ag,min:e.target.checked?1:0}:ag)});}} style={{ accentColor:'var(--acc)' }}/> Required
+                            </label>
+                            <label style={{ fontSize:10, display:'flex', alignItems:'center', gap:3, cursor:'pointer', color:'var(--t2)' }}>Max:
+                              <input type="number" min="1" max="99" style={{ ...inp, width:38, padding:'1px 4px', fontSize:10 }} value={asgn.max||''} placeholder="∞" onChange={e=>{const cur=item.assignedModifierGroups||[];onUpdate({assignedModifierGroups:cur.map(ag=>ag.groupId===g.id?{...ag,max:e.target.value===''?null:parseInt(e.target.value)||1}:ag)});}}/>
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              }
+              {(instructionGroupDefs||[]).length>0 && (
+                <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid var(--bdr)' }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', marginBottom:5 }}>Instruction groups (no price change)</div>
+                  {(instructionGroupDefs||[]).map(g=>{
+                    const asgn=(item.assignedInstructionGroups||[]).includes(g.id);
+                    return <div key={g.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 9px', marginBottom:4, borderRadius:7, border:`1.5px solid ${asgn?'var(--grn)':'var(--bdr)'}`, background:asgn?'var(--grn-d)':'var(--bg2)', cursor:'pointer' }} onClick={()=>toggleInstGroup(g.id)}>
+                      <div style={{ width:16,height:16,borderRadius:3,border:`2px solid ${asgn?'var(--grn)':'var(--bdr2)'}`,background:asgn?'var(--grn)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                        {asgn&&<div style={{ width:6,height:6,borderRadius:1,background:'#0b0c10' }}/>}
+                      </div>
+                      <span style={{ fontSize:11, fontWeight:asgn?700:500, color:asgn?'var(--grn)':'var(--t1)', flex:1 }}>{g.name}</span>
+                    </div>;
+                  })}
                 </div>
-              );
-            })}
-            <button onClick={addVariant} style={{ width:'100%', padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1.5px dashed var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600, marginTop:4 }}>+ Add variant</button>
+              )}
+            </div>
+
+            {/* Individual variants */}
+            <div>
+              <span style={lbl}>Variants <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0 }}>— each variant appears as a button in the POS picker</span></span>
+              {variants.length===0 && <div style={{ padding:'10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t4)', marginBottom:8 }}>No variants yet — click "+ Add variant" below.</div>}
+              {variants.map((v,vi)=>{
+                const vp=v.pricing||{base:v.price||0};
+                return (
+                  <div key={v.id} style={{ marginBottom:8, borderRadius:10, border:'1px solid var(--bdr)', background:'var(--bg3)', overflow:'hidden' }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 90px auto', gap:6, alignItems:'center', padding:'8px 10px' }}>
+                      <input style={{ ...inp, fontSize:13, fontWeight:600, padding:'6px 9px' }} value={v.menuName||v.name||''} onChange={e=>updateVariant(v.id,{menuName:e.target.value,name:e.target.value,receiptName:e.target.value,kitchenName:e.target.value})} placeholder={`${item.variantLabel||'Variant'} ${vi+1}`}/>
+                      <div style={{ position:'relative' }}>
+                        <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)', fontWeight:700 }}>£</span>
+                        <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:13, fontWeight:700, padding:'6px 6px 6px 20px', color:'var(--acc)' }} value={vp.base!==undefined?vp.base:''} placeholder="0.00" onChange={e=>updateVariant(v.id,{pricing:{...vp,base:parseFloat(e.target.value)||0},price:parseFloat(e.target.value)||0})}/>
+                      </div>
+                      <button onClick={()=>removeVariant(v.id)} style={{ width:28,height:36,borderRadius:7,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:15,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                    </div>
+                  </div>
+                );
+              })}
+              <button onClick={addVariant} style={{ width:'100%', padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1.5px dashed var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600 }}>+ Add {item.variantLabel||'variant'}</button>
+            </div>
+
+            {/* POS Preview */}
+            {variants.length>0 && (
+              <div style={{ padding:'10px 11px', background:'var(--bg2)', borderRadius:10, border:'1px solid var(--bdr)' }}>
+                <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 }}>POS preview</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--t3)', marginBottom:7 }}>{item.variantLabel||'Size'}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {variants.map(v=>{
+                    const vp=v.pricing||{base:v.price||0};
+                    return (
+                      <div key={v.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', borderRadius:8, border:'1.5px solid var(--bdr)', background:'var(--bg3)' }}>
+                        <div style={{ width:16,height:16,borderRadius:'50%',border:'2px solid var(--bdr2)',flexShrink:0 }}/>
+                        <span style={{ fontSize:12, fontWeight:500, color:'var(--t1)', flex:1 }}>{v.menuName||v.name||`Option ${variants.indexOf(v)+1}`}</span>
+                        <span style={{ fontSize:13, fontWeight:800, color:'var(--t2)', fontFamily:'var(--font-mono)' }}>£{(vp.base||0).toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {(item.assignedModifierGroups||[]).length>0 && (
+                  <div style={{ marginTop:8, padding:'6px 8px', background:'var(--acc-d)', borderRadius:7, fontSize:10, color:'var(--acc)', fontWeight:600 }}>
+                    ✓ After picking a {(item.variantLabel||'variant').toLowerCase()}, customer will see: {(item.assignedModifierGroups||[]).map(ag=>(modifierGroupDefs||[]).find(g=>g.id===ag.groupId)?.name).filter(Boolean).join(', ')}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

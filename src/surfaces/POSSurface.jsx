@@ -172,6 +172,7 @@ export default function POSSurface() {
         setModalItem({
           ...item,
           type: 'variants',
+          variantLabel: item.variantLabel || 'Option',
           variants: variantChildren.map(c => ({
             id: c.id,
             label: c.menuName || c.name,
