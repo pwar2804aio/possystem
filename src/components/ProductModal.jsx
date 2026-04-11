@@ -486,11 +486,9 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
       labelCounts[label] > 1 ? `${labelCounts[label]}× ${label}` : label
     );
     const instParts = Object.values(instSelections).filter(Boolean);
-    // Name shows "ItemName — VariantLabel" (if variant selected), mods show on separate rows
-    const variantPart = selected ? ` — ${selected.label}` : '';
-    // Only instruction notes go in the name (they have no separate display row)
+    // Name is the item name — mods show on separate rows, instructions go in name
     const nameExtras = instParts.length ? ` · ${instParts.join(', ')}` : '';
-    return `${item.menuName || item.name}${variantPart}${nameExtras}`;
+    return `${item.menuName || item.name}${nameExtras}`;
   };
 
   const handleAdd = () => {

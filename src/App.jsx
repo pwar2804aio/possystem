@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.8';
+const VERSION = '1.1.9';
 
 const CHANGELOG = [
   {
@@ -24,6 +24,12 @@ const CHANGELOG = [
       'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
       'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
       'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
+  {
+    version: '1.1.9', date: 'Apr 2026', label: 'Modifier modal Add button fixed — ReferenceError on selected',
+    changes: [
+      'CRITICAL FIX: Modifier modal (Ribeye, Chicken supreme etc.) Add button silently failed — buildDisplayName referenced selected which only exists in VariantsModal not ModifiersModal, causing ReferenceError. The modal stayed open with no error visible. Fixed by removing the undefined reference — modifier-only items never have a variant selection in this context.',
     ],
   },
   {
