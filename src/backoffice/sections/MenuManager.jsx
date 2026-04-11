@@ -22,6 +22,7 @@
  */
 import { useState, useMemo, useCallback } from 'react';
 import { useStore } from '../../store';
+import CanvasMenu from './CanvasMenu';
 import { ALLERGENS } from '../../data/seed';
 
 // ── Shared ───────────────────────────────────────────────────────────────────
@@ -36,7 +37,7 @@ export default function MenuManager() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       <nav style={{ display:'flex', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-        {[['menu','🍽 Menu'],['quick','⚡ Quick Screen'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
+        {[['menu','🍽 Menu'],['canvas','🗂 Canvas'],['quick','⚡ Quick Screen'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{ padding:'0 20px', height:46, cursor:'pointer', fontFamily:'inherit', border:'none', borderBottom:`3px solid ${tab===id?'var(--acc)':'transparent'}`, background:'transparent', color:tab===id?'var(--acc)':'var(--t3)', fontSize:13, fontWeight:tab===id?800:500 }}>
             {label}
           </button>
@@ -44,6 +45,7 @@ export default function MenuManager() {
       </nav>
       <div style={{ flex:1, overflow:'hidden' }}>
         {tab==='menu'         && <MenuTab />}
+        {tab==='canvas'       && <CanvasMenu />}
         {tab==='quick'        && <QuickScreenManager />}
         {tab==='modifiers'    && <ModifiersTab />}
         {tab==='instructions' && <InstructionsTab />}
@@ -69,6 +71,7 @@ function MenuTab() {
   const [overCatId, setOverCatId]   = useState(null);
   const [dragItemId, setDragItemId] = useState(null);
   const [overItemId, setOverItemId] = useState(null);
+  const [expandedParentId, setExpandedParentId] = useState(null); // variant expand
   const [search, setSearch]         = useState('');
 
   const roots     = useMemo(()=>menuCategories.filter(c=>!c.parentId&&!c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)),[menuCategories]);
@@ -81,7 +84,7 @@ function MenuTab() {
     const subs  = menuCategories.filter(c=>c.parentId===selCatId).map(c=>c.id);
     const inCat = i => i.cat===selCatId || subs.includes(i.cat) || (i.cats||[]).includes(selCatId) || (i.cats||[]).some(c=>subs.includes(c));
     return menuItems
-      .filter(i=>!i.archived && i.type!=='subitem' && inCat(i))
+      .filter(i=>!i.archived && i.type!=='subitem' && !i.parentId && inCat(i))
       .sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
   },[selCatId, menuCategories, menuItems]);
 
@@ -319,7 +322,44 @@ function MenuTab() {
                         </div>
                         {/* Drag handle — top right */}
                         <div style={{ position:'absolute', top:4, right:6, fontSize:9, color:'var(--t4)', cursor:'grab', lineHeight:1 }}>⣿</div>
+                        {/* Variant expand toggle */}
+                        {isParent && (
+                          <button onClick={e=>{e.stopPropagation();setExpandedParentId(expandedParentId===item.id?null:item.id);}}
+                            style={{ position:'absolute', bottom:6, right:6, fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:6, cursor:'pointer', fontFamily:'inherit',
+                              background:expandedParentId===item.id?catColor+'33':'var(--bg4)', border:`1px solid ${expandedParentId===item.id?catColor+'55':'var(--bdr)'}`,
+                              color:expandedParentId===item.id?catColor:'var(--t4)' }}>
+                            {expandedParentId===item.id?'▲ hide':'▼ sizes'}
+                          </button>
+                        )}
                       </div>
+                      {/* Inline variant children — shown when expanded */}
+                      {isParent && expandedParentId===item.id && (
+                        <div style={{ margin:'4px 0 0', padding:'8px', background:'var(--bg3)', borderRadius:10, border:`1px solid ${catColor}33` }}>
+                          <div style={{ fontSize:9, fontWeight:700, color:catColor, textTransform:'uppercase', letterSpacing:'.07em', marginBottom:6 }}>Variants — {children.length} sizes</div>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                            {children.sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).map(child=>{
+                              const cp = child.pricing?.base ?? child.price ?? 0;
+                              const isSelChild = selItemId===child.id;
+                              return (
+                                <button key={child.id} onClick={e=>{e.stopPropagation();setSelItemId(isSelChild?null:child.id);}}
+                                  style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', padding:'8px 10px', borderRadius:10, cursor:'pointer', fontFamily:'inherit',
+                                    border:`1.5px solid ${isSelChild?'var(--acc)':catColor+'44'}`, background:isSelChild?'var(--acc-d)':catColor+'11',
+                                    minWidth:90, flex:'1 1 90px', maxWidth:140 }}>
+                                  <div style={{ fontSize:12, fontWeight:700, color:isSelChild?'var(--acc)':'var(--t1)', marginBottom:4 }}>{child.menuName||child.name}</div>
+                                  <div style={{ fontSize:13, fontWeight:800, color:catColor, fontFamily:'var(--font-mono)' }}>£{cp.toFixed(2)}</div>
+                                  {(child.allergens||[]).length>0 && <div style={{ fontSize:9, color:'var(--red)', marginTop:3 }}>⚠ {child.allergens.length}</div>}
+                                </button>
+                              );
+                            })}
+                            <button onClick={e=>{e.stopPropagation();
+                              addMenuItem({name:'New size', menuName:'New size', type:'simple', parentId:item.id, cat:item.cat,
+                                allergens:[], pricing:{base:0}, assignedModifierGroups:[], cats:[]});
+                              markBOChange(); showToast('Variant added','success');
+                            }} style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', borderRadius:10, cursor:'pointer', fontFamily:'inherit',
+                              border:`1.5px dashed ${catColor}55`, background:'transparent', color:catColor, fontSize:20, minWidth:44, opacity:.6 }}>+</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

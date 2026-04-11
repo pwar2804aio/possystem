@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
+import InlineItemFlow from '../components/InlineItemFlow';
 import CheckoutModal from './CheckoutModal';
 import CustomerModal from '../components/CustomerModal';
 import VoidModal from '../components/VoidModal';
@@ -526,7 +527,20 @@ export default function POSSurface() {
         </div>
 
         {/* ── Menu tab ── */}
-        {rightTab==='menu'&&(
+        {/* InlineItemFlow: when an item with variants/modifiers is selected, show inline */}
+        {modalItem && rightTab==='menu' && (
+          <div style={{flex:1, overflow:'hidden'}}>
+            <InlineItemFlow
+              key={modalItem.id}
+              item={modalItem}
+              menuItems={MENU_ITEMS}
+              activeAllergens={allergens}
+              onConfirm={(item,mods,cfg,opts)=>{ addItem(item,mods,cfg,opts); setModalItem(null); showToast(`${opts.displayName||item.name} added`,'success'); }}
+              onCancel={()=>setModalItem(null)}
+            />
+          </div>
+        )}
+        {!modalItem && rightTab==='menu'&&(
           <>
             {showAllergens&&(
               <div style={{padding:'8px 14px',borderBottom:'1px solid var(--bdr)',background:'var(--bg1)',flexShrink:0}}>
@@ -676,7 +690,7 @@ export default function POSSurface() {
 
       {/* Modals */}
       {pendingItem&&<AllergenModal item={pendingItem} activeAllergens={allergens} onConfirm={()=>{const i=pendingItem;clearPendingItem();openFlow(i);}} onCancel={clearPendingItem}/>}
-      {modalItem&&<ProductModal key={modalItem.id} item={modalItem} activeAllergens={allergens} onConfirm={(item,mods,cfg,opts)=>{addItem(item,mods,cfg,opts);setModalItem(null);showToast(`${opts.displayName||item.name} added`,'success');}} onCancel={()=>setModalItem(null)}/>}
+      {/* ProductModal removed — now using InlineItemFlow inline in right panel */}
       {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={activeTableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={handlePayComplete}/>}
       {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} onConfirm={c=>{setShowCustomerModal(false);setCustomer(c);setOrderType(pendingOrderType);setPendingOrderType(null);showToast(`${c.name} — ${pendingOrderType} order started`,'success');}} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
 

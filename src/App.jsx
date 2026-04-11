@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,16 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.3.0', date: 'Apr 2026', label: 'Major UX redesign — inline flows, canvas layout, nested modifiers',
+    changes: [
+      'POS: Variant and modifier selection now happens inline in the center panel (not a modal overlay). Tap a variant item → large size buttons appear in the menu area. Pick a size → modifier groups flow below sequentially. Back button returns to variant step. Full allergen display throughout.',
+      'Menu Manager: Variant children no longer appear as separate product cards. Tap the parent to expand inline variant buttons grouped below it. Add new variants directly from the parent card.',
+      'Menu Manager: New 🗂 Canvas tab — free-form drag-anywhere layout. Move items to any position. Mouse-wheel zoom (30–200%), alt+drag or middle-click to pan. Auto-layout resets to clean grid. Item positions saved to canvasPos field.',
+      'Nested modifiers: Modifier options can now link to sub-groups via subGroupId. Example: selecting Peppercorn sauce reveals a nested "Sauce preference" group (Served hot / On the side) inline below.',
+      'Store: mgd-sauce-temp sub-group added as demonstration of nested modifier pattern.',
     ],
   },
   {

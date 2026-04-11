@@ -279,10 +279,15 @@ export const useStore = create((set, get) => ({
       ]},
     { id:'mgd-sauces',       name:'Sauce',              min:0, max:1,
       options:[
-        {id:'sub-pepper',  name:'Peppercorn sauce',    price:0},
+        {id:'sub-pepper',  name:'Peppercorn sauce',    price:0, subGroupId:'mgd-sauce-temp'},
         {id:'sub-bearn',   name:'Béarnaise',           price:0},
         {id:'sub-chimich', name:'Chimichurri',         price:0},
         {id:'sub-nosace',  name:'No sauce',            price:0},
+      ]},
+    { id:'mgd-sauce-temp',   name:'Sauce preference',   min:0, max:1,
+      options:[
+        {id:'sub-st-hot',  name:'Served hot',          price:0},
+        {id:'sub-st-side', name:'On the side',         price:0},
       ]},
     { id:'mgd-pizza-extras', name:'Pizza extras',       min:0, max:5,
       options:[
