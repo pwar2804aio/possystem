@@ -131,7 +131,7 @@ export default function KioskSurface() {
         <div style={{ flex:1, overflowY:'auto', padding:'20px 24px' }}>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:14 }}>
             {displayItems.map(item => {
-              const fromPrice = item.type==='variants' ? Math.min(...item.variants.map(v=>v.price)) : item.price;
+              const variantKids = MENU_ITEMS.filter(i => i.parentId === item.id); const fromPrice = item.type==='variants' && variantKids.length ? Math.min(...variantKids.map(v=>v.pricing?.base??v.price??0)) : (item.pricing?.base??item.price??0);
               const hasOpts = item.modifierGroups?.length > 0;
               return (
                 <button key={item.id} onClick={()=>handleAdd(item)} style={{

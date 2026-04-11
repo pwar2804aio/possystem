@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.9';
+const VERSION = '1.2.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,15 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.2.0', date: 'Apr 2026', label: 'Full audit pass: imports cleaned, Kiosk variants fixed',
+    changes: [
+      'OtherSurfaces: removed unused CATEGORIES import from seed (was replaced by live store menuCategories).',
+      'Kiosk: item.variants.map() crash fixed — same root cause as the Bar fix. Now uses MENU_ITEMS.filter(i => i.parentId === item.id) to find variant children from the store.',
+      'Kiosk: fromPrice now reads pricing.base correctly for variant parents.',
+      'POSSurface CAT_META/CATEGORIES/QUICK_IDS remain as valid legacy fallbacks.',
     ],
   },
   {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { ALLERGENS, INITIAL_TABLES, MENU_ITEMS, CATEGORIES, PRINTERS, PRODUCTION_CENTRES, STAFF } from '../data/seed';
+import { ALLERGENS, INITIAL_TABLES, MENU_ITEMS, PRINTERS, PRODUCTION_CENTRES, STAFF } from '../data/seed';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Payment Screen
