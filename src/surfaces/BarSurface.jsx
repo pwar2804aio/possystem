@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../store';
-import { CATEGORIES, MENU_ITEMS, ALLERGENS, QUICK_IDS } from '../data/seed';
+import { MENU_ITEMS, ALLERGENS } from '../data/seed';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
 import CheckoutModal from './CheckoutModal';
 
@@ -137,10 +137,10 @@ const labelStyle = { display:'block', fontSize:11, fontWeight:700, color:'var(--
 
 // ─── Main Bar Surface ─────────────────────────────────────────────────────────
 export default function BarSurface() {
-  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, menuItems: storeMenuItems } = useStore();
+  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, quickScreenIds, menuItems: storeMenuItems } = useStore();
 
   const [showOpenModal, setShowOpenModal]   = useState(false);
-  const [cat, setCat]                       = useState('cocktails');
+  const [cat, setCat]                       = useState('all');
   const [search, setSearch]                 = useState('');
   const [roundItems, setRoundItems]         = useState([]);  // items being built for next round
   const [roundNote, setRoundNote]           = useState('');
@@ -156,10 +156,10 @@ export default function BarSurface() {
   const filteredTabs = tabs.filter(t=>showTabFilter==='active' ? t.status!=='closed' : true);
 
   const ITEMS = (storeMenuItems || MENU_ITEMS).filter(i => !i.archived && i.type !== 'subitem');
-  const catMeta = CAT_META[cat] || CAT_META.cocktails;
+  const catMeta = (menuCategories||[]).find(c=>c.id===cat) || {color:'var(--acc)',icon:'🍸',label:'All'};
   const rawItems = useMemo(()=>{
     if (cat==='all') return ITEMS.filter(i=>!eightySixIds.includes(i.id));
-    if (cat==='quick') return QUICK_IDS.map(id=>ITEMS.find(i=>i.id===id)).filter(i=>i&&!eightySixIds.includes(i.id));
+    if (cat==='quick') return (quickScreenIds||[]).map(id=>ITEMS.find(i=>i.id===id)).filter(i=>i&&!eightySixIds.includes(i.id));
     return ITEMS.filter(i=>!eightySixIds.includes(i.id)&&(i.cat===cat||(i.cats||[]).includes(cat)));
   },[cat,ITEMS,eightySixIds]);
   const displayItems = useMemo(()=>{
@@ -469,7 +469,7 @@ export default function BarSurface() {
           )}
           <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:8 }}>
             {displayItems.map(item=>{
-              const m=CAT_META[item.cat]||CAT_META.cocktails;
+              const storeCat = (menuCategories||[]).find(c=>c.id===item.cat); const m={color:storeCat?.color||'var(--acc)',icon:storeCat?.icon||'🍸'};
               const is86=eightySixIds.includes(item.id);
               const fromPrice=item.type==='variants'?Math.min(...item.variants.map(v=>v.price)):item.price;
               const inRound=roundItems.filter(r=>r.itemId===item.id).reduce((s,r)=>s+r.qty,0);

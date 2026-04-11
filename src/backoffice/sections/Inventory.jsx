@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../../store';
-import { MENU_ITEMS as SEED_ITEMS, CATEGORIES } from '../../data/seed';
+import { MENU_ITEMS as SEED_ITEMS } from '../../data/seed';
 
 const STATUS_LEVELS = [
   { id:'ok',       label:'In stock',   color:'var(--grn)', bg:'var(--grn-d)', border:'var(--grn-b)', threshold:0.4 },
@@ -19,9 +19,9 @@ function getStatus(count) {
 }
 
 export default function Inventory() {
-  const { menuItems: storeItems, dailyCounts, setDailyCount, clearDailyCount, eightySixIds, toggle86, showToast, markBOChange } = useStore();
+  const { menuItems: storeItems, dailyCounts, setDailyCount, clearDailyCount, eightySixIds, toggle86, showToast, markBOChange , menuCategories } = useStore();
   const MENU_ITEMS = storeItems || SEED_ITEMS;
-  const cats = CATEGORIES.filter(c => !c.isSpecial);
+  const cats = (menuCategories||[]).filter(c => !c.isSpecial && !c.parentId).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
 
   const [catFilter, setCatFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -137,7 +137,7 @@ export default function Inventory() {
                       <div style={{ fontSize:11, color:'var(--t4)', marginTop:1 }}>£{(item.price||0).toFixed(2)}</div>
                     </td>
                     <td style={{ padding:'10px 14px', fontSize:11, color:'var(--t3)', textTransform:'capitalize' }}>
-                      {CATEGORIES.find(c => c.id === item.cat)?.label || item.cat}
+                      {(menuCategories||[]).find(c => c.id === item.cat)?.label || item.cat}
                     </td>
                     <td style={{ padding:'10px 14px' }}>
                       {item.is86 ? (

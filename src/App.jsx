@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.4';
+const VERSION = '1.1.5';
 
 const CHANGELOG = [
   {
@@ -24,6 +24,17 @@ const CHANGELOG = [
       'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
       'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
       'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
+  {
+    version: '1.1.5', date: 'Apr 2026', label: 'Bar items fix, seed refs cleaned up across surfaces',
+    changes: [
+      'Bar surface: category default was cocktails (nonexistent) — changed to all so items always show on load.',
+      'Bar surface: CAT_META and QUICK_IDS replaced with live store data (menuCategories, quickScreenIds) so category colours, icons and quick screen reflect Menu Manager edits.',
+      'Bar surface: unused CATEGORIES and QUICK_IDS seed imports removed.',
+      'OtherSurfaces (Status): CATEGORIES replaced with store menuCategories so category filter reflects live menu.',
+      'Inventory: CATEGORIES replaced with store menuCategories, category labels now live.',
+      'All surfaces now read category data from store rather than static seed constants.',
     ],
   },
   {

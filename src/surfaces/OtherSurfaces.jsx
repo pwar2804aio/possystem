@@ -510,7 +510,7 @@ export function KDSSurface() {
 // Back Office Surface — with real reporting
 // ══════════════════════════════════════════════════════════════════════════════
 export function BackOfficeSurface() {
-  const { staff, shift, logout, showToast, closedChecks } = useStore();
+  const { staff, shift, logout, showToast, closedChecks , menuCategories } = useStore();
   const [subview, setSubview] = useState('reports');
 
   const views = [
@@ -1054,7 +1054,7 @@ function BOMenu({ showToast }) {
         </div>
       </div>
       <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' }}>
-        {CATEGORIES.filter(c=>!c.isSpecial).map(c=>(
+        {(menuCategories||[]).filter(c=>!c.isSpecial&&!c.parentId).map(c=>(
           <button key={c.id} onClick={()=>setCat(c.id)} style={{
             padding:'6px 14px', borderRadius:20, cursor:'pointer', fontSize:12, fontWeight:500,
             border:`1px solid ${cat===c.id?'var(--acc)':'var(--bdr)'}`,
