@@ -33,6 +33,13 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '1.1.9', date: 'Apr 2026', label: 'Modifier modal Add button fixed',
+    changes: [
+      'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
+      'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
     version: '1.1.8', date: 'Apr 2026', label: 'Send-to-table auto-fires kitchen, variant names, mod display',
     changes: [
       'Seat at table / Add to occupied table now automatically sends to kitchen. Previously items landed on the table but the operator had to reopen the check and click Send again. Now the send modal → choose table flow completes in one step.',
