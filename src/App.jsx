@@ -14,9 +14,21 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 
 const CHANGELOG = [
+  {
+    version: '1.0.4', date: 'Apr 2026', label: 'Menu Manager complete redesign — 3-panel contextual layout',
+    changes: [
+      'Menu Manager rebuilt from scratch. Was: 5 disconnected tabs (Categories, Items, Modifiers, Instructions, Builder). Now: 3 tabs — Menu, Modifier groups, Instruction groups.',
+      'Menu tab: 3-panel layout — Category tree (left) | Items in selected category (centre) | Item editor (right). Click a category → see its items. Click an item → edit everything in one place.',
+      'Item editor has 4 sub-sections: Details (names, type, category, visibility), Pricing (per-channel prices), Modifiers (assign modifier+instruction groups with required/max controls), Allergens.',
+      'No more separate Builder tab — modifier and instruction group assignment is in the item editor.',
+      'Category tree: drag ⣿ to reorder, drag onto another to nest as subcategory, drop on root zone to un-nest. Click Edit cat to change icon/colour/name. Inline add category form.',
+      'Items panel: items in the selected category only. Drag ⣿ to reorder (updates sortOrder, reflects on POS). Shows allergen count, modifier group count inline.',
+      'Modifier groups and Instruction groups are now library tabs — create/edit groups there, assign from inside item editor.',
+    ],
+  },
   {
     version: '1.0.3', date: 'Apr 2026', label: 'Items tab filters + richer item info',
     changes: [
