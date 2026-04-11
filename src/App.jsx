@@ -18,6 +18,54 @@ const VERSION = '1.0.1';
 
 const CHANGELOG = [
   {
+    version: '1.0.1', date: 'Apr 2026', label: 'Modifier UX, multi-category, drag reorder, bug fixes',
+    changes: [
+      'Modifier groups: single-choice shows radio UI, multi-choice shows +/- qty buttons — allows adding multiple of the same option (e.g. 2× Truffle oil). Unlimited option sets no cap.',
+      'selectionType field (single/multiple) wired to store and respected in POS ordering modal.',
+      'Items can now belong to multiple categories — primary category dropdown + additional category toggles in Item Editor. Items appear in all assigned categories on POS.',
+      'Menu Manager Items tab: ⣿ drag handle reorders items (updates sortOrder, reflects on POS). Body drag still creates variants.',
+      'Checkout modal groups items by course (Course 1 / Course 2 headers) when order spans multiple courses.',
+      'Split check (T1.2) now sends to kitchen immediately on creation — no longer left as pending.',
+      'Split check floor plan icon clears correctly when all checks for a table are settled.',
+      'Duplicate subcategory pill strip removed from POS (was rendering twice).',
+      'Modifier group title fallback: group.label || group.name — titles no longer blank.',
+    ],
+  },
+  {
+    version: '1.0.0', date: 'Apr 2026', label: 'v1.0 — send flow fixed, checkout by course, split check fixes',
+    changes: [
+      'Split check now sends to kitchen immediately after creation.',
+      'Checkout modal now groups items by course.',
+      'Split check icon on floor plan clears properly after settling both checks.',
+      'Duplicate subcategory nav strip removed.',
+      'Modifier group titles fixed — no longer blank.',
+    ],
+  },
+  {
+    version: '0.9.9', date: 'Apr 2026', label: 'POS blank screen root cause fixed',
+    changes: [
+      'useEffect was missing from React import in POSSurface — caused ReferenceError on every render, blank screen.',
+      'One line fix: added useEffect to import { useState, useMemo, useRef, useEffect }.',
+    ],
+  },
+  {
+    version: '0.9.8', date: 'Apr 2026', label: 'Anchor demo data, Reports, variant pricing fix',
+    changes: [
+      'Demo floor plan tables updated to use real Anchor menu items (Ribeye, Salmon, House white).',
+      'Demo bar tabs updated to use real Anchor items (Lager pints, Stout, House wine).',
+      'Variant parent cards now show correct "from £X.XX" using child item lookup — no longer crashes on item.variants.map.',
+      'Reports rebuilt: Overview (KPIs + payment split + order type + top 5), Product mix table with share bars, By server table, Hourly bar chart with peak hour callout.',
+    ],
+  },
+  {
+    version: '0.9.7', date: 'Apr 2026', label: 'POS fixed after blank screen regression',
+    changes: [
+      'Removed stale inline OrdersHub render from POS right panel — was causing crash before anything could render.',
+      'Subcategory pills consolidated to single clean render.',
+      'Dynamic category nav from store confirmed working.',
+    ],
+  },
+  {
     version: '0.9.6', date: 'Apr 2026', label: 'Menu Manager ↔ POS bridge + The Anchor menu',
     changes: [
       'POS category nav now reads from store (Menu Manager) — not static seed data. Categories you create appear on POS immediately.',
