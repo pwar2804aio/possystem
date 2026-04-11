@@ -185,6 +185,7 @@ function CategoriesTab() {
                   onDragStart={e => onDragStart(e, cat.id)}
                   onDragOver={e => onDragOver(e, cat.id)}
                   onDragLeave={() => setDropTarget(null)}
+                  onDragEnd={() => { setDragId(null); setDropTarget(null); }}
                   onDrop={e => onDrop(e, cat.id)}
                   style={{
                     display:'flex', alignItems:'center', gap:10, padding:'10px 14px',
@@ -227,7 +228,7 @@ function CategoriesTab() {
                       return (
                         <div key={sub.id}
                           draggable onDragStart={e=>onDragStart(e,sub.id)}
-                          onDragOver={e=>onDragOver(e,sub.id)} onDragLeave={()=>setDropTarget(null)} onDrop={e=>onDrop(e,sub.id)}
+                          onDragOver={e=>onDragOver(e,sub.id)} onDragLeave={()=>setDropTarget(null)} onDragEnd={()=>{setDragId(null);setDropTarget(null);}} onDrop={e=>onDrop(e,sub.id)}
                           style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px', borderRadius:9, border:`1.5px solid ${editing===sub.id?'var(--acc)':'var(--bdr)'}`, background:editing===sub.id?'var(--acc-d)':'var(--bg2)', cursor:'grab', opacity:dragId===sub.id?.4:1 }}>
                           <span style={{ fontSize:9, color:'var(--t4)' }}>⣿</span>
                           <span style={{ fontSize:16 }}>{sub.icon}</span>
@@ -349,42 +350,57 @@ function ItemsTab() {
   const [reorderDragId, setReorderDragId] = useState(null);
   const [reorderOverId, setReorderOverId] = useState(null);
 
-  const onReorderStart = (e, id) => {
+  // Reorder: drag handle → sets reorderDragId (separate from variant drag)
+  const onReorderHandleStart = (e, id) => {
+    e.stopPropagation();
     setReorderDragId(id);
     e.dataTransfer.effectAllowed = 'move';
-    e.stopPropagation();
+    e.dataTransfer.setData('text/reorder', id);
   };
-  const onReorderOver  = (e, id) => { e.preventDefault(); e.stopPropagation(); if(id!==reorderDragId) setReorderOverId(id); };
-  const onReorderDrop  = (e, targetId) => {
-    e.preventDefault(); e.stopPropagation();
-    if (!reorderDragId || reorderDragId === targetId) { setReorderDragId(null); setReorderOverId(null); return; }
-    // Swap sortOrder values to reorder
-    const dragItem   = all.find(i => i.id === reorderDragId);
-    const targetItem = all.find(i => i.id === targetId);
-    if (!dragItem || !targetItem) { setReorderDragId(null); setReorderOverId(null); return; }
-    updateMenuItem(reorderDragId, { sortOrder: targetItem.sortOrder ?? 0 });
-    updateMenuItem(targetId, { sortOrder: dragItem.sortOrder ?? 0 });
-    markBOChange();
-    setReorderDragId(null); setReorderOverId(null);
-  };
-
-  const onDS = (e,id) => { setDragId(id); e.dataTransfer.effectAllowed='move'; };
-  const onDO = (e,id) => { e.preventDefault(); if(id!==dragId) setDropId(id); };
-  const onDrop = (e, targetId) => {
+  // Row receives the over/drop for reorder when reorderDragId is set
+  const onRowDragOver = (e, id) => {
     e.preventDefault();
-    if (!dragId || dragId===targetId) { setDragId(null); setDropId(null); return; }
-    const dragged = all.find(i=>i.id===dragId);
-    const target  = all.find(i=>i.id===targetId);
-    if (!dragged||!target) { setDragId(null); setDropId(null); return; }
-    if (dragged.type==='subitem'||target.type==='subitem') { showToast('Subitems cannot be variants','error'); setDragId(null); setDropId(null); return; }
-    if (all.some(i=>i.parentId===dragId)) { showToast('Remove this item\'s variants first before linking it','error'); setDragId(null); setDropId(null); return; }
-    const parentId = target.parentId ? target.parentId : target.id;
-    updateMenuItem(dragId, { parentId });
-    markBOChange();
-    showToast(`${dragged.menuName||dragged.name} → variant of ${target.menuName||target.name}`, 'success');
-    setDragId(null); setDropId(null);
+    if (reorderDragId && reorderDragId !== id) { setReorderOverId(id); return; }
+    if (!reorderDragId && dragId && dragId !== id) { setDropId(id); }
   };
-  const onDL = () => { setDropId(null); setReorderOverId(null); };
+  const onRowDrop = (e, targetId) => {
+    e.preventDefault();
+    // Reorder path
+    if (reorderDragId && reorderDragId !== targetId) {
+      // Re-index all root items by their display order, insert dragged before target
+      const rootItems = display.filter(i => !i.parentId && !i._isChild);
+      const withoutDrag = rootItems.filter(i => i.id !== reorderDragId);
+      const targetIdx  = withoutDrag.findIndex(i => i.id === targetId);
+      const insertAt   = targetIdx === -1 ? withoutDrag.length : targetIdx;
+      const reordered  = [...withoutDrag.slice(0, insertAt), rootItems.find(i => i.id === reorderDragId), ...withoutDrag.slice(insertAt)];
+      reordered.forEach((item, idx) => {
+        if (item && item.sortOrder !== idx) updateMenuItem(item.id, { sortOrder: idx });
+      });
+      markBOChange();
+      showToast('Order updated', 'success');
+      setReorderDragId(null); setReorderOverId(null);
+      return;
+    }
+    // Variant linking path
+    if (dragId && dragId !== targetId) {
+      const dragged = all.find(i=>i.id===dragId);
+      const target  = all.find(i=>i.id===targetId);
+      if (!dragged||!target) { setDragId(null); setDropId(null); return; }
+      if (dragged.type==='subitem'||target.type==='subitem') { showToast('Subitems cannot be variants','error'); }
+      else if (all.some(i=>i.parentId===dragId)) { showToast('Remove variants first','error'); }
+      else {
+        const parentId = target.parentId||target.id;
+        updateMenuItem(dragId, { parentId });
+        markBOChange();
+        showToast(`${dragged.menuName||dragged.name} → variant of ${target.menuName||target.name}`, 'success');
+      }
+      setDragId(null); setDropId(null);
+    }
+  };
+  const onRowDragLeave = () => { setDropId(null); setReorderOverId(null); };
+  const onRowDragEnd   = () => { setDragId(null); setDropId(null); setReorderDragId(null); setReorderOverId(null); };
+
+  // drag logic moved to onRowDragOver / onRowDrop / onRowDragLeave / onRowDragEnd
 
   const addItem = (type='simple') => {
     const n = addMenuItem({ name:`New ${type}`, menuName:`New ${type}`, receiptName:`New ${type}`, kitchenName:`New ${type}`, type, allergens:[], pricing:{base:0,dineIn:null,takeaway:null,collection:null,delivery:null} });
@@ -432,33 +448,33 @@ function ItemsTab() {
             const p = item.pricing||{base:item.price||0};
 
             return (
-              <div key={item.id} style={{ marginLeft:isChild?24:0, marginBottom:4, opacity:isDrag||reorderDragId===item.id?.3:1 }}>
+              <div key={item.id} style={{ marginLeft:isChild?24:0, marginBottom:4, opacity:(dragId===item.id||reorderDragId===item.id)?.3:1 }}>
                 <div
-                  draggable={!isSub}
-                  onDragStart={e=>!isSub&&onDS(e,item.id)}
-                  onDragOver={e=>!isSub&&onDO(e,item.id)}
-                  onDragLeave={onDL}
-                  onDrop={e=>!isSub&&onDrop(e,item.id)}
+                  draggable={!isSub && !isChild}
+                  onDragStart={e=>{if(!isSub&&!isChild){setDragId(item.id);e.dataTransfer.effectAllowed='move';}}}
+                  onDragOver={e=>!isSub&&onRowDragOver(e,item.id)}
+                  onDragLeave={onRowDragLeave}
+                  onDrop={e=>!isSub&&onRowDrop(e,item.id)}
+                  onDragEnd={onRowDragEnd}
                   onClick={()=>setSelId(active?null:item.id)}
                   style={{
                     display:'flex', alignItems:'center', gap:10, padding:'9px 12px',
-                    borderRadius:10, cursor: isSub?'pointer':'default',
-                    border:`${active?'2px':'1px'} solid ${reorderOverId===item.id?'var(--grn)':isDrop?'var(--acc)':active?'var(--acc)':isSub?'var(--bdr)':'var(--bdr)'}`,
-                    background:reorderOverId===item.id?'var(--grn-d)':isDrop?'var(--acc-d)':active?'var(--acc-d)':isSub?'var(--bg2)':'var(--bg3)',
+                    borderRadius:10, cursor:'pointer',
+                    border:`${active?'2px':'1px'} solid ${reorderOverId===item.id?'var(--grn)':dropId===item.id?'var(--acc)':active?'var(--acc)':'var(--bdr)'}`,
+                    background:reorderOverId===item.id?'var(--grn-d)':dropId===item.id?'var(--acc-d)':active?'var(--acc-d)':isSub?'var(--bg2)':'var(--bg3)',
                     opacity:is86?.5:1,
                   }}>
-                  {/* Reorder handle — drag to change order on POS */}
+                  {/* ⣿ handle: drag to REORDER. Row body drag: make VARIANT */}
                   {!isSub && !isChild && (
                     <span
                       draggable
-                      onDragStart={e=>onReorderStart(e,item.id)}
-                      onDragOver={e=>onReorderOver(e,item.id)}
-                      onDrop={e=>onReorderDrop(e,item.id)}
+                      onDragStart={e=>{e.stopPropagation();onReorderHandleStart(e,item.id);}}
                       onClick={e=>e.stopPropagation()}
-                      title="Drag to reorder on POS"
-                      style={{ fontSize:10, color:'var(--t4)', cursor:'grab', flexShrink:0, padding:'0 2px', lineHeight:1 }}>⣿</span>
+                      title="Drag to reorder"
+                      style={{ fontSize:12, color:'var(--t4)', cursor:'grab', flexShrink:0, paddingRight:4, userSelect:'none' }}>⣿</span>
                   )}
-                  {!isSub && isChild && <span style={{ fontSize:11, color:'var(--t4)', flexShrink:0 }}>↳</span>}
+
+                  {isChild && <span style={{ fontSize:11, color:'var(--t4)', flexShrink:0 }}>↳</span>}
 
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>

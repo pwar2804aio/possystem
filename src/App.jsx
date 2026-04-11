@@ -14,9 +14,18 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.0.1';
+const VERSION = '1.0.2';
 
 const CHANGELOG = [
+  {
+    version: '1.0.2', date: 'Apr 2026', label: 'Drag-and-drop fixed across Menu Manager',
+    changes: [
+      'Item reorder: drop target moved to full row (was only the 12px handle icon — undroppable). Dragging ⣿ handle now correctly reorders items, re-indexing sortOrder sequentially.',
+      'onDragEnd added to all draggable elements in Categories and Items tabs — prevents stuck drag state when drag is cancelled or dropped on invalid target.',
+      'Category drag-to-subcategory: onDragEnd added so dragId resets properly after every drag operation.',
+      'Variant drag (drag item onto item): still works via row body drag. Handle drag and row drag now cleanly separated.',
+    ],
+  },
   {
     version: '1.0.1', date: 'Apr 2026', label: 'Modifier UX, multi-category, drag reorder, bug fixes',
     changes: [
