@@ -137,7 +137,7 @@ const labelStyle = { display:'block', fontSize:11, fontWeight:700, color:'var(--
 
 // ─── Main Bar Surface ─────────────────────────────────────────────────────────
 export default function BarSurface() {
-  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, quickScreenIds, menuItems: storeMenuItems } = useStore();
+  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, quickScreenIds, menuItems: storeMenuItems, modifierGroupDefs } = useStore();
 
   const [showOpenModal, setShowOpenModal]   = useState(false);
   const [cat, setCat]                       = useState('all');
@@ -155,7 +155,7 @@ export default function BarSurface() {
   const activeTab = tabs.find(t=>t.id===activeTabId);
   const filteredTabs = tabs.filter(t=>showTabFilter==='active' ? t.status!=='closed' : true);
 
-  const ITEMS = (storeMenuItems || MENU_ITEMS).filter(i => !i.archived && i.type !== 'subitem');
+  const ITEMS = (storeMenuItems || MENU_ITEMS).filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
   const catMeta = (menuCategories||[]).find(c=>c.id===cat) || {color:'var(--acc)',icon:'🍸',label:'All'};
   const rawItems = useMemo(()=>{
     if (cat==='all') return ITEMS.filter(i=>!eightySixIds.includes(i.id));
@@ -471,7 +471,8 @@ export default function BarSurface() {
             {displayItems.map(item=>{
               const storeCat = (menuCategories||[]).find(c=>c.id===item.cat); const m={color:storeCat?.color||'var(--acc)',icon:storeCat?.icon||'🍸'};
               const is86=eightySixIds.includes(item.id);
-              const fromPrice=item.type==='variants'&&item.variants?.length?Math.min(...item.variants.map(v=>v.price??0)):(item.pricing?.base??item.price??0);
+              const variantKids = ITEMS.filter(i => i.parentId === item.id);
+              const fromPrice=item.type==='variants'&&variantKids.length?Math.min(...variantKids.map(v=>v.pricing?.base??v.price??0)):(item.pricing?.base??item.price??0);
               const inRound=roundItems.filter(r=>r.itemId===item.id).reduce((s,r)=>s+r.qty,0);
               return(
                 <button key={item.id} onClick={()=>handleItemTap(item)} style={{
@@ -505,7 +506,7 @@ export default function BarSurface() {
       {modalItem&&(
         <div className="modal-back">
           <div style={{ background:'var(--bg2)',border:'1px solid var(--bdr2)',borderRadius:20,width:'100%',maxWidth:460,maxHeight:'88vh',overflow:'auto',boxShadow:'var(--sh3)' }}>
-            <QuickItemBuilder item={modalItem} onConfirm={(mods,opts)=>{addToRound(modalItem,mods,opts);setModalItem(null);}} onCancel={()=>setModalItem(null)}/>
+            <QuickItemBuilder item={modalItem} menuItems={storeMenuItems||MENU_ITEMS} modifierGroupDefs={modifierGroupDefs} onConfirm={(mods,opts)=>{addToRound(modalItem,mods,opts);setModalItem(null);}} onCancel={()=>setModalItem(null)}/>
           </div>
         </div>
       )}
@@ -589,64 +590,79 @@ function RoundItem({ item, onQty, onRemove }) {
 }
 
 // ─── Quick Item Builder (variants/modifiers inline) ───────────────────────────
-function QuickItemBuilder({ item, onConfirm, onCancel }) {
+function QuickItemBuilder({ item, menuItems=[], modifierGroupDefs=[], onConfirm, onCancel }) {
   const [selections, setSelections] = useState({});
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [qty, setQty] = useState(1);
   const [note, setNote] = useState('');
 
-  const allRequired = (item.modifierGroups||[]).filter(g=>g.required).every(g=>!!selections[g.id]);
+  // Resolve variant children from menuItems (they have parentId === item.id)
+  const variantChildren = (menuItems||[]).filter(i => i.parentId === item.id && !i.archived);
+
+  // Resolve assigned modifier groups from modifierGroupDefs
+  const resolvedGroups = (item.assignedModifierGroups||[]).map(ag => {
+    const def = modifierGroupDefs.find(d => d.id === ag.groupId);
+    if (!def) return null;
+    return { ...def, required: ag.min > 0, min: ag.min, max: ag.max };
+  }).filter(Boolean);
+
+  const allRequired = resolvedGroups.filter(g=>g.required).every(g=>!!selections[g.id]);
   const extraCost = Object.values(selections).flat().filter(Boolean).reduce((s,m)=>s+(m?.price||0),0);
-  const varPrice = item.type==='variants'?(selectedVariant?.price||item.price):item.price;
+  const varPrice = item.type==='variants' ? (selectedVariant?.pricing?.base ?? selectedVariant?.price ?? 0) : (item.pricing?.base ?? item.price ?? 0);
   const total = (varPrice+extraCost)*qty;
 
-  const canConfirm = item.type==='variants' ? !!selectedVariant : (item.type==='modifiers' ? allRequired : true);
+  const canConfirm = item.type==='variants' ? !!selectedVariant : (resolvedGroups.some(g=>g.required) ? allRequired : true);
 
   const buildMods = () => {
-    if (item.type==='variants') return selectedVariant?[{label:selectedVariant.label,price:selectedVariant.price}]:[];
-    return Object.entries(selections).flatMap(([gid,val])=>{
-      if (!val) return [];
-      const group=(item.modifierGroups||[]).find(g=>g.id===gid);
-      const arr=Array.isArray(val)?val:[val];
-      return arr.filter(Boolean).map(m=>({groupLabel:group?.label,label:m.label,price:m.price||0}));
+    const mods = [];
+    if (item.type==='variants' && selectedVariant) {
+      mods.push({ label: `${item.variantLabel||'Size'}: ${selectedVariant.menuName||selectedVariant.name}`, price: selectedVariant.pricing?.base??selectedVariant.price??0 });
+    }
+    Object.entries(selections).forEach(([gid,val]) => {
+      if (!val) return;
+      const group = resolvedGroups.find(g=>g.id===gid);
+      const arr = Array.isArray(val)?val:[val];
+      arr.filter(Boolean).forEach(m=>mods.push({ groupLabel:group?.name, label:m.name||m.label, price:m.price||0 }));
     });
+    return mods;
   };
 
-  const displayName = item.type==='variants'&&selectedVariant ? `${item.name} — ${selectedVariant.label}` : item.name;
+  const selVariantName = selectedVariant ? (selectedVariant.menuName||selectedVariant.name) : null;
+  const displayName = item.type==='variants' && selVariantName ? `${item.menuName||item.name} — ${selVariantName}` : (item.menuName||item.name);
 
   return (
     <div style={{ padding:20 }}>
       <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}>
-        <div style={{ fontSize:16,fontWeight:700,color:'var(--t1)' }}>{item.name}</div>
+        <div style={{ fontSize:16,fontWeight:700,color:'var(--t1)' }}>{item.menuName||item.name}</div>
         <button onClick={onCancel} style={{ background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:20 }}>×</button>
       </div>
 
       {item.type==='variants'&&(
         <div style={{ marginBottom:16 }}>
-          <div style={{ fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8 }}>Choose size</div>
-          {item.variants.map(v=>(
+          <div style={{ fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8 }}>{item.variantLabel||'Size'}</div>
+          {variantChildren.map(v=>(
             <button key={v.id} onClick={()=>setSelectedVariant(v)} style={{ display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'10px 14px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',marginBottom:6,border:`1.5px solid ${selectedVariant?.id===v.id?'var(--acc)':'var(--bdr)'}`,background:selectedVariant?.id===v.id?'var(--acc-d)':'var(--bg3)',color:selectedVariant?.id===v.id?'var(--acc)':'var(--t1)',textAlign:'left' }}>
-              <span style={{ fontSize:13,fontWeight:500 }}>{v.label}</span>
-              <span style={{ fontSize:14,fontWeight:700,fontFamily:'DM Mono,monospace' }}>£{v.price.toFixed(2)}</span>
+              <span style={{ fontSize:13,fontWeight:500 }}>{v.menuName||v.name}</span>
+              <span style={{ fontSize:14,fontWeight:700,fontFamily:'DM Mono,monospace' }}>£{(v.pricing?.base??v.price??0).toFixed(2)}</span>
             </button>
           ))}
         </div>
       )}
 
-      {(item.modifierGroups||[]).map(group=>(
+      {resolvedGroups.map(group=>(
         <div key={group.id} style={{ marginBottom:14 }}>
           <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:8 }}>
-            <span style={{ fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em' }}>{group.label}</span>
+            <span style={{ fontSize:11,fontWeight:700,color:'var(--t2)',textTransform:'uppercase',letterSpacing:'.06em' }}>{group.name}</span>
             {group.required&&<span style={{ fontSize:10,color:'var(--red)',fontWeight:600 }}>Required</span>}
           </div>
-          {group.options.map(opt=>{
+          {(group.options||[]).map(opt=>{
             const cur=selections[group.id];
-            const isSel=group.multi?!!(cur||[]).find(o=>o.id===opt.id):cur?.id===opt.id;
-            const toggle=()=>setSelections(s=>group.multi?{...s,[group.id]:isSel?(cur||[]).filter(o=>o.id!==opt.id):[...(cur||[]),opt]}:{...s,[group.id]:isSel?null:opt});
+            const isSel=group.max>1?!!(cur||[]).find(o=>o.id===opt.id):cur?.id===opt.id;
+            const toggle=()=>setSelections(s=>group.max>1?{...s,[group.id]:isSel?(cur||[]).filter(o=>o.id!==opt.id):[...(cur||[]),opt]}:{...s,[group.id]:isSel?null:opt});
             return(
               <button key={opt.id} onClick={toggle} style={{ display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'9px 12px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',marginBottom:5,border:`1.5px solid ${isSel?'var(--acc)':'var(--bdr)'}`,background:isSel?'var(--acc-d)':'var(--bg3)' }}>
-                <span style={{ fontSize:13,fontWeight:500,color:isSel?'var(--acc)':'var(--t1)' }}>{opt.label}</span>
-                {opt.price>0&&<span style={{ fontSize:12,fontWeight:600,color:isSel?'var(--acc)':'var(--t3)' }}>+£{opt.price.toFixed(2)}</span>}
+                <span style={{ fontSize:13,fontWeight:500,color:isSel?'var(--acc)':'var(--t1)' }}>{opt.name||opt.label}</span>
+                {(opt.price||0)>0&&<span style={{ fontSize:12,fontWeight:600,color:isSel?'var(--acc)':'var(--t3)' }}>+£{opt.price.toFixed(2)}</span>}
               </button>
             );
           })}

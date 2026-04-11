@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.1.6';
+const VERSION = '1.1.7';
 
 const CHANGELOG = [
   {
@@ -24,6 +24,15 @@ const CHANGELOG = [
       'Kiosk surface now reads categories and items from the store, respects quickScreenIds for the Popular tab, filters by visibility.kiosk, and sorts by sortOrder.',
       'Kiosk Popular tab uses the Quick Screen configuration set in Menu Manager.',
       'Items hidden from kiosk via visibility settings no longer appear on the kiosk.',
+    ],
+  },
+  {
+    version: '1.1.7', date: 'Apr 2026', label: 'Bar variants fixed, parent-only items in menu',
+    changes: [
+      'Bar menu: variant child items (Stout Pint, Half pint etc.) were appearing alongside the parent Stout item. Fixed ITEMS filter to exclude items with a parentId.',
+      'Bar variants: clicking a variant item (Stout, Lager) crashed because QuickItemBuilder called item.variants.map() — no such array exists. Variants are stored as child items in the store. Fixed to look up children via menuItems.filter(i => i.parentId === item.id).',
+      'Bar modifiers: QuickItemBuilder now resolves modifier groups from modifierGroupDefs store state instead of the defunct item.modifierGroups format.',
+      'Bar fromPrice: item card price calculation now uses variant children from ITEMS instead of item.variants array.',
     ],
   },
   {
