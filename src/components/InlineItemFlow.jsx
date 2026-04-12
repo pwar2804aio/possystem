@@ -9,7 +9,7 @@ import { ALLERGENS } from '../data/seed';
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function InlineItemFlow({ item, menuItems, activeAllergens = [], onConfirm, onCancel }) {
-  const { modifierGroupDefs, instructionGroupDefs } = useStore.getState();
+  const { modifierGroupDefs, instructionGroupDefs } = useStore();
 
   // ── Resolve variant children from menuItems ──────────────────────────────
   const variantChildren = useMemo(() =>

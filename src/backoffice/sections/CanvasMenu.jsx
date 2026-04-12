@@ -92,9 +92,14 @@ export default function CanvasMenu({ catId }) {
 
   const onCanvasMouseUp = useCallback(() => {
     if (dragging) {
-      // Recalculate sortOrder for all items in canvas based on position (top→bottom, left→right)
-      const allVisible = menuItems.filter(i => !i.archived && !i.parentId);
-      const sorted = [...allVisible].sort((a,b) => {
+      // Only reorder items visible in this category view — don't touch other categories
+      const activeCat = catId || (catFilter !== 'all' ? catFilter : null);
+      const scopedItems = menuItems.filter(i => {
+        if (i.archived || i.parentId) return false;
+        if (!activeCat) return true;
+        return i.cat === activeCat || (i.cats||[]).includes(activeCat);
+      });
+      const sorted = [...scopedItems].sort((a,b) => {
         const pa = a.canvasPos || { x:0, y:(a.sortOrder||0)*120 };
         const pb = b.canvasPos || { x:0, y:(b.sortOrder||0)*120 };
         return pa.y !== pb.y ? pa.y - pb.y : pa.x - pb.x;
@@ -106,7 +111,7 @@ export default function CanvasMenu({ catId }) {
       setDragging(null);
     }
     if (panning) setPanning(false);
-  }, [dragging, panning, markBOChange, menuItems, updateMenuItem]);
+  }, [dragging, panning, catId, catFilter, markBOChange, menuItems, updateMenuItem]);
 
   // ── Pan canvas ────────────────────────────────────────────────────────────
   const onCanvasMouseDown = useCallback((e) => {

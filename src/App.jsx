@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.9.1';
+const VERSION = '1.9.2';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,14 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.9.2', date: 'Apr 2026', label: 'Fix: canvas sortOrder scoped per category; nested modifiers reactive',
+    changes: [
+      'Canvas sortOrder fix: dragging items in Canvas view now only recalculates sortOrder for items in the SAME category. Previously, dragging a Starter would affect the sortOrder numbering of Mains, Drinks etc because all items were sorted globally — now scoped to the active category.',
+      'InlineItemFlow now uses reactive Zustand subscription for modifierGroupDefs/instructionGroupDefs instead of a one-time getState() snapshot. This ensures nested sub-group definitions are always up-to-date when building modifier flows for variant items.',
+      'Nested modifiers on variant items: after picking a size, modifier options with subGroupId correctly trigger their linked sub-group inline below. The subGroupId is preserved through the option spread when stored in selections state.',
     ],
   },
   {
