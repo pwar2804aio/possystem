@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.6.0';
+const VERSION = '2.6.1';
 
 const CHANGELOG = [
   {
@@ -40,12 +40,26 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '2.6.1', date: 'Apr 2026', label: 'Fix: POS white screen crash + duplicate menu selector in device profiles',
+    changes: [
+      'Fixed: POS went white screen after v2.6.0 — a runtime crash caused by accessing menus before the store was ready. deviceMenuId is now safe and defaults to null (show all categories) when no menu is assigned to the device profile.',
+      'Fixed: Device profiles Edit modal showed the Menu selector twice. Duplicate removed.',
+    ],
+  },
+  {
     version: '2.6.0', date: 'Apr 2026', label: 'Menu-per-device: assign a menu to each terminal',
     changes: [
       'Device profiles now have a Menu selector. Go to Device Profiles → Edit any profile → Menu — pick which menu that terminal shows. The Bar terminal defaults to showing only the Bar menu (drinks and bar snacks).',
       'Both the Bar surface and POS surface now filter their category pills and item grids by the menu assigned to the device. A Bar terminal with the Bar menu only sees bar categories and bar items.',
       'The Menus tab in Menu Manager is where you build and manage named menus (Main menu, Bar menu, Lunch menu etc). Categories are assigned to menus via menuId.',
       'Falls back to showing all menus if no specific menu is assigned to the device profile.',
+    ],
+  },
+  {
+    version: '2.6.1', date: 'Apr 2026', label: 'Fix: POS white screen crash + duplicate menu selector in device profiles',
+    changes: [
+      'Fixed: POS went white screen after v2.6.0 — a runtime crash caused by accessing menus before the store was ready. deviceMenuId is now safe and defaults to null (show all categories) when no menu is assigned to the device profile.',
+      'Fixed: Device profiles Edit modal showed the Menu selector twice. Duplicate removed.',
     ],
   },
   {

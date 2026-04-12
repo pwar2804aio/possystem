@@ -68,7 +68,7 @@ export default function POSSurface() {
 
   // Order types this terminal is allowed to show (from device profile)
   const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];
-  const deviceMenuId = deviceConfig?.menuId || (menus||[]).find(m=>m.isDefault)?.id || 'menu-1';
+  const deviceMenuId = deviceConfig?.menuId || null; // null = show all categories (default behaviour)
   const ALL_ORDER_TYPES = [['dine-in','🍽','Dine in'],['takeaway','🥡','Takeaway'],['collection','📦','Collect']];
   const visibleOrderTypes = ALL_ORDER_TYPES.filter(([t]) => allowedOrderTypes.includes(t));
 

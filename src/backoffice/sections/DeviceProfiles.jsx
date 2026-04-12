@@ -180,7 +180,7 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
     name:'', color:'#3b82f6',
     defaultSurface:'tables', enabledOrderTypes:['dine-in'],
     assignedSection:null, hiddenFeatures:[],
-    tableServiceEnabled:true, quickScreenEnabled:true, receiptPrinterId:'pr1', quickScreenId:null, menuId:null, menuId:null,
+    tableServiceEnabled:true, quickScreenEnabled:true, receiptPrinterId:'pr1', quickScreenId:null, menuId:null,
   });
 
   const upd = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -303,27 +303,6 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
                     border:`1.5px solid ${form.menuId === m.id ? 'var(--acc)' : 'var(--bdr)'}` }}>
                   <div style={{ fontSize:12, fontWeight:700, color:form.menuId===m.id?'var(--acc)':'var(--t1)' }}>📋 {m.name}</div>
                   {m.description && <div style={{ fontSize:10, color:'var(--t4)', marginTop:2 }}>{m.description}</div>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Menu assignment */}
-          <div style={{ marginBottom:18 }}>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Menu</label>
-            <div style={{ fontSize:11, color:'var(--t4)', marginBottom:8 }}>Which menu this terminal shows. Menus are built in Menu Manager → Menus tab.</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[{ id:null, name:'Default menu (★ Main menu)' }, ...(menus||[])].map(m => (
-                <button key={String(m.id)} onClick={()=>upd('menuId', m.id)}
-                  style={{ padding:'9px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all .1s',
-                    background: form.menuId === m.id ? 'var(--acc-d)' : 'var(--bg3)',
-                    border:`1.5px solid ${form.menuId === m.id ? 'var(--acc)' : 'var(--bdr)'}` }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:form.menuId===m.id?'var(--acc)':'var(--t1)' }}>
-                    {m.isDefault?'★ ':m.id===null?'':''}{m.name}
-                  </span>
-                  {m.id && <span style={{ fontSize:10, color:'var(--t4)', marginLeft:8 }}>
-                    {(menus||[]).find(x=>x.id===m.id)?.description||''}
-                  </span>}
                 </button>
               ))}
             </div>
