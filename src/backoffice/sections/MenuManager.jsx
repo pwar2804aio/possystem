@@ -420,17 +420,17 @@ function MenuTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, onToggle86, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast }) {
   const { modifierGroupDefs, instructionGroupDefs } = useStore();
-  const [sec, setSec]             = useState(()=>isSub?'details':'flow');
-  const [modSearch, setModSearch] = useState('');
-  const [instSearch, setInstSearch] = useState('');
-  const [dragModIdx, setDragModIdx] = useState(null);
-  const [overModIdx, setOverModIdx] = useState(null);
-
   const p        = item.pricing || { base: item.price || 0 };
   const isSub    = item.type === 'subitem';
   const isPizza  = item.type === 'pizza';
   const rootCats = allCategories.filter(c => !c.parentId);
   const subCats  = allCategories.filter(c =>  c.parentId);
+
+  const [sec, setSec]             = useState(isSub ? 'details' : 'flow');
+  const [modSearch, setModSearch] = useState('');
+  const [instSearch, setInstSearch] = useState('');
+  const [dragModIdx, setDragModIdx] = useState(null);
+  const [overModIdx, setOverModIdx] = useState(null);
 
   const f   = (k,v) => onUpdate({ [k]: v });
   const fp  = (k,v) => onUpdate({ pricing: { ...p, [k]: v===''?null:parseFloat(v)||0 }, ...(k==='base'?{price:parseFloat(v)||0}:{}) });
