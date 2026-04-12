@@ -45,7 +45,14 @@ export default function CanvasMenu() {
     return items;
   }, [menuItems, catFilter, search]);
 
-  const getPos = (item) => item.canvasPos || { x: 60 + (item.sortOrder??0) * 180 % (CANVAS_W - 200), y: 60 + Math.floor((item.sortOrder??0) * 180 / (CANVAS_W - 200)) * 140 };
+  const GRID = 20;
+  const COLS = Math.floor((CANVAS_W - 80) / (CARD_W + GRID));
+  const getPos = (item) => {
+    if (item.canvasPos) return item.canvasPos;
+    const i = item.sortOrder ?? 0;
+    const col = i % COLS, row = Math.floor(i / COLS);
+    return { x: 40 + col * (CARD_W + GRID), y: 40 + row * (CARD_H + GRID) };
+  };
   const catFor  = (item) => menuCategories.find(c => c.id === item.cat);
 
   // ── Drag item ─────────────────────────────────────────────────────────────
@@ -73,8 +80,11 @@ export default function CanvasMenu() {
     const canvasRect = canvasRef.current.getBoundingClientRect();
     const mx = (e.clientX - canvasRect.left - viewport.x) / viewport.scale;
     const my = (e.clientY - canvasRect.top  - viewport.y) / viewport.scale;
-    const newX = Math.max(0, Math.min(CANVAS_W - CARD_W, mx - dragging.offX));
-    const newY = Math.max(0, Math.min(CANVAS_H - CARD_H, my - dragging.offY));
+    const GRID = 20;
+    const rawX = mx - dragging.offX;
+    const rawY = my - dragging.offY;
+    const newX = Math.max(0, Math.min(CANVAS_W - CARD_W, Math.round(rawX/GRID)*GRID));
+    const newY = Math.max(0, Math.min(CANVAS_H - CARD_H, Math.round(rawY/GRID)*GRID));
     updateMenuItem(dragging.id, { canvasPos: { x: newX, y: newY } });
   }, [dragging, panning, panStart, viewport, updateMenuItem]);
 
@@ -117,12 +127,12 @@ export default function CanvasMenu() {
   }, [onWheel]);
 
   const autoLayout = () => {
-    let x = 40, y = 40, rowH = 0;
+    const GRID = 20, COLS = Math.floor((CANVAS_W - 80) / (CARD_W + GRID));
     canvasItems.forEach((item, i) => {
-      const w = CARD_W + 20, h = CARD_H + 20;
-      if (x + w > CANVAS_W - 40) { x = 40; y += rowH + 20; rowH = 0; }
+      const col = i % COLS, row = Math.floor(i / COLS);
+      const x = 40 + col * (CARD_W + GRID);
+      const y = 40 + row * (CARD_H + GRID);
       updateMenuItem(item.id, { canvasPos: { x, y }, sortOrder: i });
-      x += w; rowH = Math.max(rowH, h);
     });
     markBOChange();
     showToast('Auto-layout applied', 'success');

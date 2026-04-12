@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,17 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.4.0', date: 'Apr 2026', label: 'Menu Manager rebuilt — search modifiers, proper sizes, pizza, grid canvas',
+    changes: [
+      'Item editor rebuilt from scratch: wider panel (420px), underline tab navigation that actually works, no more cramped horizontal buttons.',
+      'Modifiers tab: search-first assignment. Type to filter hundreds of modifier groups, click to assign. Assigned groups shown as a draggable ordered list with Required/Optional toggle and Max selector — drag to reorder the flow the customer sees on POS.',
+      'Sizes tab (renamed from Variants): clean list with drag reorder, inline name and price editing, POS preview showing exactly how sizes will appear.',
+      'Pizza tab: per-item default toppings selector. All 14 toppings shown with colour coding. Global pizza settings (sizes/bases/crusts) still configured in Modifier groups.',
+      'Canvas: grid snapping — items snap to 20px grid positions instead of arbitrary pixels. Auto-layout uses a clean column grid. Cleaner, more organised layout.',
+      'Allergens: 2-column grid layout instead of single column — faster to scan and toggle.',
     ],
   },
   {

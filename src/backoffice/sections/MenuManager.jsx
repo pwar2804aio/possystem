@@ -410,80 +410,134 @@ function MenuTab() {
 // ═══════════════════════════════════════════════════════════════════════════
 function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, onToggle86, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast }) {
   const { modifierGroupDefs, instructionGroupDefs } = useStore();
-  const [section, setSection] = useState('details');
+  const [sec, setSec]             = useState('details');
+  const [modSearch, setModSearch] = useState('');
+  const [instSearch, setInstSearch] = useState('');
+  const [dragModIdx, setDragModIdx] = useState(null);
+  const [overModIdx, setOverModIdx] = useState(null);
 
-  const rootCats = allCategories.filter(c=>!c.parentId);
-  const subCats  = allCategories.filter(c=>c.parentId);
-  const isSub    = item.type==='subitem';
-  const p        = item.pricing||{base:item.price||0};
+  const p        = item.pricing || { base: item.price || 0 };
+  const isSub    = item.type === 'subitem';
+  const isPizza  = item.type === 'pizza';
+  const rootCats = allCategories.filter(c => !c.parentId);
+  const subCats  = allCategories.filter(c =>  c.parentId);
 
-  const f   = (k,v) => onUpdate({[k]:v});
-  const fp  = (k,v) => onUpdate({ pricing:{...p,[k]:v===''?null:parseFloat(v)||0}, ...(k==='base'?{price:parseFloat(v)||0}:{}) });
-  const toggleModGroup = gid=>{
-    const cur=item.assignedModifierGroups||[];
-    onUpdate({assignedModifierGroups:cur.find(g=>g.groupId===gid)?cur.filter(g=>g.groupId!==gid):[...cur,{groupId:gid,min:0,max:null}]});
-  };
-  const toggleInstGroup = gid=>{
-    const cur=item.assignedInstructionGroups||[];
-    onUpdate({assignedInstructionGroups:cur.includes(gid)?cur.filter(g=>g!==gid):[...cur,gid]});
-  };
+  const f   = (k,v) => onUpdate({ [k]: v });
+  const fp  = (k,v) => onUpdate({ pricing: { ...p, [k]: v===''?null:parseFloat(v)||0 }, ...(k==='base'?{price:parseFloat(v)||0}:{}) });
 
-  // Variants: children of this item
-  const variants = menuItems.filter(c=>c.parentId===item.id&&!c.archived);
-  const isParent = variants.length>0;
+  // ── Variants ───────────────────────────────────────────────────────────────
+  const variants = menuItems.filter(c => c.parentId===item.id && !c.archived)
+    .sort((a,b) => (a.sortOrder??999)-(b.sortOrder??999));
+  const isParent = variants.length > 0;
 
-  const addVariant = ()=>{
+  const addVariant = () => {
     addMenuItem({ name:'New size', menuName:'New size', receiptName:'New size', kitchenName:'New size',
-      type:'simple', parentId:item.id, cat:item.cat, allergens:item.allergens||[],
-      pricing:{base:0,dineIn:null,takeaway:null,collection:null,delivery:null},
-      assignedModifierGroups:[], assignedInstructionGroups:[],
-    });
-    if((item.type||'simple')!=='variants') onUpdate({type:'variants'});
+      type:'simple', parentId:item.id, cat:item.cat, allergens:[...item.allergens||[]],
+      pricing:{ base:0, dineIn:null, takeaway:null, collection:null, delivery:null },
+      assignedModifierGroups:[], assignedInstructionGroups:[], sortOrder:variants.length });
+    if (item.type !== 'variants') onUpdate({ type:'variants' });
     markBOChange();
   };
-  const updateVariant = (id,patch)=>{ updateMenuItem(id,patch); markBOChange(); };
-  const removeVariant = id=>{ updateMenuItem(id,{archived:true,parentId:null}); markBOChange(); showToast('Variant removed','info'); if(variants.filter(v=>v.id!==id).length===0) onUpdate({type:'simple'}); };
+  const updVariant   = (id, patch) => { updateMenuItem(id, patch); markBOChange(); };
+  const removeVariant = id => {
+    updateMenuItem(id, { archived:true, parentId:null }); markBOChange(); showToast('Variant removed','info');
+    if (variants.filter(v => v.id !== id).length === 0) onUpdate({ type:'simple' });
+  };
+  const reorderVariants = (from, to) => {
+    const arr = [...variants]; const [moved] = arr.splice(from, 1); arr.splice(to, 0, moved);
+    arr.forEach((v,i) => { if ((v.sortOrder??999) !== i) updateMenuItem(v.id, { sortOrder:i }); });
+    markBOChange();
+  };
 
-  const SECS=[{id:'details',label:'Details'},{id:'variants',label:`Variants${isParent?` (${variants.length})`:''}`,hide:isSub},{id:'modifiers',label:'Modifiers',hide:isSub},{id:'pricing',label:'Pricing'},{id:'allergens',label:'Allergens'}].filter(s=>!s.hide);
+  // ── Modifier assignment ────────────────────────────────────────────────────
+  const assignedMods = item.assignedModifierGroups || [];
+  const addMod    = gid => { if (assignedMods.find(ag=>ag.groupId===gid)) return; onUpdate({ assignedModifierGroups:[...assignedMods,{groupId:gid,min:0,max:1}] }); markBOChange(); setModSearch(''); };
+  const removeMod = gid => { onUpdate({ assignedModifierGroups:assignedMods.filter(ag=>ag.groupId!==gid) }); markBOChange(); };
+  const updateMod = (gid,patch) => { onUpdate({ assignedModifierGroups:assignedMods.map(ag=>ag.groupId===gid?{...ag,...patch}:ag) }); markBOChange(); };
+  const reorderMods = (from, to) => {
+    const arr = [...assignedMods]; const [moved] = arr.splice(from,1); arr.splice(to,0,moved);
+    onUpdate({ assignedModifierGroups:arr }); markBOChange();
+  };
+
+  // ── Instruction assignment ─────────────────────────────────────────────────
+  const assignedInst = item.assignedInstructionGroups || [];
+  const addInst    = gid => { if (assignedInst.includes(gid)) return; onUpdate({ assignedInstructionGroups:[...assignedInst,gid] }); markBOChange(); setInstSearch(''); };
+  const removeInst = gid => { onUpdate({ assignedInstructionGroups:assignedInst.filter(g=>g!==gid) }); markBOChange(); };
+
+  // ── Filtered search lists ──────────────────────────────────────────────────
+  const filteredMods = (modifierGroupDefs||[]).filter(g =>
+    !assignedMods.find(ag=>ag.groupId===g.id) &&
+    (modSearch==='' || (g.name||'').toLowerCase().includes(modSearch.toLowerCase()))
+  );
+  const filteredInst = (instructionGroupDefs||[]).filter(g =>
+    !assignedInst.includes(g.id) &&
+    (instSearch==='' || (g.name||'').toLowerCase().includes(instSearch.toLowerCase()))
+  );
+
+  const SECS = [
+    { id:'details',   label:'Details' },
+    !isSub && { id:'variants',  label:`Sizes${isParent?` (${variants.length})`:''}` },
+    !isSub && { id:'modifiers', label:`Modifiers${assignedMods.length>0?` (${assignedMods.length})`:''}` },
+    { id:'pricing',   label:'Pricing' },
+    { id:'allergens', label:`Allergens${(item.allergens||[]).length>0?` (${item.allergens.length})`:''}` },
+    isPizza && { id:'pizza', label:'Pizza' },
+  ].filter(Boolean);
+
+  const lbl = { fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', display:'block', marginBottom:5 };
 
   return (
-    <div style={{ width:340, borderLeft:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg1)', flexShrink:0 }}>
-      {/* Header */}
-      <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-          <span style={{ fontSize:13, fontWeight:800, color:'var(--t1)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.menuName||item.name}</span>
-          <button onClick={onToggle86} style={{ fontSize:10, padding:'2px 7px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', border:`1px solid ${is86?'var(--grn-b)':'var(--red-b)'}`, background:is86?'var(--grn-d)':'var(--red-d)', color:is86?'var(--grn)':'var(--red)', fontWeight:700 }}>{is86?'Un-86':'86'}</button>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--t4)', cursor:'pointer', fontSize:18, lineHeight:1 }}>×</button>
+    <div style={{ width:420, borderLeft:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg1)', flexShrink:0 }}>
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div style={{ padding:'12px 16px 0', borderBottom:'1px solid var(--bdr)', flexShrink:0, background:'var(--bg1)' }}>
+        <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:10 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', lineHeight:1.3 }}>{item.menuName||item.name}</div>
+            <div style={{ display:'flex', gap:5, marginTop:4, flexWrap:'wrap' }}>
+              {[['simple','Simple'],['modifiable','Modifiable'],['variants','Has sizes'],['pizza','Pizza'],['combo','Combo'],['subitem','Sub item']].map(([v,l]) => {
+                const act = (item.type||'simple')===v || (v==='variants'&&isParent&&item.type!=='pizza');
+                return <button key={v} onClick={()=>f('type',v)} style={{ padding:'2px 7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', fontSize:9, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t4)' }}>{l}</button>;
+              })}
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+            <button onClick={onToggle86} style={{ fontSize:9, padding:'3px 8px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', border:`1px solid ${is86?'var(--grn-b)':'var(--red-b)'}`, background:is86?'var(--grn-d)':'var(--red-d)', color:is86?'var(--grn)':'var(--red)', fontWeight:700 }}>{is86?'Un-86':'86'}</button>
+            <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--t4)', cursor:'pointer', fontSize:18, lineHeight:1 }}>×</button>
+          </div>
         </div>
-        <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-          {SECS.map(s=>(
-            <button key={s.id} onClick={()=>setSection(s.id)} style={{ padding:'3px 9px', borderRadius:14, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:section===s.id?700:400, border:'none', background:section===s.id?'var(--acc-d)':'transparent', color:section===s.id?'var(--acc)':'var(--t4)' }}>{s.label}</button>
+        <div style={{ display:'flex', gap:0, marginBottom:'-1px', overflowX:'auto' }}>
+          {SECS.map(s => (
+            <button key={s.id} onClick={()=>setSec(s.id)} style={{ padding:'8px 12px', cursor:'pointer', fontFamily:'inherit', border:'none', borderBottom:`2px solid ${sec===s.id?'var(--acc)':'transparent'}`, background:'transparent', color:sec===s.id?'var(--acc)':'var(--t4)', fontSize:11, fontWeight:sec===s.id?700:400, whiteSpace:'nowrap', flexShrink:0, transition:'color .12s' }}>{s.label}</button>
           ))}
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'12px 14px' }}>
+      {/* ── Content ─────────────────────────────────────────────────────── */}
+      <div style={{ flex:1, overflowY:'auto', padding:'16px' }}>
 
-        {section==='details' && (
-          <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
+        {/* ════ DETAILS ════════════════════════════════════════════════════ */}
+        {sec==='details' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
             <div>
-              <span style={lbl}>Type</span>
-              <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                {[['simple','Simple'],['modifiable','Modifiable'],['variants','Has sizes/variants'],['subitem','Sub item (option only)'],['combo','Combo']].map(([v,l])=>{
-                  const act=(item.type||'simple')===v||((v==='variants')&&isParent);
-                  return <button key={v} onClick={()=>f('type',v)} style={{ padding:'4px 9px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1.5px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t2)' }}>{l}</button>;
-                })}
-              </div>
-              {isSub && <div style={{ marginTop:6, padding:'6px 9px', background:'var(--bg3)', borderRadius:7, fontSize:10, color:'var(--t3)' }}>Sub items only appear as options inside modifier groups — not on the POS ordering screen.</div>}
+              <span style={lbl}>POS button name</span>
+              <input style={inp} value={item.menuName||''} onChange={e=>f('menuName',e.target.value)} placeholder="Name shown on POS button"/>
             </div>
-            <div><span style={lbl}>POS button name</span><input style={inp} value={item.menuName||''} onChange={e=>f('menuName',e.target.value)}/></div>
-            {!isSub && <>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+
+            {!isSub && (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                 <div><span style={lbl}>Receipt name</span><input style={inp} value={item.receiptName||''} onChange={e=>f('receiptName',e.target.value)} placeholder="Same as above"/></div>
                 <div><span style={lbl}>Kitchen / KDS</span><input style={inp} value={item.kitchenName||''} onChange={e=>f('kitchenName',e.target.value)} placeholder="Same as above"/></div>
               </div>
-              <div><span style={lbl}>Description <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0 }}>(kiosk & online)</span></span><textarea style={{ ...inp, resize:'none', height:50 }} value={item.description||''} onChange={e=>f('description',e.target.value)}/></div>
-            </>}
+            )}
+
+            {!isSub && (
+              <div>
+                <span style={lbl}>Description <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0 }}>(kiosk & online)</span></span>
+                <textarea style={{ ...inp, resize:'none', height:56 }} value={item.description||''} onChange={e=>f('description',e.target.value)} placeholder="Brief description shown to customers…"/>
+              </div>
+            )}
+
             <div>
               <span style={lbl}>Primary category</span>
               <select value={item.cat||''} onChange={e=>f('cat',e.target.value)} style={{ ...inp, cursor:'pointer' }}>
@@ -491,204 +545,234 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
                 {rootCats.map(c=><optgroup key={c.id} label={`${c.icon} ${c.label}`}><option value={c.id}>{c.icon} {c.label}</option>{subCats.filter(s=>s.parentId===c.id).map(s=><option key={s.id} value={s.id}>  └ {s.label}</option>)}</optgroup>)}
               </select>
             </div>
+
             <div>
               <span style={lbl}>Also in</span>
               <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
                 {[...rootCats,...subCats].filter(c=>c.id!==item.cat).map(c=>{
                   const on=(item.cats||[]).includes(c.id);
-                  return <button key={c.id} onClick={()=>{const cur=item.cats||[];onUpdate({cats:on?cur.filter(id=>id!==c.id):[...cur,c.id]});}} style={{ padding:'2px 7px', borderRadius:12, cursor:'pointer', fontFamily:'inherit', fontSize:10, fontWeight:on?700:400, border:`1px solid ${on?'var(--acc)':'var(--bdr)'}`, background:on?'var(--acc-d)':'var(--bg3)', color:on?'var(--acc)':'var(--t4)' }}>{c.icon} {c.label}</button>;
+                  return <button key={c.id} onClick={()=>{const cur=item.cats||[];onUpdate({cats:on?cur.filter(id=>id!==c.id):[...cur,c.id]});}} style={{ padding:'2px 7px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', fontSize:10, fontWeight:on?700:400, border:`1px solid ${on?'var(--acc)':'var(--bdr)'}`, background:on?'var(--acc-d)':'var(--bg3)', color:on?'var(--acc)':'var(--t4)' }}>{c.icon} {c.label}</button>;
                 })}
               </div>
             </div>
-            {!isSub && <div>
-              <span style={lbl}>Visible on</span>
-              <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                {[['pos','POS'],['kiosk','Kiosk'],['online','Online'],['onlineDelivery','Delivery']].map(([k,l])=>{
-                  const on=(item.visibility||{pos:true,kiosk:true,online:true,onlineDelivery:true})[k]!==false;
-                  return <button key={k} onClick={()=>onUpdate({visibility:{...(item.visibility||{pos:true,kiosk:true,online:true,onlineDelivery:true}),[k]:!on}})} style={{ padding:'3px 9px', borderRadius:12, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:on?700:400, border:`1px solid ${on?'var(--acc)':'var(--bdr)'}`, background:on?'var(--acc-d)':'var(--bg3)', color:on?'var(--acc)':'var(--t3)' }}>{on?'✓ ':''}{l}</button>;
-                })}
+
+            {!isSub && (
+              <div>
+                <span style={lbl}>Visible on</span>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                  {[['pos','POS'],['kiosk','Kiosk'],['online','Online'],['onlineDelivery','Delivery']].map(([k,l])=>{
+                    const on=(item.visibility||{pos:true,kiosk:true,online:true,onlineDelivery:true})[k]!==false;
+                    return <button key={k} onClick={()=>onUpdate({visibility:{...(item.visibility||{pos:true,kiosk:true,online:true,onlineDelivery:true}),[k]:!on}})} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:on?700:400, border:`1px solid ${on?'var(--grn-b)':'var(--bdr)'}`, background:on?'var(--grn-d)':'var(--bg3)', color:on?'var(--grn)':'var(--t4)' }}>{on?'✓ ':''}{l}</button>;
+                  })}
+                </div>
               </div>
-            </div>}
+            )}
+
+            {isSub && (
+              <div style={{ padding:'8px 10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>Sub items only appear as options inside modifier groups — not directly on the POS ordering screen.</div>
+            )}
+
           </div>
         )}
 
-        {section==='variants' && (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {/* What to call the picker — shown as header in POS modal */}
+        {/* ════ SIZES / VARIANTS ══════════════════════════════════════════ */}
+        {sec==='variants' && !isSub && (
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+            {/* Variant label */}
             <div>
-              <span style={lbl}>What are these variants called?</span>
-              <div style={{ fontSize:10, color:'var(--t3)', marginBottom:7 }}>This label appears as the heading in the POS picker — e.g. "Size", "Cut", "Style". Pick one or type your own.</div>
+              <span style={lbl}>Size label <span style={{ fontWeight:400, textTransform:'none' }}>(shown as heading in POS picker)</span></span>
               <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:7 }}>
-                {['Size','Type','Cut','Style','Strength','Format','Serving','Portion','Blend','Roast'].map(l=>{
+                {['Size','Serving','Type','Cut','Style','Strength','Format','Portion','Blend','Roast','Weight'].map(l=>{
                   const act=(item.variantLabel||'Size')===l;
-                  return <button key={l} onClick={()=>onUpdate({variantLabel:l})} style={{ padding:'4px 10px', borderRadius:14, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)' }}>{l}</button>;
+                  return <button key={l} onClick={()=>onUpdate({variantLabel:l})} style={{ padding:'3px 9px', borderRadius:12, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)' }}>{l}</button>;
                 })}
               </div>
-              <input style={{ ...inp, fontSize:12 }} value={item.variantLabel||''} onChange={e=>onUpdate({variantLabel:e.target.value})} placeholder="Custom label e.g. Colour, Region, Weight…"/>
+              <input style={inp} value={item.variantLabel||''} onChange={e=>onUpdate({variantLabel:e.target.value})} placeholder="Custom label e.g. Colour, Region, Weight…"/>
             </div>
 
-            {/* Modifier groups on ALL variants — assign here once, applies to every variant */}
-            <div style={{ padding:'10px 11px', background:'var(--bg3)', borderRadius:10, border:'1px solid var(--bdr)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'var(--t2)', marginBottom:4 }}>Modifiers for all variants</div>
-              <div style={{ fontSize:10, color:'var(--t3)', marginBottom:8, lineHeight:1.5 }}>
-                Tick modifier groups here — they appear on the POS <strong>after</strong> the customer picks a variant (e.g. pick Pint → then choose Sides).
-                Assign to the <em>parent item</em> and it applies to every variant.
-              </div>
-              {(modifierGroupDefs||[]).length===0
-                ? <div style={{ fontSize:10, color:'var(--t4)' }}>No modifier groups yet — create them in the Modifier groups tab.</div>
-                : (modifierGroupDefs||[]).map(g=>{
-                    const asgn=(item.assignedModifierGroups||[]).find(ag=>ag.groupId===g.id);
+            {/* Variants list */}
+            <div>
+              <span style={lbl}>Sizes / variants <span style={{ fontWeight:400, textTransform:'none' }}>(each becomes a button on POS)</span></span>
+              {variants.length === 0 && (
+                <div style={{ padding:'12px', background:'var(--bg3)', borderRadius:9, fontSize:11, color:'var(--t4)', textAlign:'center', marginBottom:8 }}>No sizes yet — click "+ Add" below</div>
+              )}
+              {variants.map((v,vi) => {
+                const vp = v.pricing || { base: v.price || 0 };
+                return (
+                  <div key={v.id} draggable onDragStart={()=>setDragModIdx(vi)} onDragOver={e=>{e.preventDefault();setOverModIdx(vi);}} onDrop={e=>{e.preventDefault();if(dragModIdx!==null&&dragModIdx!==vi){reorderVariants(dragModIdx,vi);}setDragModIdx(null);setOverModIdx(null);}} onDragEnd={()=>{setDragModIdx(null);setOverModIdx(null);}}
+                    style={{ display:'grid', gridTemplateColumns:'18px 1fr 100px 32px', gap:6, alignItems:'center', marginBottom:6, opacity:dragModIdx===vi?.4:1, background:overModIdx===vi?'var(--acc-d)':'transparent', borderRadius:8, padding:'2px 0' }}>
+                    <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab', textAlign:'center' }}>⠿</span>
+                    <input style={{ ...inp, fontSize:13, fontWeight:600 }} value={v.menuName||v.name||''} onChange={e=>updVariant(v.id,{menuName:e.target.value,name:e.target.value,receiptName:e.target.value,kitchenName:e.target.value})} placeholder={`${item.variantLabel||'Size'} ${vi+1}`}/>
+                    <div style={{ position:'relative' }}>
+                      <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)', fontWeight:700 }}>£</span>
+                      <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:13, fontWeight:700, color:'var(--acc)' }} value={vp.base!==undefined?vp.base:''} placeholder="0.00" onChange={e=>updVariant(v.id,{pricing:{...vp,base:parseFloat(e.target.value)||0},price:parseFloat(e.target.value)||0})}/>
+                    </div>
+                    <button onClick={()=>removeVariant(v.id)} style={{ width:32, height:34, borderRadius:7, border:'1px solid var(--red-b)', background:'var(--red-d)', color:'var(--red)', cursor:'pointer', fontSize:15, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                  </div>
+                );
+              })}
+              <button onClick={addVariant} style={{ width:'100%', padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1.5px dashed var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600, marginTop:4 }}>+ Add {item.variantLabel||'size'}</button>
+            </div>
+
+            {/* POS preview for variants */}
+            {variants.length > 0 && (
+              <div style={{ padding:'10px 12px', background:'var(--bg2)', borderRadius:10, border:'1px solid var(--bdr)' }}>
+                <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>POS preview</div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--t3)', marginBottom:6 }}>Choose {item.variantLabel||'Size'}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  {variants.map(v => {
+                    const vp = v.pricing||{base:v.price||0};
                     return (
-                      <div key={g.id} style={{ marginBottom:5 }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 9px', borderRadius:8, border:`1.5px solid ${asgn?'var(--acc)':'var(--bdr)'}`, background:asgn?'var(--acc-d)':'var(--bg2)', cursor:'pointer' }} onClick={()=>toggleModGroup(g.id)}>
-                          <div style={{ width:16,height:16,borderRadius:3,border:`2px solid ${asgn?'var(--acc)':'var(--bdr2)'}`,background:asgn?'var(--acc)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-                            {asgn&&<div style={{ width:6,height:6,borderRadius:1,background:'#0b0c10' }}/>}
-                          </div>
-                          <span style={{ fontSize:11, fontWeight:asgn?700:500, color:asgn?'var(--acc)':'var(--t1)', flex:1 }}>{g.name}</span>
-                          <span style={{ fontSize:9, color:'var(--t4)' }}>{(g.options||[]).length} opts</span>
-                          {asgn && <span style={{ fontSize:9, color:'var(--acc)', fontWeight:700 }}>{(asgn.min||0)>0?'required':'optional'}</span>}
-                        </div>
-                        {asgn && (
-                          <div style={{ display:'flex', gap:10, padding:'3px 9px 5px', background:'var(--acc-d)', borderRadius:'0 0 7px 7px' }} onClick={e=>e.stopPropagation()}>
-                            <label style={{ fontSize:10, display:'flex', alignItems:'center', gap:3, cursor:'pointer', color:'var(--t2)' }}>
-                              <input type="checkbox" checked={(asgn.min||0)>0} onChange={e=>{const cur=item.assignedModifierGroups||[];onUpdate({assignedModifierGroups:cur.map(ag=>ag.groupId===g.id?{...ag,min:e.target.checked?1:0}:ag)});}} style={{ accentColor:'var(--acc)' }}/> Required
-                            </label>
-                            <label style={{ fontSize:10, display:'flex', alignItems:'center', gap:3, cursor:'pointer', color:'var(--t2)' }}>Max:
-                              <input type="number" min="1" max="99" style={{ ...inp, width:38, padding:'1px 4px', fontSize:10 }} value={asgn.max||''} placeholder="∞" onChange={e=>{const cur=item.assignedModifierGroups||[];onUpdate({assignedModifierGroups:cur.map(ag=>ag.groupId===g.id?{...ag,max:e.target.value===''?null:parseInt(e.target.value)||1}:ag)});}}/>
-                            </label>
-                          </div>
-                        )}
+                      <div key={v.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 10px', borderRadius:8, border:'1.5px solid var(--bdr)', background:'var(--bg3)' }}>
+                        <div style={{ width:14,height:14,borderRadius:'50%',border:'2px solid var(--bdr2)',flexShrink:0 }}/>
+                        <span style={{ fontSize:12, fontWeight:500, color:'var(--t1)', flex:1 }}>{v.menuName||v.name||'—'}</span>
+                        <span style={{ fontSize:13, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>£{(vp.base||0).toFixed(2)}</span>
                       </div>
                     );
-                  })
-              }
-              {(instructionGroupDefs||[]).length>0 && (
-                <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid var(--bdr)' }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', marginBottom:5 }}>Instruction groups (no price change)</div>
-                  {(instructionGroupDefs||[]).map(g=>{
-                    const asgn=(item.assignedInstructionGroups||[]).includes(g.id);
-                    return <div key={g.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 9px', marginBottom:4, borderRadius:7, border:`1.5px solid ${asgn?'var(--grn)':'var(--bdr)'}`, background:asgn?'var(--grn-d)':'var(--bg2)', cursor:'pointer' }} onClick={()=>toggleInstGroup(g.id)}>
-                      <div style={{ width:16,height:16,borderRadius:3,border:`2px solid ${asgn?'var(--grn)':'var(--bdr2)'}`,background:asgn?'var(--grn)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-                        {asgn&&<div style={{ width:6,height:6,borderRadius:1,background:'#0b0c10' }}/>}
-                      </div>
-                      <span style={{ fontSize:11, fontWeight:asgn?700:500, color:asgn?'var(--grn)':'var(--t1)', flex:1 }}>{g.name}</span>
-                    </div>;
                   })}
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* ════ MODIFIERS ═════════════════════════════════════════════════ */}
+        {sec==='modifiers' && !isSub && (
+          <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+            {/* Modifier groups */}
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                <span style={{ ...lbl, margin:0 }}>Modifier groups</span>
+                <span style={{ fontSize:9, color:'var(--t4)', fontWeight:400 }}>paid options — drag to reorder</span>
+              </div>
+
+              {/* Assigned groups */}
+              {assignedMods.length === 0 ? (
+                <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t4)', marginBottom:10, textAlign:'center' }}>No modifier groups assigned yet</div>
+              ) : (
+                <div style={{ marginBottom:10 }}>
+                  {assignedMods.map((ag, i) => {
+                    const def = (modifierGroupDefs||[]).find(g => g.id === ag.groupId);
+                    if (!def) return null;
+                    const isReq = (ag.min||0) > 0;
+                    return (
+                      <div key={ag.groupId} draggable
+                        onDragStart={()=>setDragModIdx(i)} onDragOver={e=>{e.preventDefault();setOverModIdx(i);}}
+                        onDrop={e=>{e.preventDefault();if(dragModIdx!==null&&dragModIdx!==i)reorderMods(dragModIdx,i);setDragModIdx(null);setOverModIdx(null);}}
+                        onDragEnd={()=>{setDragModIdx(null);setOverModIdx(null);}}
+                        style={{ display:'grid', gridTemplateColumns:'18px 1fr auto auto auto', gap:6, alignItems:'center', padding:'8px 10px', marginBottom:5, borderRadius:9, border:`1.5px solid ${overModIdx===i?'var(--acc)':'var(--bdr)'}`, background:overModIdx===i?'var(--acc-d)':'var(--bg3)', opacity:dragModIdx===i?.4:1, cursor:'default' }}>
+                        <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⠿</span>
+                        <div>
+                          <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>{def.name}</div>
+                          <div style={{ fontSize:9, color:'var(--t4)' }}>{(def.options||[]).length} options</div>
+                        </div>
+                        <button onClick={()=>updateMod(ag.groupId,{min:isReq?0:1})} style={{ padding:'2px 8px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:9, fontWeight:700, border:`1px solid ${isReq?'var(--red-b)':'var(--bdr)'}`, background:isReq?'var(--red-d)':'var(--bg2)', color:isReq?'var(--red)':'var(--t4)', whiteSpace:'nowrap' }}>{isReq?'Required':'Optional'}</button>
+                        <div style={{ display:'flex', alignItems:'center', gap:3 }}>
+                          <span style={{ fontSize:9, color:'var(--t4)' }}>Max</span>
+                          <input type="number" min="1" max="99" style={{ ...inp, width:40, padding:'2px 5px', fontSize:11, textAlign:'center' }} value={ag.max||''} placeholder="∞" onChange={e=>updateMod(ag.groupId,{max:e.target.value===''?null:parseInt(e.target.value)||1})}/>
+                        </div>
+                        <button onClick={()=>removeMod(ag.groupId)} style={{ width:24,height:24,borderRadius:6,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Search to add */}
+              <div style={{ position:'relative' }}>
+                <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)' }}>🔍</span>
+                <input style={{ ...inp, paddingLeft:28, fontSize:12 }} value={modSearch} onChange={e=>setModSearch(e.target.value)} placeholder="Search modifier groups to add…"/>
+              </div>
+              {(modSearch || filteredMods.length <= 6) && filteredMods.length > 0 && (
+                <div style={{ marginTop:4, border:'1px solid var(--bdr)', borderRadius:8, overflow:'hidden', background:'var(--bg2)' }}>
+                  {filteredMods.slice(0,8).map(g => (
+                    <div key={g.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderBottom:'1px solid var(--bdr)', cursor:'pointer' }} onClick={()=>addMod(g.id)}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--bg3)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:12, fontWeight:600, color:'var(--t1)' }}>{g.name}</div>
+                        <div style={{ fontSize:9, color:'var(--t4)' }}>{(g.options||[]).map(o=>o.name||o.label).slice(0,4).join(' · ')}{(g.options||[]).length>4?'…':''}</div>
+                      </div>
+                      <button style={{ padding:'3px 9px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:10, fontWeight:700 }}>+ Add</button>
+                    </div>
+                  ))}
+                  {filteredMods.length > 8 && <div style={{ padding:'6px 10px', fontSize:10, color:'var(--t4)', textAlign:'center' }}>{filteredMods.length-8} more — type to filter</div>}
+                </div>
+              )}
+              {modSearch && filteredMods.length === 0 && (
+                <div style={{ marginTop:4, padding:'8px 10px', fontSize:11, color:'var(--t4)', textAlign:'center', background:'var(--bg3)', borderRadius:8 }}>No matching groups — create one in the Modifier groups tab</div>
+              )}
+            </div>
+
+            {/* Instruction groups */}
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                <span style={{ ...lbl, margin:0 }}>Instruction groups</span>
+                <span style={{ fontSize:9, color:'var(--t4)', fontWeight:400 }}>no price change (cooking pref, notes)</span>
+              </div>
+
+              {assignedInst.length > 0 && (
+                <div style={{ marginBottom:8 }}>
+                  {assignedInst.map(gid => {
+                    const def = (instructionGroupDefs||[]).find(g=>g.id===gid);
+                    if (!def) return null;
+                    return (
+                      <div key={gid} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', marginBottom:4, borderRadius:8, border:'1.5px solid var(--grn-b)', background:'var(--grn-d)' }}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:12, fontWeight:700, color:'var(--grn)' }}>{def.name}</div>
+                          <div style={{ fontSize:9, color:'var(--grn)', opacity:.7 }}>{(def.options||[]).slice(0,4).join(' · ')}</div>
+                        </div>
+                        <button onClick={()=>removeInst(gid)} style={{ width:22,height:22,borderRadius:5,border:'1px solid var(--grn-b)',background:'transparent',color:'var(--grn)',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ position:'relative' }}>
+                <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)' }}>🔍</span>
+                <input style={{ ...inp, paddingLeft:28, fontSize:12 }} value={instSearch} onChange={e=>setInstSearch(e.target.value)} placeholder="Search instruction groups to add…"/>
+              </div>
+              {(instSearch || filteredInst.length <= 6) && filteredInst.length > 0 && (
+                <div style={{ marginTop:4, border:'1px solid var(--bdr)', borderRadius:8, overflow:'hidden', background:'var(--bg2)' }}>
+                  {filteredInst.slice(0,6).map(g => (
+                    <div key={g.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', borderBottom:'1px solid var(--bdr)', cursor:'pointer' }} onClick={()=>addInst(g.id)}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--bg3)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:12, fontWeight:600, color:'var(--t1)' }}>{g.name}</div>
+                        <div style={{ fontSize:9, color:'var(--t4)' }}>{(g.options||[]).slice(0,4).join(' · ')}</div>
+                      </div>
+                      <button style={{ padding:'3px 9px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', background:'var(--grn)', border:'none', color:'#fff', fontSize:10, fontWeight:700 }}>+ Add</button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Individual variants */}
-            <div>
-              <span style={lbl}>Variants <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0 }}>— each variant appears as a button in the POS picker</span></span>
-              {variants.length===0 && <div style={{ padding:'10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t4)', marginBottom:8 }}>No variants yet — click "+ Add variant" below.</div>}
-              {variants.map((v,vi)=>{
-                const vp=v.pricing||{base:v.price||0};
-                return (
-                  <div key={v.id} style={{ marginBottom:8, borderRadius:10, border:'1px solid var(--bdr)', background:'var(--bg3)', overflow:'hidden' }}>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 90px auto', gap:6, alignItems:'center', padding:'8px 10px' }}>
-                      <input style={{ ...inp, fontSize:13, fontWeight:600, padding:'6px 9px' }} value={v.menuName||v.name||''} onChange={e=>updateVariant(v.id,{menuName:e.target.value,name:e.target.value,receiptName:e.target.value,kitchenName:e.target.value})} placeholder={`${item.variantLabel||'Variant'} ${vi+1}`}/>
-                      <div style={{ position:'relative' }}>
-                        <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)', fontWeight:700 }}>£</span>
-                        <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:13, fontWeight:700, padding:'6px 6px 6px 20px', color:'var(--acc)' }} value={vp.base!==undefined?vp.base:''} placeholder="0.00" onChange={e=>updateVariant(v.id,{pricing:{...vp,base:parseFloat(e.target.value)||0},price:parseFloat(e.target.value)||0})}/>
-                      </div>
-                      <button onClick={()=>removeVariant(v.id)} style={{ width:28,height:36,borderRadius:7,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:15,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
-                    </div>
-                  </div>
-                );
-              })}
-              <button onClick={addVariant} style={{ width:'100%', padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1.5px dashed var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600 }}>+ Add {item.variantLabel||'variant'}</button>
-            </div>
-
-            {/* POS Preview */}
-            {variants.length>0 && (
-              <div style={{ padding:'10px 11px', background:'var(--bg2)', borderRadius:10, border:'1px solid var(--bdr)' }}>
-                <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 }}>POS preview</div>
-                <div style={{ fontSize:11, fontWeight:700, color:'var(--t3)', marginBottom:7 }}>{item.variantLabel||'Size'}</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                  {variants.map(v=>{
-                    const vp=v.pricing||{base:v.price||0};
-                    return (
-                      <div key={v.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', borderRadius:8, border:'1.5px solid var(--bdr)', background:'var(--bg3)' }}>
-                        <div style={{ width:16,height:16,borderRadius:'50%',border:'2px solid var(--bdr2)',flexShrink:0 }}/>
-                        <span style={{ fontSize:12, fontWeight:500, color:'var(--t1)', flex:1 }}>{v.menuName||v.name||`Option ${variants.indexOf(v)+1}`}</span>
-                        <span style={{ fontSize:13, fontWeight:800, color:'var(--t2)', fontFamily:'var(--font-mono)' }}>£{(vp.base||0).toFixed(2)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {(item.assignedModifierGroups||[]).length>0 && (
-                  <div style={{ marginTop:8, padding:'6px 8px', background:'var(--acc-d)', borderRadius:7, fontSize:10, color:'var(--acc)', fontWeight:600 }}>
-                    ✓ After picking a {(item.variantLabel||'variant').toLowerCase()}, customer will see: {(item.assignedModifierGroups||[]).map(ag=>(modifierGroupDefs||[]).find(g=>g.id===ag.groupId)?.name).filter(Boolean).join(', ')}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 
-        {section==='modifiers' && (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div>
-              <span style={lbl}>Modifier groups — paid options</span>
-              {(!modifierGroupDefs||modifierGroupDefs.length===0)&&<div style={{ fontSize:11, color:'var(--t4)', padding:'8px 0' }}>Create modifier groups in the "Modifier groups" tab first.</div>}
-              {(modifierGroupDefs||[]).map(g=>{
-                const asgn=(item.assignedModifierGroups||[]).find(ag=>ag.groupId===g.id);
-                return (
-                  <div key={g.id} style={{ marginBottom:6 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:9, border:`1.5px solid ${asgn?'var(--acc)':'var(--bdr)'}`, background:asgn?'var(--acc-d)':'var(--bg3)', cursor:'pointer' }} onClick={()=>toggleModGroup(g.id)}>
-                      <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${asgn?'var(--acc)':'var(--bdr2)'}`, background:asgn?'var(--acc)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                        {asgn&&<div style={{ width:7,height:7,borderRadius:1,background:'#0b0c10' }}/>}
-                      </div>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:12, fontWeight:asgn?700:500, color:asgn?'var(--acc)':'var(--t1)' }}>{g.name}</div>
-                        <div style={{ fontSize:9, color:'var(--t4)' }}>{(g.options||[]).map(o=>o.name).join(' · ')||'no options'}</div>
-                      </div>
-                    </div>
-                    {asgn && (
-                      <div style={{ display:'flex', gap:10, alignItems:'center', padding:'4px 10px', background:'var(--acc-d)', borderRadius:'0 0 8px 8px', borderTop:'1px solid var(--acc-b)' }} onClick={e=>e.stopPropagation()}>
-                        <label style={{ fontSize:10, display:'flex', alignItems:'center', gap:4, cursor:'pointer', color:'var(--t2)' }}>
-                          <input type="checkbox" checked={(asgn.min||0)>0} onChange={e=>{const cur=item.assignedModifierGroups||[];onUpdate({assignedModifierGroups:cur.map(ag=>ag.groupId===g.id?{...ag,min:e.target.checked?1:0}:ag)});}} style={{ accentColor:'var(--acc)' }}/> Required
-                        </label>
-                        <label style={{ fontSize:10, display:'flex', alignItems:'center', gap:4, cursor:'pointer', color:'var(--t2)' }}>Max:
-                          <input type="number" min="1" max="99" style={{ ...inp, width:42, padding:'2px 5px', fontSize:10 }} value={asgn.max||''} placeholder="∞" onChange={e=>{const cur=item.assignedModifierGroups||[];onUpdate({assignedModifierGroups:cur.map(ag=>ag.groupId===g.id?{...ag,max:e.target.value===''?null:parseInt(e.target.value)||1}:ag)});}}/>
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div>
-              <span style={lbl}>Instruction groups — no price change</span>
-              {(!instructionGroupDefs||instructionGroupDefs.length===0)&&<div style={{ fontSize:11, color:'var(--t4)', padding:'8px 0' }}>Create instruction groups in the "Instruction groups" tab first.</div>}
-              {(instructionGroupDefs||[]).map(g=>{
-                const asgn=(item.assignedInstructionGroups||[]).includes(g.id);
-                return (
-                  <div key={g.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginBottom:5, borderRadius:9, border:`1.5px solid ${asgn?'var(--grn)':'var(--bdr)'}`, background:asgn?'var(--grn-d)':'var(--bg3)', cursor:'pointer' }} onClick={()=>toggleInstGroup(g.id)}>
-                    <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${asgn?'var(--grn)':'var(--bdr2)'}`, background:asgn?'var(--grn)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      {asgn&&<div style={{ width:7,height:7,borderRadius:1,background:'#0b0c10' }}/>}
-                    </div>
-                    <div>
-                      <div style={{ fontSize:12, fontWeight:asgn?700:500, color:asgn?'var(--grn)':'var(--t1)' }}>{g.name}</div>
-                      <div style={{ fontSize:9, color:'var(--t4)' }}>{(g.options||[]).join(' · ')}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {section==='pricing' && (
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {isParent && <div style={{ padding:'8px', background:'var(--bg3)', borderRadius:7, fontSize:11, color:'var(--t3)' }}>This item has variants — set prices on each variant in the Variants tab.</div>}
-            {[{k:'base',label:'Base price',hint:'Used when no channel override is set',accent:true},{k:'dineIn',label:'Dine-in',hint:'Leave blank to use base'},{k:'takeaway',label:'Takeaway',hint:''},{k:'collection',label:'Collection',hint:''},{k:'delivery',label:'Delivery apps',hint:''}].map(({k,label,hint,accent})=>(
+        {/* ════ PRICING ════════════════════════════════════════════════════ */}
+        {sec==='pricing' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {isParent && <div style={{ padding:'8px 10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t3)' }}>This item has size variants — set prices on each size in the Sizes tab.</div>}
+            {[
+              { k:'base',         label:'Base price',     hint:'Used when no channel override is set', accent:true },
+              { k:'dineIn',       label:'Dine-in',        hint:'Leave blank to use base price' },
+              { k:'takeaway',     label:'Takeaway',       hint:'' },
+              { k:'collection',   label:'Collection',     hint:'' },
+              { k:'delivery',     label:'Delivery',       hint:'' },
+            ].map(({k,label,hint,accent}) => (
               <div key={k}>
-                <span style={lbl}>{label} {hint&&<span style={{ fontWeight:400, textTransform:'none', letterSpacing:0, color:'var(--t4)', fontSize:9 }}>{hint}</span>}</span>
+                <div style={{ display:'flex', alignItems:'baseline', gap:6, marginBottom:5 }}>
+                  <span style={lbl}>{label}</span>
+                  {hint && <span style={{ fontSize:9, color:'var(--t4)', fontWeight:400 }}>{hint}</span>}
+                </div>
                 <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', fontSize:accent?15:13, color:accent?'var(--acc)':'var(--t4)', fontWeight:700 }}>£</span>
-                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:24, fontSize:accent?15:13, fontWeight:accent?800:400, color:accent?'var(--acc)':'var(--t1)' }} value={k==='base'?(p.base||0):p[k]!==null&&p[k]!==undefined?p[k]:''} placeholder={k!=='base'?`${p.base||0} (base)`:''} onChange={e=>fp(k,e.target.value)}/>
+                  <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', fontSize:accent?16:13, color:accent?'var(--acc)':'var(--t4)', fontWeight:700 }}>£</span>
+                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:26, fontSize:accent?16:13, fontWeight:accent?800:400, color:accent?'var(--acc)':'var(--t1)' }} value={k==='base'?(p.base||0):(p[k]!==null&&p[k]!==undefined?p[k]:'')} placeholder={k!=='base'?`${p.base||0} (base)`:''} onChange={e=>fp(k,e.target.value)}/>
                   {k!=='base'&&p[k]!==null&&p[k]!==undefined&&<button onClick={()=>fp(k,'')} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'var(--t4)', cursor:'pointer', fontSize:14 }}>×</button>}
                 </div>
               </div>
@@ -696,33 +780,66 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
           </div>
         )}
 
-        {section==='allergens' && (
+        {/* ════ ALLERGENS ══════════════════════════════════════════════════ */}
+        {sec==='allergens' && (
           <div>
-            <span style={lbl}>Declared allergens (all 14 EU mandatory)</span>
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            <span style={lbl}>Declared allergens — EU 14 mandatory</span>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
               {ALLERGENS.map(a=>{
                 const on=(item.allergens||[]).includes(a.id);
                 return (
-                  <button key={a.id} onClick={()=>onUpdate({allergens:on?(item.allergens||[]).filter(x=>x!==a.id):[...(item.allergens||[]),a.id]})} style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`1.5px solid ${on?'var(--red)':'var(--bdr)'}`, background:on?'var(--red-d)':'var(--bg3)' }}>
-                    <div style={{ width:18, height:18, borderRadius:4, border:`2px solid ${on?'var(--red)':'var(--bdr2)'}`, background:on?'var(--red)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      {on&&<div style={{ width:7,height:7,borderRadius:1,background:'#fff' }}/>}
+                  <button key={a.id} onClick={()=>onUpdate({allergens:on?(item.allergens||[]).filter(x=>x!==a.id):[...(item.allergens||[]),a.id]})} style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 9px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`1.5px solid ${on?'var(--red)':'var(--bdr)'}`, background:on?'var(--red-d)':'var(--bg3)', transition:'all .1s' }}>
+                    <div style={{ width:16,height:16,borderRadius:3,border:`2px solid ${on?'var(--red)':'var(--bdr2)'}`,background:on?'var(--red)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                      {on&&<div style={{ width:6,height:6,borderRadius:1,background:'#fff' }}/>}
                     </div>
-                    <span style={{ fontSize:12, fontWeight:on?700:400, color:on?'var(--red)':'var(--t1)', flex:1 }}>{a.icon} {a.label}</span>
-                    {on&&<span style={{ fontSize:10, color:'var(--red)', fontWeight:700 }}>✓</span>}
+                    <span style={{ fontSize:11, fontWeight:on?700:400, color:on?'var(--red)':'var(--t1)' }}>{a.icon} {a.label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
         )}
+
+        {/* ════ PIZZA ══════════════════════════════════════════════════════ */}
+        {sec==='pizza' && isPizza && (
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+            <div>
+              <span style={lbl}>Default toppings</span>
+              <div style={{ fontSize:10, color:'var(--t3)', marginBottom:8 }}>These toppings are pre-selected when this pizza is ordered. Customer can add/remove at ordering time.</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
+                {PIZZA_TOPPINGS.map(t => {
+                  const on = (item.defaultToppings||[]).includes(t.id);
+                  return (
+                    <button key={t.id} onClick={()=>{const cur=item.defaultToppings||[];onUpdate({defaultToppings:on?cur.filter(x=>x!==t.id):[...cur,t.id]});}} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 9px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`1.5px solid ${on?t.color||'var(--acc)':'var(--bdr)'}`, background:on?(t.color||'var(--acc)')+'22':'var(--bg3)', transition:'all .1s' }}>
+                      <div style={{ width:12,height:12,borderRadius:'50%',background:t.color||'var(--acc)',flexShrink:0 }}/>
+                      <span style={{ fontSize:11, fontWeight:on?700:400, color:on?t.color||'var(--acc)':'var(--t1)', flex:1 }}>{t.name}</span>
+                      {t.price>0&&<span style={{ fontSize:9, color:'var(--t4)' }}>+£{t.price.toFixed(2)}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:9, fontSize:11, color:'var(--t3)', lineHeight:1.6 }}>
+              <div style={{ fontWeight:700, color:'var(--t2)', marginBottom:4 }}>Global pizza settings</div>
+              Sizes, bases, crusts, and toppings are configured globally.<br/>
+              Go to <strong>Modifier groups</strong> to customise pizza options available across all pizzas.
+            </div>
+
+          </div>
+        )}
+
       </div>
 
-      <div style={{ padding:'8px 14px', borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
+      {/* ── Footer ──────────────────────────────────────────────────────── */}
+      <div style={{ padding:'8px 16px', borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
         <button onClick={()=>{if(confirm('Archive this item?'))onArchive();}} style={{ width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'transparent', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:11, fontWeight:600 }}>Archive item</button>
       </div>
     </div>
   );
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODIFIER GROUPS TAB
