@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.6.2';
+const VERSION = '2.6.3';
 
 const CHANGELOG = [
   {
@@ -40,6 +40,13 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '2.6.3', date: 'Apr 2026', label: 'Menus: inline add and delete menus',
+    changes: [
+      'Menu Manager → Menus tab: click + to add a new menu with an inline form (type name, press Enter or click Create). No browser prompt.',
+      'Each menu now has a × delete button. The default menu (Main menu ★) cannot be deleted. Deleting a menu does not delete its categories or items.',
+    ],
+  },
+  {
     version: '2.6.2', date: 'Apr 2026', label: 'Revert: Quick Screen back to single screen',
     changes: [
       'Removed multiple Quick Screens. Back to one simple 16-slot grid. Click an item to add it, drag to reorder, × to remove.',
@@ -61,6 +68,13 @@ const CHANGELOG = [
       'Both the Bar surface and POS surface now filter their category pills and item grids by the menu assigned to the device. A Bar terminal with the Bar menu only sees bar categories and bar items.',
       'The Menus tab in Menu Manager is where you build and manage named menus (Main menu, Bar menu, Lunch menu etc). Categories are assigned to menus via menuId.',
       'Falls back to showing all menus if no specific menu is assigned to the device profile.',
+    ],
+  },
+  {
+    version: '2.6.3', date: 'Apr 2026', label: 'Menus: inline add and delete menus',
+    changes: [
+      'Menu Manager → Menus tab: click + to add a new menu with an inline form (type name, press Enter or click Create). No browser prompt.',
+      'Each menu now has a × delete button. The default menu (Main menu ★) cannot be deleted. Deleting a menu does not delete its categories or items.',
     ],
   },
   {

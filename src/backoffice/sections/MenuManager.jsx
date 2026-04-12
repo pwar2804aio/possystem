@@ -57,11 +57,13 @@ export default function MenuManager() {
 // MENU TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function MenuTab() {
-  const { menuCategories, menuItems, menus, addMenu, updateMenu, addCategory, updateCategory, removeCategory,
+  const { menuCategories, menuItems, menus, addMenu, updateMenu, removeMenu, addCategory, updateCategory, removeCategory,
           addMenuItem, updateMenuItem, archiveMenuItem, eightySixIds, toggle86,
           markBOChange, showToast, modifierGroupDefs } = useStore();
 
   const [selMenuId, setSelMenuId] = useState(menus?.[0]?.id||'menu-1');
+  const [addingMenu, setAddingMenu]   = useState(false);
+  const [newMenuName, setNewMenuName] = useState('');
   const [selCatId, setSelCatId]   = useState(null);
   const [selItemId, setSelItemId] = useState(null);
   const [editingCat, setEditingCat] = useState(null);
@@ -156,38 +158,78 @@ function MenuTab() {
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
 
       {/* ── PANEL 0: Menu selector ─────────────────────────────────────── */}
-      <div style={{ width:180, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg2)', flexShrink:0 }}>
-        <div style={{ padding:'8px 10px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
-          <span style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>Menus</span>
+      <div style={{ width:200, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg2)', flexShrink:0 }}>
+        <div style={{ padding:'8px 10px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+          <span style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', flex:1 }}>Menus</span>
+          <button onClick={()=>{setAddingMenu(true);setNewMenuName('');}}
+            style={{ width:22,height:22,borderRadius:6,cursor:'pointer',background:'var(--acc)',border:'none',color:'#0b0c10',fontSize:15,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center' }}>+</button>
         </div>
+
+        {/* Inline new menu form */}
+        {addingMenu && (
+          <div style={{ padding:'8px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+            <input autoFocus value={newMenuName} onChange={e=>setNewMenuName(e.target.value)}
+              onKeyDown={e=>{
+                if (e.key==='Enter' && newMenuName.trim()) {
+                  const newId=`menu-${Date.now()}`;
+                  addMenu({ id:newId, name:newMenuName.trim(), description:'', scope:'local', assignedProfiles:[], isDefault:false, isActive:true });
+                  setSelMenuId(newId); setSelCatId(null);
+                  markBOChange(); showToast(`"${newMenuName.trim()}" created`,'success');
+                  setAddingMenu(false); setNewMenuName('');
+                }
+                if (e.key==='Escape') { setAddingMenu(false); setNewMenuName(''); }
+              }}
+              placeholder="Menu name…"
+              style={{ ...inp, fontSize:12, marginBottom:6 }}/>
+            <div style={{ display:'flex', gap:5 }}>
+              <button onClick={()=>{
+                  if (!newMenuName.trim()) return;
+                  const newId=`menu-${Date.now()}`;
+                  addMenu({ id:newId, name:newMenuName.trim(), description:'', scope:'local', assignedProfiles:[], isDefault:false, isActive:true });
+                  setSelMenuId(newId); setSelCatId(null);
+                  markBOChange(); showToast(`"${newMenuName.trim()}" created`,'success');
+                  setAddingMenu(false); setNewMenuName('');
+                }}
+                disabled={!newMenuName.trim()}
+                style={{ flex:1,padding:'5px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0b0c10',fontSize:11,fontWeight:700,opacity:newMenuName.trim()?1:.4 }}>
+                Create
+              </button>
+              <button onClick={()=>{setAddingMenu(false);setNewMenuName('');}}
+                style={{ padding:'5px 8px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={{ flex:1, overflowY:'auto', padding:'6px' }}>
           {(menus||[]).map(m=>(
-            <button key={m.id} onClick={()=>{setSelMenuId(m.id);setSelCatId(null);setSelItemId(null);}}
-              style={{ width:'100%', display:'flex', alignItems:'center', gap:6, padding:'8px 9px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'left', marginBottom:3,
-                border:`1.5px solid ${selMenuId===m.id?'var(--acc)':'transparent'}`,
+            <div key={m.id}
+              style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3,
+                borderRadius:8, border:`1.5px solid ${selMenuId===m.id?'var(--acc)':'transparent'}`,
                 background:selMenuId===m.id?'var(--acc-d)':'transparent', transition:'all .1s' }}>
-              <div style={{ flex:1, minWidth:0 }}>
+              <button onClick={()=>{setSelMenuId(m.id);setSelCatId(null);setSelItemId(null);}}
+                style={{ flex:1, display:'flex', flexDirection:'column', padding:'8px 9px', cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:'none', background:'transparent' }}>
                 <div style={{ fontSize:12, fontWeight:700, color:selMenuId===m.id?'var(--acc)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {m.isDefault?'★ ':''}{m.name}
                 </div>
                 <div style={{ fontSize:9, color:'var(--t4)', marginTop:1 }}>
                   {menuCategories.filter(c=>!c.parentId&&c.menuId===m.id).length} categories
                 </div>
-              </div>
-            </button>
+              </button>
+              {!m.isDefault && (
+                <button onClick={()=>{
+                    if (!confirm(`Delete "${m.name}"? This won't delete its categories or items.`)) return;
+                    const fallback = (menus||[]).find(x=>x.id!==m.id)?.id||'menu-1';
+                    if (selMenuId===m.id) { setSelMenuId(fallback); setSelCatId(null); setSelItemId(null); }
+                    removeMenu(m.id); markBOChange(); showToast(`"${m.name}" deleted`,'info');
+                  }}
+                  style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginRight:5 }}>
+                  ×
+                </button>
+              )}
+            </div>
           ))}
-        </div>
-        <div style={{ padding:'6px', borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
-          <button onClick={()=>{
-            const name = prompt('New menu name:');
-            if (!name?.trim()) return;
-            const newId = `menu-${Date.now()}`;
-            addMenu({ id:newId, name:name.trim(), description:'', scope:'local', assignedProfiles:[], isDefault:false, isActive:true });
-            setSelMenuId(newId); setSelCatId(null);
-            markBOChange(); showToast(`"${name.trim()}" created`,'success');
-          }} style={{ width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1.5px dashed var(--bdr2)', color:'var(--t3)', fontSize:11, fontWeight:600 }}>
-            + New menu
-          </button>
         </div>
       </div>
 
