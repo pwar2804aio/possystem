@@ -78,7 +78,7 @@ function MenuTab() {
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [addSearch, setAddSearch]     = useState('');
 
-  const roots     = useMemo(()=>menuCategories.filter(c=>!c.parentId&&!c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)),[menuCategories]);
+  const roots     = useMemo(()=>menuCategories.filter(c=>!c.parentId&&!c.isSpecial&&(!c.menuId||c.menuId===selMenuId)).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)),[menuCategories,selMenuId]);
   const selCat    = menuCategories.find(c=>c.id===selCatId);
   const selItem   = menuItems.find(i=>i.id===selItemId);
 
@@ -145,13 +145,51 @@ function MenuTab() {
 
   const saveNewCat = ()=>{
     if (!catForm.label.trim()) return;
-    addCategory({ menuId:'menu-1', ...catForm, parentId:catForm.parentId||null, sortOrder:menuCategories.length });
+    addCategory({ menuId:selMenuId, ...catForm, parentId:catForm.parentId||null, sortOrder:menuCategories.length });
     markBOChange(); showToast(`"${catForm.label}" added`,'success');
     setCatForm({label:'',icon:'🍽',color:'#3b82f6',parentId:''}); setAddingCat(false);
   };
 
+  const selMenu = (menus||[]).find(m=>m.id===selMenuId);
+
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
+
+      {/* ── PANEL 0: Menu selector ─────────────────────────────────────── */}
+      <div style={{ width:180, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg2)', flexShrink:0 }}>
+        <div style={{ padding:'8px 10px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
+          <span style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>Menus</span>
+        </div>
+        <div style={{ flex:1, overflowY:'auto', padding:'6px' }}>
+          {(menus||[]).map(m=>(
+            <button key={m.id} onClick={()=>{setSelMenuId(m.id);setSelCatId(null);setSelItemId(null);}}
+              style={{ width:'100%', display:'flex', alignItems:'center', gap:6, padding:'8px 9px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'left', marginBottom:3,
+                border:`1.5px solid ${selMenuId===m.id?'var(--acc)':'transparent'}`,
+                background:selMenuId===m.id?'var(--acc-d)':'transparent', transition:'all .1s' }}>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:selMenuId===m.id?'var(--acc)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {m.isDefault?'★ ':''}{m.name}
+                </div>
+                <div style={{ fontSize:9, color:'var(--t4)', marginTop:1 }}>
+                  {menuCategories.filter(c=>!c.parentId&&c.menuId===m.id).length} categories
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div style={{ padding:'6px', borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
+          <button onClick={()=>{
+            const name = prompt('New menu name:');
+            if (!name?.trim()) return;
+            const newId = `menu-${Date.now()}`;
+            addMenu({ id:newId, name:name.trim(), description:'', scope:'local', assignedProfiles:[], isDefault:false, isActive:true });
+            setSelMenuId(newId); setSelCatId(null);
+            markBOChange(); showToast(`"${name.trim()}" created`,'success');
+          }} style={{ width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1.5px dashed var(--bdr2)', color:'var(--t3)', fontSize:11, fontWeight:600 }}>
+            + New menu
+          </button>
+        </div>
+      </div>
 
       {/* ── PANEL 1: Category tree ─────────────────────────────────────── */}
       <div style={{ width:200, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg1)', flexShrink:0 }}>

@@ -49,6 +49,15 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '2.6.0', date: 'Apr 2026', label: 'Menus: build multiple menus, assign per device profile',
+    changes: [
+      'Menus tab now shows a menu selector on the left — Main menu, Bar menu, Lunch menu, and a + New menu button. Click a menu to see only its categories. Categories created in a menu belong to that menu.',
+      'Device Profiles → Edit any profile → new Menu section: assign which menu that terminal shows (Main menu, Bar menu, etc). The Bar terminal can now show only Bar menu categories.',
+      'POS reads the device profile menu assignment and filters category pills accordingly. If no menu is assigned the default menu (Main menu) is used.',
+      'Menus are included in Push to POS snapshot so all terminals receive menu assignments automatically.',
+    ],
+  },
+  {
     version: '2.5.3', date: 'Apr 2026', label: 'Device profiles: assign Quick Screen per terminal',
     changes: [
       'Device profiles now have a Quick Screen layout selector. Go to Back Office → Device Profiles → Edit any profile → Quick Screen layout — pick which screen that terminal shows on its ⚡ Quick tab.',

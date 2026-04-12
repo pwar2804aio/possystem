@@ -111,6 +111,8 @@ export const useStore = create((set, get) => ({
       locationSections: snap.locationSections || useStore.getState().locationSections,
       // Menu items — full replace with pushed version
       ...(snap.menuItems ? { menuItems: snap.menuItems } : {}),
+      // Menus list
+      ...(snap.menus ? { menus: snap.menus } : {}),
       // Menu categories — full replace
       ...(snap.menuCategories ? { menuCategories: snap.menuCategories } : {}),
       // Quick screens
@@ -241,6 +243,14 @@ export const useStore = create((set, get) => ({
     { id:'cat-draught',   menuId:'menu-1', parentId:'cat-drinks', label:'Draught beer', icon:'🍺', color:'#e8a020', accountingGroup:'Beverages', sortOrder:0 },
     { id:'cat-wine',      menuId:'menu-1', parentId:'cat-drinks', label:'Wine',         icon:'🍷', color:'#8b1e3f', accountingGroup:'Beverages', sortOrder:1 },
     { id:'cat-softs',     menuId:'menu-1', parentId:'cat-drinks', label:'Soft drinks',  icon:'🥤', color:'#22d3ee', accountingGroup:'Beverages', sortOrder:2 },
+
+    // ── Bar menu (menu-2) ───────────────────────────────────────────────────
+    { id:'bcat-draught',  menuId:'menu-2', parentId:null, label:'Draught',      icon:'🍺', color:'#e8a020', accountingGroup:'Beverages', sortOrder:0 },
+    { id:'bcat-wine',     menuId:'menu-2', parentId:null, label:'Wine',         icon:'🍷', color:'#8b1e3f', accountingGroup:'Beverages', sortOrder:1 },
+    { id:'bcat-spirits',  menuId:'menu-2', parentId:null, label:'Spirits',      icon:'🥃', color:'#a855f7', accountingGroup:'Beverages', sortOrder:2 },
+    { id:'bcat-softs',    menuId:'menu-2', parentId:null, label:'Soft drinks',  icon:'🥤', color:'#22d3ee', accountingGroup:'Beverages', sortOrder:3 },
+    { id:'bcat-hot',      menuId:'menu-2', parentId:null, label:'Hot drinks',   icon:'☕', color:'#78716c', accountingGroup:'Beverages', sortOrder:4 },
+    { id:'bcat-snacks',   menuId:'menu-2', parentId:null, label:'Bar snacks',   icon:'🍟', color:'#22c55e', accountingGroup:'Food',      sortOrder:5 },
   ],
   addCategory: cat => set(s => ({ menuCategories: [...s.menuCategories, { id:`cat-${Date.now()}`, ...cat }] })),
   updateCategory: (id, patch) => set(s => ({ menuCategories: s.menuCategories.map(c => c.id===id ? { ...c, ...patch } : c) })),
