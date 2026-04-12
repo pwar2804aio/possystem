@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { broadcastConfigPush } from '../sync/SyncBridge';
 import MenuManager from './sections/MenuManager';
@@ -29,6 +29,22 @@ const NAV = [
 
 export default function BackOfficeApp() {
   const { setAppMode, staff, closedChecks, tables, devices } = useStore();
+
+  // Auto-persist menus and categories to localStorage on every change
+  // so they survive page reloads without needing Push to POS
+  useEffect(() => {
+    const unsub = useStore.subscribe((state, prev) => {
+      if (state.menus !== prev.menus || state.menuCategories !== prev.menuCategories) {
+        try {
+          localStorage.setItem('rpos-bo-config', JSON.stringify({
+            menus: state.menus,
+            menuCategories: state.menuCategories,
+          }));
+        } catch {}
+      }
+    });
+    return unsub;
+  }, []);
   const [section, setSection] = useState('overview');
 
   const groups = [...new Set(NAV.map(n => n.group))];
