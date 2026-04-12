@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.5.0';
+const VERSION = '2.5.1';
 
 const CHANGELOG = [
   {
@@ -38,6 +38,10 @@ const CHANGELOG = [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
     ],
+  },
+  {
+    version: '2.5.1', date: 'Apr 2026', label: 'Fix: Quick Screen category filter includes subcategories',
+    changes: ['Quick Screen picker category filter now shows items in subcategories. Selecting Drinks shows items from Draught beer, Wine, Soft drinks subcategories — not just direct Drinks items.'],
   },
   {
     version: '2.5.0', date: 'Apr 2026', label: 'Quick Screen: multiple named screens, variable grid, click-to-add',

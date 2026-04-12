@@ -1985,7 +1985,11 @@ function QuickScreenManager() {
   const roots    = menuCategories.filter(c => !c.parentId && !c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
   const listItems = allItems
     .filter(i => {
-      if (catFilter && i.cat !== catFilter && !(i.cats||[]).includes(catFilter)) return false;
+      if (catFilter) {
+        const subIds = menuCategories.filter(c=>c.parentId===catFilter).map(c=>c.id);
+        const inCat = i.cat===catFilter || (i.cats||[]).includes(catFilter) || subIds.includes(i.cat) || subIds.some(sid=>(i.cats||[]).includes(sid));
+        if (!inCat) return false;
+      }
       if (search) return (i.menuName||i.name||'').toLowerCase().includes(search.toLowerCase());
       return true;
     })
