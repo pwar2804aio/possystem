@@ -163,7 +163,9 @@ export default function POSSurface() {
     if (item.type === 'subitem') return;
 
     // Variant parent: detected by type OR by having linked children
-    const variantChildren = MENU_ITEMS.filter(i => i.parentId === item.id && !i.archived && !eightySixIds.includes(i.id));
+    const variantChildren = MENU_ITEMS
+      .filter(i => i.parentId === item.id && !i.archived && !eightySixIds.includes(i.id))
+      .sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
     if (item.type === 'variants' || variantChildren.length > 0) {
       if (variantChildren.length > 0) {
         setModalItem({

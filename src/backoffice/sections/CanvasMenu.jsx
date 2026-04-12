@@ -91,9 +91,22 @@ export default function CanvasMenu({ catId }) {
   }, [dragging, panning, panStart, viewport, updateMenuItem]);
 
   const onCanvasMouseUp = useCallback(() => {
-    if (dragging) { markBOChange(); setDragging(null); }
+    if (dragging) {
+      // Recalculate sortOrder for all items in canvas based on position (top→bottom, left→right)
+      const allVisible = menuItems.filter(i => !i.archived && !i.parentId);
+      const sorted = [...allVisible].sort((a,b) => {
+        const pa = a.canvasPos || { x:0, y:(a.sortOrder||0)*120 };
+        const pb = b.canvasPos || { x:0, y:(b.sortOrder||0)*120 };
+        return pa.y !== pb.y ? pa.y - pb.y : pa.x - pb.x;
+      });
+      sorted.forEach((item, idx) => {
+        if ((item.sortOrder??999) !== idx) updateMenuItem(item.id, { sortOrder: idx });
+      });
+      markBOChange();
+      setDragging(null);
+    }
     if (panning) setPanning(false);
-  }, [dragging, panning, markBOChange]);
+  }, [dragging, panning, markBOChange, menuItems, updateMenuItem]);
 
   // ── Pan canvas ────────────────────────────────────────────────────────────
   const onCanvasMouseDown = useCallback((e) => {

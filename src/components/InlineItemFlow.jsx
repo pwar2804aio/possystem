@@ -13,7 +13,8 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
 
   // ── Resolve variant children from menuItems ──────────────────────────────
   const variantChildren = useMemo(() =>
-    (menuItems || []).filter(v => v.parentId === item.id && !v.archived),
+    (menuItems || []).filter(v => v.parentId === item.id && !v.archived)
+      .sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999)),
     [item.id, menuItems]
   );
   const isVariant = item.type === 'variants' || variantChildren.length > 0;

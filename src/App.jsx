@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.8.0';
+const VERSION = '1.9.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,14 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.9.0', date: 'Apr 2026', label: 'Fix: variant order + canvas order now reflect on POS',
+    changes: [
+      'Variant order on POS fixed: dragging sizes to reorder in the Sizes tab or Flow tab now correctly reflects on the POS. Root cause was variantChildren were read from the store without sorting by sortOrder — fixed in both POSSurface and InlineItemFlow.',
+      'Canvas drag now updates sortOrder: previously dragging items on the canvas only saved canvasPos (the visual position) but never updated sortOrder. Now when you release a drag, all items in the canvas are re-ranked by their Y position (top to bottom), and that order is what the POS uses.',
+      'Canvas auto-layout also correctly updates sortOrder when items are rearranged.',
     ],
   },
   {
