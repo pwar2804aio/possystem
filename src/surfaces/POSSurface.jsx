@@ -108,7 +108,7 @@ export default function POSSurface() {
   const assignedSection = deviceConfig?.assignedSection;
   const quickItems = useMemo(() => {
     const ids = quickScreenIds && quickScreenIds.length ? quickScreenIds : QUICK_IDS;
-    const activeScreen = (quickScreens||[]).find(s=>s.id===activeQuickScreenId);
+    const activeScreen = (quickScreens||[]).find(s=>s.id===(deviceConfig?.quickScreenId || activeQuickScreenId));
     const activeIds = activeScreen?.ids || quickScreenIds || [];
     const available = MENU_ITEMS.filter(i => !i.archived && !i.parentId);
     const fromIds = activeIds.map(id => MENU_ITEMS.find(i => i.id === id)).filter(i => i && !eightySixIds.includes(i.id) && !i.archived);

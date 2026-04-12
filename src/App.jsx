@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.5.2';
+const VERSION = '2.5.3';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,14 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.5.3', date: 'Apr 2026', label: 'Device profiles: assign Quick Screen per terminal',
+    changes: [
+      'Device profiles now have a Quick Screen layout selector. Go to Back Office → Device Profiles → Edit any profile → Quick Screen layout — pick which screen that terminal shows on its ⚡ Quick tab.',
+      'The Bar terminal profile can now show the Bar screen (drinks only) while the main counter shows the Main screen. Each device independently reads its assigned screen.',
+      'POS reads quickScreenId from the active device config, falling back to the global activeQuickScreenId if no profile screen is assigned.',
     ],
   },
   {
