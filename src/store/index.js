@@ -111,6 +111,11 @@ export const useStore = create((set, get) => ({
       locationSections: snap.locationSections || useStore.getState().locationSections,
       // Menu items — full replace with pushed version
       ...(snap.menuItems ? { menuItems: snap.menuItems } : {}),
+      // Menu categories — full replace
+      ...(snap.menuCategories ? { menuCategories: snap.menuCategories } : {}),
+      // Quick screens
+      ...(snap.quickScreens ? { quickScreens: snap.quickScreens } : {}),
+      ...(snap.activeQuickScreenId ? { activeQuickScreenId: snap.activeQuickScreenId } : {}),
       configVersion: snap.version,
       configUpdateAvailable: false,
       configUpdateSnapshot: null,
