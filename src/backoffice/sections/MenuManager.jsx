@@ -1688,12 +1688,14 @@ function ModifiersTab() {
               <span style={{ fontSize:9, color:'var(--t4)' }}>drag to reorder · nested = links to another group</span>
             </div>
 
-            {(sel.options||[]).map((opt,oi)=>(
+            {(sel.options||[]).map((opt,oi)=>{
+              const allRootCats = useStore.getState().menuCategories?.filter(c=>!c.parentId&&!c.isSpecial)||[];
+              return (
               <div key={opt.id} draggable
                 onDragStart={()=>setDragOIdx(oi)} onDragOver={e=>{e.preventDefault();setOverOIdx(oi);}}
                 onDrop={e=>{e.preventDefault();if(dragOIdx!==null&&dragOIdx!==oi)reorderOpts(dragOIdx,oi);setDragOIdx(null);setOverOIdx(null);}}
                 onDragEnd={()=>{setDragOIdx(null);setOverOIdx(null);}}
-                style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, border:`1px solid ${overOIdx===oi?'var(--acc)':'var(--bdr)'}`, background:'var(--bg2)', opacity:dragOIdx===oi?.4:1 }}>
+                style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, border:`1px solid ${overOIdx===oi?'var(--acc)':opt.soldAlone?'var(--grn-b)':'var(--bdr)'}`, background:opt.soldAlone?'var(--grn-d)':'var(--bg2)', opacity:dragOIdx===oi?.4:1 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'14px 1fr 90px auto', gap:6, alignItems:'center' }}>
                   <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⠿</span>
                   <input style={{ ...inp, fontSize:13, fontWeight:600 }} value={opt.name} onChange={e=>updOpt(opt.id,{name:e.target.value})} placeholder="Option name"/>
@@ -1702,6 +1704,24 @@ function ModifiersTab() {
                     <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:12, color:'var(--acc)' }} value={opt.price||''} placeholder="0.00" onChange={e=>updOpt(opt.id,{price:parseFloat(e.target.value)||0})}/>
                   </div>
                   <button onClick={()=>delOpt(opt.id)} style={{ width:28,height:34,borderRadius:7,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                </div>
+                {/* Can be sold alone */}
+                <div style={{ marginTop:7, paddingTop:7, borderTop:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', flexShrink:0 }}>
+                    <input type="checkbox" checked={!!opt.soldAlone} onChange={e=>updOpt(opt.id,{soldAlone:e.target.checked})} style={{ accentColor:'var(--grn)', width:14, height:14 }}/>
+                    <span style={{ fontSize:11, fontWeight:600, color:opt.soldAlone?'var(--grn)':'var(--t3)' }}>Can be sold alone</span>
+                  </label>
+                  {opt.soldAlone && (
+                    <>
+                      <span style={{ fontSize:9, color:'var(--t4)' }}>→ appears in:</span>
+                      <select value={opt.soldAloneCat||''} onChange={e=>updOpt(opt.id,{soldAloneCat:e.target.value||undefined})}
+                        style={{ ...inp, fontSize:11, padding:'3px 7px', maxWidth:160, color:opt.soldAloneCat?'var(--grn)':'var(--t4)' }}>
+                        <option value="">— pick a category —</option>
+                        {allRootCats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                      </select>
+                      <span style={{ fontSize:9, fontWeight:600, color:'var(--grn)', flexShrink:0 }}>shows on POS menu</span>
+                    </>
+                  )}
                 </div>
                 {/* Nested sub-group selector */}
                 <div style={{ marginTop:7, paddingTop:7, borderTop:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:7 }}>
@@ -1714,7 +1734,8 @@ function ModifiersTab() {
                   {opt.subGroupId && <span style={{ fontSize:9, color:'var(--acc)', fontWeight:700, flexShrink:0 }}>▼ shows when selected</span>}
                 </div>
               </div>
-            ))}
+              );
+            })}
 
             {/* Add option */}
             <div style={{ marginTop:6, padding:'10px', background:'var(--bg3)', borderRadius:10, border:'1.5px dashed var(--bdr2)' }}>

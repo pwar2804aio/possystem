@@ -272,10 +272,10 @@ export const useStore = create((set, get) => ({
     // Options reference sub item IDs from MENU_ITEMS (type:'subitem')
     { id:'mgd-sides',        name:'Side choice',       min:1, max:1,
       options:[
-        {id:'sub-chips',   name:'Chips',               price:0},
-        {id:'sub-salad',   name:'Side salad',          price:0},
-        {id:'sub-spfries', name:'Sweet potato fries',  price:1.5},
-        {id:'sub-mash',    name:'Creamy mash',         price:0},
+        {id:'sub-chips',   name:'Chips',               price:0,   soldAlone:true,  soldAloneCat:'cat-starters'},
+        {id:'sub-salad',   name:'Side salad',          price:0,   soldAlone:true,  soldAloneCat:'cat-starters'},
+        {id:'sub-spfries', name:'Sweet potato fries',  price:1.5, soldAlone:true,  soldAloneCat:'cat-starters'},
+        {id:'sub-mash',    name:'Creamy mash',         price:0,   soldAlone:false},
       ]},
     { id:'mgd-sauces',       name:'Sauce',              min:0, max:1,
       options:[

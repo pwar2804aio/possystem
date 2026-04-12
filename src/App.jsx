@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.2.0';
+const VERSION = '2.3.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,15 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.3.0', date: 'Apr 2026', label: 'Sold alone: modifier options orderable as standalone POS items',
+    changes: [
+      'NEW: Can be sold alone — in the Modifier groups tab, each option now has a Can be sold alone checkbox. When ticked, you choose which category it appears in on the POS menu. That option then shows as a regular tappable item in that category.',
+      'Example: Chips and Side salad in the Side choice group can now be ticked as sold alone → Starters. They appear directly on the Starters POS screen and can be ordered without being attached to another item.',
+      'NEW: Extras category — when any soldAlone options exist, a purple ⊕ Extras category pill appears on the POS. It shows ALL soldAlone options from all modifier groups in one dedicated quick-access screen.',
+      'Demo: Chips, Side salad, Sweet potato fries from the Side choice group are sold alone in Starters. They appear both in the Starters category and the Extras screen.',
     ],
   },
   {

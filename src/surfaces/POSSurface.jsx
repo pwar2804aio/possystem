@@ -51,11 +51,41 @@ export default function POSSurface() {
   // identity on re-renders (which would remount ProductModal and reset selections state)
   const rawItems = storeMenuItems || SEED_MENU_ITEMS;
   const { getItemPrice } = useStore.getState();
-  const MENU_ITEMS = useMemo(() => rawItems.map(i => ({
+  // SoldAlone modifier options as virtual POS menu items
+  const soldAloneItems = useMemo(() => {
+    const items = [];
+    (modifierGroupDefs||[]).forEach(group => {
+      (group.options||[]).forEach(opt => {
+        if (opt.soldAlone && opt.soldAloneCat) {
+          items.push({
+            id: `solo-${opt.id}`,
+            name: opt.name,
+            menuName: opt.name,
+            receiptName: opt.name,
+            kitchenName: opt.name,
+            type: 'simple',
+            cat: opt.soldAloneCat,
+            cats: [],
+            price: opt.price||0,
+            pricing: { base: opt.price||0 },
+            allergens: [],
+            assignedModifierGroups: [],
+            assignedInstructionGroups: [],
+            sortOrder: 999,
+            _soldAlone: true,
+            _fromGroup: group.name,
+          });
+        }
+      });
+    });
+    return items;
+  }, [modifierGroupDefs]);
+
+  const MENU_ITEMS = useMemo(() => [...rawItems, ...soldAloneItems].map(i => ({
     ...i,
     name: i.menuName || i.name,
     price: getItemPrice ? getItemPrice(i, orderType) : (i.pricing?.base ?? i.price ?? 0),
-  })), [rawItems, orderType]);
+  })), [rawItems, soldAloneItems, orderType]);
 
   // Order types this terminal is allowed to show (from device profile)
   const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];
@@ -121,6 +151,7 @@ export default function POSSurface() {
 
   const catItems = useMemo(() => {
     if (cat === 'quick') return quickItems;
+    if (cat === 'extras') return soldAloneItems;
     const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId)
       .slice().sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
     const inCat = (i, id) => i.cat === id || (i.cats||[]).includes(id);
@@ -445,7 +476,7 @@ export default function POSSurface() {
         </div>
         <div style={{flex:1,overflowY:'auto',padding:'6px 7px'}}>
           {/* Quick screen always first */}
-          {[{ id:'quick', label:'Quick', icon:'⚡', color:'var(--acc)' }].concat(
+          {[{ id:'quick', label:'Quick', icon:'⚡', color:'var(--acc)' }, ...(soldAloneItems.length>0?[{ id:'extras', label:'Extras', icon:'⊕', color:'#8b5cf6' }]:[])].concat(
             menuCategories.filter(c => !c.parentId && !c.isSpecial).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0))
           ).map(c => {
             const isActive = cat === c.id && !search;
@@ -453,6 +484,8 @@ export default function POSSurface() {
             const subIds = menuCategories.filter(s => s.parentId === c.id).map(s => s.id);
             const count = c.id === 'quick'
               ? quickItems.length
+              : c.id === 'extras'
+              ? soldAloneItems.length
               : MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId && (i.cat === c.id || subIds.includes(i.cat))).length;
             const hasSubcats = subIds.length > 0;
             return (
