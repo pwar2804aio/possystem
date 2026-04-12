@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.0.1';
+const VERSION = '2.0.2';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,15 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.0.2', date: 'Apr 2026', label: 'Category ↕ Move modal, list sub-items fix',
+    changes: [
+      'Category nesting redesigned: drag-to-nest removed (unreliable HTML5 drag events). Every category now has a ↕ button that opens a clean Move modal — choose Root level or any other category to nest under. Works reliably every time.',
+      'Category un-nesting: click ↕ on any subcategory → select Root level → Move here. Done.',
+      'Category reorder via drag still works within the same level (root-to-root or sub-to-sub).',
+      'List view sub-items fix: switched from expandedIds (needed initialising per category switch) to collapsedIds (empty by default = all expanded). Variant children now always show immediately when you navigate to any category.',
     ],
   },
   {

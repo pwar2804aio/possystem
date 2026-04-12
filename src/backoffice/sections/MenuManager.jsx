@@ -63,6 +63,7 @@ function MenuTab() {
   const [selCatId, setSelCatId]   = useState(null);
   const [selItemId, setSelItemId] = useState(null);
   const [editingCat, setEditingCat] = useState(null);
+  const [movingCatId, setMovingCatId] = useState(null);
   const [addingCat, setAddingCat]   = useState(false);
   const [catForm, setCatForm]       = useState({ label:'', icon:'🍽', color:'#3b82f6', parentId:'' });
   const [dragCatId, setDragCatId]   = useState(null);
@@ -98,29 +99,22 @@ function MenuTab() {
   // ── Category drag: same level = reorder, cross level = nest ──────────────
   const onCatDrop = useCallback((e, targetId) => {
     e.preventDefault();
-    if (!dragCatId||dragCatId===targetId) { setDragCatId(null); setOverCatId(null); return; }
+    if (!dragCatId || dragCatId===targetId) { setDragCatId(null); setOverCatId(null); return; }
     const dragged = menuCategories.find(c=>c.id===dragCatId);
     const target  = menuCategories.find(c=>c.id===targetId);
-    if (targetId==='root') {
-      updateCategory(dragCatId,{parentId:null}); showToast('Moved to root level','success');
-      markBOChange(); setDragCatId(null); setOverCatId(null); return;
-    }
-    if (!dragged||!target) { setDragCatId(null); setOverCatId(null); return; }
-    if (false && targetId==='root_unused') {
-      updateCategory(dragCatId,{parentId:null}); showToast('Moved to root','success');
-    } else if (dragged.parentId===target.parentId) {
-      // Same level → reorder
-      const siblings = menuCategories.filter(c=>c.parentId===dragged.parentId).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
+    if (!dragged) { setDragCatId(null); setOverCatId(null); return; }
+    // ONLY reorder within the same parent level — no cross-level nesting via drag
+    // (Use the ↕ Move button per category to change parent/nesting)
+    if (targetId==='root' || dragged.parentId===target?.parentId) {
+      const level = targetId==='root' ? null : dragged.parentId;
+      const siblings = menuCategories.filter(c=>c.parentId===level).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
       const without  = siblings.filter(c=>c.id!==dragCatId);
-      const ti       = without.findIndex(c=>c.id===targetId);
-      const reordered= [...without.slice(0,ti), dragged, ...without.slice(ti)];
+      const ti       = targetId==='root' ? without.length : without.findIndex(c=>c.id===targetId);
+      const reordered = [...without.slice(0,ti), dragged, ...without.slice(ti)];
       reordered.forEach((c,i)=>{ if((c.sortOrder||0)!==i) updateCategory(c.id,{sortOrder:i}); });
-      showToast('Category reordered','success');
-    } else {
-      if (menuCategories.find(c=>c.id===targetId)?.parentId===dragCatId) { showToast('Cannot nest that way','error'); }
-      else { updateCategory(dragCatId,{parentId:targetId}); showToast('Nested as subcategory','success'); }
+      markBOChange(); showToast('Reordered','success');
     }
-    markBOChange(); setDragCatId(null); setOverCatId(null);
+    setDragCatId(null); setOverCatId(null);
   },[dragCatId, menuCategories, updateCategory, markBOChange, showToast]);
 
   // ── Item drag: reorder in grid ────────────────────────────────────────────
@@ -183,9 +177,7 @@ function MenuTab() {
         )}
 
         {/* Root drop zone */}
-        <div onDragOver={e=>{e.preventDefault();setOverCatId('root');}} onDrop={e=>onCatDrop(e,'root')} style={{ margin:'6px 8px 4px', padding:'8px 10px', borderRadius:6, fontSize:9, color:'var(--t4)', border:`1.5px dashed ${overCatId==='root'?'var(--acc)':'var(--bdr)'}`, background:overCatId==='root'?'var(--acc-d)':'transparent', textAlign:'center' }}>
-          {overCatId==='root'?'⤴ Drop here to make root category':'⤴ Drag a subcategory here to un-nest it'}
-        </div>
+
 
         <div style={{ flex:1, overflowY:'auto', padding:'4px 6px' }}>
           {roots.map(cat=>{
@@ -206,8 +198,8 @@ function MenuTab() {
                   <div style={{ width:7, height:7, borderRadius:'50%', background:color, flexShrink:0 }}/>
                   <span style={{ fontSize:14, flexShrink:0 }}>{cat.icon}</span>
                   <span style={{ fontSize:11, fontWeight:active?700:500, color:active?color:'var(--t2)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cat.label}</span>
-                  {!isReorder&&over&&dragCatId&&dragCatId!==cat.id&&<span style={{ fontSize:8, fontWeight:700, color:'var(--acc)', flexShrink:0 }}>nest →</span>}
-                  {!(over&&dragCatId)&&<span style={{ fontSize:9, color:'var(--t4)', flexShrink:0 }}>{count}</span>}
+                  <span style={{ fontSize:9, color:'var(--t4)', flexShrink:0 }}>{count}</span>
+                  <button onClick={e=>{e.stopPropagation();setMovingCatId(cat.id);}} title="Move / nest this category" style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--bdr)',background:'var(--bg3)',color:'var(--t4)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>↕</button>
                 </div>
                 {/* Subcats */}
                 {children.map(sub=>{
@@ -224,6 +216,7 @@ function MenuTab() {
                         <span style={{ fontSize:13 }}>{sub.icon}</span>
                         <span style={{ fontSize:10, fontWeight:sa?700:400, color:sa?sc:'var(--t3)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sub.label}</span>
                         <span style={{ fontSize:9, color:'var(--t4)' }}>{menuItems.filter(i=>!i.archived&&i.type!=='subitem'&&i.cat===sub.id).length}</span>
+                        <button onClick={e=>{e.stopPropagation();setMovingCatId(sub.id);}} title="Move / un-nest" style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--bdr)',background:'var(--bg3)',color:'var(--t4)',cursor:'pointer',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>↕</button>
                       </div>
                     </div>
                   );
@@ -412,6 +405,14 @@ function MenuTab() {
         />
       )}
 
+      {movingCatId && (() => {
+        const movingCat = menuCategories.find(c=>c.id===movingCatId);
+        return movingCat ? (
+          <MoveCatModal cat={movingCat} allCats={menuCategories.filter(c=>!c.isSpecial)}
+            onSave={parentId=>{ updateCategory(movingCatId,{parentId}); markBOChange(); setMovingCatId(null); showToast(parentId?'Nested as subcategory':'Moved to root','success'); }}
+            onClose={()=>setMovingCatId(null)}/>
+        ) : null;
+      })()}
       {editingCat && (
         <CatModal cat={editingCat} roots={roots}
           onSave={p=>{updateCategory(editingCat.id,p);markBOChange();setEditingCat(null);showToast('Updated','success');}}
@@ -1577,6 +1578,44 @@ function CatModal({ cat, roots, onSave, onDelete, onClose }) {
           <button onClick={()=>{if(confirm('Delete?'))onDelete();}} style={{ padding:'8px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:600 }}>Delete</button>
           <button onClick={onClose} style={{ flex:1, padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12 }}>Cancel</button>
           <button onClick={()=>onSave({...f,parentId:f.parentId||null})} disabled={!f.label.trim()} style={{ flex:2, padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:800, opacity:f.label.trim()?1:.4 }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOVE CATEGORY MODAL — reliable nesting/unnesting via dropdown
+// ═══════════════════════════════════════════════════════════════════════════
+function MoveCatModal({ cat, allCats, onSave, onClose }) {
+  const roots = allCats.filter(c => !c.parentId && c.id !== cat.id);
+  const [parentId, setParentId] = useState(cat.parentId || '');
+  return (
+    <div className="modal-back" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:18, width:'100%', maxWidth:380, padding:'20px', boxShadow:'var(--sh3)' }}>
+        <div style={{ fontSize:15, fontWeight:800, color:'var(--t1)', marginBottom:4 }}>Move "{cat.label}"</div>
+        <div style={{ fontSize:12, color:'var(--t3)', marginBottom:16 }}>Choose where this category sits in the hierarchy.</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:20 }}>
+          <div onClick={()=>setParentId('')} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:`2px solid ${parentId===''?'var(--acc)':'var(--bdr)'}`, background:parentId===''?'var(--acc-d)':'var(--bg3)', cursor:'pointer' }}>
+            <div style={{ width:18,height:18,borderRadius:'50%',border:`2px solid ${parentId===''?'var(--acc)':'var(--bdr2)'}`,background:parentId===''?'var(--acc)':'transparent',flexShrink:0 }}/>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:parentId===''?'var(--acc)':'var(--t1)' }}>Root category</div>
+              <div style={{ fontSize:10, color:'var(--t4)' }}>Appears at the top level of the menu</div>
+            </div>
+          </div>
+          {roots.map(r=>(
+            <div key={r.id} onClick={()=>setParentId(r.id)} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:`2px solid ${parentId===r.id?'var(--acc)':'var(--bdr)'}`, background:parentId===r.id?'var(--acc-d)':'var(--bg3)', cursor:'pointer' }}>
+              <div style={{ width:18,height:18,borderRadius:'50%',border:`2px solid ${parentId===r.id?'var(--acc)':'var(--bdr2)'}`,background:parentId===r.id?'var(--acc)':'transparent',flexShrink:0 }}/>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:parentId===r.id?'var(--acc)':'var(--t1)' }}>{r.icon} {r.label}</div>
+                <div style={{ fontSize:10, color:'var(--t4)' }}>Nest as subcategory of {r.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12 }}>Cancel</button>
+          <button onClick={()=>onSave(parentId||null)} style={{ flex:2, padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:800 }}>Move here</button>
         </div>
       </div>
     </div>
