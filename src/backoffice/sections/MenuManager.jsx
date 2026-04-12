@@ -1577,7 +1577,9 @@ function PizzaBuilder({ item, onUpdate, markBOChange }) {
 // ═══════════════════════════════════════════════════════════════════════════
 function ModifiersTab() {
   const { modifierGroupDefs:groups, addModifierGroupDef, updateModifierGroupDef,
-          removeModifierGroupDef, reorderModifierGroupDefs, markBOChange, showToast } = useStore();
+          updateModifierGroupOption,
+          removeModifierGroupDef, reorderModifierGroupDefs, markBOChange, showToast,
+          menuCategories } = useStore();
   const [selId, setSelId]     = useState(null);
   const [newName, setNewName] = useState('');
   const [newOpt, setNewOpt]   = useState({ name:'', price:'' });
@@ -1604,7 +1606,10 @@ function ModifiersTab() {
   };
 
   const delOpt  = oid => upd({ options:(sel.options||[]).filter(o=>o.id!==oid) });
-  const updOpt  = (oid,patch) => upd({ options:(sel.options||[]).map(o=>o.id===oid?{...o,...patch}:o) });
+  const updOpt  = (oid,patch) => {
+    updateModifierGroupOption(selId, oid, patch);
+    markBOChange();
+  };
 
   const reorderOpts = (from, to) => {
     const arr = [...(sel.options||[])];
@@ -1689,7 +1694,7 @@ function ModifiersTab() {
             </div>
 
             {(sel.options||[]).map((opt,oi)=>{
-              const allRootCats = useStore.getState().menuCategories?.filter(c=>!c.parentId&&!c.isSpecial)||[];
+              const allRootCats = (menuCategories||[]).filter(c=>!c.parentId&&!c.isSpecial);
               return (
               <div key={opt.id} draggable
                 onDragStart={()=>setDragOIdx(oi)} onDragOver={e=>{e.preventDefault();setOverOIdx(oi);}}

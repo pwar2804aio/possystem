@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.3.0';
+const VERSION = '2.3.1';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,14 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.3.1', date: 'Apr 2026', label: 'Sold alone: backend wired correctly',
+    changes: [
+      'Fixed: menuCategories was missing from ModifiersTab store subscription — the category dropdown in the sold-alone checkbox was calling useStore.getState() (a static one-time snapshot) instead of the reactive hook. Now uses the live menuCategories value so the dropdown always shows current categories.',
+      'Added: updateModifierGroupOption store action — a direct targeted action that patches a single option within a modifier group without rebuilding the entire options array. updOpt now calls this instead of re-mapping the full options array through updateModifierGroupDef.',
+      'The soldAlone and soldAloneCat fields now persist correctly when toggled in the Modifier groups tab. Changes reflect immediately on POS (Extras screen and category items).',
     ],
   },
   {

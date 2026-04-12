@@ -305,6 +305,13 @@ export const useStore = create((set, get) => ({
   ],
   addModifierGroupDef: g => set(s => ({ modifierGroupDefs:[...s.modifierGroupDefs,{id:`mgd-${Date.now()}`,...g}] })),
   updateModifierGroupDef: (id,patch) => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
+  updateModifierGroupOption: (groupId, optId, patch) => set(s => ({
+    modifierGroupDefs: s.modifierGroupDefs.map(g =>
+      g.id === groupId
+        ? { ...g, options: (g.options||[]).map(o => o.id===optId ? { ...o, ...patch } : o) }
+        : g
+    )
+  })),
   removeModifierGroupDef: id => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.filter(g=>g.id!==id) })),
   reorderModifierGroupDefs: (fromIdx, toIdx) => set(s => {
     const arr = [...s.modifierGroupDefs];
