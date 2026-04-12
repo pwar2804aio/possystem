@@ -36,7 +36,7 @@ export default function MenuManager() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       <nav style={{ display:'flex', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-        {[['menu','🍽 Menu'],['quick','⚡ Quick Screen'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
+        {[['menu','🍽 Menus'],['quick','⚡ Quick Screen'],['items','📋 Items'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{ padding:'0 20px', height:46, cursor:'pointer', fontFamily:'inherit', border:'none', borderBottom:`3px solid ${tab===id?'var(--acc)':'transparent'}`, background:'transparent', color:tab===id?'var(--acc)':'var(--t3)', fontSize:13, fontWeight:tab===id?800:500 }}>
             {label}
           </button>
@@ -45,6 +45,7 @@ export default function MenuManager() {
       <div style={{ flex:1, overflow:'hidden' }}>
         {tab==='menu'         && <MenuTab />}
         {tab==='quick'        && <QuickScreenManager />}
+        {tab==='items'        && <ItemsLibrary />}
         {tab==='modifiers'    && <ModifiersTab />}
         {tab==='instructions' && <InstructionsTab />}
       </div>
@@ -589,6 +590,217 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
     </div>
   );
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ITEMS LIBRARY
+// Flat list of ALL items including variant sub-items. The central item store.
+// Search, filter by type or category, click to edit, add new items.
+// Sub-items (variants) always shown indented under their parent.
+// ═══════════════════════════════════════════════════════════════════════════
+function ItemsLibrary() {
+  const { menuItems, menuCategories, addMenuItem, updateMenuItem, archiveMenuItem,
+          eightySixIds, toggle86, markBOChange, showToast } = useStore();
+
+  const [search,     setSearch]     = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [catFilter,  setCatFilter]  = useState('all');
+  const [selItemId,  setSelItemId]  = useState(null);
+
+  const allCats = useMemo(() => menuCategories.filter(c=>!c.isSpecial), [menuCategories]);
+
+  const typeLabel = t => ({ simple:'Simple', modifiable:'Options', variants:'Has sizes', pizza:'Pizza', combo:'Combo', subitem:'Sub item' }[t]||t);
+  const typeColor = t => ({ simple:'var(--t4)', modifiable:'var(--acc)', variants:'var(--grn)', pizza:'#f97316', combo:'#8b5cf6' }[t]||'var(--t4)');
+
+  // All top-level items, filtered and sorted by category then sortOrder
+  const parents = useMemo(() => {
+    let items = menuItems.filter(i => !i.archived && !i.parentId);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      items = items.filter(i => (i.menuName||i.name||'').toLowerCase().includes(q) || (i.description||'').toLowerCase().includes(q));
+    }
+    if (typeFilter !== 'all') items = items.filter(i => (i.type||'simple') === typeFilter);
+    if (catFilter !== 'all')  items = items.filter(i => i.cat===catFilter||(i.cats||[]).includes(catFilter));
+    // Sort by category order then item sortOrder
+    return items.sort((a,b) => {
+      const ca = allCats.findIndex(c=>c.id===a.cat);
+      const cb = allCats.findIndex(c=>c.id===b.cat);
+      if (ca !== cb) return ca-cb;
+      return (a.sortOrder??999)-(b.sortOrder??999);
+    });
+  }, [menuItems, allCats, search, typeFilter, catFilter]);
+
+  const variantsOf = pid => menuItems.filter(c=>c.parentId===pid&&!c.archived).sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
+  const totalVariants = menuItems.filter(i=>!i.archived&&i.parentId).length;
+
+  const addNewItem = () => {
+    const defCat = catFilter!=='all' ? catFilter : (allCats.find(c=>!c.parentId)?.id||'');
+    addMenuItem({ name:'New item', menuName:'New item', receiptName:'New item', kitchenName:'New item',
+      type:'simple', cat:defCat, allergens:[], pricing:{base:0},
+      assignedModifierGroups:[], assignedInstructionGroups:[], cats:[], sortOrder:999 });
+    markBOChange();
+    setTimeout(()=>{ const last=useStore.getState().menuItems.slice(-1)[0]; if(last) setSelItemId(last.id); }, 30);
+  };
+
+  const addVariant = (parentId, cat, allergens, count) => {
+    addMenuItem({ name:'New size', menuName:'New size', receiptName:'New size', kitchenName:'New size',
+      type:'simple', parentId, cat, allergens:[...allergens], pricing:{base:0},
+      assignedModifierGroups:[], assignedInstructionGroups:[], sortOrder:count });
+    markBOChange();
+    setTimeout(()=>{ const last=useStore.getState().menuItems.slice(-1)[0]; if(last) setSelItemId(last.id); }, 30);
+  };
+
+  const selItem = menuItems.find(i=>i.id===selItemId);
+
+  const hdrSt = { fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' };
+  const COL   = '26px 1fr 90px 80px 50px 44px';
+
+  return (
+    <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
+
+      {/* ── Left: items list ──────────────────────────────────────── */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', borderRight: selItem ? '1px solid var(--bdr)' : 'none' }}>
+
+        {/* Toolbar */}
+        <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', flexShrink:0 }}>
+          <div style={{ position:'relative', flex:1, minWidth:160 }}>
+            <span style={{ position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:12,color:'var(--t4)' }}>🔍</span>
+            <input style={{ ...inp, paddingLeft:28 }} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all items…"/>
+          </div>
+          <select value={typeFilter} onChange={e=>setTypeFilter(e.target.value)} style={{ ...inp, width:'auto', cursor:'pointer', fontSize:11 }}>
+            <option value="all">All types</option>
+            <option value="simple">Simple</option>
+            <option value="modifiable">Options (modifiable)</option>
+            <option value="variants">Has sizes / variants</option>
+            <option value="pizza">Pizza</option>
+          </select>
+          <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ ...inp, width:'auto', cursor:'pointer', fontSize:11 }}>
+            <option value="all">All categories</option>
+            {allCats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+          </select>
+          <button onClick={addNewItem} style={{ padding:'7px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700, flexShrink:0 }}>+ Item</button>
+        </div>
+
+        {/* Stats */}
+        <div style={{ padding:'5px 12px', borderBottom:'1px solid var(--bdr)', fontSize:10, color:'var(--t4)', flexShrink:0 }}>
+          {parents.length} items · {totalVariants} total sizes/variants
+        </div>
+
+        {/* Column headers */}
+        <div style={{ display:'grid', gridTemplateColumns:COL, gap:0, padding:'6px 12px', borderBottom:'2px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+          <div/>
+          <div style={hdrSt}>Item</div>
+          <div style={hdrSt}>Type</div>
+          <div style={hdrSt}>Price</div>
+          <div style={hdrSt}>Mods</div>
+          <div style={hdrSt}>⚠</div>
+        </div>
+
+        {/* Scrollable list */}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          {parents.length === 0 && (
+            <div style={{ textAlign:'center', padding:'48px', color:'var(--t4)', fontSize:13 }}>
+              <div style={{ fontSize:36, opacity:.12, marginBottom:12 }}>📋</div>
+              <div style={{ fontWeight:600, color:'var(--t3)', marginBottom:8 }}>No items found</div>
+              <button onClick={addNewItem} style={{ padding:'8px 18px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700 }}>+ Add first item</button>
+            </div>
+          )}
+
+          {parents.map(item => {
+            const variants = variantsOf(item.id);
+            const hasVars  = variants.length > 0 || (item.type||'simple')==='variants';
+            const isSel    = selItemId === item.id;
+            const is86     = eightySixIds.includes(item.id);
+            const price    = item.pricing?.base ?? item.price ?? 0;
+            const fromP    = hasVars && variants.length > 0 ? Math.min(...variants.map(v=>v.pricing?.base??v.price??0)) : price;
+            const cat      = allCats.find(c=>c.id===item.cat);
+            const color    = cat?.color || 'var(--acc)';
+            const modCount = (item.assignedModifierGroups||[]).length + (item.assignedInstructionGroups||[]).length;
+            const allergyN = (item.allergens||[]).length;
+
+            return (
+              <div key={item.id}>
+                {/* Parent row */}
+                <div onClick={()=>setSelItemId(isSel?null:item.id)}
+                  style={{ display:'grid', gridTemplateColumns:COL, gap:0, padding:'9px 12px', cursor:'pointer', alignItems:'center',
+                    background:isSel?'var(--acc-d)':is86?'var(--red-d)':'transparent',
+                    borderBottom:'1px solid var(--bdr)', transition:'background .1s' }}>
+                  <div style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }}/>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:isSel?'var(--acc)':is86?'var(--red)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {item.menuName||item.name}
+                      {is86 && <span style={{ marginLeft:6, fontSize:8, fontWeight:800, padding:'1px 4px', borderRadius:4, background:'var(--red-d)', color:'var(--red)', border:'1px solid var(--red-b)' }}>86'd</span>}
+                    </div>
+                    <div style={{ fontSize:9, color:'var(--t4)', marginTop:1 }}>{cat?.icon} {cat?.label}</div>
+                  </div>
+                  <span style={{ fontSize:10, fontWeight:600, color:typeColor(item.type||'simple') }}>{typeLabel(item.type||'simple')}</span>
+                  <span style={{ fontSize:12, fontWeight:700, color, fontFamily:'var(--font-mono)' }}>
+                    {hasVars&&variants.length>0 ? `from £${fromP.toFixed(2)}` : `£${price.toFixed(2)}`}
+                  </span>
+                  <span style={{ fontSize:11, color:modCount>0?'var(--acc)':'var(--t4)', fontWeight:modCount>0?700:400 }}>{modCount>0?`⊕ ${modCount}`:''}</span>
+                  <span style={{ fontSize:10, color:allergyN>0?'var(--red)':'var(--t4)' }}>{allergyN>0?allergyN:''}</span>
+                </div>
+
+                {/* Variant children — always visible */}
+                {hasVars && (
+                  <div style={{ background:'var(--bg3)' }}>
+                    {variants.map(v => {
+                      const vp   = v.pricing||{base:v.price||0};
+                      const vSel = selItemId===v.id;
+                      const vAll = (v.allergens||[]).length;
+                      return (
+                        <div key={v.id} onClick={e=>{e.stopPropagation();setSelItemId(vSel?null:v.id);}}
+                          style={{ display:'grid', gridTemplateColumns:COL, gap:0, padding:'6px 12px 6px 28px', cursor:'pointer', alignItems:'center',
+                            background:vSel?'var(--acc-d)':'transparent', borderBottom:'1px solid var(--bdr)', transition:'background .1s' }}>
+                          <div/>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
+                            <span style={{ fontSize:10, color:color, flexShrink:0, lineHeight:1 }}>└</span>
+                            <span style={{ fontSize:12, fontWeight:600, color:vSel?'var(--acc)':'var(--t2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{v.menuName||v.name}</span>
+                          </div>
+                          <span style={{ fontSize:9, color:'var(--t4)' }}>size</span>
+                          <span style={{ fontSize:12, fontWeight:700, color, fontFamily:'var(--font-mono)' }}>£{(vp.base||0).toFixed(2)}</span>
+                          <span/>
+                          <span style={{ fontSize:10, color:vAll>0?'var(--red)':'var(--t4)' }}>{vAll>0?vAll:''}</span>
+                        </div>
+                      );
+                    })}
+                    {/* Add size button */}
+                    <div style={{ padding:'5px 12px 5px 28px', borderBottom:'1px solid var(--bdr)' }}>
+                      <button onClick={e=>{e.stopPropagation();addVariant(item.id,item.cat,item.allergens||[],variants.length);if(item.type!=='variants')updateMenuItem(item.id,{type:'variants'});}}
+                        style={{ fontSize:10, fontWeight:600, color, background:'none', border:`1px dashed ${color}55`, borderRadius:6, padding:'2px 10px', cursor:'pointer', fontFamily:'inherit' }}>
+                        + Add size
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Right: item editor ────────────────────────────────────── */}
+      {selItem && (
+        <ItemEditor
+          key={selItem.id}
+          item={selItem}
+          allCategories={allCats}
+          onUpdate={patch=>{ updateMenuItem(selItem.id,patch); markBOChange(); }}
+          onArchive={()=>{ archiveMenuItem(selItem.id); setSelItemId(null); markBOChange(); showToast('Archived','info'); }}
+          onClose={()=>setSelItemId(null)}
+          is86={eightySixIds.includes(selItem.id)}
+          onToggle86={()=>toggle86(selItem.id)}
+          menuItems={menuItems}
+          addMenuItem={addMenuItem}
+          updateMenuItem={updateMenuItem}
+          markBOChange={markBOChange}
+          showToast={showToast}
+        />
+      )}
+    </div>
+  );
+}
+
 
 
 // ═══════════════════════════════════════════════════════════════════════════

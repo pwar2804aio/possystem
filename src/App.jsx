@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.0.2';
+const VERSION = '2.1.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,16 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.1.0', date: 'Apr 2026', label: 'Items tab — full item library with variants always visible',
+    changes: [
+      'NEW: 📋 Items tab — a flat list of every item in the system including all variant sub-items. Shows parent items with variant children always visible and indented below (Lager → └ Pint, └ Half pint). This is the central item library.',
+      'Items tab features: search by name/description, filter by type (Simple / Options / Has sizes / Pizza), filter by category, + Item button creates a new item. Click any row to open the full item editor on the right (Flow / Sizes / Modifiers / Pricing / Allergens tabs).',
+      '+ Add size button at the bottom of each variant group — add a new variant directly from the Items list.',
+      'Menu renamed to Menus — all existing menu editing functionality unchanged.',
+      'Nav order: Menus | Quick Screen | Items | Modifier groups | Instruction groups.',
     ],
   },
   {
