@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,15 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.2.0', date: 'Apr 2026', label: 'Menus tab: search and add existing items to categories',
+    changes: [
+      'Menus tab redesigned: the + Item button is replaced with + Add items. Clicking it opens a search panel that lets you find any item from the Items library and add it to the selected category.',
+      'Add items panel shows: items already in this category (with Remove button), then all available items below (with + Add button). Search filters both sections live as you type.',
+      'Removing an item from a category moves it to its next assigned category or clears the primary category — the item stays in the Items library, just removed from this menu category.',
+      'Items tab is the right place to create new items. Menus tab is for building the menu by assigning existing items to categories.',
     ],
   },
   {

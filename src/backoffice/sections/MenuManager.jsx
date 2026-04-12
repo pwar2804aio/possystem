@@ -57,10 +57,11 @@ export default function MenuManager() {
 // MENU TAB
 // ═══════════════════════════════════════════════════════════════════════════
 function MenuTab() {
-  const { menuCategories, menuItems, addCategory, updateCategory, removeCategory,
+  const { menuCategories, menuItems, menus, addMenu, updateMenu, addCategory, updateCategory, removeCategory,
           addMenuItem, updateMenuItem, archiveMenuItem, eightySixIds, toggle86,
           markBOChange, showToast, modifierGroupDefs } = useStore();
 
+  const [selMenuId, setSelMenuId] = useState(menus?.[0]?.id||'menu-1');
   const [selCatId, setSelCatId]   = useState(null);
   const [selItemId, setSelItemId] = useState(null);
   const [editingCat, setEditingCat] = useState(null);
@@ -73,7 +74,9 @@ function MenuTab() {
   const [overItemId, setOverItemId] = useState(null);
   const [expandedParentId, setExpandedParentId] = useState(null); // variant expand
   const [search, setSearch]         = useState('');
-  const [viewMode, setViewMode]     = useState('grid'); // 'grid' | 'canvas'
+  const [viewMode, setViewMode]     = useState('grid'); // 'grid' | 'list'
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [addSearch, setAddSearch]     = useState('');
 
   const roots     = useMemo(()=>menuCategories.filter(c=>!c.parentId&&!c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)),[menuCategories]);
   const selCat    = menuCategories.find(c=>c.id===selCatId);
@@ -259,10 +262,87 @@ function MenuTab() {
                   <button key={m} onClick={()=>setViewMode(m)} style={{ padding:'5px 10px', cursor:'pointer', fontFamily:'inherit', background:viewMode===m?'var(--acc-d)':'var(--bg3)', border:'none', borderRight:'1px solid var(--bdr)', color:viewMode===m?'var(--acc)':'var(--t3)', fontSize:11, fontWeight:viewMode===m?700:400 }}>{l}</button>
                 ))}
               </div>
-              <button onClick={()=>addItem('simple')} style={{ padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700 }}>+ Item</button>
+              <button onClick={()=>setShowAddPanel(v=>!v)} style={{ padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700 }}>+ Add items</button>
             </div>
           </div>
 
+
+          {/* ── Add items from library panel ─────────────────────── */}
+          {showAddPanel && selCat && (() => {
+            const catItemIds = new Set(displayItems.map(i=>i.id));
+            const q = addSearch.toLowerCase().trim();
+            const notInCat = menuItems.filter(i =>
+              !i.archived && !i.parentId &&
+              i.cat !== selCat.id && !(i.cats||[]).includes(selCat.id) &&
+              (q==='' || (i.menuName||i.name||'').toLowerCase().includes(q) || (i.description||'').toLowerCase().includes(q))
+            ).sort((a,b)=>(a.menuName||a.name||'').localeCompare(b.menuName||b.name||''));
+            const addToCat = (item) => {
+              if (!item.cat) { updateMenuItem(item.id,{cat:selCat.id}); }
+              else { updateMenuItem(item.id,{cats:[...(item.cats||[]).filter(c=>c!==selCat.id),selCat.id]}); }
+              markBOChange(); showToast(`${item.menuName||item.name} added to ${selCat.label}`,'success');
+            };
+            const removeFromCat = (item) => {
+              if (item.cat===selCat.id) { updateMenuItem(item.id,{cat:item.cats?.[0]||'',cats:(item.cats||[]).slice(1)}); }
+              else { updateMenuItem(item.id,{cats:(item.cats||[]).filter(c=>c!==selCat.id)}); }
+              markBOChange(); showToast(`Removed from ${selCat.label}`,'info');
+            };
+            return (
+              <div style={{ borderBottom:'2px solid var(--acc-b)', background:'var(--acc-d)', flexShrink:0, maxHeight:260, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+                <div style={{ padding:'8px 12px', display:'flex', gap:8, alignItems:'center', flexShrink:0, borderBottom:'1px solid var(--acc-b)' }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--acc)' }}>Add items to {selCat.label}</span>
+                  <div style={{ position:'relative', flex:1, maxWidth:320 }}>
+                    <span style={{ position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',fontSize:12,color:'var(--t4)' }}>🔍</span>
+                    <input autoFocus style={{ ...inp, paddingLeft:28, fontSize:12 }} value={addSearch} onChange={e=>setAddSearch(e.target.value)} placeholder="Search items to add…"/>
+                    {addSearch&&<button onClick={()=>setAddSearch('')} style={{ position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--t4)',cursor:'pointer',fontSize:14 }}>×</button>}
+                  </div>
+                  <button onClick={()=>{setShowAddPanel(false);setAddSearch('');}} style={{ padding:'4px 10px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11 }}>Done</button>
+                </div>
+                <div style={{ overflowY:'auto', flex:1 }}>
+                  {/* Items already in this category */}
+                  {displayItems.length>0&&(
+                    <div style={{ padding:'4px 12px 2px', fontSize:9, fontWeight:700, color:'var(--acc)', textTransform:'uppercase', letterSpacing:'.07em', marginTop:4 }}>
+                      Already in {selCat.label} ({displayItems.length})
+                    </div>
+                  )}
+                  {displayItems.map(item=>(
+                    <div key={item.id} style={{ display:'flex',alignItems:'center',gap:10,padding:'6px 12px',borderBottom:'1px solid var(--acc-b)' }}>
+                      <div style={{ flex:1,minWidth:0 }}>
+                        <span style={{ fontSize:12,fontWeight:600,color:'var(--t1)' }}>{item.menuName||item.name}</span>
+                        <span style={{ fontSize:10,color:'var(--t4)',marginLeft:8 }}>£{(item.pricing?.base??item.price??0).toFixed(2)}</span>
+                      </div>
+                      <span style={{ fontSize:10,fontWeight:600,padding:'2px 7px',borderRadius:6,background:'var(--grn-d)',color:'var(--grn)',border:'1px solid var(--grn-b)' }}>✓ In menu</span>
+                      <button onClick={()=>removeFromCat(item)} style={{ padding:'3px 8px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:10,fontWeight:600 }}>Remove</button>
+                    </div>
+                  ))}
+                  {/* Items NOT in this category */}
+                  {notInCat.length>0&&(
+                    <div style={{ padding:'4px 12px 2px', fontSize:9, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginTop:6 }}>
+                      Available to add {addSearch?`matching "${addSearch}"`:''}
+                    </div>
+                  )}
+                  {notInCat.slice(0,20).map(item=>{
+                    const itemCat = menuCategories.find(c=>c.id===item.cat);
+                    return (
+                      <div key={item.id} style={{ display:'flex',alignItems:'center',gap:10,padding:'6px 12px',borderBottom:'1px solid var(--bdr)',background:'var(--bg2)' }}>
+                        <div style={{ flex:1,minWidth:0 }}>
+                          <span style={{ fontSize:12,fontWeight:600,color:'var(--t1)' }}>{item.menuName||item.name}</span>
+                          {itemCat&&<span style={{ fontSize:9,color:'var(--t4)',marginLeft:7 }}>{itemCat.icon} {itemCat.label}</span>}
+                          <span style={{ fontSize:10,color:'var(--t4)',marginLeft:8 }}>£{(item.pricing?.base??item.price??0).toFixed(2)}</span>
+                        </div>
+                        <button onClick={()=>addToCat(item)} style={{ padding:'4px 10px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0b0c10',fontSize:11,fontWeight:700,flexShrink:0 }}>+ Add</button>
+                      </div>
+                    );
+                  })}
+                  {notInCat.length===0&&addSearch&&(
+                    <div style={{ padding:'12px',textAlign:'center',fontSize:11,color:'var(--t4)' }}>No items matching "{addSearch}" — create it in the Items tab</div>
+                  )}
+                  {notInCat.length===0&&!addSearch&&displayItems.length>0&&(
+                    <div style={{ padding:'12px',textAlign:'center',fontSize:11,color:'var(--t4)' }}>All items are already in this category</div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {viewMode==='list' ? (
             <ListItemView
@@ -278,7 +358,7 @@ function MenuTab() {
               <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)' }}>
                 <div style={{ fontSize:36, opacity:.15, marginBottom:10 }}>{selCat?.icon||'🍽'}</div>
                 <div style={{ fontSize:13, fontWeight:600, color:'var(--t3)', marginBottom:8 }}>No items in {selCat?.label||'this category'}</div>
-                <button onClick={()=>addItem('simple')} style={{ padding:'8px 18px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700 }}>+ Add first item</button>
+                <button onClick={()=>setShowAddPanel(true)} style={{ padding:'8px 18px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700 }}>+ Add items to this category</button>
               </div>
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10 }}>
