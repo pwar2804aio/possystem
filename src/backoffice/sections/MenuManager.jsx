@@ -101,8 +101,12 @@ function MenuTab() {
     if (!dragCatId||dragCatId===targetId) { setDragCatId(null); setOverCatId(null); return; }
     const dragged = menuCategories.find(c=>c.id===dragCatId);
     const target  = menuCategories.find(c=>c.id===targetId);
-    if (!dragged||!target) { setDragCatId(null); setOverCatId(null); return; }
     if (targetId==='root') {
+      updateCategory(dragCatId,{parentId:null}); showToast('Moved to root level','success');
+      markBOChange(); setDragCatId(null); setOverCatId(null); return;
+    }
+    if (!dragged||!target) { setDragCatId(null); setOverCatId(null); return; }
+    if (false && targetId==='root_unused') {
       updateCategory(dragCatId,{parentId:null}); showToast('Moved to root','success');
     } else if (dragged.parentId===target.parentId) {
       // Same level → reorder
@@ -179,9 +183,8 @@ function MenuTab() {
         )}
 
         {/* Root drop zone */}
-        <div onDragOver={e=>{e.preventDefault();setOverCatId('root');}} onDrop={e=>onCatDrop(e,'root')} onDragLeave={()=>setOverCatId(null)}
-          style={{ margin:'6px 8px 2px', padding:'3px 8px', borderRadius:6, fontSize:9, color:'var(--t4)', border:`1.5px dashed ${overCatId==='root'?'var(--acc)':'var(--bdr)'}`, background:overCatId==='root'?'var(--acc-d)':'transparent', textAlign:'center' }}>
-          {overCatId==='root'?'Drop → root':'Drag to un-nest →'}
+        <div onDragOver={e=>{e.preventDefault();setOverCatId('root');}} onDrop={e=>onCatDrop(e,'root')} style={{ margin:'6px 8px 4px', padding:'8px 10px', borderRadius:6, fontSize:9, color:'var(--t4)', border:`1.5px dashed ${overCatId==='root'?'var(--acc)':'var(--bdr)'}`, background:overCatId==='root'?'var(--acc-d)':'transparent', textAlign:'center' }}>
+          {overCatId==='root'?'⤴ Drop here to make root category':'⤴ Drag a subcategory here to un-nest it'}
         </div>
 
         <div style={{ flex:1, overflowY:'auto', padding:'4px 6px' }}>
@@ -197,13 +200,14 @@ function MenuTab() {
             return (
               <div key={cat.id} style={{ opacity:dragging?.3:1 }}>
                 {isReorder && <div style={{ height:3, background:'var(--acc)', borderRadius:2, margin:'1px 4px' }}/>}
-                <div draggable onDragStart={e=>{setDragCatId(cat.id);e.dataTransfer.effectAllowed='move';}} onDragOver={e=>{e.preventDefault();setOverCatId(cat.id);}} onDragLeave={()=>setOverCatId(null)} onDragEnd={()=>{setDragCatId(null);setOverCatId(null);}} onDrop={e=>onCatDrop(e,cat.id)} onClick={()=>{setSelCatId(cat.id);setSelItemId(null);setSearch('');}}
+                <div draggable onDragStart={e=>{setDragCatId(cat.id);e.dataTransfer.effectAllowed='move';}} onDragOver={e=>{e.preventDefault();setOverCatId(cat.id);}} onDragEnd={()=>{setDragCatId(null);setOverCatId(null);}} onDrop={e=>onCatDrop(e,cat.id)} onClick={()=>{setSelCatId(cat.id);setSelItemId(null);setSearch('');}}
                   style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', borderRadius:8, marginBottom:1, cursor:'grab', userSelect:'none', border:`1.5px solid ${!isReorder&&over?'var(--acc)':active?color+'55':'transparent'}`, background:!isReorder&&over?'var(--acc-d)':active?color+'18':'transparent' }}>
                   <span style={{ fontSize:8, color:'var(--t4)', flexShrink:0 }}>⣿</span>
                   <div style={{ width:7, height:7, borderRadius:'50%', background:color, flexShrink:0 }}/>
                   <span style={{ fontSize:14, flexShrink:0 }}>{cat.icon}</span>
                   <span style={{ fontSize:11, fontWeight:active?700:500, color:active?color:'var(--t2)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cat.label}</span>
-                  <span style={{ fontSize:9, color:'var(--t4)', flexShrink:0 }}>{count}</span>
+                  {!isReorder&&over&&dragCatId&&dragCatId!==cat.id&&<span style={{ fontSize:8, fontWeight:700, color:'var(--acc)', flexShrink:0 }}>nest →</span>}
+                  {!(over&&dragCatId)&&<span style={{ fontSize:9, color:'var(--t4)', flexShrink:0 }}>{count}</span>}
                 </div>
                 {/* Subcats */}
                 {children.map(sub=>{
@@ -215,7 +219,7 @@ function MenuTab() {
                   return (
                     <div key={sub.id} style={{ opacity:dragCatId===sub.id?.3:1 }}>
                       {sr && <div style={{ height:2, background:'var(--acc)', borderRadius:2, margin:'1px 12px' }}/>}
-                      <div draggable onDragStart={e=>{setDragCatId(sub.id);e.dataTransfer.effectAllowed='move';}} onDragOver={e=>{e.preventDefault();setOverCatId(sub.id);}} onDragLeave={()=>setOverCatId(null)} onDragEnd={()=>{setDragCatId(null);setOverCatId(null);}} onDrop={e=>onCatDrop(e,sub.id)} onClick={()=>{setSelCatId(sub.id);setSelItemId(null);setSearch('');}}
+                      <div draggable onDragStart={e=>{setDragCatId(sub.id);e.dataTransfer.effectAllowed='move';}} onDragOver={e=>{e.preventDefault();setOverCatId(sub.id);}} onDragEnd={()=>{setDragCatId(null);setOverCatId(null);}} onDrop={e=>onCatDrop(e,sub.id)} onClick={()=>{setSelCatId(sub.id);setSelItemId(null);setSearch('');}}
                         style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 8px 5px 20px', borderRadius:7, marginBottom:1, cursor:'grab', border:`1.5px solid ${!sr&&so?'var(--acc)':sa?sc+'55':'transparent'}`, background:!sr&&so?'var(--acc-d)':sa?sc+'18':'transparent' }}>
                         <span style={{ fontSize:13 }}>{sub.icon}</span>
                         <span style={{ fontSize:10, fontWeight:sa?700:400, color:sa?sc:'var(--t3)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sub.label}</span>
@@ -425,7 +429,7 @@ function MenuTab() {
 // Variant children are shown indented under their parent, always visible.
 // ═══════════════════════════════════════════════════════════════════════════
 function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, addMenuItem, updateMenuItem, markBOChange, showToast, eightySixIds, modifierGroupDefs }) {
-  const [expandedIds, setExpandedIds] = useState(new Set(items.map(i=>i.id))); // default expanded
+  const [collapsedIds, setCollapsedIds] = useState(new Set()); // empty = all expanded by default
   const [dragIdx, setDragIdx]   = useState(null);
   const [overIdx, setOverIdx]   = useState(null);
 
@@ -434,7 +438,7 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
       .sort((a,b) => (a.sortOrder??999)-(b.sortOrder??999));
 
   const toggleExpand = id =>
-    setExpandedIds(s => { const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; });
+    setCollapsedIds(s => { const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; });
 
   const reorder = (from, to) => {
     const arr = [...items];
@@ -477,7 +481,7 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
       {items.map((item, i) => {
         const isSel    = selItemId === item.id;
         const is86     = eightySixIds.includes(item.id);
-        const expanded = expandedIds.has(item.id);
+        const expanded = !collapsedIds.has(item.id);
         const variants = variantsOf(item.id);
         const hasVars  = variants.length > 0 || (item.type||'simple')==='variants';
         const price    = item.pricing?.base ?? item.price ?? 0;

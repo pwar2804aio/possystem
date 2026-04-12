@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.0.0';
+const VERSION = '2.0.1';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,16 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.0.1', date: 'Apr 2026', label: 'Fix: list view variants always visible, category drag reliable',
+    changes: [
+      'List view variants fix: sub-items (sizes) now always show expanded by default regardless of which category you navigate to. Root cause: expandedIds state was initialised once from the first category and never updated when you switched categories. Fixed by inverting the logic to track collapsedIds (empty by default = everything open). Click ▾ to collapse a variant group, click ▸ to expand.',
+      'Category drag fix: removed DragLeave event listeners that were clearing the drop target on every mouse movement between child elements, making drops unreliable. Drop zones now stay highlighted until drag ends.',
+      'Category nesting via drag: when dragging a category over another category, shows nest → badge to make clear it will become a subcategory. Same-level drag still reorders.',
+      'Category un-nesting: the top drop zone is now larger (8px padding vs 3px) with clearer label. The Edit category modal parent selector also works as a reliable backup for nesting/unnesting.',
+      'Root drop fix: un-nest to root now correctly sets parentId to null before looking up the target (previously a guard check was in wrong order).',
     ],
   },
   {
