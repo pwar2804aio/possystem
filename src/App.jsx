@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,18 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.8.0', date: 'Apr 2026', label: 'Flow tab — complete customer journey in item editor',
+    changes: [
+      'New Flow tab is now the DEFAULT view when clicking any item — shows the complete customer ordering journey in numbered steps: ① Choose size (Pint / Half pint / Third, editable inline with prices), ② Side choice REQUIRED (Chips · Side salad…), ③ Sauce Optional, ④ Cooking preference no charge. This is the exact sequence the customer goes through on POS.',
+      'Sizes are now editable directly in the Flow tab — name and price for each variant, inline. No need to switch to Sizes tab just to update a price.',
+      'Modifier groups in Flow tab show all options as chips and display nested modifier indicators (↳ If "Peppercorn": also shows Sauce preference).',
+      'Drag handles on modifier groups in Flow tab — drag to reorder the customer journey without switching tabs.',
+      'Instruction groups shown in green numbered steps at the end of the flow.',
+      'Search-to-add modifier groups available at the bottom of the Flow tab.',
+      'Visual Builder (swimlane) removed — it did not match the POS and was confusing. Clean nav: Menu | Quick Screen | Modifier groups | Instruction groups.',
     ],
   },
   {
