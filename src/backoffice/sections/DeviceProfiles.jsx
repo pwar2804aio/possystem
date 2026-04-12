@@ -143,6 +143,7 @@ export default function DeviceProfiles() {
                     hiddenFeatures: prof.hiddenFeatures,
                     tableServiceEnabled: prof.tableServiceEnabled,
                     quickScreenEnabled: prof.quickScreenEnabled,
+                    menuId: prof.menuId,
                     receiptPrinterId: prof.receiptPrinterId,
                   });
                   showToast(`"${prof.name}" applied to this terminal`, 'success');
@@ -173,13 +174,13 @@ function ConfigRow({ label, value, valueColor, truncate }) {
 
 // ── Profile editor modal ───────────────────────────────────────────────────────
 function ProfileEditor({ profile, onSave, onDelete, onClose }) {
-  const { quickScreens } = useStore();
+  const { quickScreens, menus } = useStore();
   const isNew = !profile;
   const [form, setForm] = useState(profile || {
     name:'', color:'#3b82f6',
     defaultSurface:'tables', enabledOrderTypes:['dine-in'],
     assignedSection:null, hiddenFeatures:[],
-    tableServiceEnabled:true, quickScreenEnabled:true, receiptPrinterId:'pr1', quickScreenId:null,
+    tableServiceEnabled:true, quickScreenEnabled:true, receiptPrinterId:'pr1', quickScreenId:null, menuId:null,
   });
 
   const upd = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -288,6 +289,23 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
             }}>
               <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff', position:'absolute', top:3, left: form.tableServiceEnabled ? 22 : 3, transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.3)' }}/>
             </button>
+          </div>
+
+          {/* Menu assignment */}
+          <div style={{ marginBottom:18 }}>
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Menu</label>
+            <div style={{ fontSize:11, color:'var(--t4)', marginBottom:8 }}>Which menu this terminal shows. Create and manage menus in Menu Manager → Menus tab.</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {[{ id:null, name:'All menus (default)', description:'Shows all categories from all menus' }, ...(menus||[])].map(m => (
+                <button key={String(m.id)} onClick={()=>upd('menuId', m.id)}
+                  style={{ padding:'9px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all .1s',
+                    background: form.menuId === m.id ? 'var(--acc-d)' : 'var(--bg3)',
+                    border:`1.5px solid ${form.menuId === m.id ? 'var(--acc)' : 'var(--bdr)'}` }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:form.menuId===m.id?'var(--acc)':'var(--t1)' }}>📋 {m.name}</div>
+                  {m.description && <div style={{ fontSize:10, color:'var(--t4)', marginTop:2 }}>{m.description}</div>}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Quick Screen selector */}

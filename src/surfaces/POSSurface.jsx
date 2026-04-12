@@ -46,6 +46,7 @@ export default function POSSurface() {
     quickScreenIds,
     quickScreens,
     activeQuickScreenId,
+    menus,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
@@ -54,7 +55,11 @@ export default function POSSurface() {
   const rawItems = storeMenuItems || SEED_MENU_ITEMS;
   const { getItemPrice } = useStore.getState();
   const MENU_ITEMS = useMemo(() => rawItems
-    .filter(i => i.type !== 'subitem' || i.soldAlone)   // subitems only show when sold-alone enabled
+    .filter(i => {
+      if (i.type === 'subitem' && !i.soldAlone) return false;
+      if (activeCatIds && !activeCatIds.includes(i.cat) && !(i.cats||[]).some(c=>activeCatIds.includes(c))) return false;
+      return true;
+    }) // filter by device menu + soldAlone
     .map(i => ({
       ...i,
       name: i.menuName || i.name,
@@ -452,7 +457,7 @@ export default function POSSurface() {
         <div style={{flex:1,overflowY:'auto',padding:'6px 7px'}}>
           {/* Quick screen always first */}
           {[{ id:'quick', label:'Quick', icon:'⚡', color:'var(--acc)' }].concat(
-            menuCategories.filter(c => !c.parentId && !c.isSpecial).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0))
+            menuCategories.filter(c => !c.parentId && !c.isSpecial && (!deviceMenuId||c.menuId===deviceMenuId)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0))
           ).map(c => {
             const isActive = cat === c.id && !search;
             const color = c.color || 'var(--acc)';

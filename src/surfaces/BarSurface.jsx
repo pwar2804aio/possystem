@@ -137,7 +137,7 @@ const labelStyle = { display:'block', fontSize:11, fontWeight:700, color:'var(--
 
 // ─── Main Bar Surface ─────────────────────────────────────────────────────────
 export default function BarSurface() {
-  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, quickScreenIds, menuItems: storeMenuItems, modifierGroupDefs } = useStore();
+  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, quickScreenIds, menuItems: storeMenuItems, modifierGroupDefs, menus, deviceConfig } = useStore();
 
   const [showOpenModal, setShowOpenModal]   = useState(false);
   const [cat, setCat]                       = useState('all');
@@ -155,7 +155,17 @@ export default function BarSurface() {
   const activeTab = tabs.find(t=>t.id===activeTabId);
   const filteredTabs = tabs.filter(t=>showTabFilter==='active' ? t.status!=='closed' : true);
 
-  const ITEMS = (storeMenuItems || MENU_ITEMS).filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
+  // Determine active menu for this device
+  const deviceMenuId = deviceConfig?.menuId;
+  const activeMenuCatIds = deviceMenuId
+    ? (menuCategories||[]).filter(c=>c.menuId===deviceMenuId).map(c=>c.id)
+    : null; // null means show all
+
+  const ITEMS = (storeMenuItems || MENU_ITEMS).filter(i => {
+    if (i.archived || i.parentId || (i.type==='subitem'&&!i.soldAlone)) return false;
+    if (activeMenuCatIds) return activeMenuCatIds.includes(i.cat) || (i.cats||[]).some(c=>activeMenuCatIds.includes(c));
+    return true;
+  });
   const catMeta = (menuCategories||[]).find(c=>c.id===cat) || {color:'var(--acc)',icon:'🍸',label:'All'};
   const rawItems = useMemo(()=>{
     if (cat==='all') return ITEMS.filter(i=>!eightySixIds.includes(i.id));
@@ -445,7 +455,7 @@ export default function BarSurface() {
             {!activeTab&&<button onClick={()=>setShowOpenModal(true)} className="btn btn-acc btn-sm">+ New tab</button>}
           </div>
           <div style={{ display:'flex',gap:4,overflowX:'auto',paddingBottom:2 }}>
-            {[{id:'all',label:'All',icon:'🍽',color:'var(--acc)'},...(menuCategories||[]).filter(c=>!c.parentId&&!c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0))].map(c=>{
+            {[{id:'all',label:'All',icon:'🍽',color:'var(--acc)'},...(menuCategories||[]).filter(c=>!c.parentId&&!c.isSpecial&&(!deviceMenuId||c.menuId===deviceMenuId)).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0))].map(c=>{
               const color = c.color||'var(--acc)';
               const isActive=cat===c.id&&!search;
               return(
