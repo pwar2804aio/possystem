@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.9.2';
+const VERSION = '2.0.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,16 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.0.0', date: 'Apr 2026', label: 'Canvas removed · List view with inline variant editing',
+    changes: [
+      'Canvas feature removed completely — it was unreliable and did not correctly reflect changes on the POS. The Grid/Canvas toggle is now Grid/List.',
+      'NEW: List view (☰ List button in category toolbar). Shows every item as a table row: drag handle · name · type badge · price · modifier count · allergen count. Drag rows to reorder — reorder reflects immediately on POS.',
+      'Variants visible in List view: items with sizes show a ▾ expand arrow. Click to reveal all variant children indented below the parent, always visible by default. Each variant row shows its name (editable inline) and price (editable inline) without needing to click into an editor.',
+      '+ Add size button appears at the bottom of each expanded variant group — adds a new size directly from the list without navigating anywhere.',
+      'Clicking any row (parent or variant child) still opens the full item editor panel on the right for detailed editing.',
     ],
   },
   {

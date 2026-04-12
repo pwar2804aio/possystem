@@ -22,7 +22,6 @@
  */
 import { useState, useMemo, useCallback } from 'react';
 import { useStore } from '../../store';
-import CanvasMenu from './CanvasMenu';
 import { ALLERGENS } from '../../data/seed';
 
 // ── Shared ───────────────────────────────────────────────────────────────────
@@ -59,7 +58,7 @@ export default function MenuManager() {
 function MenuTab() {
   const { menuCategories, menuItems, addCategory, updateCategory, removeCategory,
           addMenuItem, updateMenuItem, archiveMenuItem, eightySixIds, toggle86,
-          markBOChange, showToast } = useStore();
+          markBOChange, showToast, modifierGroupDefs } = useStore();
 
   const [selCatId, setSelCatId]   = useState(null);
   const [selItemId, setSelItemId] = useState(null);
@@ -258,7 +257,7 @@ function MenuTab() {
             </div>
             <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
               <div style={{ display:'flex', borderRadius:8, overflow:'hidden', border:'1px solid var(--bdr)' }}>
-                {[['grid','⊞ Grid'],['canvas','⬛ Canvas']].map(([m,l]) => (
+                {[['grid','⊞ Grid'],['list','☰ List']].map(([m,l]) => (
                   <button key={m} onClick={()=>setViewMode(m)} style={{ padding:'5px 10px', cursor:'pointer', fontFamily:'inherit', background:viewMode===m?'var(--acc-d)':'var(--bg3)', border:'none', borderRight:'1px solid var(--bdr)', color:viewMode===m?'var(--acc)':'var(--t3)', fontSize:11, fontWeight:viewMode===m?700:400 }}>{l}</button>
                 ))}
               </div>
@@ -266,12 +265,14 @@ function MenuTab() {
             </div>
           </div>
 
-          {/* CANVAS VIEW */}
-          {viewMode==='canvas' && selCatId && (
-            <div style={{ flex:1, overflow:'hidden' }}>
-              <CanvasMenu catId={selCatId}/>
-            </div>
-          )}
+
+          {viewMode==='list' ? (
+            <ListItemView
+              items={displayItems} menuItems={menuItems} selItemId={selItemId} setSelItemId={setSelItemId}
+              catColor={selCat?.color||'var(--acc)'} addMenuItem={addMenuItem}
+              updateMenuItem={updateMenuItem} markBOChange={markBOChange} showToast={showToast}
+              eightySixIds={eightySixIds} modifierGroupDefs={modifierGroupDefs}/>
+          ) : (<>
           <div style={{ flex:1, overflowY:'auto', padding:'12px' }}
             onDragOver={e=>e.preventDefault()}
             onDrop={e=>{ if(dragItemId&&!overItemId){ const max=Math.max(...displayItems.map(i=>i.sortOrder??0),0); updateMenuItem(dragItemId,{sortOrder:max+1}); markBOChange(); setDragItemId(null); } }}>
@@ -379,6 +380,8 @@ function MenuTab() {
           <div style={{ padding:'4px 12px', borderTop:'1px solid var(--bdr)', fontSize:9, color:'var(--t4)', background:'var(--bg1)' }}>
             Drag cards to reorder · order reflects on POS instantly
           </div>
+          </>
+          )}
         </>) : (
           <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:10, color:'var(--t4)' }}>
             <span style={{ fontSize:40, opacity:.12 }}>🍽</span>
@@ -414,6 +417,174 @@ function MenuTab() {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIST ITEM VIEW
+// Table-style list showing items with variants nested inline.
+// Each row: drag handle · name · type · price · mods · allergens
+// Variant children are shown indented under their parent, always visible.
+// ═══════════════════════════════════════════════════════════════════════════
+function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, addMenuItem, updateMenuItem, markBOChange, showToast, eightySixIds, modifierGroupDefs }) {
+  const [expandedIds, setExpandedIds] = useState(new Set(items.map(i=>i.id))); // default expanded
+  const [dragIdx, setDragIdx]   = useState(null);
+  const [overIdx, setOverIdx]   = useState(null);
+
+  const variantsOf = (parentId) =>
+    menuItems.filter(c => c.parentId === parentId && !c.archived)
+      .sort((a,b) => (a.sortOrder??999)-(b.sortOrder??999));
+
+  const toggleExpand = id =>
+    setExpandedIds(s => { const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n; });
+
+  const reorder = (from, to) => {
+    const arr = [...items];
+    const [moved] = arr.splice(from,1);
+    arr.splice(to, 0, moved);
+    arr.forEach((item,i) => { if((item.sortOrder??999)!==i) updateMenuItem(item.id,{sortOrder:i}); });
+    markBOChange();
+  };
+
+  const addVariant = (parentId, cat, allergens, currentCount) => {
+    addMenuItem({ name:`New size`, menuName:`New size`, receiptName:`New size`, kitchenName:`New size`,
+      type:'simple', parentId, cat, allergens:[...allergens], pricing:{base:0},
+      assignedModifierGroups:[], assignedInstructionGroups:[], sortOrder:currentCount });
+    markBOChange();
+    setTimeout(()=>{
+      const last = useStore.getState().menuItems.slice(-1)[0];
+      if(last) setSelItemId(last.id);
+    }, 30);
+  };
+
+  const typeLabel = t => ({ simple:'Simple', modifiable:'Options', variants:'Has sizes', pizza:'Pizza', combo:'Combo', subitem:'Sub item' }[t] || t);
+  const typeColor = t => ({ simple:'var(--t4)', modifiable:'var(--acc)', variants:'var(--grn)', pizza:'#f97316', combo:'#8b5cf6' }[t] || 'var(--t4)');
+
+  return (
+    <div style={{ flex:1, overflowY:'auto' }}>
+      {/* Header row */}
+      <div style={{ display:'grid', gridTemplateColumns:'28px 1fr 90px 80px 60px 50px', gap:0, padding:'6px 12px', borderBottom:'2px solid var(--bdr)', position:'sticky', top:0, background:'var(--bg1)', zIndex:5 }}>
+        <div/>
+        <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>Item</div>
+        <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>Type</div>
+        <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>Price</div>
+        <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>Mods</div>
+        <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>⚠</div>
+      </div>
+
+      {items.length === 0 && (
+        <div style={{ padding:'40px', textAlign:'center', color:'var(--t4)', fontSize:12 }}>No items — click + Item to add one</div>
+      )}
+
+      {items.map((item, i) => {
+        const isSel    = selItemId === item.id;
+        const is86     = eightySixIds.includes(item.id);
+        const expanded = expandedIds.has(item.id);
+        const variants = variantsOf(item.id);
+        const hasVars  = variants.length > 0 || (item.type||'simple')==='variants';
+        const price    = item.pricing?.base ?? item.price ?? 0;
+        const fromP    = hasVars && variants.length > 0 ? Math.min(...variants.map(v=>v.pricing?.base??v.price??0)) : price;
+        const modCount = (item.assignedModifierGroups||[]).length + (item.assignedInstructionGroups||[]).length;
+        const allergCount = (item.allergens||[]).length;
+
+        return (
+          <div key={item.id}>
+            {/* Drop zone above */}
+            {overIdx === i && dragIdx !== i && dragIdx !== i-1 && (
+              <div style={{ height:3, background:'var(--acc)', marginLeft:12, marginRight:12, borderRadius:2 }}/>
+            )}
+
+            {/* Main item row */}
+            <div
+              draggable
+              onDragStart={()=>setDragIdx(i)}
+              onDragOver={e=>{e.preventDefault();setOverIdx(i);}}
+              onDrop={e=>{e.preventDefault();if(dragIdx!==null&&dragIdx!==i)reorder(dragIdx,i);setDragIdx(null);setOverIdx(null);}}
+              onDragEnd={()=>{setDragIdx(null);setOverIdx(null);}}
+              onClick={()=>setSelItemId(isSel?null:item.id)}
+              style={{ display:'grid', gridTemplateColumns:'28px 1fr 90px 80px 60px 50px', gap:0, padding:'8px 12px', cursor:'pointer', alignItems:'center',
+                background:isSel?'var(--acc-d)':is86?'var(--red-d)':'transparent',
+                borderBottom:'1px solid var(--bdr)',
+                opacity:dragIdx===i?.4:1,
+                transition:'background .1s' }}>
+              <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab', textAlign:'center' }}>⠿</span>
+              <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+                {hasVars && (
+                  <button onClick={e=>{e.stopPropagation();toggleExpand(item.id);}} style={{ width:16, height:16, borderRadius:4, border:'1px solid var(--bdr)', background:'var(--bg3)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'var(--t4)', flexShrink:0, fontFamily:'inherit' }}>
+                    {expanded?'▾':'▸'}
+                  </button>
+                )}
+                <span style={{ fontSize:13, fontWeight:700, color:isSel?'var(--acc)':is86?'var(--red)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {item.menuName||item.name}
+                </span>
+                {is86 && <span style={{ fontSize:8, padding:'1px 4px', borderRadius:4, background:'var(--red-d)', color:'var(--red)', border:'1px solid var(--red-b)', flexShrink:0 }}>86</span>}
+              </div>
+              <span style={{ fontSize:10, fontWeight:600, color:typeColor(item.type||'simple') }}>{typeLabel(item.type||'simple')}</span>
+              <span style={{ fontSize:12, fontWeight:700, color:catColor, fontFamily:'var(--font-mono)' }}>
+                {hasVars && variants.length>0 ? `from £${fromP.toFixed(2)}` : `£${price.toFixed(2)}`}
+              </span>
+              <span style={{ fontSize:11, color:modCount>0?'var(--acc)':'var(--t4)', fontWeight:modCount>0?700:400 }}>{modCount>0?`⊕ ${modCount}`:''}</span>
+              <span style={{ fontSize:10, color:allergCount>0?'var(--red)':'var(--t4)' }}>{allergCount>0?allergCount:''}</span>
+            </div>
+
+            {/* Variant children — shown when parent is expanded */}
+            {hasVars && expanded && (
+              <div style={{ background:'var(--bg3)', borderBottom:'1px solid var(--bdr)' }}>
+                {variants.map(v => {
+                  const vp = v.pricing||{base:v.price||0};
+                  const vSel = selItemId===v.id;
+                  return (
+                    <div key={v.id} onClick={e=>{e.stopPropagation();setSelItemId(vSel?null:v.id);}}
+                      style={{ display:'grid', gridTemplateColumns:'28px 1fr 90px 80px 60px 50px', gap:0, padding:'6px 12px 6px 44px', cursor:'pointer', alignItems:'center',
+                        background:vSel?'var(--acc-d)':'transparent', borderBottom:'1px solid var(--bdr)', transition:'background .1s' }}>
+                      <div/>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
+                        <span style={{ fontSize:10, color:catColor, flexShrink:0 }}>└</span>
+                        <input
+                          style={{ fontSize:12, fontWeight:600, color:vSel?'var(--acc)':'var(--t1)', background:'transparent', border:'none', outline:'none', width:'100%', fontFamily:'inherit', cursor:'text' }}
+                          value={v.menuName||v.name||''}
+                          onClick={e=>e.stopPropagation()}
+                          onChange={e=>{updateMenuItem(v.id,{menuName:e.target.value,name:e.target.value,receiptName:e.target.value,kitchenName:e.target.value});markBOChange();}}
+                          placeholder="Size name"
+                        />
+                      </div>
+                      <span style={{ fontSize:10, color:'var(--t4)' }}>size</span>
+                      <div style={{ display:'flex', alignItems:'center', gap:2 }}>
+                        <span style={{ fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
+                        <input type="number" step="0.01" min="0"
+                          style={{ fontSize:12, fontWeight:700, color:catColor, fontFamily:'var(--font-mono)', background:'transparent', border:'none', outline:'none', width:55, fontFamily:'inherit', cursor:'text' }}
+                          value={vp.base!==undefined?vp.base:''}
+                          onClick={e=>e.stopPropagation()}
+                          onChange={e=>{updateMenuItem(v.id,{pricing:{...vp,base:parseFloat(e.target.value)||0},price:parseFloat(e.target.value)||0});markBOChange();}}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <span style={{ fontSize:10, color:(v.allergens||[]).length>0?'var(--red)':'var(--t4)' }}>
+                        {(v.allergens||[]).length>0?(v.allergens||[]).length:''}
+                      </span>
+                      <button onClick={e=>{e.stopPropagation();if(confirm('Remove this size?')){updateMenuItem(v.id,{archived:true,parentId:null});markBOChange();showToast('Size removed','info');}}} style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                    </div>
+                  );
+                })}
+                {/* Add variant row */}
+                <div style={{ padding:'5px 12px 5px 44px' }}>
+                  <button onClick={e=>{e.stopPropagation();addVariant(item.id, item.cat, item.allergens||[], variants.length);if(item.type!=='variants'){updateMenuItem(item.id,{type:'variants'});markBOChange();}}}
+                    style={{ fontSize:11, fontWeight:600, color:catColor, background:'none', border:`1px dashed ${catColor}55`, borderRadius:7, padding:'3px 10px', cursor:'pointer', fontFamily:'inherit' }}>
+                    + Add size
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Drag drop footer */}
+      <div style={{ padding:'4px 12px', borderTop:'1px solid var(--bdr)', fontSize:9, color:'var(--t4)', background:'var(--bg1)' }}>
+        Drag rows to reorder · click row to edit · expand ▾ to see/edit sizes
+      </div>
+    </div>
+  );
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ITEM EDITOR
