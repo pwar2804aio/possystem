@@ -804,7 +804,7 @@ function ItemsLibrary() {
                 <div onClick={()=>setSelItemId(isSel?null:item.id)}
                   style={{ display:'grid', gridTemplateColumns:COL, gap:0, padding:'9px 12px', cursor:'pointer', alignItems:'center',
                     background:isSel?'var(--acc-d)':is86?'var(--red-d)':'transparent',
-                    borderBottom:'1px solid var(--bdr)', transition:'background .1s' }}>
+                    borderBottom:item.type==='subitem'&&item.soldAlone?'none':'1px solid var(--bdr)', transition:'background .1s' }}>
                   <div style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }}/>
                   <div style={{ minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:700, color:isSel?'var(--acc)':is86?'var(--red)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -821,6 +821,32 @@ function ItemsLibrary() {
                   <span style={{ fontSize:10, color:allergyN>0?'var(--red)':'var(--t4)' }}>{allergyN>0?allergyN:''}</span>
                 </div>
 
+                {/* soldAlone toggle for sub-items */}
+                {item.type==='subitem' && (
+                  <div onClick={e=>e.stopPropagation()} style={{ padding:'6px 12px 6px 28px', background:item.soldAlone?'#16a34a11':'var(--bg3)', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                    {/* Sliding toggle */}
+                    <button onClick={()=>{ updateMenuItem(item.id,{soldAlone:!item.soldAlone,cat:item.soldAlone?'':item.cat}); markBOChange(); }}
+                      style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit' }}>
+                      <div style={{ width:36, height:20, borderRadius:10, background:item.soldAlone?'var(--grn)':'var(--bg5)', border:`1.5px solid ${item.soldAlone?'var(--grn)':'var(--bdr2)'}`, position:'relative', transition:'all .2s', flexShrink:0 }}>
+                        <div style={{ width:14, height:14, borderRadius:'50%', background:'#fff', position:'absolute', top:2, left:item.soldAlone?18:2, transition:'left .2s', boxShadow:'0 1px 3px #0003' }}/>
+                      </div>
+                      <span style={{ fontSize:11, fontWeight:700, color:item.soldAlone?'var(--grn)':'var(--t4)' }}>
+                        {item.soldAlone?'Sold alone — visible on POS':'Also sell standalone'}
+                      </span>
+                    </button>
+                    {item.soldAlone && (
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginLeft:'auto' }}>
+                        <span style={{ fontSize:10, color:'var(--t3)' }}>Category:</span>
+                        <select value={item.cat||''} onChange={e=>{updateMenuItem(item.id,{cat:e.target.value}); markBOChange();}}
+                          style={{ ...inp, width:'auto', fontSize:11, padding:'3px 8px', color:item.cat?'var(--t1)':'var(--t4)', cursor:'pointer' }}>
+                          <option value="">— pick a category —</option>
+                          {allCats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                        </select>
+                        {item.cat && <span style={{ fontSize:10, fontWeight:600, color:'var(--grn)' }}>✓ Will show on POS</span>}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* Variant children — always visible */}
                 {hasVars && (
                   <div style={{ background:'var(--bg3)' }}>
@@ -1048,7 +1074,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
             )}
 
             {isSub && (
-              <div style={{ padding:'8px 10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>Sub items only appear as options inside modifier groups — not directly on the POS ordering screen.</div>
+              <div style={{ padding:'8px 10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>Sub items are modifier options. Use the toggle in the Items tab to also sell them as standalone POS items.</div>
             )}
 
           </div>
@@ -1578,8 +1604,7 @@ function PizzaBuilder({ item, onUpdate, markBOChange }) {
 function ModifiersTab() {
   const { modifierGroupDefs:groups, addModifierGroupDef, updateModifierGroupDef,
           updateModifierGroupOption,
-          removeModifierGroupDef, reorderModifierGroupDefs, markBOChange, showToast,
-          menuCategories } = useStore();
+          removeModifierGroupDef, reorderModifierGroupDefs, markBOChange, showToast } = useStore();
   const [selId, setSelId]     = useState(null);
   const [newName, setNewName] = useState('');
   const [newOpt, setNewOpt]   = useState({ name:'', price:'' });
@@ -1693,14 +1718,12 @@ function ModifiersTab() {
               <span style={{ fontSize:9, color:'var(--t4)' }}>drag to reorder · nested = links to another group</span>
             </div>
 
-            {(sel.options||[]).map((opt,oi)=>{
-              const allRootCats = (menuCategories||[]).filter(c=>!c.parentId&&!c.isSpecial);
-              return (
+            {(sel.options||[]).map((opt,oi)=>(
               <div key={opt.id} draggable
                 onDragStart={()=>setDragOIdx(oi)} onDragOver={e=>{e.preventDefault();setOverOIdx(oi);}}
                 onDrop={e=>{e.preventDefault();if(dragOIdx!==null&&dragOIdx!==oi)reorderOpts(dragOIdx,oi);setDragOIdx(null);setOverOIdx(null);}}
                 onDragEnd={()=>{setDragOIdx(null);setOverOIdx(null);}}
-                style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, border:`1px solid ${overOIdx===oi?'var(--acc)':opt.soldAlone?'var(--grn-b)':'var(--bdr)'}`, background:opt.soldAlone?'var(--grn-d)':'var(--bg2)', opacity:dragOIdx===oi?.4:1 }}>
+                style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, border:`1px solid ${overOIdx===oi?'var(--acc)':'var(--bdr)'}`, background:'var(--bg2)', opacity:dragOIdx===oi?.4:1 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'14px 1fr 90px auto', gap:6, alignItems:'center' }}>
                   <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⠿</span>
                   <input style={{ ...inp, fontSize:13, fontWeight:600 }} value={opt.name} onChange={e=>updOpt(opt.id,{name:e.target.value})} placeholder="Option name"/>
@@ -1710,24 +1733,7 @@ function ModifiersTab() {
                   </div>
                   <button onClick={()=>delOpt(opt.id)} style={{ width:28,height:34,borderRadius:7,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
                 </div>
-                {/* Can be sold alone */}
-                <div style={{ marginTop:7, paddingTop:7, borderTop:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-                  <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', flexShrink:0 }}>
-                    <input type="checkbox" checked={!!opt.soldAlone} onChange={e=>updOpt(opt.id,{soldAlone:e.target.checked})} style={{ accentColor:'var(--grn)', width:14, height:14 }}/>
-                    <span style={{ fontSize:11, fontWeight:600, color:opt.soldAlone?'var(--grn)':'var(--t3)' }}>Can be sold alone</span>
-                  </label>
-                  {opt.soldAlone && (
-                    <>
-                      <span style={{ fontSize:9, color:'var(--t4)' }}>→ appears in:</span>
-                      <select value={opt.soldAloneCat||''} onChange={e=>updOpt(opt.id,{soldAloneCat:e.target.value||undefined})}
-                        style={{ ...inp, fontSize:11, padding:'3px 7px', maxWidth:160, color:opt.soldAloneCat?'var(--grn)':'var(--t4)' }}>
-                        <option value="">— pick a category —</option>
-                        {allRootCats.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
-                      </select>
-                      <span style={{ fontSize:9, fontWeight:600, color:'var(--grn)', flexShrink:0 }}>shows on POS menu</span>
-                    </>
-                  )}
-                </div>
+
                 {/* Nested sub-group selector */}
                 <div style={{ marginTop:7, paddingTop:7, borderTop:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:7 }}>
                   <span style={{ fontSize:9, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.05em', flexShrink:0 }}>↳ Nested group:</span>
@@ -1739,8 +1745,7 @@ function ModifiersTab() {
                   {opt.subGroupId && <span style={{ fontSize:9, color:'var(--acc)', fontWeight:700, flexShrink:0 }}>▼ shows when selected</span>}
                 </div>
               </div>
-              );
-            })}
+            ))}
 
             {/* Add option */}
             <div style={{ marginTop:6, padding:'10px', background:'var(--bg3)', borderRadius:10, border:'1.5px dashed var(--bdr2)' }}>

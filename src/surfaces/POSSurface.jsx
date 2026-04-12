@@ -44,7 +44,6 @@ export default function POSSurface() {
     menuItems: storeMenuItems,
     menuCategories,
     quickScreenIds,
-    modifierGroupDefs,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
@@ -52,41 +51,13 @@ export default function POSSurface() {
   // identity on re-renders (which would remount ProductModal and reset selections state)
   const rawItems = storeMenuItems || SEED_MENU_ITEMS;
   const { getItemPrice } = useStore.getState();
-  // SoldAlone modifier options as virtual POS menu items
-  const soldAloneItems = useMemo(() => {
-    const items = [];
-    (modifierGroupDefs||[]).forEach(group => {
-      (group.options||[]).forEach(opt => {
-        if (opt.soldAlone && opt.soldAloneCat) {
-          items.push({
-            id: `solo-${opt.id}`,
-            name: opt.name,
-            menuName: opt.name,
-            receiptName: opt.name,
-            kitchenName: opt.name,
-            type: 'simple',
-            cat: opt.soldAloneCat,
-            cats: [],
-            price: opt.price||0,
-            pricing: { base: opt.price||0 },
-            allergens: [],
-            assignedModifierGroups: [],
-            assignedInstructionGroups: [],
-            sortOrder: 999,
-            _soldAlone: true,
-            _fromGroup: group.name,
-          });
-        }
-      });
-    });
-    return items;
-  }, [modifierGroupDefs]);
-
-  const MENU_ITEMS = useMemo(() => [...rawItems, ...soldAloneItems].map(i => ({
-    ...i,
-    name: i.menuName || i.name,
-    price: getItemPrice ? getItemPrice(i, orderType) : (i.pricing?.base ?? i.price ?? 0),
-  })), [rawItems, soldAloneItems, orderType]);
+  const MENU_ITEMS = useMemo(() => rawItems
+    .filter(i => i.type !== 'subitem' || i.soldAlone)   // subitems only show when sold-alone enabled
+    .map(i => ({
+      ...i,
+      name: i.menuName || i.name,
+      price: getItemPrice ? getItemPrice(i, orderType) : (i.pricing?.base ?? i.price ?? 0),
+    })), [rawItems, orderType]);
 
   // Order types this terminal is allowed to show (from device profile)
   const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];
@@ -135,7 +106,7 @@ export default function POSSurface() {
   const assignedSection = deviceConfig?.assignedSection;
   const quickItems = useMemo(() => {
     const ids = quickScreenIds && quickScreenIds.length ? quickScreenIds : QUICK_IDS;
-    const available = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
+    const available = MENU_ITEMS.filter(i => !i.archived && !i.parentId);
     const fromIds = ids.map(id => MENU_ITEMS.find(i => i.id === id)).filter(i => i && !eightySixIds.includes(i.id) && !i.archived);
     if (fromIds.length >= 12) return fromIds.slice(0, 16);
     const pad = available.filter(i => !ids.includes(i.id) && !eightySixIds.includes(i.id)).slice(0, 16 - fromIds.length);
@@ -152,7 +123,6 @@ export default function POSSurface() {
 
   const catItems = useMemo(() => {
     if (cat === 'quick') return quickItems;
-    if (cat === 'extras') return soldAloneItems;
     const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId)
       .slice().sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
     const inCat = (i, id) => i.cat === id || (i.cats||[]).includes(id);
@@ -477,7 +447,7 @@ export default function POSSurface() {
         </div>
         <div style={{flex:1,overflowY:'auto',padding:'6px 7px'}}>
           {/* Quick screen always first */}
-          {[{ id:'quick', label:'Quick', icon:'⚡', color:'var(--acc)' }, ...(soldAloneItems.length>0?[{ id:'extras', label:'Extras', icon:'⊕', color:'#8b5cf6' }]:[])].concat(
+          {[{ id:'quick', label:'Quick', icon:'⚡', color:'var(--acc)' }].concat(
             menuCategories.filter(c => !c.parentId && !c.isSpecial).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0))
           ).map(c => {
             const isActive = cat === c.id && !search;
@@ -485,9 +455,7 @@ export default function POSSurface() {
             const subIds = menuCategories.filter(s => s.parentId === c.id).map(s => s.id);
             const count = c.id === 'quick'
               ? quickItems.length
-              : c.id === 'extras'
-              ? soldAloneItems.length
-              : MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId && (i.cat === c.id || subIds.includes(i.cat))).length;
+              : MENU_ITEMS.filter(i => !i.archived && !i.parentId && (i.cat === c.id || subIds.includes(i.cat))).length;
             const hasSubcats = subIds.length > 0;
             return (
               <button key={c.id} onClick={() => { setCat(c.id); setSearch(''); }} className="cat-btn" style={{

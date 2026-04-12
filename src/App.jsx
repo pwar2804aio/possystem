@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.3.1';
+const VERSION = '2.4.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,16 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.4.0', date: 'Apr 2026', label: 'Sold alone toggle on items, not modifier groups',
+    changes: [
+      'Sold alone moved to the correct place — it is now a sliding toggle on each sub-item row in the Items tab, not on modifier group options (which was wrong).',
+      'How it works: go to Items tab → find any Sub item (Chips, Side salad, etc.) → a sliding toggle appears below the row labelled Also sell standalone. Flip it green → a Category dropdown appears inline → pick any category → that item now appears there on the POS exactly like a normal item.',
+      'Removed: Extras category from POS — sold-alone items now appear in whichever real category you assign them to, not in a special Extras screen.',
+      'Removed: soldAlone checkbox from Modifier groups tab (wrong location). The toggle lives on the product itself in the Items tab.',
+      'Backend: POS now includes subitem-type items in the menu when soldAlone is true and a cat is set. The updateMenuItem store action handles soldAlone and cat fields directly.',
     ],
   },
   {
