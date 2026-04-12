@@ -1950,22 +1950,39 @@ function MoveCatModal({ cat, allCats, onSave, onClose }) {
 // Drag items from the full menu onto a 16-slot grid — order and selection
 // persists to store and reflects on POS ⚡ tab immediately
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// QUICK SCREEN MANAGER — Multiple named screens, variable grid, click-to-add
+// ═══════════════════════════════════════════════════════════════════════════
 function QuickScreenManager() {
-  const { menuItems, menuCategories, quickScreenIds, setQuickScreenIds, showToast, markBOChange } = useStore();
-  const [catFilter, setCatFilter]   = useState('');
-  const [search, setSearch]         = useState('');
-  const [dragSrc, setDragSrc]       = useState(null); // {type:'slot'|'list', id, slotIdx}
-  const [overSlot, setOverSlot]     = useState(null);
+  const { menuItems, menuCategories, quickScreens, activeQuickScreenId,
+          setActiveQuickScreenId, addQuickScreen, updateQuickScreen, removeQuickScreen,
+          quickScreenIds, setQuickScreenIds, showToast, markBOChange } = useStore();
 
-  const SLOTS = 16;
+  const [catFilter, setCatFilter] = useState('');
+  const [search, setSearch]       = useState('');
+  const [dragSrc, setDragSrc]     = useState(null);
+  const [overSlot, setOverSlot]   = useState(null);
+  const [addingScreen, setAddingScreen] = useState(false);
+  const [newScreenName, setNewScreenName] = useState('');
+  const [editingName, setEditingName] = useState(null); // id of screen being renamed
 
-  // Current Quick Screen — array of item IDs, length ≤ SLOTS, some may be null (empty)
-  const slots = Array.from({ length: SLOTS }, (_, i) => quickScreenIds[i] || null);
+  // Active screen — fall back to first if not found
+  const screens     = quickScreens || [{ id:'qs-default', name:'Main screen', cols:4, ids: quickScreenIds||[] }];
+  const activeScreen = screens.find(s => s.id === activeQuickScreenId) || screens[0];
+  const COLS  = activeScreen?.cols || 4;
+  const TOTAL = COLS * Math.ceil(24 / COLS); // always enough rows
+  const ids   = activeScreen?.ids || [];
+  const slots = Array.from({ length: Math.max(TOTAL, ids.length + COLS) }, (_, i) => ids[i] || null);
 
-  // All orderable items for the picker panel
-  const allItems = menuItems.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
+  const save = (newIds) => {
+    updateQuickScreen(activeScreen.id, { ids: newIds.filter(Boolean) });
+    // Keep legacy quickScreenIds in sync for POS
+    if (activeScreen.id === screens[0]?.id) setQuickScreenIds(newIds.filter(Boolean));
+    markBOChange();
+  };
+
+  const allItems = menuItems.filter(i => !i.archived && (i.type !== 'subitem' || i.soldAlone) && !i.parentId);
   const roots    = menuCategories.filter(c => !c.parentId && !c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
-
   const listItems = allItems
     .filter(i => {
       if (catFilter && i.cat !== catFilter && !(i.cats||[]).includes(catFilter)) return false;
@@ -1974,165 +1991,223 @@ function QuickScreenManager() {
     })
     .sort((a,b) => (a.sortOrder??999)-(b.sortOrder??999));
 
-  const onSlot = idx => quickScreenIds[idx] ? menuItems.find(m => m.id === quickScreenIds[idx]) : null;
   const catFor = item => menuCategories.find(c => c.id === item?.cat);
 
-  // Save updated ids to store
-  const save = (newIds) => {
-    setQuickScreenIds(newIds.filter(Boolean));
-    markBOChange();
-  };
-
-  // Remove item from a slot
   const clearSlot = (idx) => {
-    const next = [...slots];
-    next[idx] = null;
-    save(next);
+    const next = [...slots]; next[idx] = null; save(next);
   };
 
-  // Drop: from list onto slot
+  const addItem = (itemId, idx) => {
+    const next = [...slots];
+    if (idx !== undefined) {
+      if (next.includes(itemId)) { showToast('Already on this screen','warning'); return; }
+      next[idx] = itemId;
+    } else {
+      if (next.includes(itemId)) { showToast('Already on this screen','warning'); return; }
+      const firstEmpty = next.findIndex(s => !s);
+      if (firstEmpty === -1) next.push(itemId);
+      else next[firstEmpty] = itemId;
+    }
+    save(next);
+    showToast('Added to Quick Screen','success');
+  };
+
   const onSlotDrop = (e, idx) => {
     e.preventDefault();
     if (!dragSrc) { setOverSlot(null); return; }
-
     const next = [...slots];
-
     if (dragSrc.type === 'list') {
-      // Adding from picker
-      if (next.includes(dragSrc.id)) {
-        showToast('Already on Quick Screen', 'warning');
-        setDragSrc(null); setOverSlot(null); return;
-      }
+      if (next.includes(dragSrc.id)) { showToast('Already on this screen','warning'); setDragSrc(null); setOverSlot(null); return; }
       next[idx] = dragSrc.id;
     } else if (dragSrc.type === 'slot') {
-      // Reordering within grid
-      const srcIdx = dragSrc.slotIdx;
-      const tmp = next[srcIdx];
-      next[srcIdx] = next[idx];
-      next[idx] = tmp;
+      const tmp = next[dragSrc.slotIdx]; next[dragSrc.slotIdx] = next[idx]; next[idx] = tmp;
     }
+    save(next); setDragSrc(null); setOverSlot(null);
+  };
 
-    save(next);
-    setDragSrc(null); setOverSlot(null);
+  const createScreen = () => {
+    if (!newScreenName.trim()) return;
+    const id = `qs-${Date.now()}`;
+    addQuickScreen({ id, name: newScreenName.trim(), cols:4, ids:[] });
+    setActiveQuickScreenId(id);
+    markBOChange();
+    setNewScreenName(''); setAddingScreen(false);
+    showToast(`"${newScreenName}" created`,'success');
   };
 
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
 
-      {/* ── Left: 4×4 Quick Screen grid ─────────────────────────────── */}
+      {/* ── Left: screen tabs + grid ─────────────────────────────────── */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', borderRight:'1px solid var(--bdr)' }}>
-        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-          <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom:2 }}>
-            <span style={{ fontSize:15, fontWeight:800, color:'var(--t1)' }}>⚡ Quick Screen</span>
-            <span style={{ fontSize:11, color:'var(--t4)' }}>{quickScreenIds.filter(Boolean).length}/{SLOTS} slots used</span>
+
+        {/* Screen selector tabs */}
+        <div style={{ borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', overflowX:'auto', padding:'0 12px' }}>
+            {screens.map(screen => (
+              <div key={screen.id} style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+                {editingName === screen.id ? (
+                  <input autoFocus value={screen.name}
+                    onChange={e=>updateQuickScreen(screen.id,{name:e.target.value})}
+                    onBlur={()=>{setEditingName(null);markBOChange();}}
+                    onKeyDown={e=>{if(e.key==='Enter'){setEditingName(null);markBOChange();}}}
+                    style={{ fontSize:12, fontWeight:700, border:'1px solid var(--acc)', borderRadius:6, padding:'3px 7px', background:'var(--bg2)', color:'var(--t1)', fontFamily:'inherit', width:120 }}/>
+                ) : (
+                  <button onClick={()=>setActiveQuickScreenId(screen.id)}
+                    onDoubleClick={()=>setEditingName(screen.id)}
+                    style={{ padding:'10px 14px', cursor:'pointer', fontFamily:'inherit', border:'none',
+                      borderBottom:`3px solid ${activeScreen?.id===screen.id?'var(--acc)':'transparent'}`,
+                      background:'transparent', fontSize:12, fontWeight:activeScreen?.id===screen.id?800:500,
+                      color:activeScreen?.id===screen.id?'var(--acc)':'var(--t3)', whiteSpace:'nowrap' }}>
+                    ⚡ {screen.name}
+                    <span style={{ marginLeft:6, fontSize:9, color:'var(--t4)' }}>{(screen.ids||[]).length}</span>
+                  </button>
+                )}
+                {screens.length > 1 && activeScreen?.id===screen.id && (
+                  <button onClick={()=>{ if(confirm(`Remove "${screen.name}"?`)){ removeQuickScreen(screen.id); setActiveQuickScreenId(screens.find(s=>s.id!==screen.id)?.id||''); markBOChange(); }}}
+                    style={{ width:16,height:16,borderRadius:4,border:'1px solid var(--bdr)',background:'var(--bg3)',color:'var(--t4)',cursor:'pointer',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                )}
+              </div>
+            ))}
+            {addingScreen ? (
+              <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 0' }}>
+                <input autoFocus value={newScreenName} onChange={e=>setNewScreenName(e.target.value)}
+                  onKeyDown={e=>{if(e.key==='Enter')createScreen();if(e.key==='Escape'){setAddingScreen(false);setNewScreenName('');}}}
+                  placeholder="Screen name…"
+                  style={{ fontSize:12,border:'1px solid var(--acc)',borderRadius:7,padding:'4px 8px',background:'var(--bg2)',color:'var(--t1)',fontFamily:'inherit',width:140,outline:'none' }}/>
+                <button onClick={createScreen} style={{ padding:'4px 10px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0b0c10',fontSize:11,fontWeight:700 }}>Add</button>
+                <button onClick={()=>{setAddingScreen(false);setNewScreenName('');}} style={{ padding:'4px 8px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11 }}>✕</button>
+              </div>
+            ) : (
+              <button onClick={()=>setAddingScreen(true)} style={{ padding:'6px 10px',cursor:'pointer',fontFamily:'inherit',border:'none',background:'transparent',fontSize:12,color:'var(--t4)',flexShrink:0 }}>+ Screen</button>
+            )}
           </div>
-          <div style={{ fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>
-            Drag items from the right panel onto a slot. Drag within the grid to reorder. Click ✕ to remove. Changes reflect on POS instantly.
+
+          {/* Screen settings bar */}
+          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'7px 14px', borderTop:'1px solid var(--bdr)' }}>
+            <span style={{ fontSize:11, color:'var(--t3)', fontWeight:600 }}>Grid columns:</span>
+            {[3,4,5,6].map(n=>(
+              <button key={n} onClick={()=>{updateQuickScreen(activeScreen.id,{cols:n});markBOChange();}}
+                style={{ width:28,height:24,borderRadius:6,cursor:'pointer',fontFamily:'inherit',border:`1px solid ${COLS===n?'var(--acc)':'var(--bdr)'}`,background:COLS===n?'var(--acc-d)':'var(--bg3)',color:COLS===n?'var(--acc)':'var(--t3)',fontSize:11,fontWeight:COLS===n?700:400 }}>
+                {n}
+              </button>
+            ))}
+            <span style={{ fontSize:10, color:'var(--t4)', marginLeft:'auto' }}>
+              {ids.length} items · Double-click tab to rename · Drag to reorder
+            </span>
+            <button onClick={()=>{ save([]); showToast('Screen cleared','info'); }}
+              style={{ padding:'3px 10px',borderRadius:7,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:10,fontWeight:600 }}>Clear</button>
           </div>
         </div>
 
-        <div style={{ flex:1, overflowY:'auto', padding:'16px' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+        {/* Grid */}
+        <div style={{ flex:1, overflowY:'auto', padding:'14px' }}>
+          <div style={{ display:'grid', gridTemplateColumns:`repeat(${COLS},1fr)`, gap:8 }}>
             {slots.map((itemId, idx) => {
-              const item  = itemId ? menuItems.find(m => m.id === itemId) : null;
-              const cat   = catFor(item);
-              const color = cat?.color || 'var(--acc)';
+              const item    = itemId ? menuItems.find(m => m.id === itemId) : null;
+              const cat     = catFor(item);
+              const color   = cat?.color || 'var(--acc)';
               const isOver  = overSlot === idx;
-              const isDragging = dragSrc?.type==='slot' && dragSrc?.slotIdx===idx;
+              const isDrag  = dragSrc?.type==='slot' && dragSrc?.slotIdx===idx;
+              const price   = item?.pricing?.base ?? item?.price ?? 0;
+              const kids    = item ? menuItems.filter(c=>c.parentId===item.id&&!c.archived) : [];
+              const fromP   = kids.length>0 ? Math.min(...kids.map(k=>k.pricing?.base??k.price??0)) : price;
 
               return (
                 <div key={idx}
-                  onDragOver={e => { e.preventDefault(); setOverSlot(idx); }}
-                  onDragLeave={() => setOverSlot(null)}
-                  onDrop={e => onSlotDrop(e, idx)}
-                  style={{
-                    aspectRatio:'1/.75', borderRadius:14, border:`2px ${isOver?'solid':'dashed'} ${isOver?'var(--acc)':item?'var(--bdr)':'var(--bdr)'}`,
+                  onDragOver={e=>{e.preventDefault();setOverSlot(idx);}}
+                  onDragLeave={()=>setOverSlot(null)}
+                  onDrop={e=>onSlotDrop(e,idx)}
+                  style={{ aspectRatio:'1/.72', borderRadius:12,
+                    border:`2px ${isOver?'solid':'dashed'} ${isOver?'var(--acc)':item?'var(--bdr)':'var(--bdr2)'}`,
                     background:isOver?'var(--acc-d)':item?'var(--bg2)':'var(--bg3)',
-                    position:'relative', overflow:'hidden', opacity:isDragging?.3:1,
-                    transition:'all .1s', cursor:item?'grab':'default',
-                  }}
+                    position:'relative', overflow:'hidden', opacity:isDrag?.3:1,
+                    transition:'all .1s', cursor:item?'grab':'default' }}
                   draggable={!!item}
-                  onDragStart={e => { if(item){ setDragSrc({type:'slot', id:itemId, slotIdx:idx}); e.dataTransfer.effectAllowed='move'; } }}
-                  onDragEnd={() => { setDragSrc(null); setOverSlot(null); }}>
+                  onDragStart={e=>{if(item){setDragSrc({type:'slot',id:itemId,slotIdx:idx});e.dataTransfer.effectAllowed='move';}}}
+                  onDragEnd={()=>{setDragSrc(null);setOverSlot(null);}}>
 
                   {item ? (<>
-                    {/* Colour bar */}
-                    <div style={{ position:'absolute', left:0, top:0, bottom:0, width:4, background:color }}/>
-                    {/* Remove btn */}
-                    <button onClick={()=>clearSlot(idx)} style={{ position:'absolute', top:4, right:4, width:18, height:18, borderRadius:'50%', border:'none', background:'rgba(0,0,0,.35)', color:'#fff', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>✕</button>
-                    {/* Slot number */}
-                    <div style={{ position:'absolute', bottom:4, right:6, fontSize:9, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>{idx+1}</div>
-                    <div style={{ padding:'8px 8px 6px 12px', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
-                      <div>
-                        <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)', lineHeight:1.3, marginBottom:2 }}>{item.menuName||item.name}</div>
-                        <div style={{ fontSize:9, color:'var(--t4)' }}>{cat?.icon} {cat?.label}</div>
+                    <div style={{ position:'absolute',left:0,top:0,bottom:0,width:4,background:color }}/>
+                    <button onClick={()=>clearSlot(idx)} style={{ position:'absolute',top:4,right:4,width:18,height:18,borderRadius:5,border:'none',background:'rgba(0,0,0,.08)',color:'var(--t3)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1 }}>×</button>
+                    <div style={{ padding:'8px 8px 6px 12px', display:'flex', flexDirection:'column', height:'100%', boxSizing:'border-box' }}>
+                      <div style={{ fontSize:10, color:color, fontWeight:600, marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {cat?.icon} {cat?.label}
                       </div>
-                      <div style={{ fontSize:13, fontWeight:800, color:color, fontFamily:'var(--font-mono)' }}>
-                        £{(item.pricing?.base??item.price??0).toFixed(2)}
+                      <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)', lineHeight:1.3, flex:1, overflow:'hidden' }}>
+                        {item.menuName||item.name}
+                      </div>
+                      <div style={{ fontSize:12, fontWeight:800, color:color, fontFamily:'var(--font-mono)', marginTop:'auto' }}>
+                        {kids.length>0?`from £${fromP.toFixed(2)}`:`£${price.toFixed(2)}`}
                       </div>
                     </div>
                   </>) : (
-                    <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:4 }}>
-                      <span style={{ fontSize:18, opacity:.15 }}>+</span>
-                      <span style={{ fontSize:9, color:'var(--t4)' }}>Slot {idx+1}</span>
+                    <div style={{ height:'100%',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:3 }}>
+                      <span style={{ fontSize:18,opacity:.15 }}>+</span>
+                      <span style={{ fontSize:8,color:'var(--t4)' }}>{idx+1}</span>
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
-
-          {/* Quick clear + tips */}
-          <div style={{ marginTop:16, display:'flex', gap:8 }}>
-            <button onClick={()=>{ save([]); showToast('Quick Screen cleared','info'); }} style={{ padding:'6px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:600 }}>Clear all</button>
-            <button onClick={()=>{ const ids=allItems.slice(0,SLOTS).map(i=>i.id); save(ids); showToast('Filled with first '+ids.length+' items','success'); }} style={{ padding:'6px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600 }}>Auto-fill from menu</button>
-          </div>
         </div>
       </div>
 
-      {/* ── Right: Item picker ───────────────────────────────────────── */}
-      <div style={{ width:280, display:'flex', flexDirection:'column', overflow:'hidden', flexShrink:0 }}>
-        <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-          <div style={{ fontSize:12, fontWeight:700, color:'var(--t2)', marginBottom:8 }}>Drag items onto the grid →</div>
-          <div style={{ position:'relative', marginBottom:6 }}>
-            <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)' }}>🔍</span>
-            <input style={{ ...inp, paddingLeft:28, fontSize:12, padding:'5px 5px 5px 28px' }} placeholder="Search items…" value={search} onChange={e=>setSearch(e.target.value)}/>
+      {/* ── Right: item picker ───────────────────────────────────────── */}
+      <div style={{ width:280, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg1)', flexShrink:0 }}>
+        <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--t2)', marginBottom:8 }}>Add items →</div>
+          <div style={{ position:'relative', marginBottom:7 }}>
+            <span style={{ position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',fontSize:11,color:'var(--t4)' }}>🔍</span>
+            <input style={{ ...inp, paddingLeft:26, fontSize:11 }} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items…"/>
+            {search && <button onClick={()=>setSearch('')} style={{ position:'absolute',right:7,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--t4)',cursor:'pointer',fontSize:13 }}>×</button>}
           </div>
-          <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ ...inp, fontSize:11, padding:'4px 8px', cursor:'pointer' }}>
+          <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ ...inp, fontSize:11, cursor:'pointer' }}>
             <option value="">All categories</option>
             {roots.map(c=><option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
           </select>
         </div>
 
-        <div style={{ flex:1, overflowY:'auto', padding:'6px 8px' }}>
+        <div style={{ flex:1, overflowY:'auto' }}>
           {listItems.map(item => {
-            const onScreen = quickScreenIds.includes(item.id);
-            const cat      = catFor(item);
-            const color    = cat?.color || 'var(--acc)';
+            const cat     = catFor(item);
+            const color   = cat?.color || 'var(--acc)';
+            const inScreen = ids.includes(item.id);
+            const price   = item.pricing?.base ?? item.price ?? 0;
+
             return (
               <div key={item.id}
-                draggable={!onScreen}
-                onDragStart={e=>{ if(!onScreen){ setDragSrc({type:'list',id:item.id}); e.dataTransfer.effectAllowed='move'; } }}
+                draggable={!inScreen}
+                onDragStart={e=>{if(!inScreen){setDragSrc({type:'list',id:item.id});e.dataTransfer.effectAllowed='move';}}}
                 onDragEnd={()=>setDragSrc(null)}
-                style={{
-                  display:'flex', alignItems:'center', gap:8, padding:'7px 9px', marginBottom:4,
-                  borderRadius:9, border:`1.5px solid ${onScreen?'var(--grn-b)':'var(--bdr)'}`,
-                  background:onScreen?'var(--grn-d)':'var(--bg3)',
-                  cursor:onScreen?'default':'grab', opacity:onScreen?.7:1,
-                  userSelect:'none',
-                }}>
-                <div style={{ width:4, height:32, borderRadius:2, background:color, flexShrink:0 }}/>
+                onClick={()=>!inScreen && addItem(item.id)}
+                style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 12px',
+                  borderBottom:'1px solid var(--bdr)',
+                  background:inScreen?'var(--bg3)':dragSrc?.id===item.id?'var(--acc-d)':'var(--bg1)',
+                  cursor:inScreen?'default':'pointer', opacity:inScreen?.6:1, transition:'background .1s' }}
+                onMouseEnter={e=>{if(!inScreen)e.currentTarget.style.background='var(--bg3)';}}
+                onMouseLeave={e=>{if(!inScreen)e.currentTarget.style.background='var(--bg1)';}}>
+                <div style={{ width:3,height:32,borderRadius:2,background:color,flexShrink:0 }}/>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:12, fontWeight:600, color:onScreen?'var(--grn)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.menuName||item.name}</div>
-                  <div style={{ fontSize:9, color:'var(--t4)' }}>{cat?.icon} {cat?.label}</div>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.menuName||item.name}</div>
+                  <div style={{ fontSize:9, color:'var(--t4)' }}>{cat?.icon} {cat?.label} · £{price.toFixed(2)}</div>
                 </div>
-                <span style={{ fontSize:12, fontWeight:700, color:onScreen?'var(--grn)':color, fontFamily:'var(--font-mono)', flexShrink:0 }}>
-                  {onScreen ? '✓' : `£${(item.pricing?.base??item.price??0).toFixed(2)}`}
-                </span>
+                {inScreen
+                  ? <span style={{ fontSize:9,fontWeight:700,color:'var(--grn)',flexShrink:0 }}>✓</span>
+                  : <span style={{ fontSize:14,color:'var(--acc)',flexShrink:0,fontWeight:300 }}>+</span>
+                }
               </div>
             );
           })}
-          {listItems.length===0 && <div style={{ textAlign:'center', padding:'20px 0', color:'var(--t4)', fontSize:11 }}>No items found</div>}
+        </div>
+
+        {/* Auto-fill */}
+        <div style={{ padding:'8px 12px', borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
+          <button onClick={()=>{ const fill=allItems.slice(0,COLS*5).map(i=>i.id); save(fill); showToast('Auto-filled','success'); }}
+            style={{ width:'100%',padding:'6px',borderRadius:8,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t2)',fontSize:11,fontWeight:600 }}>
+            Auto-fill from menu
+          </button>
         </div>
       </div>
     </div>

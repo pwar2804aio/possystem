@@ -44,6 +44,8 @@ export default function POSSurface() {
     menuItems: storeMenuItems,
     menuCategories,
     quickScreenIds,
+    quickScreens,
+    activeQuickScreenId,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
@@ -106,12 +108,14 @@ export default function POSSurface() {
   const assignedSection = deviceConfig?.assignedSection;
   const quickItems = useMemo(() => {
     const ids = quickScreenIds && quickScreenIds.length ? quickScreenIds : QUICK_IDS;
+    const activeScreen = (quickScreens||[]).find(s=>s.id===activeQuickScreenId);
+    const activeIds = activeScreen?.ids || quickScreenIds || [];
     const available = MENU_ITEMS.filter(i => !i.archived && !i.parentId);
-    const fromIds = ids.map(id => MENU_ITEMS.find(i => i.id === id)).filter(i => i && !eightySixIds.includes(i.id) && !i.archived);
+    const fromIds = activeIds.map(id => MENU_ITEMS.find(i => i.id === id)).filter(i => i && !eightySixIds.includes(i.id) && !i.archived);
     if (fromIds.length >= 12) return fromIds.slice(0, 16);
     const pad = available.filter(i => !ids.includes(i.id) && !eightySixIds.includes(i.id)).slice(0, 16 - fromIds.length);
     return [...fromIds, ...pad];
-  }, [quickScreenIds, MENU_ITEMS, eightySixIds]);
+  }, [quickScreenIds, quickScreens, activeQuickScreenId, MENU_ITEMS, eightySixIds]);
 
   // When the main category changes, reset the subcategory selection
   useEffect(() => { setSubCat(null); }, [cat]);

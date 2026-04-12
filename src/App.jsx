@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.4.2';
+const VERSION = '2.5.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,16 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.5.0', date: 'Apr 2026', label: 'Quick Screen: multiple named screens, variable grid, click-to-add',
+    changes: [
+      'Multiple named Quick Screens: click + Screen to add screens (Main screen, Bar screen, Lunch, etc). Each screen has its own independent item list. Double-click a tab to rename it.',
+      'Variable grid columns: choose 3, 4, 5 or 6 columns per screen from the settings bar. Grid expands automatically.',
+      'Click to add: click any item in the right panel to instantly add it to the next empty slot. No drag required. Drag still works for precise placement or reordering.',
+      'Already-on-screen indicator: items that are already on the current screen show a green ✓ in the picker panel and cannot be added twice.',
+      'Screen isolation: each screen saves its own item list. The main screen stays in sync with the POS Quick tab.',
     ],
   },
   {

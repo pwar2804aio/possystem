@@ -355,6 +355,16 @@ export const useStore = create((set, get) => ({
   // Quick Screen — list of item IDs shown on the ⚡ Quick tab, ordered
   quickScreenIds: QUICK_IDS,
   setQuickScreenIds: (ids) => set({ quickScreenIds: ids }),
+  // Multiple named quick screens
+  quickScreens: [
+    { id:'qs-main', name:'Main screen', cols:4, ids: QUICK_IDS },
+    { id:'qs-bar',  name:'Bar screen',  cols:4, ids: [] },
+  ],
+  activeQuickScreenId: 'qs-main',
+  setActiveQuickScreenId: id => set({ activeQuickScreenId: id }),
+  addQuickScreen: (screen) => set(s => ({ quickScreens:[...s.quickScreens, { id:`qs-${Date.now()}`, cols:4, ids:[], ...screen }] })),
+  updateQuickScreen: (id, patch) => set(s => ({ quickScreens: s.quickScreens.map(qs => qs.id===id ? { ...qs, ...patch } : qs) })),
+  removeQuickScreen: id => set(s => ({ quickScreens: s.quickScreens.filter(qs => qs.id!==id) })),
 
   menuItems: MENU_ITEMS.map((item, idx) => ({
     ...item,
