@@ -306,6 +306,12 @@ export const useStore = create((set, get) => ({
   addModifierGroupDef: g => set(s => ({ modifierGroupDefs:[...s.modifierGroupDefs,{id:`mgd-${Date.now()}`,...g}] })),
   updateModifierGroupDef: (id,patch) => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
   removeModifierGroupDef: id => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.filter(g=>g.id!==id) })),
+  reorderModifierGroupDefs: (fromIdx, toIdx) => set(s => {
+    const arr = [...s.modifierGroupDefs];
+    const [moved] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, moved);
+    return { modifierGroupDefs: arr };
+  }),
 
   // ── Instruction groups — preparation instructions (no price change) ────────
   // These DON'T change the price. e.g. "Cooking preference: Rare / Medium / Well done"
@@ -322,6 +328,12 @@ export const useStore = create((set, get) => ({
   addInstructionGroupDef: g => set(s => ({ instructionGroupDefs:[...s.instructionGroupDefs,{id:`igd-${Date.now()}`,...g}] })),
   updateInstructionGroupDef: (id,patch) => set(s => ({ instructionGroupDefs:s.instructionGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
   removeInstructionGroupDef: id => set(s => ({ instructionGroupDefs:s.instructionGroupDefs.filter(g=>g.id!==id) })),
+  reorderInstructionGroupDefs: (fromIdx, toIdx) => set(s => {
+    const arr = [...s.instructionGroupDefs];
+    const [moved] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, moved);
+    return { instructionGroupDefs: arr };
+  }),
 
   // ── Menu items — full enhanced model ─────────────────────────────────────────
   //

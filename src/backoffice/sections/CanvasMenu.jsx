@@ -15,7 +15,7 @@ const GROUP_PAD = 20;
 
 const inp = { background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:9, padding:'7px 10px', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none', width:'100%', boxSizing:'border-box' };
 
-export default function CanvasMenu() {
+export default function CanvasMenu({ catId }) {
   const { menuItems, menuCategories, modifierGroupDefs, updateMenuItem, markBOChange, showToast, addMenuItem } = useStore();
 
   // Canvas position states per item: { [itemId]: {x, y} }
@@ -37,13 +37,15 @@ export default function CanvasMenu() {
 
   const canvasItems = useMemo(() => {
     let items = menuItems.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId);
-    if (catFilter !== 'all') items = items.filter(i => i.cat === catFilter || (i.cats||[]).includes(catFilter));
+    // When embedded in a category, filter to that category by default
+    const activeCat = catId || (catFilter !== 'all' ? catFilter : null);
+    if (activeCat) items = items.filter(i => i.cat === activeCat || (i.cats||[]).includes(activeCat));
     if (search.trim()) {
       const q = search.toLowerCase();
       items = items.filter(i => (i.menuName||i.name||'').toLowerCase().includes(q));
     }
     return items;
-  }, [menuItems, catFilter, search]);
+  }, [menuItems, catId, catFilter, search]);
 
   const GRID = 20;
   const COLS = Math.floor((CANVAS_W - 80) / (CARD_W + GRID));

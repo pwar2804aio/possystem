@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,16 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.6.0', date: 'Apr 2026', label: 'Modifier/instruction groups drag-reorder, subGroupId, canvas as view mode',
+    changes: [
+      'Modifier groups tab: drag handles on both groups (left list) and options (right editor). Drag groups to reorder the order they appear in search/assignment. Drag options within a group to set the order the customer sees them on POS.',
+      'Nested modifiers in editor: each option now has a nested group selector (↳ Nested group dropdown). Pick any other modifier group to make it appear when that option is selected. This is the core of the conditional modifier flow.',
+      'Instruction groups tab: same drag-to-reorder for both groups and individual options within each group.',
+      'Canvas removed as top-level tab — now accessed per-category via the Grid/Canvas toggle button in the category toolbar. The canvas view automatically shows only items in the selected category.',
+      'Reorder store actions added: reorderModifierGroupDefs and reorderInstructionGroupDefs for persistent ordering without sortOrder fields.',
     ],
   },
   {

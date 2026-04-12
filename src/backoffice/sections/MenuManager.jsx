@@ -37,7 +37,7 @@ export default function MenuManager() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       <nav style={{ display:'flex', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-        {[['menu','🍽 Menu'],['canvas','🗂 Canvas'],['quick','⚡ Quick Screen'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
+        {[['menu','🍽 Menu'],['quick','⚡ Quick Screen'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{ padding:'0 20px', height:46, cursor:'pointer', fontFamily:'inherit', border:'none', borderBottom:`3px solid ${tab===id?'var(--acc)':'transparent'}`, background:'transparent', color:tab===id?'var(--acc)':'var(--t3)', fontSize:13, fontWeight:tab===id?800:500 }}>
             {label}
           </button>
@@ -45,7 +45,6 @@ export default function MenuManager() {
       </nav>
       <div style={{ flex:1, overflow:'hidden' }}>
         {tab==='menu'         && <MenuTab />}
-        {tab==='canvas'       && <CanvasMenu />}
         {tab==='quick'        && <QuickScreenManager />}
         {tab==='modifiers'    && <ModifiersTab />}
         {tab==='instructions' && <InstructionsTab />}
@@ -73,6 +72,7 @@ function MenuTab() {
   const [overItemId, setOverItemId] = useState(null);
   const [expandedParentId, setExpandedParentId] = useState(null); // variant expand
   const [search, setSearch]         = useState('');
+  const [viewMode, setViewMode]     = useState('grid'); // 'grid' | 'canvas'
 
   const roots     = useMemo(()=>menuCategories.filter(c=>!c.parentId&&!c.isSpecial).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)),[menuCategories]);
   const selCat    = menuCategories.find(c=>c.id===selCatId);
@@ -257,11 +257,21 @@ function MenuTab() {
               {search && <button onClick={()=>setSearch('')} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'var(--t4)', cursor:'pointer', fontSize:14 }}>×</button>}
             </div>
             <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
+              <div style={{ display:'flex', borderRadius:8, overflow:'hidden', border:'1px solid var(--bdr)' }}>
+                {[['grid','⊞ Grid'],['canvas','⬛ Canvas']].map(([m,l]) => (
+                  <button key={m} onClick={()=>setViewMode(m)} style={{ padding:'5px 10px', cursor:'pointer', fontFamily:'inherit', background:viewMode===m?'var(--acc-d)':'var(--bg3)', border:'none', borderRight:'1px solid var(--bdr)', color:viewMode===m?'var(--acc)':'var(--t3)', fontSize:11, fontWeight:viewMode===m?700:400 }}>{l}</button>
+                ))}
+              </div>
               <button onClick={()=>addItem('simple')} style={{ padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700 }}>+ Item</button>
             </div>
           </div>
 
-          {/* GRID — same card style as POS */}
+          {/* CANVAS VIEW */}
+          {viewMode==='canvas' && selCatId && (
+            <div style={{ flex:1, overflow:'hidden' }}>
+              <CanvasMenu catId={selCatId}/>
+            </div>
+          )}
           <div style={{ flex:1, overflowY:'auto', padding:'12px' }}
             onDragOver={e=>e.preventDefault()}
             onDrop={e=>{ if(dragItemId&&!overItemId){ const max=Math.max(...displayItems.map(i=>i.sortOrder??0),0); updateMenuItem(dragItemId,{sortOrder:max+1}); markBOChange(); setDragItemId(null); } }}>
@@ -966,18 +976,23 @@ function PizzaBuilder({ item, onUpdate, markBOChange }) {
 }
 
 
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MODIFIER GROUPS TAB
-// Options are plain {id, name, price} pairs — no sub-item concept
+// Drag to reorder groups + options. Options support nested subGroupId.
 // ═══════════════════════════════════════════════════════════════════════════
 function ModifiersTab() {
-  const { modifierGroupDefs:groups, addModifierGroupDef, updateModifierGroupDef, removeModifierGroupDef, markBOChange, showToast } = useStore();
-  const [selId, setSelId]   = useState(null);
+  const { modifierGroupDefs:groups, addModifierGroupDef, updateModifierGroupDef,
+          removeModifierGroupDef, reorderModifierGroupDefs, markBOChange, showToast } = useStore();
+  const [selId, setSelId]     = useState(null);
   const [newName, setNewName] = useState('');
   const [newOpt, setNewOpt]   = useState({ name:'', price:'' });
+  const [dragGIdx, setDragGIdx] = useState(null);
+  const [overGIdx, setOverGIdx] = useState(null);
+  const [dragOIdx, setDragOIdx] = useState(null);
+  const [overOIdx, setOverOIdx] = useState(null);
 
   const sel = groups?.find(g=>g.id===selId);
-  const maxUnlimited = !sel?.max||sel.max>=99;
   const upd = patch => { updateModifierGroupDef(selId,patch); markBOChange(); };
 
   const addGroup = () => {
@@ -994,91 +1009,138 @@ function ModifiersTab() {
     setNewOpt({name:'',price:''});
   };
 
-  const delOpt = oid => upd({ options:(sel.options||[]).filter(o=>o.id!==oid) });
-  const updOpt = (oid,patch) => upd({ options:(sel.options||[]).map(o=>o.id===oid?{...o,...patch}:o) });
+  const delOpt  = oid => upd({ options:(sel.options||[]).filter(o=>o.id!==oid) });
+  const updOpt  = (oid,patch) => upd({ options:(sel.options||[]).map(o=>o.id===oid?{...o,...patch}:o) });
+
+  const reorderOpts = (from, to) => {
+    const arr = [...(sel.options||[])];
+    const [m] = arr.splice(from,1); arr.splice(to,0,m);
+    upd({ options:arr });
+  };
+
+  const maxUnlimited = !sel?.max || sel.max >= 99;
 
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
-      {/* List */}
-      <div style={{ width:260, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+      {/* ── Left: group list ─────────────────────────────────────── */}
+      <div style={{ width:270, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
           <div style={{ fontSize:13, fontWeight:800, color:'var(--t1)', marginBottom:4 }}>Modifier groups</div>
-          <div style={{ fontSize:11, color:'var(--t3)', lineHeight:1.5, marginBottom:8 }}>Paid option groups. Create here, then assign to items from the item editor (Modifiers tab).</div>
+          <div style={{ fontSize:10, color:'var(--t3)', lineHeight:1.5, marginBottom:8 }}>Paid options. Create here, assign to items via the item editor → Modifiers tab. Drag to reorder.</div>
           <div style={{ display:'flex', gap:6 }}>
             <input style={{ ...inp, flex:1, fontSize:12, padding:'6px 10px' }} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addGroup()} placeholder="Group name e.g. Sides"/>
-            <button onClick={addGroup} disabled={!newName.trim()} style={{ padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700, opacity:newName.trim()?1:.4 }}>+</button>
+            <button onClick={addGroup} disabled={!newName.trim()} style={{ padding:'6px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700, opacity:newName.trim()?1:.4 }}>+</button>
           </div>
         </div>
-        <div style={{ flex:1, overflowY:'auto', padding:'8px' }}>
-          {(groups||[]).map(g=>(
-            <div key={g.id} onClick={()=>setSelId(g.id===selId?null:g.id)} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginBottom:4, borderRadius:9, cursor:'pointer', border:`1.5px solid ${selId===g.id?'var(--acc)':'var(--bdr)'}`, background:selId===g.id?'var(--acc-d)':'var(--bg3)' }}>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:selId===g.id?'var(--acc)':'var(--t1)' }}>{g.name}</div>
-                <div style={{ fontSize:10, color:'var(--t4)', marginTop:1 }}>{(g.options||[]).length} options · {g.min>0?'required':'optional'} · {!g.max||g.max>=99?'unlimited':`max ${g.max}`}</div>
+        <div style={{ flex:1, overflowY:'auto', padding:'6px' }}>
+          {(groups||[]).map((g,gi)=>(
+            <div key={g.id} draggable
+              onDragStart={()=>setDragGIdx(gi)} onDragOver={e=>{e.preventDefault();setOverGIdx(gi);}}
+              onDrop={e=>{e.preventDefault();if(dragGIdx!==null&&dragGIdx!==gi)reorderModifierGroupDefs(dragGIdx,gi);setDragGIdx(null);setOverGIdx(null);}}
+              onDragEnd={()=>{setDragGIdx(null);setOverGIdx(null);}}
+              onClick={()=>setSelId(g.id===selId?null:g.id)}
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 10px', marginBottom:3, borderRadius:9, cursor:'pointer',
+                border:`1.5px solid ${selId===g.id?'var(--acc)':overGIdx===gi?'var(--acc-b)':'var(--bdr)'}`,
+                background:selId===g.id?'var(--acc-d)':overGIdx===gi?'var(--bg3)':'transparent',
+                opacity:dragGIdx===gi?.4:1 }}>
+              <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab', flexShrink:0 }}>⠿</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:selId===g.id?'var(--acc)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{g.name}</div>
+                <div style={{ fontSize:9, color:'var(--t4)', marginTop:1 }}>{(g.options||[]).length} opts · {g.min>0?'required':'optional'}</div>
               </div>
-              <button onClick={e=>{e.stopPropagation();if(confirm(`Remove "${g.name}"?`)){removeModifierGroupDef(g.id);if(selId===g.id)setSelId(null);markBOChange();}}} style={{ width:22,height:22,borderRadius:5,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+              <button onClick={e=>{e.stopPropagation();if(confirm(`Remove "${g.name}"?`)){removeModifierGroupDef(g.id);if(selId===g.id)setSelId(null);markBOChange();}}} style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>×</button>
             </div>
           ))}
           {(!groups||groups.length===0)&&<div style={{ textAlign:'center', padding:'32px 8px', color:'var(--t4)', fontSize:11 }}>No modifier groups yet</div>}
         </div>
       </div>
 
-      {/* Editor */}
+      {/* ── Right: editor ────────────────────────────────────────── */}
       {sel ? (
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-            <input style={{ ...inp, fontSize:15, fontWeight:800, border:'none', background:'transparent', padding:'0 0 8px' }} value={sel.name} onChange={e=>upd({name:e.target.value})}/>
-            {/* Required / Optional */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
-              {[[false,'Optional','Customer can skip'],[ true,'Required','Must pick at least one']].map(([req,label,hint])=>{
-                const act=req?(sel.min||0)>0:!(sel.min>0);
-                return <button key={label} onClick={()=>upd({min:req?1:0})} style={{ padding:'7px 8px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`2px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)' }}>
+
+          {/* Header */}
+          <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+            <input style={{ ...inp, fontSize:16, fontWeight:800, border:'none', background:'transparent', padding:'0 0 8px', color:'var(--t1)' }} value={sel.name} onChange={e=>upd({name:e.target.value})} placeholder="Group name"/>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
+              {[[false,'Optional','Skip if desired'],[true,'Required','Must pick at least one']].map(([req,label,hint])=>{
+                const act = req?(sel.min||0)>0:!(sel.min>0);
+                return <button key={label} onClick={()=>upd({min:req?1:0})} style={{ padding:'7px 8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`2px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)' }}>
                   <div style={{ fontSize:11, fontWeight:700, color:act?'var(--acc)':'var(--t2)' }}>{label}</div>
                   <div style={{ fontSize:9, color:'var(--t4)' }}>{hint}</div>
                 </button>;
               })}
             </div>
-            {/* Max */}
+
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <span style={{ fontSize:11, fontWeight:600, color:'var(--t2)' }}>Max selections:</span>
-              <button onClick={()=>upd({max:1,selectionType:'single'})} style={{ padding:'3px 9px', borderRadius:14, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:sel.max===1?800:500, border:`1px solid ${sel.max===1?'var(--acc)':'var(--bdr)'}`, background:sel.max===1?'var(--acc-d)':'var(--bg3)', color:sel.max===1?'var(--acc)':'var(--t3)' }}>1 (pick one)</button>
-              <button onClick={()=>upd({max:99,selectionType:'multiple'})} style={{ padding:'3px 9px', borderRadius:14, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:maxUnlimited&&sel.max!==1?800:500, border:`1px solid ${maxUnlimited&&sel.max!==1?'var(--acc)':'var(--bdr)'}`, background:maxUnlimited&&sel.max!==1?'var(--acc-d)':'var(--bg3)', color:maxUnlimited&&sel.max!==1?'var(--acc)':'var(--t3)' }}>Unlimited</button>
+              <span style={{ fontSize:11, fontWeight:600, color:'var(--t3)' }}>Max picks:</span>
+              {[['1','1 only',1],['∞','Unlimited',99]].map(([l,h,v])=>{
+                const act = v===1?(sel.max||1)===1:maxUnlimited&&(sel.max||1)!==1;
+                return <button key={l} onClick={()=>upd({max:v,selectionType:v===1?'single':'multiple'})} style={{ padding:'3px 10px', borderRadius:12, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)' }} title={h}>{l}</button>;
+              })}
               <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                 <span style={{ fontSize:10, color:'var(--t4)' }}>Custom:</span>
-                <input type="number" min="2" max="20" style={{ ...inp, width:48, padding:'3px 6px', fontSize:11 }} value={!maxUnlimited&&sel.max!==1?sel.max:''} placeholder="N" onChange={e=>upd({max:parseInt(e.target.value)||2,selectionType:'multiple'})}/>
+                <input type="number" min="2" max="20" style={{ ...inp, width:48, padding:'3px 6px', fontSize:11 }} value={!maxUnlimited&&(sel.max||1)!==1?sel.max:''} placeholder="N" onChange={e=>upd({max:parseInt(e.target.value)||2,selectionType:'multiple'})}/>
               </div>
             </div>
           </div>
-          <div style={{ flex:1, overflowY:'auto', padding:'12px 14px' }}>
-            <span style={lbl}>Options in this group</span>
-            {(sel.options||[]).map(opt=>(
-              <div key={opt.id} style={{ display:'grid', gridTemplateColumns:'1fr 80px auto', gap:6, alignItems:'center', marginBottom:6 }}>
-                <input style={{ ...inp, fontSize:12 }} value={opt.name} onChange={e=>updOpt(opt.id,{name:e.target.value})} placeholder="Option name"/>
-                <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)' }}>£</span>
-                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:12 }} value={opt.price||''} placeholder="0.00" onChange={e=>updOpt(opt.id,{price:parseFloat(e.target.value)||0})}/>
+
+          {/* Options */}
+          <div style={{ flex:1, overflowY:'auto', padding:'14px 16px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+              <span style={{ fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em' }}>Options</span>
+              <span style={{ fontSize:9, color:'var(--t4)' }}>drag to reorder · nested = links to another group</span>
+            </div>
+
+            {(sel.options||[]).map((opt,oi)=>(
+              <div key={opt.id} draggable
+                onDragStart={()=>setDragOIdx(oi)} onDragOver={e=>{e.preventDefault();setOverOIdx(oi);}}
+                onDrop={e=>{e.preventDefault();if(dragOIdx!==null&&dragOIdx!==oi)reorderOpts(dragOIdx,oi);setDragOIdx(null);setOverOIdx(null);}}
+                onDragEnd={()=>{setDragOIdx(null);setOverOIdx(null);}}
+                style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, border:`1px solid ${overOIdx===oi?'var(--acc)':'var(--bdr)'}`, background:'var(--bg2)', opacity:dragOIdx===oi?.4:1 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'14px 1fr 90px auto', gap:6, alignItems:'center' }}>
+                  <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⠿</span>
+                  <input style={{ ...inp, fontSize:13, fontWeight:600 }} value={opt.name} onChange={e=>updOpt(opt.id,{name:e.target.value})} placeholder="Option name"/>
+                  <div style={{ position:'relative' }}>
+                    <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
+                    <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:12, color:'var(--acc)' }} value={opt.price||''} placeholder="0.00" onChange={e=>updOpt(opt.id,{price:parseFloat(e.target.value)||0})}/>
+                  </div>
+                  <button onClick={()=>delOpt(opt.id)} style={{ width:28,height:34,borderRadius:7,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
                 </div>
-                <button onClick={()=>delOpt(opt.id)} style={{ width:28,height:28,borderRadius:6,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                {/* Nested sub-group selector */}
+                <div style={{ marginTop:7, paddingTop:7, borderTop:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:7 }}>
+                  <span style={{ fontSize:9, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.05em', flexShrink:0 }}>↳ Nested group:</span>
+                  <select value={opt.subGroupId||''} onChange={e=>updOpt(opt.id,{subGroupId:e.target.value||undefined})}
+                    style={{ ...inp, fontSize:11, padding:'3px 7px', flex:1, color:opt.subGroupId?'var(--acc)':'var(--t4)' }}>
+                    <option value="">None — no sub-options</option>
+                    {(groups||[]).filter(g=>g.id!==sel.id).map(g=><option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                  {opt.subGroupId && <span style={{ fontSize:9, color:'var(--acc)', fontWeight:700, flexShrink:0 }}>▼ shows when selected</span>}
+                </div>
               </div>
             ))}
-            {/* Add new option */}
-            <div style={{ marginTop:8, padding:'10px', background:'var(--bg3)', borderRadius:10, border:'1.5px dashed var(--bdr2)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', marginBottom:6 }}>Add option</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 80px auto', gap:6, alignItems:'center' }}>
-                <input style={{ ...inp, fontSize:12 }} value={newOpt.name} onChange={e=>setNewOpt(o=>({...o,name:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()} placeholder="e.g. Chips" autoComplete="off"/>
+
+            {/* Add option */}
+            <div style={{ marginTop:6, padding:'10px', background:'var(--bg3)', borderRadius:10, border:'1.5px dashed var(--bdr2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', marginBottom:7 }}>Add option</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 90px auto', gap:6, alignItems:'center' }}>
+                <input style={{ ...inp, fontSize:12 }} value={newOpt.name} onChange={e=>setNewOpt(o=>({...o,name:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()} placeholder="e.g. Chips, Peppercorn sauce" autoComplete="off"/>
                 <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)' }}>£</span>
+                  <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
                   <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:12 }} value={newOpt.price} placeholder="0.00" onChange={e=>setNewOpt(o=>({...o,price:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()}/>
                 </div>
-                <button onClick={addOpt} disabled={!newOpt.name.trim()} style={{ width:28,height:28,borderRadius:6,border:'none',background:'var(--acc)',color:'#0b0c10',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',opacity:newOpt.name.trim()?1:.4 }}>+</button>
+                <button onClick={addOpt} disabled={!newOpt.name.trim()} style={{ width:32,height:36,borderRadius:8,border:'none',background:'var(--acc)',color:'#0b0c10',cursor:'pointer',fontSize:18,display:'flex',alignItems:'center',justifyContent:'center',opacity:newOpt.name.trim()?1:.4 }}>+</button>
               </div>
             </div>
           </div>
         </div>
       ) : (
         <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8, color:'var(--t4)' }}>
-          <div style={{ fontSize:32, opacity:.15 }}>⊕</div>
-          <div style={{ fontSize:12, fontWeight:600, color:'var(--t3)' }}>Select a group to edit</div>
+          <div style={{ fontSize:40, opacity:.12 }}>⊕</div>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--t3)' }}>Select a group to edit</div>
+          <div style={{ fontSize:11, color:'var(--t4)' }}>Or create a new group above</div>
         </div>
       )}
     </div>
@@ -1087,57 +1149,90 @@ function ModifiersTab() {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INSTRUCTION GROUPS TAB
+// Drag to reorder groups and options within groups.
 // ═══════════════════════════════════════════════════════════════════════════
 function InstructionsTab() {
-  const { instructionGroupDefs:groups, addInstructionGroupDef, updateInstructionGroupDef, removeInstructionGroupDef, markBOChange } = useStore();
-  const [selId, setSelId]   = useState(null);
+  const { instructionGroupDefs:groups, addInstructionGroupDef, updateInstructionGroupDef,
+          removeInstructionGroupDef, reorderInstructionGroupDefs, markBOChange } = useStore();
+  const [selId, setSelId]     = useState(null);
   const [newName, setNewName] = useState('');
   const [newOpt, setNewOpt]   = useState('');
+  const [dragGIdx, setDragGIdx] = useState(null);
+  const [overGIdx, setOverGIdx] = useState(null);
+  const [dragOIdx, setDragOIdx] = useState(null);
+  const [overOIdx, setOverOIdx] = useState(null);
 
   const sel = groups?.find(g=>g.id===selId);
   const upd = patch => { updateInstructionGroupDef(selId,patch); markBOChange(); };
   const addGroup = () => { if(!newName.trim())return; addInstructionGroupDef({name:newName.trim(),options:[]}); markBOChange(); setNewName(''); setTimeout(()=>setSelId(useStore.getState().instructionGroupDefs?.slice(-1)[0]?.id),30); };
-  const addOpt = () => { if(!newOpt.trim())return; upd({options:[...(sel.options||[]),newOpt.trim()]}); setNewOpt(''); };
+  const addOpt   = () => { if(!newOpt.trim())return; upd({options:[...(sel.options||[]),newOpt.trim()]}); setNewOpt(''); };
+  const reorderOpts = (from, to) => {
+    const arr=[...(sel.options||[])]; const [m]=arr.splice(from,1); arr.splice(to,0,m); upd({options:arr});
+  };
 
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
-      <div style={{ width:260, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+      {/* ── Left: group list ─────────────────────────────────────── */}
+      <div style={{ width:270, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
           <div style={{ fontSize:13, fontWeight:800, color:'var(--t1)', marginBottom:4 }}>Instruction groups</div>
-          <div style={{ fontSize:11, color:'var(--t3)', lineHeight:1.5, marginBottom:8 }}>Preparation choices printed on the kitchen ticket. No price change — customer picks one during ordering.</div>
+          <div style={{ fontSize:10, color:'var(--t3)', lineHeight:1.5, marginBottom:8 }}>Preparation choices (no price change). Drag to reorder. Assign to items via Modifiers tab.</div>
           <div style={{ display:'flex', gap:6 }}>
             <input style={{ ...inp, flex:1, fontSize:12, padding:'6px 10px' }} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addGroup()} placeholder="e.g. Cooking preference"/>
-            <button onClick={addGroup} disabled={!newName.trim()} style={{ padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700, opacity:newName.trim()?1:.4 }}>+</button>
+            <button onClick={addGroup} disabled={!newName.trim()} style={{ padding:'6px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700, opacity:newName.trim()?1:.4 }}>+</button>
           </div>
         </div>
-        <div style={{ flex:1, overflowY:'auto', padding:'8px' }}>
-          {(groups||[]).map(g=>(
-            <div key={g.id} onClick={()=>setSelId(g.id===selId?null:g.id)} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', marginBottom:4, borderRadius:9, cursor:'pointer', border:`1.5px solid ${selId===g.id?'var(--acc)':'var(--bdr)'}`, background:selId===g.id?'var(--acc-d)':'var(--bg3)' }}>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:selId===g.id?'var(--acc)':'var(--t1)' }}>{g.name}</div>
-                <div style={{ fontSize:10, color:'var(--t4)', marginTop:1 }}>{(g.options||[]).join(' · ')||'no options yet'}</div>
+        <div style={{ flex:1, overflowY:'auto', padding:'6px' }}>
+          {(groups||[]).map((g,gi)=>(
+            <div key={g.id} draggable
+              onDragStart={()=>setDragGIdx(gi)} onDragOver={e=>{e.preventDefault();setOverGIdx(gi);}}
+              onDrop={e=>{e.preventDefault();if(dragGIdx!==null&&dragGIdx!==gi)reorderInstructionGroupDefs(dragGIdx,gi);setDragGIdx(null);setOverGIdx(null);}}
+              onDragEnd={()=>{setDragGIdx(null);setOverGIdx(null);}}
+              onClick={()=>setSelId(g.id===selId?null:g.id)}
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 10px', marginBottom:3, borderRadius:9, cursor:'pointer',
+                border:`1.5px solid ${selId===g.id?'var(--grn)':overGIdx===gi?'var(--grn-b)':'var(--bdr)'}`,
+                background:selId===g.id?'var(--grn-d)':overGIdx===gi?'var(--bg3)':'transparent',
+                opacity:dragGIdx===gi?.4:1 }}>
+              <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab', flexShrink:0 }}>⠿</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:selId===g.id?'var(--grn)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{g.name}</div>
+                <div style={{ fontSize:9, color:'var(--t4)', marginTop:1 }}>{(g.options||[]).slice(0,3).join(' · ')}{(g.options||[]).length>3?'…':''}</div>
               </div>
-              <button onClick={e=>{e.stopPropagation();if(confirm(`Remove "${g.name}"?`)){removeInstructionGroupDef(g.id);if(selId===g.id)setSelId(null);markBOChange();}}} style={{ width:22,height:22,borderRadius:5,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+              <button onClick={e=>{e.stopPropagation();if(confirm(`Remove "${g.name}"?`)){removeInstructionGroupDef(g.id);if(selId===g.id)setSelId(null);markBOChange();}}} style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>×</button>
             </div>
           ))}
           {(!groups||groups.length===0)&&<div style={{ textAlign:'center', padding:'32px 8px', color:'var(--t4)', fontSize:11 }}>No instruction groups yet</div>}
         </div>
       </div>
+
+      {/* ── Right: editor ────────────────────────────────────────── */}
       {sel ? (
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
           <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-            <input style={{ ...inp, fontSize:15, fontWeight:800, border:'none', background:'transparent', padding:'0 0 4px' }} value={sel.name} onChange={e=>upd({name:e.target.value})}/>
-            <div style={{ fontSize:11, color:'var(--t3)', marginTop:3 }}>Printed on kitchen ticket. Customer picks one — no price change.</div>
+            <input style={{ ...inp, fontSize:16, fontWeight:800, border:'none', background:'transparent', padding:'0 0 6px', color:'var(--t1)' }} value={sel.name} onChange={e=>upd({name:e.target.value})}/>
+            <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>Printed on kitchen ticket. Customer picks one — no price change.</div>
           </div>
-          <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
-            <span style={lbl}>Options</span>
-            {(sel.options||[]).map((opt,i)=>(
-              <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:7, marginBottom:6 }}>
-                <input style={inp} value={opt} onChange={e=>{const o=[...(sel.options||[])];o[i]=e.target.value;upd({options:o});}}/>
-                <button onClick={()=>upd({options:(sel.options||[]).filter((_,idx)=>idx!==i)})} style={{ width:30,height:36,borderRadius:7,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:14 }}>×</button>
+          <div style={{ flex:1, overflowY:'auto', padding:'14px 16px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+              <span style={{ fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em' }}>Options</span>
+              <span style={{ fontSize:9, color:'var(--t4)' }}>drag to reorder</span>
+            </div>
+
+            {(sel.options||[]).map((opt,oi)=>(
+              <div key={oi} draggable
+                onDragStart={()=>setDragOIdx(oi)} onDragOver={e=>{e.preventDefault();setOverOIdx(oi);}}
+                onDrop={e=>{e.preventDefault();if(dragOIdx!==null&&dragOIdx!==oi)reorderOpts(dragOIdx,oi);setDragOIdx(null);setOverOIdx(null);}}
+                onDragEnd={()=>{setDragOIdx(null);setOverOIdx(null);}}
+                style={{ display:'grid', gridTemplateColumns:'14px 1fr auto', gap:7, marginBottom:6, alignItems:'center',
+                  background:overOIdx===oi?'var(--bg3)':'transparent', borderRadius:8, padding:'2px 0', opacity:dragOIdx===oi?.4:1 }}>
+                <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab', textAlign:'center' }}>⠿</span>
+                <input style={inp} value={opt} onChange={e=>{const o=[...(sel.options||[])];o[oi]=e.target.value;upd({options:o});}}/>
+                <button onClick={()=>upd({options:(sel.options||[]).filter((_,idx)=>idx!==oi)})} style={{ width:30,height:36,borderRadius:7,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
               </div>
             ))}
-            <div style={{ display:'flex', gap:7, marginTop:6 }}>
+
+            <div style={{ display:'flex', gap:7, marginTop:8 }}>
               <input style={{ ...inp, flex:1 }} value={newOpt} onChange={e=>setNewOpt(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addOpt()} placeholder="e.g. Rare, Medium rare, Well done"/>
               <button onClick={addOpt} disabled={!newOpt.trim()} style={{ padding:'7px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600, opacity:newOpt.trim()?1:.4 }}>+ Add</button>
             </div>
@@ -1145,13 +1240,14 @@ function InstructionsTab() {
         </div>
       ) : (
         <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8 }}>
-          <div style={{ fontSize:32, opacity:.15 }}>📝</div>
-          <div style={{ fontSize:12, fontWeight:600, color:'var(--t3)' }}>Select a group to edit</div>
+          <div style={{ fontSize:40, opacity:.12 }}>📝</div>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--t3)' }}>Select a group to edit</div>
         </div>
       )}
     </div>
   );
 }
+
 
 // ── Edit Category Modal ───────────────────────────────────────────────────────
 function CatModal({ cat, roots, onSave, onDelete, onClose }) {
