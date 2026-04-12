@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,17 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.7.0', date: 'Apr 2026', label: 'Visual Menu Builder — swim-lane drag-and-drop + flow visualizer',
+    changes: [
+      'NEW: ✦ Visual Builder tab in Menu Manager — a full swim-lane canvas showing your entire menu at once. One column per category, drag items between categories to reassign, drag columns to reorder categories.',
+      'Per-item flow visualization: click ▼ flow on any item card to see the complete POS ordering journey — ① Sizes ② Side choice ★ required ③ Sauce (with nested modifiers shown) ④ Cooking preference. Exactly what the customer sees, step by step.',
+      'Channel assignment on each menu: toggle POS / Kiosk / Online / Delivery active state per menu directly in the builder header.',
+      'Local/Shared/Global pricing scope restored in item editor — sets whether pricing is unique to this item, inherited from a shared rule, or identical across all channels.',
+      'Item quick-edit panel slides in from right when clicking any item card — full Details/Pricing/Modifiers/Sizes/Allergens without leaving the visual builder.',
+      'Modifier assignment in the quick-edit panel uses the same search-first pattern — all changes visible immediately on the swim-lane.',
     ],
   },
   {

@@ -23,6 +23,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useStore } from '../../store';
 import CanvasMenu from './CanvasMenu';
+import MenuVisualizer from './MenuVisualizer';
 import { ALLERGENS } from '../../data/seed';
 
 // ── Shared ───────────────────────────────────────────────────────────────────
@@ -37,13 +38,14 @@ export default function MenuManager() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       <nav style={{ display:'flex', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-        {[['menu','🍽 Menu'],['quick','⚡ Quick Screen'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
+        {[['visual','✦ Visual Builder'],['menu','🍽 Menu'],['quick','⚡ Quick Screen'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{ padding:'0 20px', height:46, cursor:'pointer', fontFamily:'inherit', border:'none', borderBottom:`3px solid ${tab===id?'var(--acc)':'transparent'}`, background:'transparent', color:tab===id?'var(--acc)':'var(--t3)', fontSize:13, fontWeight:tab===id?800:500 }}>
             {label}
           </button>
         ))}
       </nav>
       <div style={{ flex:1, overflow:'hidden' }}>
+        {tab==='visual'       && <MenuVisualizer />}
         {tab==='menu'         && <MenuTab />}
         {tab==='quick'        && <QuickScreenManager />}
         {tab==='modifiers'    && <ModifiersTab />}
