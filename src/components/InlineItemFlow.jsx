@@ -59,12 +59,14 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
       setSelectedVariant(variant);
       setSelections({});
       setInstSel({});
-      const targetItem = variant._childItem || variant;
-      const hasMods = buildModGroups(targetItem).length > 0 || buildInstGroups(targetItem).length > 0;
+      const childItem = variant._childItem || variant;
+      // Modifiers can be on child OR parent — check both
+      const hasMods = buildModGroups(childItem).length > 0 || buildInstGroups(childItem).length > 0
+                   || buildModGroups(item).length > 0      || buildInstGroups(item).length > 0;
       if (!hasMods) {
-        // No modifiers after variant — confirm directly
+        // No modifiers anywhere — confirm directly
         const displayName = `${item.menuName || item.name} — ${variant.menuName || variant.name || variant.label}`;
-        onConfirm(variant._childItem || item, [], null, {
+        onConfirm(childItem, [], null, {
           notes: '', qty, linePrice: (variant.pricing?.base ?? variant.price ?? 0) * qty, displayName
         });
         return;
@@ -74,10 +76,24 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
     }, 180);
   };
 
-  // Active item for modifier resolution (child item if variant was picked, else parent)
+  // Active item for modifier resolution:
+  // After picking a variant, prefer child item's mods; fall back to parent item's mods
   const activeItem = selectedVariant?._childItem || (step === 'modifiers' && !isVariant ? item : null);
-  const modGroups  = useMemo(() => buildModGroups(activeItem || item), [activeItem, item, modifierGroupDefs]);
-  const instGroups = useMemo(() => buildInstGroups(activeItem || item), [activeItem, item, instructionGroupDefs]);
+  const modGroups = useMemo(() => {
+    if (activeItem) {
+      const childMods = buildModGroups(activeItem);
+      // If child has its own modifier groups use those, otherwise use parent's
+      return childMods.length > 0 ? childMods : buildModGroups(item);
+    }
+    return buildModGroups(item);
+  }, [activeItem, item, modifierGroupDefs]);
+  const instGroups = useMemo(() => {
+    if (activeItem) {
+      const childInst = buildInstGroups(activeItem);
+      return childInst.length > 0 ? childInst : buildInstGroups(item);
+    }
+    return buildInstGroups(item);
+  }, [activeItem, item, instructionGroupDefs]);
 
   const allRequired = modGroups
     .filter(g => g.required || (g.min || 0) > 0)

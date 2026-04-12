@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.9.0';
+const VERSION = '1.9.1';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,13 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.9.1', date: 'Apr 2026', label: 'Fix: modifiers on variant items now show after picking a size',
+    changes: [
+      'Critical fix: when an item has sizes (variants), modifier groups assigned to the parent item now correctly appear after the customer picks a size. Root cause: after picking a variant (e.g. Pint), the flow was looking for modifier groups on the child item (Pint) instead of the parent (Stout). Child items never have their own modifier groups — they inherit from the parent. Fixed in InlineItemFlow to check parent modifiers when child has none.',
+      'The hasMods check now also looks at the parent item — so if a variant item has parent modifiers, the flow correctly transitions to the modifiers step instead of immediately adding to the order.',
     ],
   },
   {
