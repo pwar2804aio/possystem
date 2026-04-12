@@ -44,6 +44,7 @@ export default function POSSurface() {
     menuItems: storeMenuItems,
     menuCategories,
     quickScreenIds,
+    modifierGroupDefs,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
