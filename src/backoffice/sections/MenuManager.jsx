@@ -88,7 +88,7 @@ function MenuTab() {
     const subs  = menuCategories.filter(c=>c.parentId===selCatId).map(c=>c.id);
     const inCat = i => i.cat===selCatId || subs.includes(i.cat) || (i.cats||[]).includes(selCatId) || (i.cats||[]).some(c=>subs.includes(c));
     return menuItems
-      .filter(i=>!i.archived && i.type!=='subitem' && !i.parentId && inCat(i))
+      .filter(i=>!i.archived && (i.type!=='subitem' || i.soldAlone) && !i.parentId && inCat(i))
       .sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
   },[selCatId, menuCategories, menuItems]);
 
@@ -272,7 +272,7 @@ function MenuTab() {
             const catItemIds = new Set(displayItems.map(i=>i.id));
             const q = addSearch.toLowerCase().trim();
             const notInCat = menuItems.filter(i =>
-              !i.archived && !i.parentId &&
+              !i.archived && !i.parentId && (i.type!=='subitem'||i.soldAlone) &&
               i.cat !== selCat.id && !(i.cats||[]).includes(selCat.id) &&
               (q==='' || (i.menuName||i.name||'').toLowerCase().includes(q) || (i.description||'').toLowerCase().includes(q))
             ).sort((a,b)=>(a.menuName||a.name||'').localeCompare(b.menuName||b.name||''));

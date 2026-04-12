@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.4.0';
+const VERSION = '2.4.1';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,15 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.4.1', date: 'Apr 2026', label: 'Fix: soldAlone sub-items now appear correctly on POS and in Menus tab',
+    changes: [
+      'Root cause fixed: 4 separate filter bugs were blocking soldAlone sub-items from appearing on the POS. catItems excluded all sub-items regardless of soldAlone flag. Search results did the same. Tapping a sub-item on POS returned early before processing. Category pill counts did not include them.',
+      'Menus tab grid now shows soldAlone sub-items in their assigned category — the gridItems filter was blocking all type=subitem items even when soldAlone was true.',
+      'Add Items panel in Menus tab now shows soldAlone sub-items in the available-to-add list so they can be assigned to categories from there.',
+      'Full end-to-end flow: Items tab → toggle sold alone on Chips → pick Starters → Push to POS → Chips appears in Starters on POS and is fully tappable and orderable.',
     ],
   },
   {

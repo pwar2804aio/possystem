@@ -123,7 +123,7 @@ export default function POSSurface() {
 
   const catItems = useMemo(() => {
     if (cat === 'quick') return quickItems;
-    const base = MENU_ITEMS.filter(i => !i.archived && i.type !== 'subitem' && !i.parentId)
+    const base = MENU_ITEMS.filter(i => !i.archived && (i.type !== 'subitem' || i.soldAlone) && !i.parentId)
       .slice().sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
     const inCat = (i, id) => i.cat === id || (i.cats||[]).includes(id);
     if (subCat) return base.filter(i => inCat(i, subCat));
@@ -138,7 +138,7 @@ export default function POSSurface() {
     if (!search.trim()) return catItems;
     const q = search.toLowerCase();
     return MENU_ITEMS.filter(i =>
-      !i.archived && i.type !== 'subitem' && !i.parentId &&
+      !i.archived && (i.type !== 'subitem' || i.soldAlone) && !i.parentId &&
       ((i.menuName||i.name||'').toLowerCase().includes(q) || i.description?.toLowerCase().includes(q))
     );
   }, [cat, search, catItems, MENU_ITEMS]);
@@ -162,7 +162,7 @@ export default function POSSurface() {
     openFlow(item);
   };
   const openFlow = (item) => {
-    if (item.type === 'subitem') return;
+    if (item.type === 'subitem' && !item.soldAlone) return;
 
     // Variant parent: detected by type OR by having linked children
     const variantChildren = MENU_ITEMS
@@ -455,7 +455,7 @@ export default function POSSurface() {
             const subIds = menuCategories.filter(s => s.parentId === c.id).map(s => s.id);
             const count = c.id === 'quick'
               ? quickItems.length
-              : MENU_ITEMS.filter(i => !i.archived && !i.parentId && (i.cat === c.id || subIds.includes(i.cat))).length;
+              : MENU_ITEMS.filter(i => !i.archived && !i.parentId && (i.type !== 'subitem' || i.soldAlone) && (i.cat === c.id || subIds.includes(i.cat))).length;
             const hasSubcats = subIds.length > 0;
             return (
               <button key={c.id} onClick={() => { setCat(c.id); setSearch(''); }} className="cat-btn" style={{
