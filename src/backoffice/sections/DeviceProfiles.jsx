@@ -174,13 +174,13 @@ function ConfigRow({ label, value, valueColor, truncate }) {
 
 // ── Profile editor modal ───────────────────────────────────────────────────────
 function ProfileEditor({ profile, onSave, onDelete, onClose }) {
-  const { quickScreens, menus } = useStore();
+  const { menus } = useStore();
   const isNew = !profile;
   const [form, setForm] = useState(profile || {
     name:'', color:'#3b82f6',
     defaultSurface:'tables', enabledOrderTypes:['dine-in'],
     assignedSection:null, hiddenFeatures:[],
-    tableServiceEnabled:true, quickScreenEnabled:true, receiptPrinterId:'pr1', quickScreenId:null, menuId:null,
+    tableServiceEnabled:true, quickScreenEnabled:true, receiptPrinterId:'pr1', menuId:null,
   });
 
   const upd = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -303,23 +303,6 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
                     border:`1.5px solid ${form.menuId === m.id ? 'var(--acc)' : 'var(--bdr)'}` }}>
                   <div style={{ fontSize:12, fontWeight:700, color:form.menuId===m.id?'var(--acc)':'var(--t1)' }}>📋 {m.name}</div>
                   {m.description && <div style={{ fontSize:10, color:'var(--t4)', marginTop:2 }}>{m.description}</div>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Screen selector */}
-          <div style={{ marginBottom:18 }}>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Quick Screen layout</label>
-            <div style={{ fontSize:11, color:'var(--t4)', marginBottom:8 }}>Which Quick Screen this terminal shows on the ⚡ Quick tab. Manage screens in Menu Manager → Quick Screen.</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {[{ id:null, name:'Main screen (default)' }, ...(quickScreens||[])].map(qs => (
-                <button key={String(qs.id)} onClick={()=>upd('quickScreenId', qs.id)}
-                  style={{ padding:'9px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', transition:'all .1s',
-                    background: form.quickScreenId === qs.id ? 'var(--acc-d)' : 'var(--bg3)',
-                    border:`1.5px solid ${form.quickScreenId === qs.id ? 'var(--acc)' : 'var(--bdr)'}` }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:form.quickScreenId===qs.id?'var(--acc)':'var(--t1)' }}>⚡ {qs.name}</span>
-                  {qs.id && <span style={{ fontSize:10, color:'var(--t4)', marginLeft:8 }}>{(quickScreens||[]).find(s=>s.id===qs.id)?.ids?.length||0} items</span>}
                 </button>
               ))}
             </div>

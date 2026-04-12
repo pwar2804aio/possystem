@@ -167,7 +167,7 @@ export default function BackOfficeApp() {
 
 // ── Push to POS button ────────────────────────────────────────────────────────
 function PushToPOSButton() {
-  const { pendingBOChanges, clearBOChanges, tables, locationSections, menuItems, menuCategories, menus, quickScreens, activeQuickScreenId, staff } = useStore();
+  const { pendingBOChanges, clearBOChanges, tables, locationSections, menuItems, menuCategories, menus, staff } = useStore();
   const [pushing, setPushing] = useState(false);
   const [justPushed, setJustPushed] = useState(false);
 
@@ -187,8 +187,6 @@ function PushToPOSButton() {
       menus,
       menuItems,
       menuCategories,
-      quickScreens,
-      activeQuickScreenId,
       changeCount: pendingBOChanges,
     };
 

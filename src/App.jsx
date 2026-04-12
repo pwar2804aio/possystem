@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.6.1';
+const VERSION = '2.6.2';
 
 const CHANGELOG = [
   {
@@ -40,6 +40,14 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '2.6.2', date: 'Apr 2026', label: 'Revert: Quick Screen back to single screen',
+    changes: [
+      'Removed multiple Quick Screens. Back to one simple 16-slot grid. Click an item to add it, drag to reorder, × to remove.',
+      'Removed Quick Screen layout selector from Device Profiles.',
+      'Category filter in the picker now includes subcategories.',
+    ],
+  },
+  {
     version: '2.6.1', date: 'Apr 2026', label: 'Fix: POS white screen crash + duplicate menu selector in device profiles',
     changes: [
       'Fixed: POS went white screen after v2.6.0 — a runtime crash caused by accessing menus before the store was ready. deviceMenuId is now safe and defaults to null (show all categories) when no menu is assigned to the device profile.',
@@ -53,6 +61,14 @@ const CHANGELOG = [
       'Both the Bar surface and POS surface now filter their category pills and item grids by the menu assigned to the device. A Bar terminal with the Bar menu only sees bar categories and bar items.',
       'The Menus tab in Menu Manager is where you build and manage named menus (Main menu, Bar menu, Lunch menu etc). Categories are assigned to menus via menuId.',
       'Falls back to showing all menus if no specific menu is assigned to the device profile.',
+    ],
+  },
+  {
+    version: '2.6.2', date: 'Apr 2026', label: 'Revert: Quick Screen back to single screen',
+    changes: [
+      'Removed multiple Quick Screens. Back to one simple 16-slot grid. Click an item to add it, drag to reorder, × to remove.',
+      'Removed Quick Screen layout selector from Device Profiles.',
+      'Category filter in the picker now includes subcategories.',
     ],
   },
   {
