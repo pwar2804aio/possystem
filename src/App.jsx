@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,17 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '1.5.0', date: 'Apr 2026', label: 'Full pizza builder + pizza items fixed',
+    changes: [
+      'Pizza items (Margherita, Pepperoni, BBQ chicken) now correctly set as type:pizza — previously they were type:modifiable so the pizza builder never appeared.',
+      'Per-item pizza configuration: each pizza can now have its own sizes (with custom names and prices), available bases, available crusts, and default toppings — all independent from the global defaults.',
+      'Pizza builder in Menu Manager shows: sizes list with drag-edit + add-size form; bases toggle (which are available for this pizza); crusts toggle; default toppings grid with colour-coded indicators; order flow preview showing exactly what the customer will see.',
+      'PizzaModal now reads per-item config (pizzaSizes/pizzaBases/pizzaCrusts) and falls back to globals. BBQ chicken correctly defaults to BBQ base only.',
+      'POS routing: pizza items use the full PizzaModal overlay (size + base + crust + half/half + toppings), other items use the new inline flow.',
+      'BBQ base added to PIZZA_BASES global list.',
     ],
   },
   {

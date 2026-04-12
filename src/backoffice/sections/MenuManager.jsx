@@ -802,32 +802,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
 
         {/* ════ PIZZA ══════════════════════════════════════════════════════ */}
         {sec==='pizza' && isPizza && (
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-
-            <div>
-              <span style={lbl}>Default toppings</span>
-              <div style={{ fontSize:10, color:'var(--t3)', marginBottom:8 }}>These toppings are pre-selected when this pizza is ordered. Customer can add/remove at ordering time.</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
-                {PIZZA_TOPPINGS.map(t => {
-                  const on = (item.defaultToppings||[]).includes(t.id);
-                  return (
-                    <button key={t.id} onClick={()=>{const cur=item.defaultToppings||[];onUpdate({defaultToppings:on?cur.filter(x=>x!==t.id):[...cur,t.id]});}} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 9px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`1.5px solid ${on?t.color||'var(--acc)':'var(--bdr)'}`, background:on?(t.color||'var(--acc)')+'22':'var(--bg3)', transition:'all .1s' }}>
-                      <div style={{ width:12,height:12,borderRadius:'50%',background:t.color||'var(--acc)',flexShrink:0 }}/>
-                      <span style={{ fontSize:11, fontWeight:on?700:400, color:on?t.color||'var(--acc)':'var(--t1)', flex:1 }}>{t.name}</span>
-                      {t.price>0&&<span style={{ fontSize:9, color:'var(--t4)' }}>+£{t.price.toFixed(2)}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:9, fontSize:11, color:'var(--t3)', lineHeight:1.6 }}>
-              <div style={{ fontWeight:700, color:'var(--t2)', marginBottom:4 }}>Global pizza settings</div>
-              Sizes, bases, crusts, and toppings are configured globally.<br/>
-              Go to <strong>Modifier groups</strong> to customise pizza options available across all pizzas.
-            </div>
-
-          </div>
+          <PizzaBuilder item={item} onUpdate={onUpdate} markBOChange={markBOChange}/>
         )}
 
       </div>
@@ -836,6 +811,156 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
       <div style={{ padding:'8px 16px', borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
         <button onClick={()=>{if(confirm('Archive this item?'))onArchive();}} style={{ width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'transparent', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:11, fontWeight:600 }}>Archive item</button>
       </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PIZZA BUILDER
+// Full per-item pizza configurator: sizes, bases, crusts, toppings
+// pizzaSizes/pizzaBases/pizzaCrusts = null means "use global defaults"
+// ═══════════════════════════════════════════════════════════════════════════
+function PizzaBuilder({ item, onUpdate, markBOChange }) {
+  const [newSizeName, setNewSizeName] = useState('');
+  const [newSizePrice, setNewSizePrice] = useState('');
+
+  // Per-item overrides (null = use globals)
+  const sizes   = item.pizzaSizes  || PIZZA_SIZES;
+  const bases   = item.pizzaBases  || PIZZA_BASES.map(b=>b.id);
+  const crusts  = item.pizzaCrusts || PIZZA_CRUSTS.map(c=>c.id);
+  const tops    = item.defaultToppings || [];
+  const useCustomSizes  = !!item.pizzaSizes;
+  const useCustomBases  = !!item.pizzaBases;
+  const useCustomCrusts = !!item.pizzaCrusts;
+
+  const u = (patch) => { onUpdate(patch); markBOChange(); };
+
+  const addSize = () => {
+    if (!newSizeName.trim()) return;
+    const cur = useCustomSizes ? sizes : [...PIZZA_SIZES];
+    u({ pizzaSizes: [...cur, { id:`sz-${Date.now()}`, name:newSizeName.trim(), basePrice:parseFloat(newSizePrice)||0 }] });
+    setNewSizeName(''); setNewSizePrice('');
+  };
+  const updateSize = (id, patch) => u({ pizzaSizes: sizes.map(s=>s.id===id?{...s,...patch}:s) });
+  const removeSize = (id) => u({ pizzaSizes: sizes.filter(s=>s.id!==id) });
+
+  const toggleBase  = (id) => {
+    const cur = useCustomBases  ? [...bases]             : PIZZA_BASES.map(b=>b.id);
+    u({ pizzaBases:  cur.includes(id)?cur.filter(x=>x!==id):[...cur,id] });
+  };
+  const toggleCrust = (id) => {
+    const cur = useCustomCrusts ? [...crusts]            : PIZZA_CRUSTS.map(c=>c.id);
+    u({ pizzaCrusts: cur.includes(id)?cur.filter(x=>x!==id):[...cur,id] });
+  };
+  const toggleTop   = (id) => {
+    u({ defaultToppings: tops.includes(id)?tops.filter(x=>x!==id):[...tops,id] });
+  };
+
+  const sbl = { fontSize:11, fontWeight:700, color:'var(--t2)', display:'block', marginBottom:8, paddingBottom:5, borderBottom:'1px solid var(--bdr)' };
+  const badge = (txt, color) => <span style={{ fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:9, background:`${color}22`, color, border:`1px solid ${color}55`, marginLeft:6 }}>{txt}</span>;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:22 }}>
+
+      {/* ── SIZES ───────────────────────────────────────────────────── */}
+      <div>
+        <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'var(--t2)' }}>Sizes & prices</span>
+          {badge(useCustomSizes?'Custom':'Global default','var(--acc)')}
+          {useCustomSizes && <button onClick={()=>u({pizzaSizes:null})} style={{ marginLeft:'auto', fontSize:9, color:'var(--t4)', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit' }}>Reset to global</button>}
+        </div>
+
+        {sizes.map((s,i) => (
+          <div key={s.id} style={{ display:'grid', gridTemplateColumns:'1fr 90px 32px', gap:6, marginBottom:6, alignItems:'center' }}>
+            <input value={s.name} onChange={e=>updateSize(s.id,{name:e.target.value})} style={{ ...inp, fontSize:12, fontWeight:600 }} placeholder={`Size ${i+1}`}/>
+            <div style={{ position:'relative' }}>
+              <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
+              <input type="number" step="0.01" min="0" value={s.basePrice||''} onChange={e=>updateSize(s.id,{basePrice:parseFloat(e.target.value)||0})} style={{ ...inp, paddingLeft:20, fontSize:13, fontWeight:700, color:'var(--acc)' }} placeholder="0.00"/>
+            </div>
+            <button onClick={()=>removeSize(s.id)} style={{ width:32, height:34, borderRadius:7, border:'1px solid var(--red-b)', background:'var(--red-d)', color:'var(--red)', cursor:'pointer', fontSize:15, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+          </div>
+        ))}
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 90px auto', gap:6, marginTop:4 }}>
+          <input value={newSizeName} onChange={e=>setNewSizeName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addSize()} style={{ ...inp, fontSize:12 }} placeholder={'Size name e.g. Medium 11"'}/>
+          <div style={{ position:'relative' }}>
+            <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
+            <input type="number" step="0.01" min="0" value={newSizePrice} onChange={e=>setNewSizePrice(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addSize()} style={{ ...inp, paddingLeft:20, fontSize:12 }} placeholder="0.00"/>
+          </div>
+          <button onClick={addSize} disabled={!newSizeName.trim()} style={{ padding:'7px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700, opacity:newSizeName.trim()?1:.4 }}>+ Add</button>
+        </div>
+      </div>
+
+      {/* ── BASES ───────────────────────────────────────────────────── */}
+      <div>
+        <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'var(--t2)' }}>Available bases</span>
+          {badge(useCustomBases?'Custom':'All available','var(--grn)')}
+        </div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {PIZZA_BASES.map(b => {
+            const avail = useCustomBases ? bases.includes(b.id) : true;
+            return (
+              <button key={b.id} onClick={()=>toggleBase(b.id)} style={{ padding:'6px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:avail?700:400, border:`1.5px solid ${avail?'var(--acc)':'var(--bdr)'}`, background:avail?'var(--acc-d)':'var(--bg3)', color:avail?'var(--acc)':'var(--t3)' }}>
+                {avail?'✓ ':''}{b.name}
+                {b.allergens.length>0&&<span style={{ fontSize:9, color:'var(--t4)', marginLeft:4 }}>⚠</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── CRUSTS ──────────────────────────────────────────────────── */}
+      <div>
+        <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'var(--t2)' }}>Available crusts</span>
+          {badge(useCustomCrusts?'Custom':'All available','var(--grn)')}
+        </div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {PIZZA_CRUSTS.map(c => {
+            const avail = useCustomCrusts ? crusts.includes(c.id) : true;
+            return (
+              <button key={c.id} onClick={()=>toggleCrust(c.id)} style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:avail?700:400, border:`1.5px solid ${avail?'var(--acc)':'var(--bdr)'}`, background:avail?'var(--acc-d)':'var(--bg3)', color:avail?'var(--acc)':'var(--t3)' }}>
+                {avail?'✓ ':''}{c.name}
+                {(c.extra||0)>0&&<span style={{ fontSize:10, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>+£{c.extra.toFixed(2)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── DEFAULT TOPPINGS ────────────────────────────────────────── */}
+      <div>
+        <div style={{ marginBottom:8 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'var(--t2)' }}>Default toppings</span>
+          <div style={{ fontSize:10, color:'var(--t4)', marginTop:3 }}>Pre-selected when customer opens this pizza. They can still add/remove any topping.</div>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
+          {PIZZA_TOPPINGS.map(t => {
+            const on = tops.includes(t.id);
+            return (
+              <button key={t.id} onClick={()=>toggleTop(t.id)} style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`1.5px solid ${on?t.color||'var(--acc)':'var(--bdr)'}`, background:on?(t.color||'var(--acc)')+'18':'var(--bg3)', transition:'all .1s' }}>
+                <div style={{ width:12,height:12,borderRadius:'50%',background:t.color||'var(--acc)',flexShrink:0,boxShadow:on?`0 0 6px ${t.color}88`:'none' }}/>
+                <span style={{ fontSize:11, fontWeight:on?700:400, color:on?t.color||'var(--acc)':'var(--t1)', flex:1 }}>{t.name}</span>
+                {t.price>0&&<span style={{ fontSize:10, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>+£{t.price.toFixed(2)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── POS PREVIEW ─────────────────────────────────────────────── */}
+      <div style={{ padding:'12px', background:'var(--bg2)', borderRadius:10, border:'1px solid var(--bdr)' }}>
+        <div style={{ fontSize:9, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:8 }}>Order flow preview</div>
+        <div style={{ fontSize:11, color:'var(--t3)', lineHeight:2, marginBottom:4 }}>
+          1. Choose size: <strong style={{ color:'var(--t1)' }}>{sizes.map(s=>s.name).join(' / ')}</strong><br/>
+          2. Choose base: <strong style={{ color:'var(--t1)' }}>{(useCustomBases?PIZZA_BASES.filter(b=>bases.includes(b.id)):PIZZA_BASES).map(b=>b.name).join(' / ')}</strong><br/>
+          3. Choose crust: <strong style={{ color:'var(--t1)' }}>{(useCustomCrusts?PIZZA_CRUSTS.filter(c=>crusts.includes(c.id)):PIZZA_CRUSTS).map(c=>c.name).join(' / ')}</strong><br/>
+          4. Toppings: <strong style={{ color:'var(--t1)' }}>{tops.length?PIZZA_TOPPINGS.filter(t=>tops.includes(t.id)).map(t=>t.name).join(', '):'None pre-selected'}</strong>
+        </div>
+      </div>
+
     </div>
   );
 }

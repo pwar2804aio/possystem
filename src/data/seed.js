@@ -66,9 +66,10 @@ export const PIZZA_TOPPINGS = [
   { id:'chicken', name:'BBQ chicken',  color:'#d97706', price:2.0, allergens:[]       },
 ];
 export const PIZZA_BASES  = [
-  { id:'tomato', name:'Tomato', allergens:[] },
-  { id:'white',  name:'White',  allergens:['milk'] },
-  { id:'pesto',  name:'Pesto',  allergens:['nuts','milk'] },
+  { id:'tomato', name:'Tomato',  allergens:[] },
+  { id:'white',  name:'White',   allergens:['milk'] },
+  { id:'pesto',  name:'Pesto',   allergens:['nuts','milk'] },
+  { id:'bbq',    name:'BBQ',     allergens:[] },
 ];
 export const PIZZA_CRUSTS = [
   { id:'thin',    name:'Classic thin',  extra:0   },
@@ -192,25 +193,28 @@ export const MENU_ITEMS = [
 
   // ── PIZZA ─────────────────────────────────────────────────────────────────
   { id:'m-marg',     name:'Margherita',              menuName:'Margherita',          receiptName:'Margherita',   kitchenName:'MARG',
-    type:'modifiable', cat:'cat-pizza', allergens:['gluten','milk'],
+    type:'pizza', cat:'cat-pizza', allergens:['gluten','milk'],
     description:'San Marzano tomato, fior di latte, fresh basil',
     pricing:{base:13.0,dineIn:null,takeaway:13.0,collection:13.0,delivery:13.0},
-    assignedModifierGroups:[{groupId:'mgd-pizza-extras',min:0,max:5}],
-    assignedInstructionGroups:[] },
+    assignedModifierGroups:[], assignedInstructionGroups:[],
+    defaultToppings:[],
+    pizzaSizes:null, pizzaBases:null, pizzaCrusts:null },
 
   { id:'m-pep',      name:'Pepperoni',               menuName:'Pepperoni',           receiptName:'Pepperoni',    kitchenName:'PEPPERONI',
-    type:'modifiable', cat:'cat-pizza', allergens:['gluten','milk'],
+    type:'pizza', cat:'cat-pizza', allergens:['gluten','milk'],
     description:'San Marzano tomato, fior di latte, spicy pepperoni',
     pricing:{base:15.0,dineIn:null,takeaway:15.0,collection:15.0,delivery:15.0},
-    assignedModifierGroups:[{groupId:'mgd-pizza-extras',min:0,max:5}],
-    assignedInstructionGroups:[] },
+    assignedModifierGroups:[], assignedInstructionGroups:[],
+    defaultToppings:['pep'],
+    pizzaSizes:null, pizzaBases:null, pizzaCrusts:null },
 
   { id:'m-bbqchick', name:'BBQ chicken',             menuName:'BBQ chicken pizza',   receiptName:'BBQ Chicken',  kitchenName:'BBQ CHICK',
-    type:'modifiable', cat:'cat-pizza', allergens:['gluten','milk'],
+    type:'pizza', cat:'cat-pizza', allergens:['gluten','milk'],
     description:'BBQ base, mozzarella, pulled chicken, red onion, coriander',
     pricing:{base:15.0,dineIn:null,takeaway:15.0,collection:15.0,delivery:15.0},
-    assignedModifierGroups:[{groupId:'mgd-pizza-extras',min:0,max:5}],
-    assignedInstructionGroups:[] },
+    assignedModifierGroups:[], assignedInstructionGroups:[],
+    defaultToppings:['chicken','onion'],
+    pizzaSizes:null, pizzaBases:['bbq','tomato'], pizzaCrusts:null },
 
   // ── DESSERTS ──────────────────────────────────────────────────────────────
   { id:'m-stp',      name:'Sticky toffee pudding',   menuName:'Sticky toffee',       receiptName:'STP',          kitchenName:'STP',

@@ -632,9 +632,14 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
 
 // ── Pizza modal (half & half builder) ─────────────────────────────────────────
 function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
-  const [size,  setSize]  = useState(PIZZA_SIZES[1]);
-  const [base,  setBase]  = useState(PIZZA_BASES[0]);
-  const [crust, setCrust] = useState(PIZZA_CRUSTS[0]);
+  // Use per-item overrides if configured, fall back to global constants
+  const availSizes  = item.pizzaSizes  || PIZZA_SIZES;
+  const availBases  = item.pizzaBases  ? PIZZA_BASES.filter(b => item.pizzaBases.includes(b.id))  : PIZZA_BASES;
+  const availCrusts = item.pizzaCrusts ? PIZZA_CRUSTS.filter(c => item.pizzaCrusts.includes(c.id)) : PIZZA_CRUSTS;
+
+  const [size,  setSize]  = useState(availSizes[Math.min(1, availSizes.length-1)] || availSizes[0]);
+  const [base,  setBase]  = useState(availBases[0]);
+  const [crust, setCrust] = useState(availCrusts[0]);
   const [split, setSplit] = useState('whole');
   const [side,  setSide]  = useState('whole');
   const [left,  setLeft]  = useState(item.defaultToppings ? PIZZA_TOPPINGS.filter(t => (item.defaultToppings||[]).includes(t.id)) : []);
@@ -707,7 +712,7 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
             <div style={{ marginBottom:16 }}>
               <div className="label-xs" style={{ marginBottom:8 }}>Size</div>
               <div style={{ display:'flex', gap:6 }}>
-                {PIZZA_SIZES.map(s => (
+                {availSizes.map(s => (
                   <button key={s.id} onClick={() => setSize(s)} style={{
                     flex:1, padding:'9px 6px', borderRadius:9, cursor:'pointer', textAlign:'center',
                     border:`1.5px solid ${size.id===s.id?'var(--acc)':'var(--bdr)'}`,
@@ -724,7 +729,7 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
             <div style={{ marginBottom:16 }}>
               <div className="label-xs" style={{ marginBottom:8 }}>Base</div>
               <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                {PIZZA_BASES.map(b => (
+                {availBases.map(b => (
                   <button key={b.id} onClick={() => setBase(b)} style={{
                     padding:'6px 11px', borderRadius:7, cursor:'pointer', fontSize:12, fontWeight:500,
                     border:`1.5px solid ${base.id===b.id?'var(--acc)':'var(--bdr)'}`,
@@ -739,7 +744,7 @@ function PizzaModal({ item, activeAllergens, onConfirm, onCancel }) {
             <div style={{ marginBottom:16 }}>
               <div className="label-xs" style={{ marginBottom:8 }}>Crust</div>
               <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                {PIZZA_CRUSTS.map(c => (
+                {availCrusts.map(c => (
                   <button key={c.id} onClick={() => setCrust(c)} style={{
                     padding:'6px 11px', borderRadius:7, cursor:'pointer', fontSize:12, fontWeight:500,
                     border:`1.5px solid ${crust.id===c.id?'var(--acc)':'var(--bdr)'}`,
