@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.4.1';
+const VERSION = '2.4.2';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,13 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.4.2', date: 'Apr 2026', label: 'Fix: config snapshot always applied on page load',
+    changes: [
+      'Critical sync fix: when any page reloaded (POS, KDS, etc.), the Zustand store reset to seed data. SyncBridge was checking sessionStorage version — if it matched the snapshot version, it assumed the config was already applied and showed no banner. But the store had already reset to seed. Result: POS running on stale seed data with no way to know.',
+      'Fix: always apply the config snapshot on every mount. The store always starts from seed on reload, so the snapshot must always be re-applied. This means soldAlone items, price changes, menu edits, category changes — all persist correctly across page reloads without needing to click Sync now.',
     ],
   },
   {

@@ -40,16 +40,18 @@ export default function SyncBridge({ onSyncPulse }) {
       }
     } catch {}
 
-    // Check if there's a pending config snapshot (for tabs that open after a push)
+    // Apply config snapshot on every mount — the Zustand store always resets to
+    // seed data on page reload, so we must re-apply the snapshot regardless of
+    // whether sessionStorage thinks we've seen this version before.
     try {
       const snap = localStorage.getItem('rpos-config-snapshot');
-      const currentVersion = parseInt(sessionStorage.getItem('rpos-config-version') || '0');
       if (snap) {
         const parsed = JSON.parse(snap);
-        if (parsed.version > currentVersion) {
-          // This tab hasn't applied this config yet — show the banner
-          useStore.getState().setConfigUpdate(parsed);
-        }
+        // Always apply — store just reset to seed, snapshot has the live config
+        useStore.getState().applyConfigUpdate();
+        // Pre-load so applyConfigUpdate can find it
+        useStore.getState().setConfigUpdate(parsed);
+        useStore.getState().applyConfigUpdate();
       }
     } catch {}
 
