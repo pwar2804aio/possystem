@@ -37,10 +37,16 @@ export default function StaffManager() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data: profile } = await supabase.from('user_profiles').select('org_id, location_id').eq('id', user.id).single();
-      if (!profile?.location_id) return;
-      const { data: rows } = await supabase.from('staff_members').select('*').eq('location_id', profile.location_id).eq('active', true);
+      let locationId = profile?.location_id;
+      // Auto-assign first location if none set
+      if (!locationId && profile?.org_id) {
+        const { data: locs } = await supabase.from('locations').select('id').eq('org_id', profile.org_id).limit(1);
+        locationId = locs?.[0]?.id;
+        if (locationId) await supabase.from('user_profiles').update({ location_id: locationId }).eq('id', user.id);
+      }
+      if (!locationId) return;
+      const { data: rows } = await supabase.from('staff_members').select('*').eq('location_id', locationId).eq('active', true);
       if (rows?.length) {
-        // Replace store staff with Supabase data
         useStore.setState({ staffMembers: rows.map(r => ({
           id: r.id, name: r.name, role: r.role, pin: r.pin,
           color: r.color || '#3b82f6', initials: r.initials || r.name.slice(0,2).toUpperCase(),
@@ -88,12 +94,23 @@ export default function StaffManager() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         const { data: profile } = await supabase.from('user_profiles').select('org_id, location_id').eq('id', user.id).single();
-        if (profile?.location_id) {
-          await supabase.from('staff_members').insert({
-            location_id: profile.location_id, org_id: profile.org_id,
+        // Get location_id — from profile, or find first location in their org
+        let locationId = profile?.location_id;
+        if (!locationId && profile?.org_id) {
+          const { data: locs } = await supabase.from('locations').select('id').eq('org_id', profile.org_id).limit(1);
+          locationId = locs?.[0]?.id;
+          // Also update user profile so we don't have to look this up again
+          if (locationId) await supabase.from('user_profiles').update({ location_id: locationId }).eq('id', user.id);
+        }
+        if (locationId) {
+          const { error } = await supabase.from('staff_members').insert({
+            location_id: locationId, org_id: profile?.org_id,
             name: member.name, role: member.role, pin: member.pin,
             color: member.color || '#3b82f6', initials: member.initials, active: true,
           });
+          if (error) console.error('Staff save failed:', error.message);
+        } else {
+          console.warn('Cannot save staff — no location_id found for this user');
         }
       })();
     }

@@ -155,12 +155,28 @@ export default function PINScreen() {
         </div>
       )}
 
-      {/* Emergency bypass for demo/testing — only if no staff configured AND loading is complete */}
+      {/* No staff configured — show helpful message */}
       {staff.length === 0 && loadedStaff !== null && (
-        <button onClick={() => login({ id:'demo', name:'Demo User', role:'Manager', color:'#e8a020', initials:'DU', pin:'', permissions:['void','discount','refund','cashup','reports','eod','menu86','staff'] })}
-          style={{ padding:'10px 24px', borderRadius:12, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:14, fontWeight:700 }}>
-          Enter as Demo (no staff set up)
-        </button>
+        <div style={{ textAlign: 'center' }}>
+          {!isMock ? (
+            <div style={{ maxWidth: 320 }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>👥</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--t1)', marginBottom: 8 }}>No staff members set up yet</div>
+              <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 20, lineHeight: 1.6 }}>
+                Go to <strong>Back Office → Staff & Access</strong> and add your staff members with PINs. They'll appear here automatically.
+              </div>
+              <button onClick={() => { localStorage.setItem('rpos-device-mode', 'backoffice'); window.location.reload(); }}
+                style={{ padding:'10px 20px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#fff', fontSize:13, fontWeight:700, marginBottom:8, display:'block', width:'100%' }}>
+                Go to Back Office →
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => login({ id:'demo', name:'Demo User', role:'Manager', color:'#e8a020', initials:'DU', pin:'', permissions:['void','discount','refund','cashup','reports','eod','menu86','staff'] })}
+              style={{ padding:'10px 24px', borderRadius:12, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:14, fontWeight:700 }}>
+              Enter as Demo (no staff set up)
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
