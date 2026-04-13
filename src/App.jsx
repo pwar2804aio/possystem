@@ -10,6 +10,7 @@ import BackOfficeApp from './backoffice/BackOfficeApp';
 import { isMock } from './lib/supabase';
 import PairingScreen from './surfaces/PairingScreen';
 import ModeSelector from './surfaces/ModeSelector';
+import CompanyAdminApp from './admin/CompanyAdminApp';
 import DeviceSetup from './surfaces/DeviceSetup';
 import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
@@ -18,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.9.7';
+const VERSION = '2.9.8';
 
 const CHANGELOG = [
   {

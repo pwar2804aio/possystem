@@ -269,11 +269,11 @@ export const useStore = create((set, get) => ({
   removeDevice: (id) => set(s => ({ devices:s.devices.filter(d=>d.id!==id) })),
 
   // ── Menus (multiple menus per location, assigned to device profiles) ─────────
-  menus: _savedBO.menus || [
+  menus: _savedBO.menus || (isMock ? [
     { id:'menu-1', name:'Main menu',    description:'Full food and drinks', scope:'local', assignedProfiles:[], isDefault:true,  isActive:true, sortOrder:0 },
     { id:'menu-2', name:'Bar menu',     description:'Drinks and bar snacks',scope:'local', assignedProfiles:['prof-2'],isDefault:false, isActive:true, sortOrder:1 },
     { id:'menu-3', name:'Lunch menu',   description:'Midday menu',          scope:'local', assignedProfiles:[], isDefault:false, isActive:true, sortOrder:2 },
-  ],
+  ] : []),
   activeMenuId: 'menu-1',
   setActiveMenuId: id => set({ activeMenuId: id }),
   addMenu: menu => {
@@ -294,7 +294,7 @@ export const useStore = create((set, get) => ({
   // ── Categories (hierarchical — parentId for subcategories) ───────────────────
   // accountingGroup → for financial reporting (P&L, tax)
   // statisticGroup  → for operational reporting (bestsellers, waste)
-  menuCategories: _savedBO.menuCategories || [
+  menuCategories: _savedBO.menuCategories || (isMock ? [
     // ── The Anchor — category tree ──────────────────────────────────────────
     // Root categories
     { id:'cat-starters',  menuId:'menu-1', parentId:null, label:'Starters',  icon:'🥗', color:'#22c55e', accountingGroup:'Food',      sortOrder:0 },
@@ -319,7 +319,7 @@ export const useStore = create((set, get) => ({
     { id:'bcat-softs',    menuId:'menu-2', parentId:null, label:'Soft drinks',  icon:'🥤', color:'#22d3ee', accountingGroup:'Beverages', sortOrder:3 },
     { id:'bcat-hot',      menuId:'menu-2', parentId:null, label:'Hot drinks',   icon:'☕', color:'#78716c', accountingGroup:'Beverages', sortOrder:4 },
     { id:'bcat-snacks',   menuId:'menu-2', parentId:null, label:'Bar snacks',   icon:'🍟', color:'#22c55e', accountingGroup:'Food',      sortOrder:5 },
-  ],
+  ] : []),
   addCategory: cat => {
     const newCat = { id:`cat-${Date.now()}`, ...cat };
     set(s => ({ menuCategories: [...s.menuCategories, newCat] }));
