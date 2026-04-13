@@ -9,6 +9,8 @@ import { KDSSurface } from './surfaces/OtherSurfaces';
 import BackOfficeApp from './backoffice/BackOfficeApp';
 import { isMock } from './lib/supabase';
 import PairingScreen from './surfaces/PairingScreen';
+import ModeSelector from './surfaces/ModeSelector';
+import DeviceSetup from './surfaces/DeviceSetup';
 import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
@@ -16,7 +18,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.9.3';
+const VERSION = '2.9.4';
 
 const CHANGELOG = [
   {
@@ -864,15 +866,19 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Back office is always accessible without pairing (it's for admins)
-  if (appMode === 'backoffice') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
+  // ── Device mode selection ─────────────────────────────────────────────
+  // On first load, ask what this device is used for (POS or Back Office)
+  // Stored in localStorage so the choice persists across page reloads
+  const deviceMode = isMock ? 'pos' : (localStorage.getItem('rpos-device-mode') || null);
 
-  // Check if this POS device has been paired — skip in mock mode
+  if (!deviceMode) return <DeviceSetup onSelectMode={() => window.location.reload()} />;
+
+  // Back office mode — go to email login (no pairing needed)
+  if (deviceMode === 'backoffice') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
+
+  // POS mode — check if paired to a location
   const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
-  if (!isMock && !pairedDevice) return <PairingScreen onPaired={() => window.location.reload()} />;
-
-  // Admin mode device — go straight to back office (auth-gated)
-  if (pairedDevice?.adminMode) return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
+  if (!pairedDevice) return <PairingScreen onPaired={() => window.location.reload()} />;
 
   if (!staff) return <><SyncBridge onSyncPulse={handleSyncPulse}/><PINScreen /></>;
   // Kiosk — full screen, no staff sidebar, no shift bar
