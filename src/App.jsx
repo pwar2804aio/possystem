@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.9.8';
+const VERSION = '2.9.9';
 
 const CHANGELOG = [
   {
@@ -872,7 +872,17 @@ export default function App() {
   // Stored in localStorage so the choice persists across page reloads
   const deviceMode = isMock ? 'pos' : (localStorage.getItem('rpos-device-mode') || null);
 
-  if (!deviceMode) return <DeviceSetup onSelectMode={() => window.location.reload()} />;
+  // First visit — ask what this device is for
+  if (!deviceMode) return (
+    <ModeSelector
+      onSelectPOS={() => { localStorage.setItem('rpos-device-mode', 'pos'); window.location.reload(); }}
+      onSelectBackOffice={() => { localStorage.setItem('rpos-device-mode', 'backoffice'); window.location.reload(); }}
+      onSelectAdmin={() => { localStorage.setItem('rpos-device-mode', 'admin'); window.location.reload(); }}
+    />
+  );
+
+  // Company Admin — completely separate internal app
+  if (deviceMode === 'admin') return <CompanyAdminApp />;
 
   // Back office mode — go to email login (no pairing needed)
   if (deviceMode === 'backoffice') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
