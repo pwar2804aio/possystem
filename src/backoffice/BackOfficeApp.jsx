@@ -26,7 +26,6 @@ const NAV = [
   { id:'printing',   label:'Print routing',   icon:'🖨',  group:'Configuration' },
   { id:'reports',    label:'Reports',         icon:'📊',  group:'Analytics' },
   { id:'eod',        label:'End of day',      icon:'🔒',  group:'Analytics' },
-  { id:'admin',       label:'Company admin',   icon:'🔐',  group:'Organisation' },
 ];
 
 export default function BackOfficeApp() {
