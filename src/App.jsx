@@ -18,7 +18,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.9.5';
+const VERSION = '2.9.6';
 
 const CHANGELOG = [
   {
