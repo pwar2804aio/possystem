@@ -163,7 +163,7 @@ export default function BackOfficeApp() {
               <div style={{ fontSize:10, color:'var(--t4)' }}>{staff?.role || 'Admin'}</div>
             </div>
           </div>
-          <button onClick={() => setAppMode('pos')} style={{
+          <button onClick={() => { localStorage.setItem('rpos-device-mode', 'pos'); window.location.reload(); }} style={{
             width:'100%', padding:'9px 10px', borderRadius:9,
             cursor:'pointer', textAlign:'left', fontSize:12,
             fontWeight:600, border:'1px solid var(--bdr)',

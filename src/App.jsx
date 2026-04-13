@@ -926,7 +926,8 @@ const NAV = [
 
 function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme, syncPulse }) {
   const { deviceConfig, setSurface, orderQueue, tables, tabs } = useStore();
-  const terminalName = deviceConfig?.terminalName || 'POS';
+  const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
+  const terminalName = deviceConfig?.terminalName || pairedDevice?.name || 'POS';
   const profileName  = deviceConfig?.profileName;
 
   // Active order count for Orders Hub button
@@ -1114,7 +1115,7 @@ function Sidebar({ surface, setSurface }) {
       </button>
 
       {/* Back Office button */}
-      <button onClick={() => setAppMode('backoffice')} title="Back Office" style={{
+      <button onClick={() => { localStorage.setItem('rpos-device-mode', 'backoffice'); window.location.reload(); }} title="Back Office" style={{
         width:46, height:46, borderRadius:10, cursor:'pointer',
         display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
         background:'transparent', border:'1px solid transparent',

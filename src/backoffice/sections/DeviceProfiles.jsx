@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 import { isMock } from '../../lib/supabase';
 
@@ -50,9 +50,15 @@ const DEFAULT_PROFILES = [
 
 export default function DeviceProfiles() {
   const { showToast, devices, setDeviceConfig, markBOChange } = useStore();
-  const [profiles, setProfiles] = useState(isMock ? DEFAULT_PROFILES : []);
+  const stored = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null'); } catch { return null; } })();
+  const [profiles, setProfiles] = useState(stored || (isMock ? DEFAULT_PROFILES : []));
   const [editing, setEditing] = useState(null);
   const [showNew, setShowNew] = useState(false);
+
+  // Persist profiles to localStorage so DeviceRegistry can read them
+  useEffect(() => {
+    localStorage.setItem('rpos-device-profiles', JSON.stringify(profiles));
+  }, [profiles]);
 
   const save = (updated) => {
     setProfiles(ps => ps.map(p => p.id === updated.id ? updated : p));

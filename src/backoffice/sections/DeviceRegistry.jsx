@@ -25,14 +25,36 @@ const S = {
   label: { fontSize: 12, fontWeight: 600, color: 'var(--t3)', marginBottom: 4, display: 'block' },
 };
 
+const DEFAULT_PROFILES = [
+  { id:'prof-1', name:'Main counter', color:'#3b82f6' },
+  { id:'prof-2', name:'Bar terminal', color:'#e8a020' },
+  { id:'prof-3', name:'Server handheld', color:'#22c55e' },
+];
+
+function DeviceProfileSelect({ value, onChange }) {
+  // Read profiles from localStorage (saved by DeviceProfiles section)
+  const stored = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null'); } catch { return null; } })();
+  const profiles = stored || DEFAULT_PROFILES;
+  return (
+    <select
+      style={{ width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid var(--bdr)', background:'var(--bg)', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}
+      value={value} onChange={e => onChange(e.target.value)}
+    >
+      <option value="">No profile assigned</option>
+      {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+    </select>
+  );
+}
+
 export default function DeviceRegistry() {
   const [devices, setDevices] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [locationId, setLocationId] = useState(null);
   const [locationName, setLocationName] = useState('');
   const [showPairFlow, setShowPairFlow] = useState(false);
   const [pairStep, setPairStep] = useState(1); // 1=config, 2=code
-  const [newDevice, setNewDevice] = useState({ name: '', type: 'pos' });
+  const [newDevice, setNewDevice] = useState({ name: '', type: 'pos', profileId: '' });
   const [pairingCode, setPairingCode] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
@@ -73,6 +95,7 @@ export default function DeviceRegistry() {
       type: newDevice.type,
       pairing_code: code,
       status: 'unpaired',
+      profile_id: newDevice.profileId || null,
     }).select().single();
     setWorking(false);
     if (err) return setError(err.message);
@@ -124,7 +147,7 @@ export default function DeviceRegistry() {
                 Step 1 — Configure the new terminal
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
                 <div>
                   <label style={S.label}>Terminal name *</label>
                   <input style={S.input} placeholder="e.g. Counter 1, Bar terminal" value={newDevice.name}
@@ -135,6 +158,10 @@ export default function DeviceRegistry() {
                   <select style={S.input} value={newDevice.type} onChange={e => setNewDevice(d => ({ ...d, type: e.target.value }))}>
                     {DEVICE_TYPES.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label style={S.label}>Device profile</label>
+                  <DeviceProfileSelect value={newDevice.profileId} onChange={v => setNewDevice(d => ({ ...d, profileId: v }))} />
                 </div>
               </div>
 
@@ -226,7 +253,7 @@ export default function DeviceRegistry() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, color: 'var(--t1)', fontSize: 14 }}>{d.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--t3)' }}>
-                  {dtype.label}
+                  {dtype.label}{d.profile_id ? ` · ${((() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null'); } catch { return null; } })() || DEFAULT_PROFILES).find(p => p.id === d.profile_id)?.name || d.profile_id}` : ''}
                   {d.pairing_code && d.status === 'unpaired' && (
                     <span style={{ marginLeft: 8, fontFamily: 'monospace', color: 'var(--acc)', fontWeight: 700 }}>
                       Code: {d.pairing_code}
