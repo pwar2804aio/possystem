@@ -117,13 +117,17 @@ export default function PairingScreen({ onPaired }) {
           <strong>Back Office → Devices → Add terminal</strong>
         </div>
 
-        {/* Dev shortcut — skip pairing in dev/mock mode */}
-        {isMock && (
-          <button onClick={() => onPaired({ id: 'dev', name: 'Dev terminal', type: 'pos', location_id: LOCATION_ID })}
-            style={{ marginTop: 20, fontSize: 12, color: 'var(--t3)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-            Skip pairing (dev mode)
+        {/* Admin bypass link */}
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 16 }}>
+          Restaurant owner or admin?{' '}
+          <button onClick={() => {
+            // Mark as "admin mode" so we skip pairing and go to back office
+            localStorage.setItem('rpos-device', JSON.stringify({ id: 'admin', name: 'Admin', type: 'admin', locationId: null, adminMode: true }));
+            window.location.reload();
+          }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--acc)', fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}>
+            Access Back Office →
           </button>
-        )}
+        </div>
       </div>
     </div>
   );

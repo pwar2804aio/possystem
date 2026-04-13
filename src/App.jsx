@@ -16,7 +16,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.9.1';
+const VERSION = '2.9.2';
 
 const CHANGELOG = [
   {
@@ -870,6 +870,9 @@ export default function App() {
   // Check if this POS device has been paired — skip in mock mode
   const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
   if (!isMock && !pairedDevice) return <PairingScreen onPaired={() => window.location.reload()} />;
+
+  // Admin mode device — go straight to back office (auth-gated)
+  if (pairedDevice?.adminMode) return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
 
   if (!staff) return <><SyncBridge onSyncPulse={handleSyncPulse}/><PINScreen /></>;
   // Kiosk — full screen, no staff sidebar, no shift bar
