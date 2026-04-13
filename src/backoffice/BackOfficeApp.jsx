@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { broadcastConfigPush } from '../sync/SyncBridge';
-import { fetchMenus, fetchMenuCategories } from '../lib/db';
 import MenuManager from './sections/MenuManager';
 import FloorPlanBuilder from './sections/FloorPlanBuilder';
 import DeviceProfiles from './sections/DeviceProfiles';
@@ -31,32 +30,6 @@ const NAV = [
 export default function BackOfficeApp() {
   const { setAppMode, staff, closedChecks, tables, devices } = useStore();
 
-  // Load menus + categories from Supabase on mount — source of truth
-  useEffect(() => {
-    const hydrate = async () => {
-      const [menuRes, catRes] = await Promise.all([fetchMenus(), fetchMenuCategories()]);
-      if (menuRes.data && menuRes.data.length > 0) {
-        // Map snake_case DB columns back to camelCase store format
-        const menus = menuRes.data.map(m => ({
-          id: m.id, name: m.name, description: m.description || '',
-          isDefault: m.is_default, isActive: m.is_active, sortOrder: m.sort_order,
-          scope: 'local', assignedProfiles: [],
-        }));
-        useStore.setState({ menus });
-        try { localStorage.setItem('rpos-bo-config', JSON.stringify({ menus, menuCategories: useStore.getState().menuCategories })); } catch {}
-      }
-      if (catRes.data && catRes.data.length > 0) {
-        const cats = catRes.data.map(c => ({
-          id: c.id, menuId: c.menu_id, parentId: c.parent_id,
-          label: c.label, icon: c.icon, color: c.color,
-          accountingGroup: c.accounting_group || '', sortOrder: c.sort_order, isSpecial: c.is_special || false,
-        }));
-        useStore.setState({ menuCategories: cats });
-        try { const bo = JSON.parse(localStorage.getItem('rpos-bo-config')||'{}'); bo.menuCategories = cats; localStorage.setItem('rpos-bo-config', JSON.stringify(bo)); } catch {}
-      }
-    };
-    hydrate();
-  }, []);
   const [section, setSection] = useState('overview');
 
   const groups = [...new Set(NAV.map(n => n.group))];

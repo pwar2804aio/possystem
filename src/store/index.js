@@ -126,15 +126,7 @@ export function getCollectionSlots() {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 // Restore back-office config (menus/categories) from localStorage on load
-const _savedBO = (() => {
-  try {
-    const raw = JSON.parse(localStorage.getItem('rpos-bo-config') || '{}');
-    return {
-      menus: (raw.menus && raw.menus.length > 0) ? raw.menus : null,
-      menuCategories: (raw.menuCategories && raw.menuCategories.length > 0) ? raw.menuCategories : null,
-    };
-  } catch { return {}; }
-})();
+const _savedBO = (() => { try { return JSON.parse(localStorage.getItem('rpos-bo-config')||'{}'); } catch { return {}; } })();
 
 export const useStore = create((set, get) => ({
 
