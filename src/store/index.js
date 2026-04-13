@@ -1,4 +1,43 @@
 import { create } from 'zustand';
+import { supabase, isMock, LOCATION_ID } from '../lib/supabase';
+
+// ── Supabase helpers ─────────────────────────────────────────────────────────
+const sbUpsertMenu = async (menu) => {
+  if (isMock) return;
+  await supabase.from('menus').upsert({ ...menu, location_id: LOCATION_ID, updated_at: new Date().toISOString() });
+};
+const sbDeleteMenu = async (id) => {
+  if (isMock) return;
+  await supabase.from('menus').delete().eq('id', id);
+};
+const sbUpsertCategory = async (cat) => {
+  if (isMock) return;
+  await supabase.from('menu_categories').upsert({
+    id: cat.id, location_id: LOCATION_ID, menu_id: cat.menuId||null,
+    parent_id: cat.parentId||null, label: cat.label, icon: cat.icon||'🍽',
+    color: cat.color||'#3b82f6', accounting_group: cat.accountingGroup||'',
+    sort_order: cat.sortOrder||0, updated_at: new Date().toISOString()
+  });
+};
+const sbDeleteCategory = async (id) => {
+  if (isMock) return;
+  await supabase.from('menu_categories').delete().eq('id', id);
+};
+const sbUpsertMenuItem = async (item) => {
+  if (isMock) return;
+  await supabase.from('menu_items').upsert({
+    id: item.id, location_id: LOCATION_ID, name: item.name,
+    menu_name: item.menuName||item.name, receipt_name: item.receiptName||item.name,
+    kitchen_name: item.kitchenName||item.name, description: item.description||'',
+    type: item.type||'simple', cat: item.cat||null, cats: item.cats||[],
+    parent_id: item.parentId||null, sort_order: item.sortOrder||0,
+    pricing: item.pricing||{base:0}, allergens: item.allergens||[],
+    assigned_modifier_groups: item.assignedModifierGroups||[],
+    visibility: item.visibility||{pos:true,kiosk:true,online:true},
+    sold_alone: item.soldAlone||false, archived: item.archived||false,
+    updated_at: new Date().toISOString()
+  });
+};
 import { INITIAL_KDS, SHIFT, MENU_ITEMS, CATEGORIES, STAFF as STAFF_SEED, QUICK_IDS } from '../data/seed';
 
 // ─── ID helpers ──────────────────────────────────────────────────────────────
@@ -220,9 +259,20 @@ export const useStore = create((set, get) => ({
   ],
   activeMenuId: 'menu-1',
   setActiveMenuId: id => set({ activeMenuId: id }),
-  addMenu: menu => set(s => ({ menus: [...s.menus, { id:`menu-${Date.now()}`, ...menu }] })),
-  updateMenu: (id, patch) => set(s => ({ menus: s.menus.map(m => m.id===id ? { ...m, ...patch } : m) })),
-  removeMenu: id => set(s => ({ menus: s.menus.filter(m => m.id!==id) })),
+  addMenu: menu => {
+    const newMenu = { id:`menu-${Date.now()}`, ...menu };
+    set(s => ({ menus: [...s.menus, newMenu] }));
+    sbUpsertMenu(newMenu);
+  },
+  updateMenu: (id, patch) => {
+    set(s => ({ menus: s.menus.map(m => m.id===id ? { ...m, ...patch } : m) }));
+    const updated = useStore.getState().menus.find(m => m.id===id);
+    if (updated) sbUpsertMenu(updated);
+  },
+  removeMenu: id => {
+    set(s => ({ menus: s.menus.filter(m => m.id!==id) }));
+    sbDeleteMenu(id);
+  },
 
   // ── Categories (hierarchical — parentId for subcategories) ───────────────────
   // accountingGroup → for financial reporting (P&L, tax)
@@ -253,9 +303,20 @@ export const useStore = create((set, get) => ({
     { id:'bcat-hot',      menuId:'menu-2', parentId:null, label:'Hot drinks',   icon:'☕', color:'#78716c', accountingGroup:'Beverages', sortOrder:4 },
     { id:'bcat-snacks',   menuId:'menu-2', parentId:null, label:'Bar snacks',   icon:'🍟', color:'#22c55e', accountingGroup:'Food',      sortOrder:5 },
   ],
-  addCategory: cat => set(s => ({ menuCategories: [...s.menuCategories, { id:`cat-${Date.now()}`, ...cat }] })),
-  updateCategory: (id, patch) => set(s => ({ menuCategories: s.menuCategories.map(c => c.id===id ? { ...c, ...patch } : c) })),
-  removeCategory: id => set(s => ({ menuCategories: s.menuCategories.filter(c => c.id!==id) })),
+  addCategory: cat => {
+    const newCat = { id:`cat-${Date.now()}`, ...cat };
+    set(s => ({ menuCategories: [...s.menuCategories, newCat] }));
+    sbUpsertCategory(newCat);
+  },
+  updateCategory: (id, patch) => {
+    set(s => ({ menuCategories: s.menuCategories.map(c => c.id===id ? { ...c, ...patch } : c) }));
+    const updated = useStore.getState().menuCategories.find(c => c.id===id);
+    if (updated) sbUpsertCategory(updated);
+  },
+  removeCategory: id => {
+    set(s => ({ menuCategories: s.menuCategories.filter(c => c.id!==id) }));
+    sbDeleteCategory(id);
+  },
 
   // ── Modifier library — create modifiers here, add to groups ─────────────────
   modifierLibrary: [

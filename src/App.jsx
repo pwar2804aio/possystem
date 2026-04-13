@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.6.4';
+const VERSION = '2.7.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,14 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.7.0', date: 'Apr 2026', label: 'Supabase integration: menus and categories persist to live database',
+    changes: [
+      'Menus and categories now save to Supabase on every change — create a menu, it is instantly in the database.',
+      'Page reloads, new devices, and multiple terminals all see the same menus without needing Push to POS.',
+      'Falls back to localStorage automatically if Supabase is unreachable.',
     ],
   },
   {
@@ -75,6 +83,14 @@ const CHANGELOG = [
       'Both the Bar surface and POS surface now filter their category pills and item grids by the menu assigned to the device. A Bar terminal with the Bar menu only sees bar categories and bar items.',
       'The Menus tab in Menu Manager is where you build and manage named menus (Main menu, Bar menu, Lunch menu etc). Categories are assigned to menus via menuId.',
       'Falls back to showing all menus if no specific menu is assigned to the device profile.',
+    ],
+  },
+  {
+    version: '2.7.0', date: 'Apr 2026', label: 'Supabase integration: menus and categories persist to live database',
+    changes: [
+      'Menus and categories now save to Supabase on every change — create a menu, it is instantly in the database.',
+      'Page reloads, new devices, and multiple terminals all see the same menus without needing Push to POS.',
+      'Falls back to localStorage automatically if Supabase is unreachable.',
     ],
   },
   {
