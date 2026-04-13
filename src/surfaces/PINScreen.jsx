@@ -1,13 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { supabase, isMock } from '../lib/supabase';
 
 export default function PINScreen() {
   const { login, staffMembers } = useStore();
-  const staff = staffMembers && staffMembers.length ? staffMembers : [];
+  const [loadedStaff, setLoadedStaff] = useState(null); // null = still loading
   const [sel, setSel] = useState(null);
   const [pin, setPin] = useState('');
   const [shake, setShake] = useState(false);
   const [skipMode, setSkipMode] = useState(false);
+
+  // Load staff from Supabase using the paired device's locationId
+  useEffect(() => {
+    if (isMock) { setLoadedStaff(staffMembers); return; }
+    (async () => {
+      try {
+        // Get locationId from paired device in localStorage
+        const paired = JSON.parse(localStorage.getItem('rpos-device') || 'null');
+        const locationId = paired?.locationId;
+        if (!locationId) { setLoadedStaff(staffMembers); return; }
+        const { data } = await supabase
+          .from('staff_members')
+          .select('*')
+          .eq('location_id', locationId)
+          .eq('active', true);
+        if (data?.length) {
+          const mapped = data.map(r => ({
+            id: r.id, name: r.name, role: r.role, pin: r.pin,
+            color: r.color || '#3b82f6',
+            initials: r.initials || r.name.slice(0,2).toUpperCase(),
+          }));
+          useStore.setState({ staffMembers: mapped });
+          setLoadedStaff(mapped);
+        } else {
+          setLoadedStaff(staffMembers);
+        }
+      } catch(e) {
+        setLoadedStaff(staffMembers);
+      }
+    })();
+  }, []);
+
+  const staff = loadedStaff ?? staffMembers ?? [];
 
   const KEYS = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 
@@ -51,7 +85,7 @@ export default function PINScreen() {
         <div style={{ width:56, height:56, background:'var(--acc)', borderRadius:16, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, fontWeight:800, color:'#0e0f14', margin:'0 auto 14px' }}>R</div>
         <div style={{ fontSize:22, fontWeight:800, color:'var(--t1)', letterSpacing:'-.02em' }}>Restaurant OS</div>
         <div style={{ fontSize:13, color:'var(--t3)', marginTop:4 }}>
-          {staff.length ? 'Select your profile to continue' : 'No staff configured — go to Back Office → Staff'}
+          {loadedStaff === null ? 'Loading staff…' : staff.length ? 'Select your profile to continue' : 'No staff configured — go to Back Office → Staff'}
         </div>
       </div>
 
@@ -121,8 +155,8 @@ export default function PINScreen() {
         </div>
       )}
 
-      {/* Emergency bypass for demo/testing — only if no staff configured */}
-      {staff.length === 0 && (
+      {/* Emergency bypass for demo/testing — only if no staff configured AND loading is complete */}
+      {staff.length === 0 && loadedStaff !== null && (
         <button onClick={() => login({ id:'demo', name:'Demo User', role:'Manager', color:'#e8a020', initials:'DU', pin:'', permissions:['void','discount','refund','cashup','reports','eod','menu86','staff'] })}
           style={{ padding:'10px 24px', borderRadius:12, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:14, fontWeight:700 }}>
           Enter as Demo (no staff set up)
