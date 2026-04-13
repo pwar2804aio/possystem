@@ -134,9 +134,29 @@ function AdminPanel({ authUser }) {
     setSection('org-detail');
   };
 
-  const inviteOwner = () => {
+  const createOwner = async () => {
     if (!form.inviteEmail?.trim()) return err('Email required');
-    setMsg({ type:'info', text:`Invite steps for ${form.inviteEmail}:\n\n1. Go to Supabase → Authentication → Users → Add user → Send invitation\n   Enter: ${form.inviteEmail}\n\n2. In Supabase SQL Editor run:\nUPDATE user_profiles\nSET org_id = '${selectedOrg.id}', role = 'owner', full_name = '${form.inviteName||''}'  \nWHERE id = (SELECT id FROM auth.users WHERE email = '${form.inviteEmail}');\n\nWhen the owner clicks the invite link and sets their password, their back office will show only ${selectedOrg.name} with no demo data.` });
+    if (!form.invitePassword?.trim() || form.invitePassword.length < 8) return err('Password must be at least 8 characters');
+    setWorking(true); setMsg({ type:'', text:'' });
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setWorking(false); return err('Not logged in'); }
+    const assignLocationId = form.inviteLocationId || locations[0]?.id || null;
+    try {
+      const resp = await fetch('https://tbetcegmszzotrwdtqhi.supabase.co/functions/v1/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ email: form.inviteEmail.trim(), password: form.invitePassword, fullName: form.inviteName || '', orgId: selectedOrg.id, locationId: assignLocationId, role: 'owner' }),
+      });
+      const result = await resp.json();
+      setWorking(false);
+      if (result.error) return err(result.error);
+      ok(`✓ Owner account created for ${result.email}. They can log in to the Back Office immediately.`);
+      setForm(f => ({ ...f, inviteEmail:'', invitePassword:'', inviteName:'', inviteLocationId:'' }));
+      setSection('org-detail');
+    } catch(e) {
+      setWorking(false);
+      err(`Failed: ${e.message}`);
+    }
   };
 
   const msgBg = { ok:{ bg:'#0d2e1a', border:'#166534', color:'#86efac' }, err:{ bg:'#2d0f0f', border:'#991b1b', color:'#fca5a5' }, info:{ bg:'#1e1a3a', border:'#4c4a8a', color:'#a5b4fc' } };
@@ -236,7 +256,7 @@ function AdminPanel({ authUser }) {
               <>
                 <div style={{ display:'flex', gap:10, marginBottom:24 }}>
                   <button onClick={() => setSection('new-location')} style={{ ...S.btn, ...S.btnPrimary }}>+ Add location</button>
-                  <button onClick={() => setSection('invite')} style={{ ...S.btn, ...S.btnGhost }}>👤 Create owner</button>
+                  <button onClick={() => { setSection('invite'); setMsg({type:'',text:''}); }} style={{ ...S.btn, ...S.btnGhost }}>👤 Create owner</button>
                 </div>
                 <div style={S.card}>
                   <div style={S.cardTitle}>📍 Locations</div>
