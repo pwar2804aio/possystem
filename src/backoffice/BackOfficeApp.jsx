@@ -32,7 +32,8 @@ const NAV = [
 export default function BackOfficeApp() {
   const { setAppMode, staff, closedChecks, tables, devices } = useStore();
   const [authUser, setAuthUser] = useState(null);
-  const [authChecked, setAuthChecked] = useState(isMock); // skip check in mock mode
+  const [authChecked, setAuthChecked] = useState(isMock);
+  const [section, setSection] = useState('overview');
 
   // Check Supabase session on mount
   useEffect(() => {
@@ -56,8 +57,6 @@ export default function BackOfficeApp() {
 
   // Show login screen if not authenticated
   if (!authUser && !isMock) return <BOLogin onLogin={setAuthUser} />;
-
-  const [section, setSection] = useState('overview');
 
   const groups = [...new Set(NAV.map(n => n.group))];
 

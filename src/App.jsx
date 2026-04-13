@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.8.1';
+const VERSION = '2.8.2';
 
 const CHANGELOG = [
   {
@@ -38,6 +38,10 @@ const CHANGELOG = [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
     ],
+  },
+  {
+    version: '2.8.2', date: 'Apr 2026', label: 'Fix: back office now loads after login',
+    changes: ['Fixed React hooks violation — useState was declared after conditional early returns, causing the back office to render a blank page after authentication. All hooks are now declared before any conditional returns.'],
   },
   {
     version: '2.8.1', date: 'Apr 2026', label: 'Fix: back office auth gate — login screen now works',
