@@ -14,6 +14,7 @@ import EODClose from './sections/EODClose';
 import MultiLocation from './sections/MultiLocation';
 import Inventory from './sections/Inventory';
 import SupabaseSetup from '../lib/SupabaseSetup';
+import CompanyAdmin from './sections/CompanyAdmin';
 
 const NAV = [
   { id:'overview',   label:'Overview',        icon:'◈',  group:'Dashboard' },
@@ -27,6 +28,7 @@ const NAV = [
   { id:'reports',    label:'Reports',         icon:'📊',  group:'Analytics' },
   { id:'eod',        label:'End of day',      icon:'🔒',  group:'Analytics' },
   { id:'locations',   label:'Locations',       icon:'📍',  group:'Organisation' },
+  { id:'admin',       label:'Company admin',   icon:'🔐',  group:'Organisation' },
 ];
 
 export default function BackOfficeApp() {

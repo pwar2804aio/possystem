@@ -7,6 +7,8 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface } from './surfaces/OtherSurfaces';
 import BackOfficeApp from './backoffice/BackOfficeApp';
+import { isMock } from './lib/supabase';
+import PairingScreen from './surfaces/PairingScreen';
 import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
@@ -14,7 +16,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.8.2';
+const VERSION = '2.9.0';
 
 const CHANGELOG = [
   {
@@ -37,6 +39,15 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.9.0', date: 'Apr 2026', label: 'Onboarding: Company Admin, Device Pairing, POS First Boot',
+    changes: [
+      'Company Admin panel — create organisations, add locations, invite restaurant owners (back office → Company Admin).',
+      'Device pairing — generate a pairing code in Devices section, enter it on any POS device to register it to your location.',
+      'POS first-boot screen — new unregistered devices show a pairing screen instead of going straight to PIN login.',
+      'Devices section rebuilt with real Supabase integration — pairing codes stored in database, status tracked.',
     ],
   },
   {
@@ -852,6 +863,10 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Check if this device has been paired (skip in mock/dev mode)
+  const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
+  if (!isMock && !pairedDevice) return <PairingScreen onPaired={() => window.location.reload()} />;
 
   if (!staff) return <><SyncBridge onSyncPulse={handleSyncPulse}/><PINScreen /></>;
   if (appMode === 'backoffice') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
