@@ -1196,7 +1196,7 @@ export const useStore = create((set, get) => ({
   ] }),
 
   // ── Closed check history ──────────────────
-  closedChecks: [
+  closedChecks: isMock ? [
     { id:'cc1', ref:'#1042', tableId:'t1', tableLabel:'T1', server:'Sarah', covers:2, orderType:'dine-in', customer:null,
       items:[{uid:'cc1i1',name:'Carbonara pasta',price:14.5,qty:2,mods:[],notes:'',allergens:[]},{uid:'cc1i2',name:'House red wine — 250ml',price:10.5,qty:2,mods:[],notes:'',allergens:[]}],
       discounts:[], subtotal:50, service:6.25, tip:7.50, total:63.75, method:'card',
@@ -1211,7 +1211,7 @@ export const useStore = create((set, get) => ({
       items:[{uid:'cc3i1',name:'Pepperoni pizza',price:14,qty:1,mods:[],notes:'Extra cheese',allergens:[]},{uid:'cc3i2',name:'Garlic bread',price:4.5,qty:1,mods:[],notes:'',allergens:[]}],
       discounts:[], subtotal:18.5, service:0, tip:0, total:18.5, method:'card',
       closedAt:Date.now()-90*60000, status:'paid', refunds:[] },
-  ],
+  ] : [],
 
   recordClosedCheck: (tableId, paymentInfo = {}) => {
     const { tables, staff } = get();

@@ -51,6 +51,8 @@ export default function BackOfficeApp() {
   // Load org/location context once user is known
   useEffect(() => {
     if (!authUser || isMock) return;
+    // Clear any locally cached back office data — real data comes from Supabase
+    localStorage.removeItem('rpos-bo-config');
     (async () => {
       const { data: profile } = await supabase
         .from('user_profiles')
