@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import { isMock } from '../lib/supabase';
 
 export const CHANNEL_NAME = 'rpos-sync';
 export const STORAGE_KEY  = 'rpos-shared-state';
@@ -35,14 +36,29 @@ export default function SyncBridge({ onSyncPulse }) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         isApplyingRef.current = true;
-        useStore.setState(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        // In real Supabase mode, strip menu/product data — loaded from DB instead
+        if (!isMock) {
+          delete parsed.menus;
+          delete parsed.menuCategories;
+          delete parsed.menuItems;
+          delete parsed.modifierGroups;
+          delete parsed.modifierOptions;
+          delete parsed.itemVariants;
+          delete parsed.quickScreenIds;
+          delete parsed.staff;
+          delete parsed.tables;
+          delete parsed.sections;
+          delete parsed.eightySix;
+        }
+        useStore.setState(parsed);
         isApplyingRef.current = false;
       }
     } catch {}
 
-    // Apply config snapshot on every mount — the Zustand store always resets to
-    // seed data on page reload, so we must re-apply the snapshot regardless of
-    // whether sessionStorage thinks we've seen this version before.
+    // Apply config snapshot on every mount — only in mock mode
+    // In real mode, config comes from Supabase
+    if (!isMock) return;
     try {
       const snap = localStorage.getItem('rpos-config-snapshot');
       if (snap) {

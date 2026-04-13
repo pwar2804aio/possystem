@@ -132,7 +132,7 @@ export const useStore = create((set, get) => ({
 
   // ── Auth ──────────────────────────────────
   staff: null,
-  staffMembers: STAFF_SEED,
+  staffMembers: isMock ? STAFF_SEED : [],
   addStaffMember:    s    => set(st => ({ staffMembers: [...st.staffMembers, { ...s, id:`s-${Date.now()}` }] })),
   updateStaffMember: (id,patch) => set(st => ({ staffMembers: st.staffMembers.map(s => s.id===id ? {...s,...patch} : s) })),
   removeStaffMember: id  => set(st => ({ staffMembers: st.staffMembers.filter(s => s.id!==id) })),
@@ -259,11 +259,11 @@ export const useStore = create((set, get) => ({
   },
 
   // ── Registered POS terminals ───────────────────────────────────────────────
-  devices: [
+  devices: isMock ? [
     { id:'dev-1', label:'Counter 1', type:'counter', section:'main', status:'online', hardwareModel:'Sunmi T2s', ipAddress:'192.168.1.10' },
     { id:'dev-2', label:'Counter 2', type:'counter', section:'bar',  status:'offline',hardwareModel:'Sunmi T2s', ipAddress:'192.168.1.11' },
     { id:'dev-3', label:'Handheld 1',type:'handheld',section:'main', status:'online', hardwareModel:'Sunmi V2s', ipAddress:'192.168.1.20' },
-  ],
+  ] : [],
   addDevice: (device) => set(s => ({ devices:[...s.devices, { id:`dev-${Date.now()}`, status:'offline', ...device }] })),
   updateDevice: (id, patch) => set(s => ({ devices:s.devices.map(d=>d.id===id?{...d,...patch}:d) })),
   removeDevice: (id) => set(s => ({ devices:s.devices.filter(d=>d.id!==id) })),
@@ -362,7 +362,7 @@ export const useStore = create((set, get) => ({
 
   // ── Modifier groups — reusable paid option groups ─────────────────────────
   // These change the price. Assigned to items in the Product Builder.
-  modifierGroupDefs: [
+  modifierGroupDefs: isMock ? [
     // Options reference sub item IDs from MENU_ITEMS (type:'subitem')
     { id:'mgd-sides',        name:'Side choice',       min:1, max:1,
       options:[
@@ -396,7 +396,7 @@ export const useStore = create((set, get) => ({
         {id:'sub-almond',  name:'Almond milk',         price:0.5},
         {id:'sub-soy',     name:'Soy milk',            price:0.5},
       ]},
-  ],
+  ] : [],
   addModifierGroupDef: g => set(s => ({ modifierGroupDefs:[...s.modifierGroupDefs,{id:`mgd-${Date.now()}`,...g}] })),
   updateModifierGroupDef: (id,patch) => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
   updateModifierGroupOption: (groupId, optId, patch) => set(s => ({
@@ -447,10 +447,10 @@ export const useStore = create((set, get) => ({
   // Visibility:     { pos, kiosk, online, onlineDelivery }
   //
   // Quick Screen — list of item IDs shown on the ⚡ Quick tab, ordered
-  quickScreenIds: QUICK_IDS,
+  quickScreenIds: isMock ? QUICK_IDS : [],
   setQuickScreenIds: (ids) => set({ quickScreenIds: ids }),
 
-  menuItems: MENU_ITEMS.map((item, idx) => ({
+  menuItems: (isMock ? MENU_ITEMS : []).map((item, idx) => ({
     ...item,
     sortOrder: item.sortOrder ?? idx,  // assign sequential sortOrder if not set
     menuName:    item.menuName    || item.name,
@@ -587,7 +587,7 @@ export const useStore = create((set, get) => ({
   })),
 
   // ── Tables (source of truth for all orders) ──────────
-  tables: buildInitialTables(),
+  tables: isMock ? buildInitialTables() : [],
 
   // Helper to update a single table
   _updateTable: (id, patch) => set(s => ({ tables: s.tables.map(t => t.id===id ? { ...t, ...patch } : t) })),
@@ -1405,7 +1405,7 @@ export const useStore = create((set, get) => ({
   },
 
   // ── KDS ───────────────────────────────────
-  kdsTickets: INITIAL_KDS,
+  kdsTickets: isMock ? INITIAL_KDS : [],
   bumpTicket: id => {
     set(s => ({ kdsTickets: s.kdsTickets.filter(t => t.id !== id) }));
     import('../lib/db.js').then(({ bumpKDSTicket }) => bumpKDSTicket(id));
