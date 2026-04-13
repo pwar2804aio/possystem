@@ -199,6 +199,7 @@ export default function BackOfficeApp() {
           {section === 'reports'    && <BOReports />}
           {section === 'eod'        && <EODClose />}
           {section === 'locations'   && <MultiLocation />}
+          {section === 'admin'       && <CompanyAdmin />}
         </div>
       </div>
     </div>
