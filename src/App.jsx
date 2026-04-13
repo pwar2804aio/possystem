@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.7.2';
+const VERSION = '2.7.3';
 
 const CHANGELOG = [
   {
@@ -38,6 +38,10 @@ const CHANGELOG = [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
     ],
+  },
+  {
+    version: '2.7.3', date: 'Apr 2026', label: 'Fix: Supabase env vars explicitly baked into bundle',
+    changes: ['Updated vite.config.js to explicitly define all Supabase env vars at build time, bypassing Vercel build cache issues.'],
   },
   {
     version: '2.7.2', date: 'Apr 2026', label: 'Supabase: live connection active',
