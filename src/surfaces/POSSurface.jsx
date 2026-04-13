@@ -55,9 +55,8 @@ export default function POSSurface() {
   const MENU_ITEMS = useMemo(() => rawItems
     .filter(i => {
       if (i.type === 'subitem' && !i.soldAlone) return false;
-      if (activeCatIds && !activeCatIds.includes(i.cat) && !(i.cats||[]).some(c=>activeCatIds.includes(c))) return false;
       return true;
-    }) // filter by device menu + soldAlone
+    }) // filter soldAlone
     .map(i => ({
       ...i,
       name: i.menuName || i.name,

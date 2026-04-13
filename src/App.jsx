@@ -40,6 +40,10 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '2.7.9', date: 'Apr 2026', label: 'Fix: POS crash — activeCatIds was not defined',
+    changes: ['Fixed ReferenceError: activeCatIds is not defined — this variable was referenced in POSSurface but never declared, crashing the POS ordering screen on every load.'],
+  },
+  {
     version: '2.7.8', date: 'Apr 2026', label: 'Fix: store init crash resolved',
     changes: ['Fixed store initialization crash — _savedBO is now computed inside a single IIFE, eliminating the broken two-variable pattern that caused a white screen on load.'],
   },
