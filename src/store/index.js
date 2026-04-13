@@ -4,7 +4,17 @@ import { supabase, isMock, LOCATION_ID } from '../lib/supabase';
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 const sbUpsertMenu = async (menu) => {
   if (isMock) return;
-  await supabase.from('menus').upsert({ ...menu, location_id: LOCATION_ID, updated_at: new Date().toISOString() });
+  const { error } = await supabase.from('menus').upsert({
+    id: menu.id,
+    location_id: LOCATION_ID,
+    name: menu.name,
+    description: menu.description || '',
+    is_default: menu.isDefault || false,
+    is_active: menu.isActive !== false,
+    sort_order: menu.sortOrder || 0,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) console.error('[Supabase] menus upsert error:', error);
 };
 const sbDeleteMenu = async (id) => {
   if (isMock) return;
@@ -12,12 +22,19 @@ const sbDeleteMenu = async (id) => {
 };
 const sbUpsertCategory = async (cat) => {
   if (isMock) return;
-  await supabase.from('menu_categories').upsert({
-    id: cat.id, location_id: LOCATION_ID, menu_id: cat.menuId||null,
-    parent_id: cat.parentId||null, label: cat.label, icon: cat.icon||'🍽',
-    color: cat.color||'#3b82f6', accounting_group: cat.accountingGroup||'',
-    sort_order: cat.sortOrder||0, updated_at: new Date().toISOString()
+  const { error } = await supabase.from('menu_categories').upsert({
+    id: cat.id,
+    location_id: LOCATION_ID,
+    menu_id: cat.menuId || null,
+    parent_id: cat.parentId || null,
+    label: cat.label,
+    icon: cat.icon || '🍽',
+    color: cat.color || '#3b82f6',
+    accounting_group: cat.accountingGroup || '',
+    sort_order: cat.sortOrder || 0,
+    updated_at: new Date().toISOString(),
   });
+  if (error) console.error('[Supabase] menu_categories upsert error:', error);
 };
 const sbDeleteCategory = async (id) => {
   if (isMock) return;
