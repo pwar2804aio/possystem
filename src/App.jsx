@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.7.4';
+const VERSION = '2.7.5';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,13 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.7.5', date: 'Apr 2026', label: 'Supabase: menus load from database on startup',
+    changes: [
+      'Back office now reads menus and categories from Supabase on startup — not from localStorage seed.',
+      'Menus you create persist permanently across all page reloads and devices.',
     ],
   },
   {

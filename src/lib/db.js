@@ -11,6 +11,17 @@
 import { supabase, isMock, LOCATION_ID } from './supabase';
 
 // ── Menu ──────────────────────────────────────────────────────────────────────
+export const fetchMenus = async (locationId = LOCATION_ID) => {
+  if (isMock) return { data: null, error: null };
+  return supabase.from('menus').select('*').eq('location_id', locationId).order('sort_order');
+};
+
+export const fetchMenuCategories = async (locationId = LOCATION_ID) => {
+  if (isMock) return { data: null, error: null };
+  return supabase.from('menu_categories').select('*').eq('location_id', locationId).order('sort_order');
+};
+
+
 export const fetchMenuItems = async (locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
   return supabase
