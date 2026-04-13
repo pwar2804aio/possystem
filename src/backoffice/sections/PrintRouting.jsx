@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useStore } from '../../store';
 import { PRINTERS, PRODUCTION_CENTRES } from '../../data/seed';
+import { isMock } from '../../lib/supabase';
 
 export default function PrintRouting() {
   const { printJobs, showToast } = useStore();
-  const [printers, setPrinters] = useState(PRINTERS);
+  const [printers, setPrinters] = useState(isMock ? PRINTERS : []);
   const [routing, setRouting] = useState(() => {
     // centreId -> printerId mapping
     const m = {};

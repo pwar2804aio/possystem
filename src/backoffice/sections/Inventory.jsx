@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../../store';
 import { MENU_ITEMS as SEED_ITEMS } from '../../data/seed';
+import { isMock } from '../../lib/supabase';
 
 const STATUS_LEVELS = [
   { id:'ok',       label:'In stock',   color:'var(--grn)', bg:'var(--grn-d)', border:'var(--grn-b)', threshold:0.4 },
@@ -20,7 +21,7 @@ function getStatus(count) {
 
 export default function Inventory() {
   const { menuItems: storeItems, dailyCounts, setDailyCount, clearDailyCount, eightySixIds, toggle86, showToast, markBOChange , menuCategories } = useStore();
-  const MENU_ITEMS = storeItems || SEED_ITEMS;
+  const MENU_ITEMS = (isMock && (!storeItems || storeItems.length === 0)) ? SEED_ITEMS : (storeItems || []);
   const cats = (menuCategories||[]).filter(c => !c.isSpecial && !c.parentId).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0));
 
   const [catFilter, setCatFilter] = useState('all');

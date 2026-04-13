@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../../store';
+import { isMock } from '../../lib/supabase';
 
 const SURFACES = [
   { id:'tables', label:'Floor plan', icon:'⬚', desc:'Opens to the table layout view' },
@@ -49,7 +50,7 @@ const DEFAULT_PROFILES = [
 
 export default function DeviceProfiles() {
   const { showToast, devices, setDeviceConfig, markBOChange } = useStore();
-  const [profiles, setProfiles] = useState(DEFAULT_PROFILES);
+  const [profiles, setProfiles] = useState(isMock ? DEFAULT_PROFILES : []);
   const [editing, setEditing] = useState(null);
   const [showNew, setShowNew] = useState(false);
 
