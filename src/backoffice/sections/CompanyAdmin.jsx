@@ -75,17 +75,33 @@ export default function CompanyAdmin() {
   const createLocation = async () => {
     if (!form.locName?.trim()) return setError('Location name is required');
     setWorking(true); setError('');
-    const { error: err } = await supabase.from('locations').insert({
+    const { data: loc, error: err } = await supabase.from('locations').insert({
       org_id: selectedOrg.id,
       name: form.locName.trim(),
       address: form.locAddress?.trim() || '',
       timezone: form.locTz || 'Europe/London',
       currency: form.locCurrency || 'GBP',
       status: 'active',
+    }).select().single();
+    if (err) { setWorking(false); return setError(err.message); }
+
+    // If the current user has no location assigned yet, assign them to this new location
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('user_profiles').select('location_id').eq('id', user.id).single();
+      if (!profile?.location_id) {
+        await supabase.from('user_profiles').update({ location_id: loc.id }).eq('id', user.id);
+      }
+    }
+
+    // Create a subscription row for this location
+    await supabase.from('subscriptions').insert({
+      org_id: selectedOrg.id, location_id: loc.id,
+      plan: 'free', gmv_this_month: 0, billing_period_start: new Date().toISOString().slice(0,10),
     });
+
     setWorking(false);
-    if (err) return setError(err.message);
-    setSuccess(`✓ Location "${form.locName}" created`);
+    setSuccess(`✓ Location "${loc.name}" created`);
     setForm(f => ({ ...f, locName: '', locAddress: '' }));
     await loadLocations(selectedOrg.id);
     setTab('org-detail');

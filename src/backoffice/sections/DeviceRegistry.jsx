@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isMock, LOCATION_ID } from '../../lib/supabase';
+import { supabase, isMock } from '../../lib/supabase';
 
 const ADJECTIVES = ['APPLE','BAKER','CEDAR','DONUT','EMBER','FROST','GROVE','HONEY','IVORY','JAZZY'];
 const NOUNS      = ['STAR','MOON','PEAK','WAVE','GLOW','BIRD','SAGE','MINT','DUSK','BELL'];
@@ -28,6 +28,8 @@ const S = {
 export default function DeviceRegistry() {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [locationId, setLocationId] = useState(null);
+  const [locationName, setLocationName] = useState('');
   const [showPairFlow, setShowPairFlow] = useState(false);
   const [pairStep, setPairStep] = useState(1); // 1=config, 2=code
   const [newDevice, setNewDevice] = useState({ name: '', type: 'pos' });
@@ -35,22 +37,38 @@ export default function DeviceRegistry() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => { loadDevices(); }, []);
+  useEffect(() => { init(); }, []);
 
-  const loadDevices = async () => {
+  const init = async () => {
     setLoading(true);
     if (isMock) { setLoading(false); return; }
-    const { data } = await supabase.from('devices').select('*').eq('location_id', LOCATION_ID).order('created_at');
-    setDevices(data || []);
+    // Get the logged-in user's location from their profile
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+    const { data: profile } = await supabase.from('user_profiles').select('location_id, locations(name)').eq('id', user.id).single();
+    if (profile?.location_id) {
+      setLocationId(profile.location_id);
+      setLocationName(profile.locations?.name || '');
+      // Load devices for this location
+      const { data } = await supabase.from('devices').select('*').eq('location_id', profile.location_id).order('created_at');
+      setDevices(data || []);
+    }
     setLoading(false);
+  };
+
+  const loadDevices = async () => {
+    if (!locationId || isMock) return;
+    const { data } = await supabase.from('devices').select('*').eq('location_id', locationId).order('created_at');
+    setDevices(data || []);
   };
 
   const startPairing = async () => {
     if (!newDevice.name.trim()) return setError('Device name is required');
     setWorking(true); setError('');
     const code = genCode();
+    if (!locationId) return setError('No location assigned to your account. Create a location in Company Admin first.');
     const { data, error: err } = await supabase.from('devices').insert({
-      location_id: LOCATION_ID,
+      location_id: locationId,
       name: newDevice.name.trim(),
       type: newDevice.type,
       pairing_code: code,
@@ -182,7 +200,13 @@ export default function DeviceRegistry() {
           Registered devices ({devices.length})
         </div>
 
-        {loading && <div style={{ color: 'var(--t3)', fontSize: 13 }}>Loading…</div>}
+      {!loading && !locationId && !isMock && (
+        <div style={{ padding: '32px', textAlign: 'center', color: 'var(--t3)', fontSize: 14 }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>📍</div>
+          <div style={{ fontWeight: 700, color: 'var(--t2)', marginBottom: 8 }}>No location assigned to your account</div>
+          <div style={{ fontSize: 13 }}>Go to <strong>Company Admin → Create organisation → Add location</strong>, then assign your account to that location in Supabase → user_profiles.</div>
+        </div>
+      )}
 
         {!loading && devices.length === 0 && (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--t3)', fontSize: 13 }}>
