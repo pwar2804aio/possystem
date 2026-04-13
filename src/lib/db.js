@@ -15,7 +15,7 @@ export const fetchMenuItems = async (locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
   return supabase
     .from('menu_items')
-    .select(`*, modifier_groups(*, modifier_options(*)), item_variants(*)`)
+    .select('*')
     .eq('location_id', locationId)
     .eq('archived', false)
     .order('sort_order');

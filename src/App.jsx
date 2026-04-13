@@ -14,7 +14,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '2.7.0';
+const VERSION = '2.7.1';
 
 const CHANGELOG = [
   {
@@ -37,6 +37,13 @@ const CHANGELOG = [
     changes: [
       'CRITICAL FIX: clicking "Add to order" on modifiable items (Ribeye, Chicken supreme etc.) did nothing — buildDisplayName in ModifiersModal referenced selected which is only defined in the variant pick step, not the modifier step. ReferenceError was swallowed by React leaving the modal open.',
       'ModifiersModal buildDisplayName now uses only item name + instruction group selections (cooking preference etc.). Modifier rows (Side choice, Sauce) display on separate lines in the order panel, not in the name.',
+    ],
+  },
+  {
+    version: '2.7.1', date: 'Apr 2026', label: 'Fix: Supabase connection — force fresh build with env vars',
+    changes: [
+      'Triggered fresh Vercel build so VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and VITE_USE_MOCK env vars are baked into the bundle.',
+      'Fixed menu_items query — removed invalid embedded join that caused 400 errors on startup.',
     ],
   },
   {
@@ -83,6 +90,13 @@ const CHANGELOG = [
       'Both the Bar surface and POS surface now filter their category pills and item grids by the menu assigned to the device. A Bar terminal with the Bar menu only sees bar categories and bar items.',
       'The Menus tab in Menu Manager is where you build and manage named menus (Main menu, Bar menu, Lunch menu etc). Categories are assigned to menus via menuId.',
       'Falls back to showing all menus if no specific menu is assigned to the device profile.',
+    ],
+  },
+  {
+    version: '2.7.1', date: 'Apr 2026', label: 'Fix: Supabase connection — force fresh build with env vars',
+    changes: [
+      'Triggered fresh Vercel build so VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and VITE_USE_MOCK env vars are baked into the bundle.',
+      'Fixed menu_items query — removed invalid embedded join that caused 400 errors on startup.',
     ],
   },
   {
