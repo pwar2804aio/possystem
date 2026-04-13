@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { VERSION } from '../lib/version';
 import { supabase } from '../lib/supabase';
 
 export default function BOLogin({ onLogin }) {
@@ -104,6 +105,7 @@ export default function BOLogin({ onLogin }) {
 
         <div style={{ textAlign: 'center', marginTop: 24, fontSize: 12, color: 'var(--text-muted)' }}>
           Restaurant OS · Staff POS access is via PIN on the terminal
+          <div style={{ fontFamily:'monospace', fontSize:11, marginTop:6, color:'var(--text-muted)' }}>v{VERSION}</div>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase, isMock, LOCATION_ID } from '../lib/supabase';
+import { VERSION } from '../lib/version';
 
 export default function PairingScreen({ onPaired }) {
   const [code, setCode] = useState('');
@@ -112,7 +113,8 @@ export default function PairingScreen({ onPaired }) {
           {loading ? 'Pairing…' : 'Pair this device →'}
         </button>
 
-        <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 24, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 16, fontFamily: 'monospace' }}>v{VERSION}</div>
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 8, lineHeight: 1.6 }}>
           Generate a pairing code in your back office:<br />
           <strong>Back Office → Devices → Add terminal</strong>
         </div>

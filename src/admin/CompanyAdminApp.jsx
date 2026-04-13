@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { VERSION } from '../lib/version';
 import { supabase } from '../lib/supabase';
 import BOLogin from '../backoffice/BOLogin';
 
@@ -235,7 +236,7 @@ function AdminPanel({ authUser }) {
               <>
                 <div style={{ display:'flex', gap:10, marginBottom:24 }}>
                   <button onClick={() => setSection('new-location')} style={{ ...S.btn, ...S.btnPrimary }}>+ Add location</button>
-                  <button onClick={() => setSection('invite')} style={{ ...S.btn, ...S.btnGhost }}>✉ Invite owner</button>
+                  <button onClick={() => setSection('invite')} style={{ ...S.btn, ...S.btnGhost }}>👤 Create owner</button>
                 </div>
                 <div style={S.card}>
                   <div style={S.cardTitle}>📍 Locations</div>
@@ -302,16 +303,25 @@ function AdminPanel({ authUser }) {
 
             {section==='invite' && (
               <div style={S.card}>
-                <div style={S.cardTitle}>✉ Invite owner to {selectedOrg.name}</div>
+                <div style={S.cardTitle}>👤 Create owner account for {selectedOrg.name}</div>
                 <p style={{ fontSize:13, color:'#64748b', marginBottom:16, lineHeight:1.6 }}>
-                  When the owner sets their password they will see only <strong style={{ color:'#e2e8f0' }}>{selectedOrg.name}</strong> — completely clean, no demo data.
+                  Create a login for the restaurant owner. They can log in immediately — no email confirmation needed. They will see only <strong style={{ color:'#e2e8f0' }}>{selectedOrg.name}</strong> with no demo data.
                 </p>
                 <div style={S.row}>
                   <div><label style={S.label}>Owner email *</label><input type="email" style={S.input} placeholder="owner@restaurant.com" value={form.inviteEmail||''} onChange={e=>f('inviteEmail',e.target.value)} /></div>
                   <div><label style={S.label}>Full name</label><input style={S.input} placeholder="Sarah Smith" value={form.inviteName||''} onChange={e=>f('inviteName',e.target.value)} /></div>
                 </div>
+                <div style={S.row}>
+                  <div><label style={S.label}>Password for their account *</label><input type="password" style={S.input} placeholder="Min 8 characters" value={form.invitePassword||''} onChange={e=>f('invitePassword',e.target.value)} /></div>
+                  <div><label style={S.label}>Assign to location</label>
+                    <select style={S.input} value={form.inviteLocationId||''} onChange={e=>f('inviteLocationId',e.target.value)}>
+                      <option value="">First location (auto)</option>
+                      {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </div>
+                </div>
                 <div style={{ display:'flex', gap:10 }}>
-                  <button onClick={inviteOwner} style={{ ...S.btn, ...S.btnPrimary }}>Show invite instructions →</button>
+                  <button onClick={createOwner} disabled={working} style={{ ...S.btn, ...S.btnPrimary }}>{working?'Creating account…':'Create owner account →'}</button>
                   <button onClick={() => setSection('org-detail')} style={{ ...S.btn, ...S.btnGhost }}>Cancel</button>
                 </div>
               </div>

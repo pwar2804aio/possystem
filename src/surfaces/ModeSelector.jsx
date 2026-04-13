@@ -29,7 +29,8 @@ export default function ModeSelector({ onSelectPOS, onSelectBackOffice, onSelect
           </button>
         </div>
 
-        <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 16 }}>
+        <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 20, fontFamily: 'monospace' }}>v{VERSION}</div>
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 8 }}>
           This choice is saved to this device · <button onClick={() => { localStorage.removeItem('rpos-device-mode'); localStorage.removeItem('rpos-device'); window.location.reload(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t3)', fontSize: 12, textDecoration: 'underline', padding: 0 }}>reset</button>
         </div>
       </div>
@@ -57,3 +58,4 @@ function DevCard({ icon, title, desc, accent, onClick }) {
 
 // Need useState
 import { useState } from 'react';
+import { VERSION } from '../lib/version';
