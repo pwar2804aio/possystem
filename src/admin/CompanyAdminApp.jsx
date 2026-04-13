@@ -187,7 +187,7 @@ function AdminPanel({ authUser }) {
         <div style={{ padding:'0 12px' }}>
           <div style={{ fontSize:11, color:'#475569', padding:'0 6px', marginBottom:6 }}>{authUser.email}</div>
           <button onClick={() => supabase.auth.signOut()} style={{ ...S.btn, ...S.btnGhost, width:'100%', fontSize:12 }}>Sign out</button>
-          <button onClick={() => { localStorage.removeItem('rpos-device-mode'); window.location.reload(); }}
+          <button onClick={() => { localStorage.removeItem('rpos-device-mode'); window.location.href = '/'; }}
             style={{ width:'100%', padding:'6px', background:'none', border:'none', cursor:'pointer', fontSize:11, color:'#475569', marginTop:4, fontFamily:'inherit' }}>
             ← Switch device mode
           </button>

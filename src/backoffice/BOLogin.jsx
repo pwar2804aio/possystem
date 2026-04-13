@@ -67,7 +67,7 @@ export default function BOLogin({ onLogin }) {
 
         {/* Mode switcher */}
         <button
-          onClick={() => { localStorage.removeItem('rpos-device-mode'); localStorage.removeItem('rpos-device'); window.location.reload(); }}
+          onClick={() => { localStorage.removeItem('rpos-device-mode'); window.location.href = '/'; }}
           style={{ background: 'none', border: '1px solid #2d3148', borderRadius: 8, padding: '8px 14px', color: '#475569', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
           ← Change device mode
         </button>

@@ -54,7 +54,7 @@ export default function ModeSelector({ onSelectPOS, onSelectBackOffice, onSelect
           desc="A till, counter screen, or handheld used by staff to take orders and process payments."
           note="Requires a pairing code from Back Office"
           accent="#d4881c"
-          onClick={onSelectPOS}
+          href='?mode=pos' onClick={onSelectPOS}
         />
         <Card
           icon="🏢"

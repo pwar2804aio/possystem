@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.0.6';
+const VERSION = '3.0.7';
 
 const CHANGELOG = [
   {
@@ -868,16 +868,23 @@ export default function App() {
   }, [theme]);
 
   // ── Device mode selection ─────────────────────────────────────────────
-  // On first load, ask what this device is used for (POS or Back Office)
-  // Stored in localStorage so the choice persists across page reloads
-  const deviceMode = isMock ? 'pos' : (localStorage.getItem('rpos-device-mode') || null);
+  // Priority: URL ?mode=X param > localStorage > first-visit selector
+  // This lets users bookmark /app?mode=pos, /app?mode=office, /app?mode=admin
+  const urlMode = new URLSearchParams(window.location.search).get('mode');
+  const storedMode = localStorage.getItem('rpos-device-mode');
+  const deviceMode = isMock ? 'pos' : (urlMode || storedMode || null);
+
+  // If URL param set, save to localStorage so it persists
+  if (urlMode && urlMode !== storedMode) {
+    localStorage.setItem('rpos-device-mode', urlMode);
+  }
 
   // First visit — ask what this device is for
   if (!deviceMode) return (
     <ModeSelector
-      onSelectPOS={() => { localStorage.setItem('rpos-device-mode', 'pos'); window.location.reload(); }}
-      onSelectBackOffice={() => { localStorage.setItem('rpos-device-mode', 'backoffice'); window.location.reload(); }}
-      onSelectAdmin={() => { localStorage.setItem('rpos-device-mode', 'admin'); window.location.reload(); }}
+      onSelectPOS={() => { localStorage.setItem('rpos-device-mode', 'pos'); window.location.href = '?mode=pos'; }}
+      onSelectBackOffice={() => { localStorage.setItem('rpos-device-mode', 'backoffice'); window.location.href = '?mode=office'; }}
+      onSelectAdmin={() => { localStorage.setItem('rpos-device-mode', 'admin'); window.location.href = '?mode=admin'; }}
     />
   );
 
@@ -885,7 +892,7 @@ export default function App() {
   if (deviceMode === 'admin') return <CompanyAdminApp />;
 
   // Back office mode — go to email login (no pairing needed)
-  if (deviceMode === 'backoffice') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
+  if (deviceMode === 'backoffice' || deviceMode === 'office') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
 
   // POS mode — check if paired to a location
   const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
@@ -1125,7 +1132,7 @@ function Sidebar({ surface, setSurface }) {
       </button>
 
       {/* Back Office button */}
-      <button onClick={() => { localStorage.setItem('rpos-device-mode', 'backoffice'); window.location.reload(); }} title="Back Office" style={{
+      <button onClick={() => { window.location.href = "?mode=office"; }} title="Back Office" style={{
         width:46, height:46, borderRadius:10, cursor:'pointer',
         display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
         background:'transparent', border:'1px solid transparent',
