@@ -34,6 +34,7 @@ export default function BackOfficeApp() {
   const [authUser, setAuthUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(isMock);
   const [section, setSection] = useState('overview');
+  const [orgCtx, setOrgCtx] = useState(null); // { orgName, locationName, locationId, orgId, role }
 
   // Check Supabase session on mount
   useEffect(() => {
@@ -47,6 +48,27 @@ export default function BackOfficeApp() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // Load org/location context once user is known
+  useEffect(() => {
+    if (!authUser || isMock) return;
+    (async () => {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role, org_id, location_id, organisations(name), locations(name)')
+        .eq('id', authUser.id)
+        .single();
+      if (profile) {
+        setOrgCtx({
+          role: profile.role,
+          orgId: profile.org_id,
+          orgName: profile.organisations?.name || 'Restaurant OS',
+          locationId: profile.location_id,
+          locationName: profile.locations?.name || null,
+        });
+      }
+    })();
+  }, [authUser]);
 
   // Show spinner while checking session
   if (!authChecked) return (
@@ -78,10 +100,14 @@ export default function BackOfficeApp() {
               background:'var(--acc)', display:'flex',
               alignItems:'center', justifyContent:'center',
               fontSize:16, fontWeight:800, color:'#0b0c10', flexShrink:0,
-            }}>R</div>
+            }}>{orgCtx?.orgName?.[0] || 'R'}</div>
             <div>
-              <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>Restaurant OS</div>
-              <div style={{ fontSize:10, color:'var(--acc)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase' }}>Back Office</div>
+              <div style={{ fontSize:13, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>
+                {orgCtx?.orgName || 'Restaurant OS'}
+              </div>
+              <div style={{ fontSize:10, color:'var(--acc)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase' }}>
+                {orgCtx?.locationName || 'Back Office'}
+              </div>
             </div>
           </div>
         </div>
@@ -197,7 +223,7 @@ export default function BackOfficeApp() {
 
         {/* Sections */}
         <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
-          {section === 'overview'   && <BOOverview setSection={setSection} />}
+          {section === 'overview'   && <BOOverview setSection={setSection} orgCtx={orgCtx} />}
           {section === 'menu'       && <MenuManager />}
           {section === 'floorplan'  && <FloorPlanBuilder />}
           {section === 'inventory'  && <Inventory />}
@@ -294,7 +320,7 @@ function PushToPOSButton() {
     </button>
   );
 }
-function BOOverview({ setSection }) {
+function BOOverview({ setSection, orgCtx }) {
   const { closedChecks, tables, devices, staff: currentStaff } = useStore();
 
   const revenue     = closedChecks.reduce((s, c) => s + c.total, 0);
@@ -321,7 +347,18 @@ function BOOverview({ setSection }) {
   return (
     <div style={{ flex:1, overflowY:'auto', padding:28 }}>
       <SupabaseSetup />
+
+      {/* No location warning */}
+      {!orgCtx?.locationId && !isMock && (
+        <div style={{ padding:'14px 18px', borderRadius:10, background:'#fef9c3', border:'1px solid #fde047', marginBottom:20, fontSize:13 }}>
+          <strong>⚠️ No location assigned to your account.</strong> Go to <button onClick={() => setSection('admin')} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--acc)', fontWeight:700, fontSize:13, padding:0, textDecoration:'underline' }}>Company Admin</button> → create an organisation and location first.
+        </div>
+      )}
+
       <div style={{ marginBottom:28 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--acc)', letterSpacing:'.08em', textTransform:'uppercase', marginBottom:4 }}>
+          {orgCtx?.locationName ? `${orgCtx.orgName} · ${orgCtx.locationName}` : orgCtx?.orgName || 'Restaurant OS'}
+        </div>
         <div style={{ fontSize:24, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em', marginBottom:4 }}>
           Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}
           {currentStaff?.name ? `, ${currentStaff.name}` : ''}
