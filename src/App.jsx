@@ -40,6 +40,16 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '2.8.0', date: 'Apr 2026', label: 'Auth: Back office login with Supabase Auth',
+    changes: [
+      'Back office is now gated behind email + password login via Supabase Auth.',
+      'Super admin account (peter@posup.co.uk) created and linked to Restaurant OS Internal org.',
+      'Multi-tenant schema live: organisations, locations, user_profiles, subscriptions, location_features, devices tables created.',
+      'Sign out button added to back office sidebar.',
+      'GMV-based plan calculator function deployed to Supabase.',
+    ],
+  },
+  {
     version: '2.7.9', date: 'Apr 2026', label: 'Fix: POS crash — activeCatIds was not defined',
     changes: ['Fixed ReferenceError: activeCatIds is not defined — this variable was referenced in POSSurface but never declared, crashing the POS ordering screen on every load.'],
   },

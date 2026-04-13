@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { broadcastConfigPush } from '../sync/SyncBridge';
+import { supabase, isMock } from '../lib/supabase';
+import BOLogin from './BOLogin';
 import MenuManager from './sections/MenuManager';
 import FloorPlanBuilder from './sections/FloorPlanBuilder';
 import DeviceProfiles from './sections/DeviceProfiles';
@@ -116,10 +118,21 @@ export default function BackOfficeApp() {
             fontWeight:600, border:'1px solid var(--bdr)',
             fontFamily:'inherit', background:'var(--bg3)',
             color:'var(--t2)', display:'flex', alignItems:'center', gap:8,
-            transition:'all .1s',
+            transition:'all .1s', marginBottom:6,
           }}>
             <span style={{ fontSize:16 }}>←</span> Back to POS
           </button>
+          {authUser && !isMock && (
+            <button onClick={() => supabase.auth.signOut()} style={{
+              width:'100%', padding:'8px 10px', borderRadius:9,
+              cursor:'pointer', textAlign:'left', fontSize:12,
+              fontWeight:600, border:'1px solid var(--bdr)',
+              fontFamily:'inherit', background:'transparent',
+              color:'var(--t4)', display:'flex', alignItems:'center', gap:8,
+            }}>
+              <span>⎋</span> Sign out
+            </button>
+          )}
         </div>
       </div>
 
