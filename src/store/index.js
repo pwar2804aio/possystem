@@ -1,12 +1,14 @@
 import { create } from 'zustand';
-import { supabase, isMock, LOCATION_ID } from '../lib/supabase';
+import { supabase, isMock, getLocationId } from '../lib/supabase';
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 const sbUpsertMenu = async (menu) => {
   if (isMock) return;
+  const locationId = await getLocationId();
+  if (!locationId) return console.warn('[Supabase] no location ID — menu not saved');
   const { error } = await supabase.from('menus').upsert({
     id: menu.id,
-    location_id: LOCATION_ID,
+    location_id: locationId,
     name: menu.name,
     description: menu.description || '',
     is_default: menu.isDefault || false,
@@ -22,9 +24,11 @@ const sbDeleteMenu = async (id) => {
 };
 const sbUpsertCategory = async (cat) => {
   if (isMock) return;
+  const locationId = await getLocationId();
+  if (!locationId) return console.warn('[Supabase] no location ID — category not saved');
   const { error } = await supabase.from('menu_categories').upsert({
     id: cat.id,
-    location_id: LOCATION_ID,
+    location_id: locationId,
     menu_id: cat.menuId || null,
     parent_id: cat.parentId || null,
     label: cat.label,
@@ -42,8 +46,10 @@ const sbDeleteCategory = async (id) => {
 };
 const sbUpsertMenuItem = async (item) => {
   if (isMock) return;
+  const locationId = await getLocationId();
+  if (!locationId) return console.warn('[Supabase] no location ID — item not saved');
   await supabase.from('menu_items').upsert({
-    id: item.id, location_id: LOCATION_ID, name: item.name,
+    id: item.id, location_id: locationId, name: item.name,
     menu_name: item.menuName||item.name, receipt_name: item.receiptName||item.name,
     kitchen_name: item.kitchenName||item.name, description: item.description||'',
     type: item.type||'simple', cat: item.cat||null, cats: item.cats||[],
@@ -125,8 +131,13 @@ export function getCollectionSlots() {
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
-// Restore back-office config (menus/categories) from localStorage on load
-const _savedBO = (() => { try { return JSON.parse(localStorage.getItem('rpos-bo-config')||'{}'); } catch { return {}; } })();
+// Restore back-office config from localStorage — ONLY in mock mode
+// In real mode, data comes from Supabase (loaded in BackOfficeApp on mount)
+const _isMockMode = import.meta.env.VITE_USE_MOCK === 'true';
+const _savedBO = (() => {
+  if (!_isMockMode) return {}; // real mode: always load from Supabase
+  try { return JSON.parse(localStorage.getItem('rpos-bo-config')||'{}'); } catch { return {}; }
+})();
 
 export const useStore = create((set, get) => ({
 

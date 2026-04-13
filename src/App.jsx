@@ -928,7 +928,17 @@ function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme, syncPulse 
   const { deviceConfig, setSurface, orderQueue, tables, tabs } = useStore();
   const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
   const terminalName = deviceConfig?.terminalName || pairedDevice?.name || 'POS';
-  const profileName  = deviceConfig?.profileName;
+  // Resolve profile name from paired device's profileId
+  const storedProfiles = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null'); } catch { return null; } })();
+  const DEFAULT_PROFILES = [
+    { id:'prof-1', name:'Main counter' },
+    { id:'prof-2', name:'Bar terminal' },
+    { id:'prof-3', name:'Server handheld' },
+  ];
+  const allProfiles = storedProfiles || DEFAULT_PROFILES;
+  const profileName = deviceConfig?.profileName
+    || allProfiles.find(p => p.id === pairedDevice?.profileId)?.name
+    || null;
 
   // Active order count for Orders Hub button
   const activeOrders = (orderQueue?.filter(o => !['collected','paid'].includes(o.status)).length || 0)
