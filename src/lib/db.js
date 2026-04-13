@@ -8,22 +8,28 @@
  * All queries are scoped to a location_id for multi-tenancy.
  */
 
-import { supabase, isMock, LOCATION_ID } from './supabase';
+import { supabase, isMock, getLocationId } from './supabase';
 
 // ── Menu ──────────────────────────────────────────────────────────────────────
-export const fetchMenus = async (locationId = LOCATION_ID) => {
+export const fetchMenus = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId();
+  if (!locationId) return { data: null, error: new Error('No location') };
   return supabase.from('menus').select('*').eq('location_id', locationId).order('sort_order');
 };
 
-export const fetchMenuCategories = async (locationId = LOCATION_ID) => {
+export const fetchMenuCategories = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId();
+  if (!locationId) return { data: null, error: new Error('No location') };
   return supabase.from('menu_categories').select('*').eq('location_id', locationId).order('sort_order');
 };
 
 
-export const fetchMenuItems = async (locationId = LOCATION_ID) => {
+export const fetchMenuItems = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId();
+  if (!locationId) return { data: null, error: new Error('No location') };
   return supabase
     .from('menu_items')
     .select('*')
@@ -34,6 +40,8 @@ export const fetchMenuItems = async (locationId = LOCATION_ID) => {
 
 export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId();
+  if (!locationId) return { data: null, error: new Error('No location') };
   return supabase.from('menu_items').upsert({ ...item, location_id: locationId, updated_at: new Date().toISOString() });
 };
 
@@ -43,8 +51,10 @@ export const archiveMenuItem = async (id) => {
 };
 
 // ── Floor plan ────────────────────────────────────────────────────────────────
-export const fetchFloorPlan = async (locationId = LOCATION_ID) => {
+export const fetchFloorPlan = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId();
+  if (!locationId) return { data: null, error: new Error('No location') };
   const [tables, sections] = await Promise.all([
     supabase.from('floor_tables').select('*').eq('location_id', locationId).order('sort_order'),
     supabase.from('sections').select('*').eq('location_id', locationId).order('sort_order'),
@@ -54,6 +64,8 @@ export const fetchFloorPlan = async (locationId = LOCATION_ID) => {
 
 export const upsertFloorTable = async (table, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId();
+  if (!locationId) return { data: null, error: new Error('No location') };
   return supabase.from('floor_tables').upsert({ ...table, location_id: locationId });
 };
 
@@ -63,7 +75,7 @@ export const deleteFloorTable = async (id) => {
 };
 
 // ── 86 list ───────────────────────────────────────────────────────────────────
-export const fetch86List = async (locationId = LOCATION_ID) => {
+export const fetch86List = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
   return supabase.from('eighty_six').select('item_id').eq('location_id', locationId);
 };
@@ -77,7 +89,7 @@ export const toggle86DB = async (itemId, is86, locationId = LOCATION_ID) => {
 };
 
 // ── KDS ───────────────────────────────────────────────────────────────────────
-export const fetchKDSTickets = async (locationId = LOCATION_ID) => {
+export const fetchKDSTickets = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
   return supabase
     .from('kds_tickets')
@@ -119,7 +131,7 @@ export const insertConfigPush = async (push, locationId = LOCATION_ID) => {
   return supabase.from('config_pushes').insert({ ...push, location_id: locationId });
 };
 
-export const fetchLatestConfigPush = async (locationId = LOCATION_ID) => {
+export const fetchLatestConfigPush = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
   return supabase
     .from('config_pushes')
@@ -131,7 +143,7 @@ export const fetchLatestConfigPush = async (locationId = LOCATION_ID) => {
 };
 
 // ── Staff ─────────────────────────────────────────────────────────────────────
-export const fetchStaff = async (locationId = LOCATION_ID) => {
+export const fetchStaff = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
   return supabase
     .from('staff_locations')
@@ -145,7 +157,7 @@ export const updateDeviceHeartbeat = async (deviceId) => {
   return supabase.from('devices').update({ status: 'online', last_seen: new Date().toISOString() }).eq('id', deviceId);
 };
 
-export const fetchDevices = async (locationId = LOCATION_ID) => {
+export const fetchDevices = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
   return supabase.from('devices').select('*, device_profiles(*)').eq('location_id', locationId);
 };

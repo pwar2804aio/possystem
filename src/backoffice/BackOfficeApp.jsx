@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { broadcastConfigPush } from '../sync/SyncBridge';
-import { supabase, isMock } from '../lib/supabase';
+import { supabase, isMock, setResolvedLocationId, clearResolvedLocationId } from '../lib/supabase';
 import BOLogin from './BOLogin';
 import MenuManager from './sections/MenuManager';
 import FloorPlanBuilder from './sections/FloorPlanBuilder';
@@ -65,9 +65,32 @@ export default function BackOfficeApp() {
           locationId: profile.location_id,
           locationName: profile.locations?.name || null,
         });
+        if (profile.location_id) {
+          setResolvedLocationId(profile.location_id);
+          // Load all location data from Supabase
+          loadLocationData(profile.location_id);
+        }
       }
     })();
   }, [authUser]);
+
+  const loadLocationData = async (locationId) => {
+    if (!locationId) return;
+    const { fetchMenus, fetchMenuCategories, fetchMenuItems, fetchFloorPlan } = await import('../lib/db.js');
+    const [menusRes, catsRes, itemsRes, floorRes] = await Promise.all([
+      fetchMenus(locationId),
+      fetchMenuCategories(locationId),
+      fetchMenuItems(locationId),
+      fetchFloorPlan(locationId),
+    ]);
+    const { useStore } = await import('../store/index.js');
+    const patch = {};
+    if (menusRes.data?.length)   patch.menus          = menusRes.data;
+    if (catsRes.data?.length)    patch.menuCategories  = catsRes.data;
+    if (itemsRes.data?.length)   patch.menuItems       = itemsRes.data;
+    if (floorRes.data?.tables?.length)   patch.tables  = floorRes.data.tables;
+    if (Object.keys(patch).length) useStore.setState(patch);
+  };
 
   // Show spinner while checking session
   if (!authChecked) return (
@@ -172,7 +195,7 @@ export default function BackOfficeApp() {
             <span style={{ fontSize:16 }}>←</span> Back to POS
           </button>
           {authUser && !isMock && (
-            <button onClick={() => supabase.auth.signOut()} style={{
+            <button onClick={() => { clearResolvedLocationId(); supabase.auth.signOut(); }} style={{
               width:'100%', padding:'8px 10px', borderRadius:9,
               cursor:'pointer', textAlign:'left', fontSize:12,
               fontWeight:600, border:'1px solid var(--bdr)',
@@ -209,6 +232,11 @@ export default function BackOfficeApp() {
             {NAV.find(n => n.id === section)?.label}
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            {/* Back to POS — top bar shortcut */}
+            <button onClick={() => { localStorage.setItem('rpos-device-mode', 'pos'); window.location.reload(); }}
+              style={{ padding:'6px 14px', borderRadius:8, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:6 }}>
+              ← POS
+            </button>
             {/* Push to POS button */}
             <PushToPOSButton />
             <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'var(--t3)' }}>

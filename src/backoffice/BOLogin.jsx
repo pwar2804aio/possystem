@@ -7,6 +7,7 @@ export default function BOLogin({ onLogin }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [remember, setRemember] = useState(true);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -78,6 +79,14 @@ export default function BOLogin({ onLogin }) {
                 boxSizing: 'border-box',
               }}
             />
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+            <input type="checkbox" id="remember" checked={remember} onChange={e=>setRemember(e.target.checked)}
+              style={{ width:15, height:15, cursor:'pointer', accentColor:'var(--accent)' }} />
+            <label htmlFor="remember" style={{ fontSize:13, color:'var(--text-secondary)', cursor:'pointer' }}>
+              Keep me logged in
+            </label>
           </div>
 
           {error && (
