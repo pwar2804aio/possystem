@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
+import { supabase, isMock } from '../../lib/supabase';
 
 const ROLES = ['Manager','Server','Bartender','Cashier','Kitchen'];
 const ROLE_COLORS = { Manager:'#e8a020', Server:'#3b82f6', Bartender:'#22c55e', Cashier:'#a855f7', Kitchen:'#ef4444' };
@@ -28,6 +29,41 @@ function randomColor() {
 
 export default function StaffManager() {
   const { staffMembers, addStaffMember, updateStaffMember, removeStaffMember, markBOChange, showToast } = useStore();
+
+  // Load staff from Supabase on mount (real mode only)
+  useEffect(() => {
+    if (isMock) return;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from('user_profiles').select('org_id, location_id').eq('id', user.id).single();
+      if (!profile?.location_id) return;
+      const { data: rows } = await supabase.from('staff_members').select('*').eq('location_id', profile.location_id).eq('active', true);
+      if (rows?.length) {
+        // Replace store staff with Supabase data
+        useStore.setState({ staffMembers: rows.map(r => ({
+          id: r.id, name: r.name, role: r.role, pin: r.pin,
+          color: r.color || '#3b82f6', initials: r.initials || r.name.slice(0,2).toUpperCase(),
+          permissions: [], active: r.active,
+        })) });
+      }
+    })();
+  }, []);
+
+  const saveStaffToSupabase = async (member, locationId, orgId) => {
+    await supabase.from('staff_members').upsert({
+      id: member.id.startsWith('s-') ? undefined : member.id, // let Supabase generate UUID for new records
+      location_id: locationId, org_id: orgId,
+      name: member.name, role: member.role, pin: member.pin,
+      color: member.color, initials: member.initials, active: true,
+    }, { onConflict: 'id' });
+  };
+
+  const deleteStaffFromSupabase = async (id) => {
+    if (!id.startsWith('s-')) { // only delete real UUIDs
+      await supabase.from('staff_members').update({ active: false }).eq('id', id);
+    }
+  };
   const [selId, setSelId]     = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showPin, setShowPin] = useState(null);
@@ -44,7 +80,23 @@ export default function StaffManager() {
   const addMember = () => {
     if (!newForm.name.trim()) return;
     const perms = newForm.permissions.length ? newForm.permissions : ROLE_DEFAULTS[newForm.role] || [];
-    addStaffMember({ ...newForm, name:newForm.name.trim(), permissions:perms, initials:initials(newForm.name) });
+    const member = { ...newForm, name:newForm.name.trim(), permissions:perms, initials:initials(newForm.name) };
+    addStaffMember(member);
+    // Save to Supabase
+    if (!isMock) {
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase.from('user_profiles').select('org_id, location_id').eq('id', user.id).single();
+        if (profile?.location_id) {
+          await supabase.from('staff_members').insert({
+            location_id: profile.location_id, org_id: profile.org_id,
+            name: member.name, role: member.role, pin: member.pin,
+            color: member.color || '#3b82f6', initials: member.initials, active: true,
+          });
+        }
+      })();
+    }
     markBOChange();
     showToast(`${newForm.name} added`, 'success');
     setShowAdd(false);
@@ -53,6 +105,9 @@ export default function StaffManager() {
 
   const deleteMember = (id) => {
     removeStaffMember(id);
+    if (!isMock && !String(id).startsWith('s-')) {
+      supabase.from('staff_members').update({ active: false }).eq('id', id);
+    }
     markBOChange();
     if (selId === id) setSelId(null);
     showToast('Staff member removed', 'info');
