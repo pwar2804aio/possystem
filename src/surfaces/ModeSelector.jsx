@@ -1,61 +1,94 @@
-export default function ModeSelector({ onSelectPOS, onSelectBackOffice, onSelectAdmin }) {
-  return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg)', fontFamily: 'inherit',
-    }}>
-      <div style={{ width: 560, textAlign: 'center' }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: 18, background: 'var(--acc)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 32, fontWeight: 800, color: '#fff', margin: '0 auto 20px',
-        }}>R</div>
-        <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--t1)', marginBottom: 8 }}>Restaurant OS</div>
-        <div style={{ fontSize: 15, color: 'var(--t3)', marginBottom: 48 }}>What is this device being used for?</div>
+import { useState } from 'react';
+import { VERSION } from '../lib/version';
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-          <DevCard icon="🖥" title="POS Terminal" desc="A till, counter screen or handheld device used by staff to take orders" accent="var(--acc)" onClick={onSelectPOS} />
-          <DevCard icon="🏢" title="Back Office" desc="A manager or owner's browser to manage menus, staff, reports and settings" accent="#6366f1" onClick={onSelectBackOffice} />
-        </div>
-
-        {/* Company Admin — separated, subtle */}
-        <div style={{ borderTop: '1px solid var(--bdr)', paddingTop: 16, marginTop: 4 }}>
-          <button onClick={onSelectAdmin} style={{
-            background: 'none', border: '1px solid var(--bdr)', borderRadius: 10,
-            padding: '10px 20px', cursor: 'pointer', fontFamily: 'inherit',
-            fontSize: 13, color: 'var(--t3)', display: 'inline-flex', alignItems: 'center', gap: 8,
-          }}>
-            🔐 Restaurant OS Internal — Company Admin
-          </button>
-        </div>
-
-        <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 20, fontFamily: 'monospace' }}>v{VERSION}</div>
-        <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 8 }}>
-          This choice is saved to this device · <button onClick={() => { localStorage.removeItem('rpos-device-mode'); localStorage.removeItem('rpos-device'); window.location.reload(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t3)', fontSize: 12, textDecoration: 'underline', padding: 0 }}>reset</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DevCard({ icon, title, desc, accent, onClick }) {
+function Card({ icon, title, desc, note, accent, onClick }) {
   const [hover, setHover] = useState(false);
   return (
     <button onClick={onClick}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
-        background: hover ? 'var(--bg1)' : 'var(--bg1)',
-        border: `2px solid ${hover ? accent : 'var(--bdr)'}`,
-        borderRadius: 16, padding: '32px 20px', cursor: 'pointer',
-        textAlign: 'center', fontFamily: 'inherit', transition: 'all .15s',
+        background: hover ? '#1e2235' : '#161926',
+        border: `2px solid ${hover ? accent : '#2d3148'}`,
+        borderRadius: 16, padding: '32px 28px',
+        cursor: 'pointer', textAlign: 'left',
+        fontFamily: 'inherit', transition: 'all .18s',
+        display: 'flex', flexDirection: 'column', gap: 10,
       }}>
-      <div style={{ fontSize: 40, marginBottom: 12 }}>{icon}</div>
-      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)', marginBottom: 6 }}>{title}</div>
-      <div style={{ fontSize: 13, color: 'var(--t3)', lineHeight: 1.5 }}>{desc}</div>
+      <div style={{ fontSize: 36, lineHeight: 1 }}>{icon}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: '#f1f5f9' }}>{title}</div>
+      <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>{desc}</div>
+      {note && <div style={{ fontSize: 12, color: accent, fontWeight: 600, marginTop: 4 }}>{note}</div>}
     </button>
   );
 }
 
-// Need useState
-import { useState } from 'react';
-import { VERSION } from '../lib/version';
+export default function ModeSelector({ onSelectPOS, onSelectBackOffice, onSelectAdmin }) {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#0f1117',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'inherit', padding: 40,
+    }}>
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: 56 }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: 16,
+          background: 'linear-gradient(135deg, #d4881c, #e8a020)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 28, fontWeight: 800, color: '#fff',
+          margin: '0 auto 20px',
+          boxShadow: '0 8px 30px rgba(212,136,28,0.25)',
+        }}>R</div>
+        <div style={{ fontSize: 32, fontWeight: 800, color: '#f1f5f9', marginBottom: 10 }}>Restaurant OS</div>
+        <div style={{ fontSize: 16, color: '#64748b' }}>What is this device being used for?</div>
+      </div>
+
+      {/* Main two cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, width: '100%', maxWidth: 680, marginBottom: 20 }}>
+        <Card
+          icon="🖥"
+          title="POS Terminal"
+          desc="A till, counter screen, or handheld used by staff to take orders and process payments."
+          note="Requires a pairing code from Back Office"
+          accent="#d4881c"
+          onClick={onSelectPOS}
+        />
+        <Card
+          icon="🏢"
+          title="Back Office"
+          desc="For owners and managers — menu builder, staff, reports, device management and settings."
+          note="Requires a Restaurant OS account"
+          accent="#6366f1"
+          onClick={onSelectBackOffice}
+        />
+      </div>
+
+      {/* Internal admin — subtle */}
+      <div style={{ width: '100%', maxWidth: 680 }}>
+        <button
+          onClick={onSelectAdmin}
+          style={{
+            width: '100%', padding: '14px 20px',
+            background: 'transparent', border: '1px solid #2d3148',
+            borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', gap: 12,
+            transition: 'all .15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#1a1d27'; e.currentTarget.style.borderColor = '#6366f1'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = '#2d3148'; }}
+        >
+          <span style={{ fontSize: 18 }}>🔐</span>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>Restaurant OS Internal — Company Admin</div>
+            <div style={{ fontSize: 12, color: '#334155' }}>Your internal tool for creating and managing restaurants on the platform</div>
+          </div>
+        </button>
+      </div>
+
+      <div style={{ marginTop: 28, fontSize: 11, color: '#334155', fontFamily: 'monospace' }}>v{VERSION} · Choice saved to this device</div>
+    </div>
+  );
+}
