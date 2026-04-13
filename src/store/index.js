@@ -126,7 +126,12 @@ export function getCollectionSlots() {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 // Restore back-office config (menus/categories) from localStorage on load
-const _savedBO = (() => { try { return JSON.parse(localStorage.getItem('rpos-bo-config')||'{}'); } catch { return {}; } })();
+const _rawBO = (() => { try { return JSON.parse(localStorage.getItem('rpos-bo-config')||'{}'); } catch { return {}; } })();
+// Only use saved data if it actually contains entries — never boot with empty menus/categories
+const _savedBO = {
+  menus: (_rawBO.menus && _rawBO.menus.length > 0) ? _rawBO.menus : null,
+  menuCategories: (_rawBO.menuCategories && _rawBO.menuCategories.length > 0) ? _rawBO.menuCategories : null,
+};
 
 export const useStore = create((set, get) => ({
 
