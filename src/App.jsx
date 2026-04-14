@@ -20,7 +20,7 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.22';
+const VERSION = '3.5.23';
 
 const CHANGELOG = [
   {
@@ -957,12 +957,17 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
       if (data.profile_id) {
         try {
           const storedProfiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
+          // Also check the latest config push snapshot for profiles (populated by Back Office Push to POS)
+          const snapProfiles = (() => {
+            try { return JSON.parse(localStorage.getItem('rpos-config-snapshot') || '{}')?.profiles || null; } catch { return null; }
+          })();
           const DEFAULT_PROFILES = [
             { id:'prof-1', name:'Main counter', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null, hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true },
             { id:'prof-2', name:'Bar terminal', defaultSurface:'bar', enabledOrderTypes:['dine-in'], assignedSection:'bar', hiddenFeatures:['courses','kiosk','reports'], tableServiceEnabled:false, quickScreenEnabled:true },
             { id:'prof-3', name:'Server handheld', defaultSurface:'pos', enabledOrderTypes:['dine-in'], assignedSection:null, hiddenFeatures:['kiosk','reports'], tableServiceEnabled:true, quickScreenEnabled:true },
           ];
-          const allProfiles = storedProfiles || DEFAULT_PROFILES;
+          // Priority: local device profiles > config push profiles > hardcoded defaults
+          const allProfiles = [...(storedProfiles || []), ...(snapProfiles || []), ...DEFAULT_PROFILES];
           const profile = allProfiles.find(p => p.id === data.profile_id);
           if (profile) {
             const config = {
