@@ -20,7 +20,7 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.3.8';
+const VERSION = '3.3.9';
 
 const CHANGELOG = [
   {
@@ -947,7 +947,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
       if (data.name !== current.name || data.profile_id !== current.profileId) {
         localStorage.setItem('rpos-device', JSON.stringify({ ...current, name: data.name, profileId: data.profile_id }));
       }
-      // Apply profile settings
+      // Apply profile settings — always re-apply on boot to prevent stale configs
       if (data.profile_id) {
         try {
           const storedProfiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
@@ -969,8 +969,16 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
               quickScreenEnabled: profile.quickScreenEnabled !== false,
             };
             localStorage.setItem('rpos-device-config', JSON.stringify(config));
-            // Apply to store immediately so POS updates without reload
             useStore.getState().setDeviceConfig(config);
+          } else {
+            // Profile not in localStorage — no profile found, keep existing config
+            const existingConfig = JSON.parse(localStorage.getItem('rpos-device-config') || 'null');
+            if (!existingConfig) {
+              // Write a minimal config so device shows something
+              const minConfig = { profileId: data.profile_id, profileName: 'Custom profile', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true };
+              localStorage.setItem('rpos-device-config', JSON.stringify(minConfig));
+              useStore.getState().setDeviceConfig(minConfig);
+            }
           }
         } catch(e) {}
       }

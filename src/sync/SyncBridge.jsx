@@ -77,13 +77,45 @@ export default function SyncBridge({ onSyncPulse }) {
           const paired = JSON.parse(localStorage.getItem('rpos-device') || 'null');
           const locationId = paired?.locationId;
           if (!locationId) return;
-          const { fetchLatestConfigPush } = await import('../lib/db.js');
+          const { fetchLatestConfigPush, fetchFloorPlan, fetchMenuItems, fetchMenuCategories, fetchMenus } = await import('../lib/db.js');
+
+          // Load config push (menus, layout, sections)
           const { data } = await fetchLatestConfigPush(locationId);
           if (data?.snapshot) {
             useStore.getState().setConfigUpdate(data.snapshot);
             useStore.getState().applyConfigUpdate();
           }
-        } catch {}
+
+          // Also load floor plan directly from Supabase in case Push to POS hasn't been done
+          const [floorRes, itemsRes, catsRes, menusRes] = await Promise.all([
+            fetchFloorPlan(locationId),
+            fetchMenuItems(locationId),
+            fetchMenuCategories(locationId),
+            fetchMenus(locationId),
+          ]);
+          const patch = {};
+          if (floorRes.data?.tables?.length) {
+            // Merge with any existing tables (preserve session state)
+            const existing = useStore.getState().tables;
+            const existingIds = new Set(existing.map(t => t.id));
+            const newTables = floorRes.data.tables
+              .filter(t => !existingIds.has(t.id))
+              .map(t => ({ ...t, status:'available', session:null, firedCourses:[], sentAt:null }));
+            if (newTables.length) patch.tables = [...existing, ...newTables];
+          }
+          if (itemsRes.data?.length) patch.menuItems = itemsRes.data.map(item => ({
+            ...item,
+            menuName: item.menu_name ?? item.menuName ?? item.name ?? 'Item',
+            receiptName: item.receipt_name ?? item.receiptName ?? item.name,
+            kitchenName: item.kitchen_name ?? item.kitchenName ?? item.name,
+            sortOrder: item.sort_order ?? item.sortOrder ?? 0,
+            parentId: item.parent_id ?? item.parentId ?? null,
+            soldAlone: item.sold_alone ?? item.soldAlone,
+          }));
+          if (catsRes.data?.length) patch.menuCategories = catsRes.data;
+          if (menusRes.data?.length) patch.menus = menusRes.data;
+          if (Object.keys(patch).length) useStore.setState(patch);
+        } catch(e) { console.warn('[SyncBridge] boot load error:', e.message); }
       })();
     }
 

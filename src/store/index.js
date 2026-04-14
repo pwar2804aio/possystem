@@ -182,14 +182,25 @@ export const useStore = create((set, get) => ({
   applyConfigUpdate: () => {
     const snap = useStore.getState().configUpdateSnapshot;
     if (!snap) return;
+
+    // Tables: merge layout into existing live tables, AND add new tables from snapshot
+    let updatedTables = useStore.getState().tables;
+    if (snap.tables) {
+      // Update layout of existing tables
+      updatedTables = updatedTables.map(t => {
+        const st = snap.tables.find(s => s.id === t.id);
+        return st ? { ...t, label:st.label, x:st.x, y:st.y, w:st.w, h:st.h, shape:st.shape, maxCovers:st.maxCovers, section:st.section } : t;
+      });
+      // Add new tables that exist in snapshot but not in store
+      const existingIds = new Set(updatedTables.map(t => t.id));
+      const newTables = snap.tables
+        .filter(st => !existingIds.has(st.id))
+        .map(st => ({ ...st, status:'available', session:null, firedCourses:[], sentAt:null }));
+      updatedTables = [...updatedTables, ...newTables];
+    }
+
     set({
-      // Layout: merge positions/labels into live tables, preserve session/order state
-      tables: snap.tables
-        ? useStore.getState().tables.map(t => {
-            const st = snap.tables.find(s => s.id === t.id);
-            return st ? { ...t, label:st.label, x:st.x, y:st.y, w:st.w, h:st.h, shape:st.shape, maxCovers:st.maxCovers, section:st.section } : t;
-          })
-        : useStore.getState().tables,
+      tables: updatedTables,
       // Sections
       locationSections: snap.locationSections || useStore.getState().locationSections,
       // Menu items — full replace with pushed version
