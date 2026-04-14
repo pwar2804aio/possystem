@@ -33,15 +33,43 @@ export default function PairingScreen({ onPaired }) {
     }).eq('id', data.id);
 
     // Store device identity in localStorage
-    localStorage.setItem('rpos-device', JSON.stringify({
+    const deviceEntry = {
       id: data.id,
       name: data.name,
       type: data.type,
       locationId: data.location_id,
       locationName: data.locations?.name || 'Unknown',
       orgId: data.locations?.org_id,
+      profileId: data.profile_id || null,
       pairedAt: new Date().toISOString(),
-    }));
+    };
+    localStorage.setItem('rpos-device', JSON.stringify(deviceEntry));
+
+    // Apply device profile settings to rpos-device-config
+    if (data.profile_id) {
+      try {
+        const storedProfiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
+        const DEFAULT_PROFILES = [
+          { id:'prof-1', name:'Main counter', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null, hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true },
+          { id:'prof-2', name:'Bar terminal', defaultSurface:'bar', enabledOrderTypes:['dine-in'], assignedSection:'bar', hiddenFeatures:['courses','kiosk','reports'], tableServiceEnabled:false, quickScreenEnabled:true },
+          { id:'prof-3', name:'Server handheld', defaultSurface:'pos', enabledOrderTypes:['dine-in'], assignedSection:null, hiddenFeatures:['kiosk','reports'], tableServiceEnabled:true, quickScreenEnabled:true },
+        ];
+        const allProfiles = storedProfiles || DEFAULT_PROFILES;
+        const profile = allProfiles.find(p => p.id === data.profile_id);
+        if (profile) {
+          localStorage.setItem('rpos-device-config', JSON.stringify({
+            profileId: profile.id,
+            profileName: profile.name,
+            defaultSurface: profile.defaultSurface || 'tables',
+            enabledOrderTypes: profile.enabledOrderTypes || ['dine-in'],
+            assignedSection: profile.assignedSection || null,
+            hiddenFeatures: profile.hiddenFeatures || [],
+            tableServiceEnabled: profile.tableServiceEnabled !== false,
+            quickScreenEnabled: profile.quickScreenEnabled !== false,
+          }));
+        }
+      } catch(e) { console.warn('Profile apply failed:', e); }
+    }
 
     setLoading(false);
     onPaired(data);

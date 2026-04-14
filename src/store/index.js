@@ -151,7 +151,14 @@ export const useStore = create((set, get) => ({
   logout: () => set({ staff:null, activeTableId:null, orderType:'dine-in', customer:null }),
 
   // ── Navigation ────────────────────────────
-  surface: 'tables',
+  surface: (() => {
+    // Apply defaultSurface from device config on startup
+    try {
+      const dc = JSON.parse(localStorage.getItem('rpos-device-config') || 'null');
+      if (dc?.defaultSurface) return dc.defaultSurface;
+    } catch {}
+    return 'tables';
+  })(),
   setSurface: s => set({ surface:s }),
 
   // ── Back Office config push workflow ────────────────────────────────────────
