@@ -82,7 +82,7 @@ export default function CompanyAdminApp() {
 function AdminPanel({ authUser }) {
   const [section, setSection] = useState('orgs');
   const [orgs, setOrgs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState(null);
   const [locations, setLocations] = useState([]);
   const [form, setForm] = useState({});
@@ -91,7 +91,9 @@ function AdminPanel({ authUser }) {
   const [users, setUsers] = useState([]);
   const [editUser, setEditUser] = useState(null); // user being edited for location access
 
-  useEffect(() => { loadOrgs(); }, []);
+  useEffect(() => {
+    loadOrgs();
+  }, []);
 
   const loadUsers = async (orgId) => {
     const { data } = await supabase
@@ -111,8 +113,14 @@ function AdminPanel({ authUser }) {
 
   const loadOrgs = async () => {
     setLoading(true);
-    const { data } = await supabase.from('organisations').select('*').order('created_at', { ascending:false });
-    setOrgs(data || []);
+    try {
+      const { data, error } = await supabase.from('organisations').select('*').order('created_at', { ascending:false });
+      if (error) console.error('[Admin] loadOrgs error:', error.message);
+      setOrgs(data || []);
+    } catch(e) {
+      console.error('[Admin] loadOrgs exception:', e.message);
+      setOrgs([]);
+    }
     setLoading(false);
   };
 
@@ -240,7 +248,12 @@ function AdminPanel({ authUser }) {
             <div style={S.sub}>All restaurants on the platform · {orgs.length} total</div>
             <button onClick={() => setSection('new-org')} style={{ ...S.btn, ...S.btnPrimary, marginBottom:20 }}>+ New organisation</button>
             <div style={S.card}>
-              {loading ? <div style={{ color:'#64748b', fontSize:13 }}>Loading…</div> : (
+              {loading ? (
+                <div style={{ color:'#64748b', fontSize:13, display:'flex', alignItems:'center', gap:10 }}>
+                  Loading…
+                  <button onClick={loadOrgs} style={{ ...S.btn, ...S.btnGhost, padding:'3px 10px', fontSize:11 }}>Retry</button>
+                </div>
+              ) : (
                 <table style={S.table}>
                   <thead><tr>
                     <th style={S.th}>Name</th><th style={S.th}>Slug</th><th style={S.th}>Status</th><th style={S.th}>Created</th><th style={S.th}></th>
