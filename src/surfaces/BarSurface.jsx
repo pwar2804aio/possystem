@@ -163,7 +163,7 @@ export default function BarSurface() {
     : null; // null means show all
 
   const ITEMS = (storeMenuItems || MENU_ITEMS).filter(i => {
-    if (i.archived || i.parentId || (i.type==='subitem'&&!i.soldAlone)) return false;
+    if (i.archived || i.parentId || i.parent_id || (i.type==='subitem'&&!i.soldAlone)) return false;
     if (activeMenuCatIds) return activeMenuCatIds.includes(i.cat) || (i.cats||[]).some(c=>activeMenuCatIds.includes(c));
     return true;
   });
@@ -472,7 +472,7 @@ export default function BarSurface() {
             {!activeTab&&<button onClick={()=>setShowOpenModal(true)} className="btn btn-acc btn-sm">+ New tab</button>}
           </div>
           <div style={{ display:'flex',gap:4,overflowX:'auto',paddingBottom:2 }}>
-            {[{id:'all',label:'All',icon:'🍽',color:'var(--acc)'},...(menuCategories||[]).filter(c=>!c.parentId&&!c.isSpecial&&(!deviceMenuId||c.menuId===deviceMenuId)).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0))].map(c=>{
+            {[{id:'all',label:'All',icon:'🍽',color:'var(--acc)'},...(menuCategories||[]).filter(c=>!c.parentId&&!c.parent_id&&!c.isSpecial&&(!deviceMenuId||c.menuId===deviceMenuId)).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0))].map(c=>{
               const color = c.color||'var(--acc)';
               const isActive=cat===c.id&&!search;
               return(
@@ -498,7 +498,7 @@ export default function BarSurface() {
             {displayItems.map(item=>{
               const storeCat = (menuCategories||[]).find(c=>c.id===item.cat); const m={color:storeCat?.color||'var(--acc)',icon:storeCat?.icon||'🍸'};
               const is86=eightySixIds.includes(item.id);
-              const variantKids = ITEMS.filter(i => i.parentId === item.id);
+              const variantKids = ITEMS.filter(i => (i.parentId || i.parent_id) === item.id);
               const fromPrice=item.type==='variants'&&variantKids.length?Math.min(...variantKids.map(v=>v.pricing?.base??v.price??0)):(item.pricing?.base??item.price??0);
               const inRound=roundItems.filter(r=>r.itemId===item.id).reduce((s,r)=>s+r.qty,0);
               return(
@@ -649,7 +649,7 @@ function QuickItemBuilder({ item, menuItems=[], modifierGroupDefs=[], onConfirm,
   const [note, setNote] = useState('');
 
   // Resolve variant children from menuItems (they have parentId === item.id)
-  const variantChildren = (menuItems||[]).filter(i => i.parentId === item.id && !i.archived);
+  const variantChildren = (menuItems||[]).filter(i => ((i.parentId || i.parent_id) === item.id) && !i.archived);
 
   // Resolve assigned modifier groups from modifierGroupDefs
   const resolvedGroups = (item.assignedModifierGroups||[]).map(ag => {

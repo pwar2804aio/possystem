@@ -49,8 +49,8 @@ const sbUpsertMenuItem = async (item) => {
   const locationId = await getLocationId();
   if (!locationId) return console.warn('[Supabase] no location ID — item not saved');
   await supabase.from('menu_items').upsert({
-    id: item.id, location_id: locationId, name: item.name,
-    menu_name: item.menuName||item.name, receipt_name: item.receiptName||item.name,
+    id: item.id, location_id: locationId, name: item.menuName||item.menu_name||item.name||'Item',
+    menu_name: item.menuName||item.menu_name||item.name||'Item', receipt_name: item.receiptName||item.name,
     kitchen_name: item.kitchenName||item.name, description: item.description||'',
     type: item.type||'simple', cat: item.cat||null, cats: item.cats||[],
     parent_id: item.parentId||null, sort_order: item.sortOrder||0,
