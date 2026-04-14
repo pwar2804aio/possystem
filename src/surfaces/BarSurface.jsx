@@ -498,7 +498,7 @@ export default function BarSurface() {
             {displayItems.map(item=>{
               const storeCat = (menuCategories||[]).find(c=>c.id===item.cat); const m={color:storeCat?.color||'var(--acc)',icon:storeCat?.icon||'🍸'};
               const is86=eightySixIds.includes(item.id);
-              const variantKids = ITEMS.filter(i => (i.parentId || i.parent_id) === item.id);
+              const variantKids = (storeMenuItems||MENU_ITEMS).filter(i => (i.parentId || i.parent_id) === item.id && !i.archived);
               const fromPrice=item.type==='variants'&&variantKids.length?Math.min(...variantKids.map(v=>v.pricing?.base??v.price??0)):(item.pricing?.base??item.price??0);
               const inRound=roundItems.filter(r=>r.itemId===item.id).reduce((s,r)=>s+r.qty,0);
               return(
