@@ -1,3 +1,4 @@
+import { useCompact } from '../lib/useCompact';
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import CheckSelectorModal from '../components/CheckSelectorModal';

@@ -1,3 +1,4 @@
+import { useCompact } from '../lib/useCompact';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
@@ -433,8 +434,8 @@ export default function POSSurface() {
             <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:40,height:40,borderRadius:11,border:'1px solid var(--bdr2)',background:'var(--bg3)',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:20,flexShrink:0,transition:'all .14s'}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--bdr3)';e.currentTarget.style.color='var(--t2)';}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr2)';e.currentTarget.style.color='var(--t3)';}}>+</button>
-            <button className="btn btn-ghost" style={{flex:1,height:40,opacity:items.length===0?.3:1,fontSize:13,fontWeight:700,letterSpacing:.01}} onClick={handleSend}>Send →</button>
-            <button className="btn btn-acc" style={{flex:1.4,height:40,opacity:items.length===0?.3:1,fontSize:14,fontWeight:800,letterSpacing:.01}} onClick={()=>{
+            <button className="btn btn-ghost" style={{flex:1,height:compact?34:40,opacity:items.length===0?.3:1,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01}} onClick={handleSend}>Send →</button>
+            <button className="btn btn-acc" style={{flex:1.4,height:compact?34:40,opacity:items.length===0?.3:1,fontSize:compact?12:14,fontWeight:800,letterSpacing:.01}} onClick={()=>{
               if (!items.length) return;
               const hasAllergens = items.some(i=>!i.voided&&i.allergens?.length);
               if (hasAllergens) setShowAllergenGate(true);
@@ -588,7 +589,7 @@ export default function POSSurface() {
                 })}
               </div>
             )}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
+            <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?120:160}px,1fr))`,gap:compact?5:8}}>
                 {displayItems.map(item=>{
                   // Resolve category colour/icon from store (Menu Manager categories)
                   const storeCat = menuCategories.find(c => c.id === item.cat);
@@ -637,7 +638,7 @@ export default function POSSurface() {
                         background:is86?'var(--bg5)':flagged?'var(--red)':isHot?catColor:`${catColor}60`,
                         borderRadius:'14px 0 0 14px',
                       }}/>
-                      <div style={{padding:'12px 12px 11px 16px',flex:1,display:'flex',flexDirection:'column'}}>
+                      <div style={{padding:compact?'8px 8px 7px 10px':'12px 12px 11px 16px',flex:1,display:'flex',flexDirection:'column'}}>
                         {/* Top row: emoji + badges */}
                         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
                           <span style={{fontSize:24,lineHeight:1}}>{is86?'🚫':flagged?'⚠️':catIcon}</span>
@@ -663,7 +664,7 @@ export default function POSSurface() {
                         <div style={{fontSize:13,fontWeight:700,color:is86?'var(--t4)':flagged?'var(--red)':'var(--t1)',lineHeight:1.3,flex:1,marginBottom:8}}>{item.name}</div>
                         {/* Bottom: price + type + 86 button */}
                         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:4}}>
-                          <div style={{fontSize:18,fontWeight:800,color:accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>
+                          <div style={{fontSize:compact?14:18,fontWeight:800,color:accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>
                             {item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}
                           </div>
                           <div style={{display:'flex',gap:3,alignItems:'center',flexShrink:0}}>
@@ -945,7 +946,7 @@ function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote,
         borderRadius:'12px 0 0 12px',
       }}/>
 
-      <div style={{padding:'9px 10px 9px 14px'}}>
+      <div style={{padding:compact?'6px 8px 6px 10px':'9px 10px 9px 14px'}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'flex-start'}}>
           <div style={{flex:1}}>
             <div style={{

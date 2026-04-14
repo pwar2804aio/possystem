@@ -1,3 +1,4 @@
+import { useCompact } from '../lib/useCompact';
 import { useState, useEffect } from 'react';
 import { ALLERGENS } from '../data/seed';
 import SplitModal from '../components/SplitModal';
@@ -182,14 +183,14 @@ function CashTransaction({ grand, onComplete, onBack }) {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
           <div>
             <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:3 }}>Amount due</div>
-            <div style={{ fontSize:30, fontWeight:800, color:'var(--t1)', fontFamily:'var(--font-mono)', letterSpacing:'-.01em' }}>£{grand.toFixed(2)}</div>
+            <div style={{ fontSize:compact?22:30, fontWeight:800, color:'var(--t1)', fontFamily:'var(--font-mono)', letterSpacing:'-.01em' }}>£{grand.toFixed(2)}</div>
           </div>
           <div style={{ textAlign:'right' }}>
             <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:3,
               color:isValid?'var(--grn)':entered?'var(--red)':'var(--t4)' }}>
               {isValid?'Change':'Short by'}
             </div>
-            <div style={{ fontSize:30, fontWeight:800, fontFamily:'var(--font-mono)', letterSpacing:'-.01em',
+            <div style={{ fontSize:compact?22:30, fontWeight:800, fontFamily:'var(--font-mono)', letterSpacing:'-.01em',
               color:isValid?'var(--grn)':entered?'var(--red)':'var(--t4)' }}>
               {isValid?`£${change.toFixed(2)}`:entered?`£${(grand-tendered).toFixed(2)}`:'—'}
             </div>
@@ -235,11 +236,11 @@ function CashTransaction({ grand, onComplete, onBack }) {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, marginBottom:12 }}>
         {[7,8,9,4,5,6,1,2,3,'.',0,'⌫'].map((d,i)=>(
           <button key={i} onClick={()=>press(String(d))} style={{
-            height:56, borderRadius:11, cursor:'pointer', fontFamily:'inherit',
+            height:compact?44:56, borderRadius:compact?9:11, cursor:'pointer', fontFamily:'inherit',
             background:d==='⌫'?'var(--red-d)':'var(--bg3)',
             border:`1.5px solid ${d==='⌫'?'var(--red-b)':'var(--bdr)'}`,
             color:d==='⌫'?'var(--red)':'var(--t1)',
-            fontSize:d==='⌫'?20:22, fontWeight:700,
+            fontSize:d==='⌫'?(compact?16:20):(compact?18:22), fontWeight:700,
             transition:'all .08s',
           }}
           onMouseEnter={e=>e.currentTarget.style.background=d==='⌫'?'var(--red)':'var(--bg4)'}
@@ -250,8 +251,8 @@ function CashTransaction({ grand, onComplete, onBack }) {
       </div>
 
       <div style={{ display:'flex', gap:8 }}>
-        <button className="btn btn-ghost" style={{ flex:1, height:50 }} onClick={onBack}>← Back</button>
-        <button className="btn btn-grn" style={{ flex:2, height:50, fontSize:15, fontWeight:800 }}
+        <button className="btn btn-ghost" style={{ flex:1, height:compact?40:50 }} onClick={onBack}>← Back</button>
+        <button className="btn btn-grn" style={{ flex:2, height:compact?40:50, fontSize:compact?13:15, fontWeight:800 }}
           disabled={!isValid}
           onClick={()=>onComplete(tendered)}>
           {isValid ? `Complete · £${change.toFixed(2)} change` : 'Enter cash amount'}
@@ -306,7 +307,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
     <div className="modal-back">
       <div style={{
         background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:24,
-        width:'100%', maxWidth:500, maxHeight:'94vh',
+        width:'100%', maxWidth:compact?420:500, maxHeight:'94vh',
         display:'flex', flexDirection:'column',
         boxShadow:'var(--sh3)', overflow:'hidden',
       }}>
@@ -346,9 +347,9 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                     : item.price;
                   const isLast = idx === courseGroups[cNum].length - 1;
                   return (
-                    <div key={item.uid} style={{ display:'flex', justifyContent:'space-between', gap:12, padding:'11px 14px', borderBottom:isLast?'none':'1px solid var(--bdr)', background:idx%2===0?'var(--bg2)':'var(--bg1)' }}>
+                    <div key={item.uid} style={{ display:'flex', justifyContent:'space-between', gap:compact?8:12, padding:compact?'7px 10px':'11px 14px', borderBottom:isLast?'none':'1px solid var(--bdr)', background:idx%2===0?'var(--bg2)':'var(--bg1)' }}>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:14, fontWeight:600, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        <div style={{ fontSize:compact?12:14, fontWeight:600, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                           {item.qty>1 && <span style={{ fontWeight:800, color:'var(--acc)', marginRight:5, fontFamily:'var(--font-mono)' }}>{item.qty}×</span>}
                           {item.name}
                         </div>
@@ -367,7 +368,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                         )}
                       </div>
                       <div style={{ textAlign:'right', flexShrink:0 }}>
-                        <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>£{(price*item.qty).toFixed(2)}</div>
+                        <div style={{ fontSize:compact?12:14, fontWeight:700, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>£{(price*item.qty).toFixed(2)}</div>
                         {disc && <div style={{ fontSize:11, color:'var(--t4)', textDecoration:'line-through', fontFamily:'var(--font-mono)' }}>£{(item.price*item.qty).toFixed(2)}</div>}
                       </div>
                     </div>
@@ -378,7 +379,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
               </div>
 
               {/* Totals */}
-              <div style={{ background:'var(--bg3)', borderRadius:14, padding:'14px 16px', marginBottom:20, border:'1px solid var(--bdr)' }}>
+              <div style={{ background:'var(--bg3)', borderRadius:compact?10:14, padding:compact?'10px 12px':'14px 16px', marginBottom:compact?12:20, border:'1px solid var(--bdr)' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:5 }}>
                   <span>Subtotal</span>
                   <span style={{ fontFamily:'var(--font-mono)' }}>£{subtotal.toFixed(2)}</span>
@@ -396,36 +397,36 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                 <div style={{ height:1, background:'var(--bdr)', margin:'8px 0' }}/>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
                   <span style={{ fontSize:15, fontWeight:600, color:'var(--t2)' }}>Total due</span>
-                  <span style={{ fontSize:26, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)', letterSpacing:'-.02em' }}>£{total.toFixed(2)}</span>
+                  <span style={{ fontSize:compact?20:26, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)', letterSpacing:'-.02em' }}>£{total.toFixed(2)}</span>
                 </div>
               </div>
 
               {/* ── Primary payment buttons ── */}
               <div style={{ display:'flex', gap:10, marginBottom:10 }}>
                 <button onClick={handleCardPress} style={{
-                  flex:1, padding:'22px 14px', borderRadius:18, cursor:'pointer', fontFamily:'inherit',
+                  flex:1, padding:compact?'12px 10px':'22px 14px', borderRadius:compact?12:18, cursor:'pointer', fontFamily:'inherit',
                   background:'var(--card-bg)', border:`1.5px solid var(--card-border)`,
                   display:'flex', flexDirection:'column', alignItems:'center', gap:8,
                   transition:'transform .14s, box-shadow .14s',
                 }}
                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='var(--sh2)';}}
                 onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-                  <div style={{ fontSize:36 }}>💳</div>
-                  <div style={{ fontSize:17, fontWeight:800, color:'var(--card-text)' }}>Card</div>
+                  <div style={{ fontSize:compact?24:36 }}>💳</div>
+                  <div style={{ fontSize:compact?13:17, fontWeight:800, color:'var(--card-text)' }}>Card</div>
                   <div style={{ fontSize:11, color:'var(--card-sub)' }}>Tap, chip, contactless</div>
                   {!skipTip && <div style={{ fontSize:10, color:'var(--card-sub)', opacity:.7, marginTop:-2 }}>Tip step included</div>}
                 </button>
 
                 <button onClick={()=>setScreen('cash')} style={{
-                  flex:1, padding:'22px 14px', borderRadius:18, cursor:'pointer', fontFamily:'inherit',
+                  flex:1, padding:compact?'12px 10px':'22px 14px', borderRadius:compact?12:18, cursor:'pointer', fontFamily:'inherit',
                   background:'var(--cash-bg)', border:`1.5px solid var(--cash-border)`,
                   display:'flex', flexDirection:'column', alignItems:'center', gap:8,
                   transition:'transform .14s, box-shadow .14s',
                 }}
                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='var(--sh2)';}}
                 onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-                  <div style={{ fontSize:36 }}>💵</div>
-                  <div style={{ fontSize:17, fontWeight:800, color:'var(--cash-text)' }}>Cash</div>
+                  <div style={{ fontSize:compact?24:36 }}>💵</div>
+                  <div style={{ fontSize:compact?13:17, fontWeight:800, color:'var(--cash-text)' }}>Cash</div>
                   <div style={{ fontSize:11, color:'var(--cash-sub)' }}>Change calculated</div>
                   <div style={{ fontSize:10, color:'var(--cash-sub)', opacity:.7, marginTop:-2 }}>Instant, no tip prompt</div>
                 </button>
