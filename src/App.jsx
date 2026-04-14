@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.3.3';
+const VERSION = '3.3.4';
 
 const CHANGELOG = [
   {
@@ -1017,11 +1017,10 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
         Another device or browser window has connected to <strong style={{color:'#e2e8f0'}}>{pairedDevice.name}</strong>.<br/>
         Each POS device can only be active in one place at a time.
       </div>
-      <a href={window.location.href} onClick={() => {
-          // Set reclaim flag so on reload we write our token first, kicking the other session
+      <a href="?mode=pos" onClick={() => {
           sessionStorage.setItem(`rpos-reclaim-${pairedDevice.id}`, '1');
-          // Also generate a fresh token for this reclaim
           sessionStorage.removeItem(SESSION_TOKEN_KEY);
+          localStorage.setItem('rpos-device-mode', 'pos');
         }}
         style={{ padding:'14px 32px', borderRadius:12, background:'#6366f1', color:'#fff', fontWeight:700, fontSize:15, textDecoration:'none', fontFamily:'inherit', display:'inline-block' }}>
         Reconnect this terminal
@@ -1030,9 +1029,14 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
     </div>
   );
 
-  // KDS devices skip PIN and staff login — boot straight to KDS surface
+  // KDS devices — if device type is kds, ensure mode is set correctly
   const pairedDeviceType = pairedDevice?.type;
-  if (pairedDeviceType === 'kds' || deviceConfig?.defaultSurface === 'kds') {
+  if (pairedDeviceType === 'kds') {
+    // KDS devices always show KDS surface regardless of URL mode
+    return <><SyncBridge onSyncPulse={handleSyncPulse}/><KDSSurface /></>;
+  }
+  // For non-KDS devices, also check deviceConfig (set during pairing)
+  if (deviceConfig?.defaultSurface === 'kds' && !deviceConfig?.profileName?.toLowerCase().includes('counter') && !deviceConfig?.profileName?.toLowerCase().includes('bar') && !deviceConfig?.profileName?.toLowerCase().includes('server')) {
     return <><SyncBridge onSyncPulse={handleSyncPulse}/><KDSSurface /></>;
   }
 
