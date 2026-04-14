@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.2.9';
+const VERSION = '3.3.0';
 
 const CHANGELOG = [
   {
@@ -911,7 +911,8 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
 
     const refreshDevice = async () => {
       const { data } = await supabase.from('devices').select('id, status, profile_id, name').eq('id', pairedDevice.id).single();
-      if (!data || data.status === 'removed' || data.status === 'unpaired') {
+      if (!data || data.status === 'removed') {
+        // Only clear pairing if explicitly removed by admin
         localStorage.removeItem('rpos-device');
         setDeviceValid(false);
         return;

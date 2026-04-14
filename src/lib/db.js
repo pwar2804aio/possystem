@@ -42,7 +42,9 @@ export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
   if (!locationId) locationId = await getLocationId();
   if (!locationId) return { data: null, error: new Error('No location') };
-  return supabase.from('menu_items').upsert({ ...item, location_id: locationId, updated_at: new Date().toISOString() });
+  const result = await supabase.from('menu_items').upsert({ ...item, location_id: locationId, updated_at: new Date().toISOString() });
+  if (result.error) console.error('[DB] menu_items upsert failed:', result.error.message, 'item:', item.id, 'location:', locationId);
+  return result;
 };
 
 export const archiveMenuItem = async (id) => {
@@ -66,7 +68,9 @@ export const upsertFloorTable = async (table, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
   if (!locationId) locationId = await getLocationId();
   if (!locationId) return { data: null, error: new Error('No location') };
-  return supabase.from('floor_tables').upsert({ ...table, location_id: locationId });
+  const result = await supabase.from('floor_tables').upsert({ ...table, location_id: locationId });
+  if (result.error) console.error('[DB] floor_tables upsert failed:', result.error.message, 'table:', table.id, 'location:', locationId);
+  return result;
 };
 
 export const deleteFloorTable = async (id) => {
@@ -127,7 +131,9 @@ export const bumpKDSTicket = async (id) => {
 // ── Closed checks ─────────────────────────────────────────────────────────────
 export const insertClosedCheck = async (check, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
-  return supabase.from('closed_checks').insert({ ...check, location_id: locationId });
+  const result = await supabase.from('closed_checks').insert({ ...check, location_id: locationId });
+  if (result.error) console.error('[DB] closed_checks insert failed:', result.error.message);
+  return result;
 };
 
 export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 200) => {
@@ -143,7 +149,9 @@ export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 200) =
 // ── Config pushes ─────────────────────────────────────────────────────────────
 export const insertConfigPush = async (push, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
-  return supabase.from('config_pushes').insert({ ...push, location_id: locationId });
+  const result = await supabase.from('config_pushes').insert({ ...push, location_id: locationId });
+  if (result.error) console.error('[DB] config_pushes insert failed:', result.error.message);
+  return result;
 };
 
 export const fetchLatestConfigPush = async (locationId = null) => {

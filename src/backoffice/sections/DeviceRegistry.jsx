@@ -334,11 +334,19 @@ export default function DeviceRegistry() {
 
                   <div style={{ display:'flex', gap:6 }}>
                     <button onClick={()=>startEdit(d)} style={{ ...S.btn, ...S.btnGhost, padding:'6px 12px', fontSize:12 }}>Edit</button>
-                    {d.status!=='unpaired' && (
-                      <button onClick={()=>{ setShowCodeFor(showCode?null:d.id); if(!showCode)regenerateCode(d.id); }}
-                        style={{ ...S.btn, ...S.btnGhost, padding:'6px 12px', fontSize:12 }}>
-                        {showCode?'Hide code':'Show code'}
-                      </button>
+                    {d.status !== 'unpaired' && (
+                      <>
+                        <button onClick={()=>setShowCodeFor(showCode?null:d.id)}
+                          style={{ ...S.btn, ...S.btnGhost, padding:'6px 12px', fontSize:12 }}>
+                          {showCode?'Hide code':'Show code'}
+                        </button>
+                        {showCode && (
+                          <button onClick={()=>regenerateCode(d.id)}
+                            style={{ ...S.btn, ...S.btnDanger, padding:'6px 12px', fontSize:12 }}>
+                            New code
+                          </button>
+                        )}
+                      </>
                     )}
                     <button onClick={()=>removeDevice(d.id)} style={{ ...S.btn, ...S.btnDanger, padding:'6px 12px', fontSize:12 }}>Remove</button>
                   </div>
