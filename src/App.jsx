@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.3.0';
+const VERSION = '3.3.1';
 
 const CHANGELOG = [
   {
@@ -909,14 +909,30 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   useEffect(() => {
     if (isMock) { setDeviceValid(true); return; }
 
-    const refreshDevice = async () => {
-      const { data } = await supabase.from('devices').select('id, status, profile_id, name').eq('id', pairedDevice.id).single();
+    // Generate a unique session token for this browser tab
+  const SESSION_TOKEN_KEY = `rpos-session-${pairedDevice.id}`;
+  const mySessionToken = (() => {
+    let t = sessionStorage.getItem(SESSION_TOKEN_KEY);
+    if (!t) { t = `sess-${Date.now()}-${Math.random().toString(36).slice(2,8)}`; sessionStorage.setItem(SESSION_TOKEN_KEY, t); }
+    return t;
+  })();
+
+  const refreshDevice = async () => {
+      const { data } = await supabase.from('devices').select('id, status, profile_id, name, session_token').eq('id', pairedDevice.id).single();
       if (!data || data.status === 'removed') {
         // Only clear pairing if explicitly removed by admin
         localStorage.removeItem('rpos-device');
         setDeviceValid(false);
         return;
       }
+      // Check if another session has claimed this device
+      if (data.session_token && data.session_token !== mySessionToken) {
+        // Another browser/tab is using this device — we've been kicked
+        setDeviceValid('kicked');
+        return;
+      }
+      // Claim this device for our session
+      await supabase.from('devices').update({ session_token: mySessionToken }).eq('id', pairedDevice.id);
       // Refresh device name + profile
       const current = JSON.parse(localStorage.getItem('rpos-device') || '{}');
       if (data.name !== current.name || data.profile_id !== current.profileId) {
@@ -963,8 +979,14 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
         schema: 'public',
         table: 'devices',
         filter: `id=eq.${pairedDevice.id}`,
-      }, () => {
-        // Device updated in back office — refresh profile immediately
+      }, (payload) => {
+        const updatedToken = payload.new?.session_token;
+        // If session_token changed and it's not ours → we've been displaced
+        if (updatedToken && updatedToken !== mySessionToken) {
+          setDeviceValid('kicked');
+          return;
+        }
+        // Otherwise refresh profile
         refreshDevice().catch(() => {});
       })
       .subscribe();
@@ -978,6 +1000,26 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
     </div>
   );
   if (deviceValid === false) return <PairingScreen onPaired={() => window.location.reload()} />;
+
+  // Kicked — another session claimed this device
+  if (deviceValid === 'kicked') return (
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#0f1117', fontFamily:'inherit', gap:20, padding:40 }}>
+      <div style={{ fontSize:48 }}>⚠️</div>
+      <div style={{ fontSize:22, fontWeight:800, color:'#f1f5f9', textAlign:'center' }}>This terminal has been disconnected</div>
+      <div style={{ fontSize:15, color:'#64748b', textAlign:'center', maxWidth:400, lineHeight:1.7 }}>
+        Another device or browser window has connected to <strong style={{color:'#e2e8f0'}}>{pairedDevice.name}</strong>.<br/>
+        Each POS device can only be active in one place at a time.
+      </div>
+      <button onClick={() => {
+        // Reclaim this session
+        sessionStorage.removeItem(SESSION_TOKEN_KEY);
+        window.location.reload();
+      }} style={{ padding:'14px 32px', borderRadius:12, background:'#6366f1', color:'#fff', fontWeight:700, fontSize:15, border:'none', cursor:'pointer', fontFamily:'inherit' }}>
+        Reconnect this terminal
+      </button>
+      <div style={{ fontSize:12, color:'#334155' }}>v{VERSION}</div>
+    </div>
+  );
 
   // KDS devices skip PIN and staff login — boot straight to KDS surface
   const pairedDeviceType = pairedDevice?.type;

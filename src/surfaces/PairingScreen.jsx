@@ -44,6 +44,8 @@ export default function PairingScreen({ onPaired }) {
       pairedAt: new Date().toISOString(),
     };
     localStorage.setItem('rpos-device', JSON.stringify(deviceEntry));
+    // Clear any previous session token so old sessions get kicked
+    sessionStorage.removeItem(`rpos-session-${data.id}`);
 
     // KDS devices get a special config — boot straight to KDS surface, no PIN, no nav
     if (data.type === 'kds') {
