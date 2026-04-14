@@ -370,6 +370,7 @@ export function KDSSurface() {
     const load = async () => {
       try {
         let q = supabase.from('kds_tickets').select('*').eq('location_id', locationId).eq('status', 'pending').order('sent_at', { ascending: true });
+        // Filter by centre_id if this KDS is assigned to a specific center
         if (centreId) q = q.eq('centre_id', centreId);
         const { data } = await q;
         if (data) setLiveTickets(data.map(mapRow));
@@ -406,13 +407,13 @@ export function KDSSurface() {
     return () => { supabase.removeChannel(channel); };
   }, [locationId, centreId]);
 
-  // Map Supabase snake_case row to store camelCase format
+  // Map Supabase snake_case row to display format
   const mapRow = (row) => ({
     id: row.id,
-    table: row.table_label || row.table,
-    server: row.server,
-    covers: row.covers,
-    centreId: row.centre_id || row.centreId,
+    table: row.table_label || row.table || '',
+    server: row.server || '',
+    covers: row.covers || 1,
+    centreId: row.centre_id || row.centreId || null,
     sentAt: row.sent_at ? new Date(row.sent_at).getTime() : Date.now(),
     minutes: 0,
     items: typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []),

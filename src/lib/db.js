@@ -103,7 +103,20 @@ export const insertKDSTicket = async (ticket, locationId = null) => {
   if (isMock) return { data: null, error: null };
   if (!locationId) locationId = await getLocationId();
   if (!locationId) return { data: null, error: new Error('No location') };
-  return supabase.from('kds_tickets').insert({ ...ticket, location_id: locationId });
+  // Map camelCase store ticket to snake_case DB columns
+  const row = {
+    id: ticket.id,
+    location_id: locationId,
+    table_label: ticket.table || ticket.tableLabel || '',
+    table_id: ticket.tableId || null,
+    server: ticket.server || null,
+    covers: ticket.covers || 1,
+    centre_id: ticket.centreId || null,
+    items: ticket.items || [],
+    status: 'pending',
+    sent_at: ticket.sentAt ? new Date(ticket.sentAt).toISOString() : new Date().toISOString(),
+  };
+  return supabase.from('kds_tickets').insert(row);
 };
 
 export const bumpKDSTicket = async (id) => {
