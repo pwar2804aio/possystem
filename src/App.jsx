@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.2.6';
+const VERSION = '3.2.7';
 
 const CHANGELOG = [
   {
@@ -856,8 +856,8 @@ export default function App() {
   useEffect(() => {
     let cleanup;
     import('./lib/realtime.js').then(({ startRealtime }) => {
-      import('./store/index.js').then(({ useStore: storeModule }) => {
-        cleanup = startRealtime(storeModule);
+      Promise.resolve().then(() => {
+        cleanup = startRealtime(useStore);
       });
     }).catch(() => {});
     return () => cleanup?.();
@@ -944,8 +944,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             };
             localStorage.setItem('rpos-device-config', JSON.stringify(config));
             // Apply to store immediately so POS updates without reload
-            const { useStore: store } = await import('./store/index.js');
-            store.getState().setDeviceConfig(config);
+            useStore.getState().setDeviceConfig(config);
           }
         } catch(e) {}
       }
