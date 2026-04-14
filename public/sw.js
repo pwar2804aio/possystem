@@ -14,10 +14,17 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network first — fall back to cache for navigation requests
+  // Network first — always fetch fresh for navigation
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).catch(() => caches.match('/'))
     );
+  }
+});
+
+// Allow app to trigger update programmatically
+self.addEventListener('message', e => {
+  if (e.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
