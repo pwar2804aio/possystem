@@ -34,7 +34,10 @@ export default function CompanyAdminApp() {
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
+    // Timeout so we never hang on Loading forever
+    const fallback = setTimeout(() => setAuthChecked(true), 4000);
     supabase.auth.getSession().then(async ({ data }) => {
+      clearTimeout(fallback);
       const user = data?.session?.user || null;
       setAuthUser(user);
       if (user) {
@@ -44,7 +47,7 @@ export default function CompanyAdminApp() {
         } catch(e) {}
       }
       setAuthChecked(true);
-    }).catch(() => setAuthChecked(true));
+    }).catch(() => { clearTimeout(fallback); setAuthChecked(true); });
 
     let subscription;
     try {
@@ -99,6 +102,13 @@ function AdminPanel({ authUser }) {
     setUsers(data || []);
   };
 
+  // Users per location — built from users list
+  const usersForLocation = (locationId) =>
+    users.filter(u =>
+      u.location_id === locationId ||
+      u.user_locations?.some(ul => ul.location_id === locationId)
+    );
+
   const loadOrgs = async () => {
     setLoading(true);
     const { data } = await supabase.from('organisations').select('*').order('created_at', { ascending:false });
@@ -118,18 +128,7 @@ function AdminPanel({ authUser }) {
     setMsg({ type:'', text:'' });
   };
 
-  const saveUserLocations = async (userId, locationIds) => {
-    // Remove all existing, re-insert selected
-    await supabase.from('user_locations').delete().eq('user_id', userId);
-    if (locationIds.length) {
-      await supabase.from('user_locations').insert(locationIds.map(lid => ({ user_id: userId, location_id: lid })));
-    }
-    // Update primary location_id to first selected
-    await supabase.from('user_profiles').update({ location_id: locationIds[0] || null }).eq('id', userId);
-    await loadUsers(selectedOrg.id);
-    setEditUser(null);
-    ok('✓ Location access updated');
-  };
+
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const ok = t => setMsg({ type:'ok', text:t });
@@ -293,84 +292,6 @@ function AdminPanel({ authUser }) {
                   <button onClick={() => { setSection('invite'); setMsg({type:'',text:''}); }} style={{ ...S.btn, ...S.btnGhost }}>👤 Create user</button>
                 </div>
 
-                {/* Users */}
-                <div style={S.card}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-                    <div style={S.cardTitle}>👤 Users</div>
-                    <div style={{ fontSize:12, color:'#64748b' }}>{users.length} user{users.length!==1?'s':''}</div>
-                  </div>
-                  {users.length === 0
-                    ? <div style={{ color:'#64748b', fontSize:13, padding:'20px 0' }}>No users yet — create one with the button above</div>
-                    : <table style={S.table}>
-                        <thead><tr>
-                          <th style={S.th}>Name</th>
-                          <th style={S.th}>Email</th>
-                          <th style={S.th}>Role</th>
-                          <th style={S.th}>Locations</th>
-                          <th style={S.th}></th>
-                        </tr></thead>
-                        <tbody>
-                          {users.map(u => {
-                            const assignedIds = u.user_locations?.map(ul => ul.location_id) || (u.location_id ? [u.location_id] : []);
-                            const assignedNames = assignedIds.map(lid => locations.find(l => l.id === lid)?.name).filter(Boolean);
-                            const isEditing = editUser?.id === u.id;
-                            return (
-                              <tr key={u.id}>
-                                <td style={{ ...S.td, fontWeight:700, color:'#f1f5f9' }}>{u.full_name || '—'}</td>
-                                <td style={{ ...S.td, fontSize:12, fontFamily:'monospace', color:'#a5b4fc' }}>{u.email || '—'}</td>
-                                <td style={S.td}>
-                                  <span style={{ ...S.badge, background: u.role==='super_admin'?'#4c0519':u.role==='owner'?'#1e1a3a':'#0d2e1a', color: u.role==='super_admin'?'#fda4af':u.role==='owner'?'#a5b4fc':'#86efac' }}>
-                                    {u.role || 'owner'}
-                                  </span>
-                                </td>
-                                <td style={S.td}>
-                                  {isEditing ? (
-                                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                                      {locations.map(loc => {
-                                        const checked = (editUser.locationIds || []).includes(loc.id);
-                                        return (
-                                          <label key={loc.id} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:12, color:'#e2e8f0' }}>
-                                            <input type="checkbox" checked={checked}
-                                              onChange={e => setEditUser(eu => ({
-                                                ...eu,
-                                                locationIds: e.target.checked
-                                                  ? [...(eu.locationIds||[]), loc.id]
-                                                  : (eu.locationIds||[]).filter(id => id !== loc.id)
-                                              }))}
-                                              style={{ accentColor:'#6366f1', width:14, height:14 }}
-                                            />
-                                            {loc.name}
-                                          </label>
-                                        );
-                                      })}
-                                      <div style={{ display:'flex', gap:6, marginTop:4 }}>
-                                        <button onClick={() => saveUserLocations(u.id, editUser.locationIds || [])}
-                                          style={{ ...S.btn, ...S.btnPrimary, padding:'5px 12px', fontSize:12 }}>Save</button>
-                                        <button onClick={() => setEditUser(null)}
-                                          style={{ ...S.btn, ...S.btnGhost, padding:'5px 12px', fontSize:12 }}>Cancel</button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div style={{ fontSize:12, color:'#94a3b8' }}>
-                                      {assignedNames.length ? assignedNames.join(', ') : <span style={{ color:'#475569' }}>No locations</span>}
-                                    </div>
-                                  )}
-                                </td>
-                                <td style={S.td}>
-                                  {!isEditing && (
-                                    <button onClick={() => setEditUser({ id:u.id, locationIds: assignedIds })}
-                                      style={{ ...S.btn, ...S.btnGhost, padding:'5px 12px', fontSize:12 }}>
-                                      Edit access
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                  }
-                </div>
 
                 <div style={S.card}>
                   <div style={S.cardTitle}>📍 Locations</div>
@@ -378,21 +299,67 @@ function AdminPanel({ authUser }) {
                     ? <div style={{ color:'#64748b', fontSize:13, padding:'20px 0' }}>No locations yet</div>
                     : <table style={S.table}>
                       <thead><tr>
-                        <th style={S.th}>Location</th><th style={S.th}>Timezone</th><th style={S.th}>Currency</th><th style={S.th}>Plan</th><th style={S.th}>Max devices</th><th style={S.th}>GMV this month</th>
+                        <th style={S.th}>Location</th>
+                        <th style={S.th}>Users</th>
+                        <th style={S.th}>Plan</th>
+                        <th style={S.th}>Max devices</th>
+                        <th style={S.th}>GMV this month</th>
+                        <th style={S.th}></th>
                       </tr></thead>
                       <tbody>
                         {locations.map(loc => {
                           const maxDev = loc.location_features?.find(f=>f.feature==='max_devices')?.price_per_month || 3;
                           const plan = loc.subscriptions?.[0]?.plan || 'free';
                           const gmv = loc.subscriptions?.[0]?.gmv_this_month || 0;
+                          const locUsers = usersForLocation(loc.id);
+                          const isManaging = editUser?.locationId === loc.id;
                           return (
                             <tr key={loc.id}>
                               <td style={{ ...S.td, fontWeight:700, color:'#f1f5f9' }}>{loc.name}</td>
-                              <td style={{ ...S.td, fontSize:12 }}>{loc.timezone}</td>
-                              <td style={S.td}>{loc.currency}</td>
+                              <td style={S.td}>
+                                {isManaging ? (
+                                  <div>
+                                    {users.map(u => {
+                                      const hasAccess = locUsers.some(lu => lu.id === u.id);
+                                      return (
+                                        <label key={u.id} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4, cursor:'pointer', fontSize:12 }}>
+                                          <input type="checkbox" checked={hasAccess}
+                                            onChange={async (e) => {
+                                              if (e.target.checked) {
+                                                await supabase.from('user_locations').insert({ user_id:u.id, location_id:loc.id });
+                                                if (!u.location_id) await supabase.from('user_profiles').update({ location_id:loc.id }).eq('id',u.id);
+                                              } else {
+                                                await supabase.from('user_locations').delete().eq('user_id',u.id).eq('location_id',loc.id);
+                                              }
+                                              await loadUsers(selectedOrg.id);
+                                            }}
+                                            style={{ accentColor:'#6366f1' }}
+                                          />
+                                          <span style={{ color:'#e2e8f0' }}>{u.email || u.full_name}</span>
+                                        </label>
+                                      );
+                                    })}
+                                    <button onClick={() => setEditUser(null)} style={{ ...S.btn, ...S.btnGhost, padding:'3px 10px', fontSize:11, marginTop:4 }}>Done</button>
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize:12, color: locUsers.length ? '#a5b4fc' : '#475569' }}>
+                                    {locUsers.length
+                                      ? locUsers.map(u => u.email || u.full_name).join(', ')
+                                      : 'No users'}
+                                  </div>
+                                )}
+                              </td>
                               <td style={S.td}><span style={{ ...S.badge, background:'#1e1a3a', color:'#a5b4fc' }}>{plan}</span></td>
                               <td style={S.td}>{maxDev}</td>
                               <td style={S.td}>£{parseFloat(gmv).toFixed(2)}</td>
+                              <td style={S.td}>
+                                {!isManaging && (
+                                  <button onClick={() => setEditUser({ locationId: loc.id })}
+                                    style={{ ...S.btn, ...S.btnGhost, padding:'5px 10px', fontSize:11 }}>
+                                    Manage users
+                                  </button>
+                                )}
+                              </td>
                             </tr>
                           );
                         })}
