@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.3.2';
+const VERSION = '3.3.3';
 
 const CHANGELOG = [
   {
@@ -917,22 +917,30 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
     return t;
   })();
 
+  // Check if this is a forced reclaim (user clicked Reconnect)
+  const isReclaim = !!sessionStorage.getItem(`rpos-reclaim-${pairedDevice.id}`);
+  if (isReclaim) sessionStorage.removeItem(`rpos-reclaim-${pairedDevice.id}`);
+
   const refreshDevice = async () => {
+      // If reclaiming: write our token to Supabase FIRST — this kicks the other session immediately
+      if (isReclaim) {
+        await supabase.from('devices').update({ session_token: mySessionToken }).eq('id', pairedDevice.id);
+      }
       const { data } = await supabase.from('devices').select('id, status, profile_id, name, session_token').eq('id', pairedDevice.id).single();
       if (!data || data.status === 'removed') {
-        // Only clear pairing if explicitly removed by admin
         localStorage.removeItem('rpos-device');
         setDeviceValid(false);
         return;
       }
-      // Check if another session has claimed this device
-      if (data.session_token && data.session_token !== mySessionToken) {
-        // Another browser/tab is using this device — we've been kicked
+      // Check if another session has claimed this device (only if we're NOT reclaiming)
+      if (!isReclaim && data.session_token && data.session_token !== mySessionToken) {
         setDeviceValid('kicked');
         return;
       }
-      // Claim this device for our session
-      await supabase.from('devices').update({ session_token: mySessionToken }).eq('id', pairedDevice.id);
+      // Claim this device for our session (if not already done via reclaim above)
+      if (!isReclaim) {
+        await supabase.from('devices').update({ session_token: mySessionToken }).eq('id', pairedDevice.id);
+      }
       // Refresh device name + profile
       const current = JSON.parse(localStorage.getItem('rpos-device') || '{}');
       if (data.name !== current.name || data.profile_id !== current.profileId) {
@@ -1009,7 +1017,12 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
         Another device or browser window has connected to <strong style={{color:'#e2e8f0'}}>{pairedDevice.name}</strong>.<br/>
         Each POS device can only be active in one place at a time.
       </div>
-      <a href={window.location.href} onClick={() => sessionStorage.removeItem(SESSION_TOKEN_KEY)}
+      <a href={window.location.href} onClick={() => {
+          // Set reclaim flag so on reload we write our token first, kicking the other session
+          sessionStorage.setItem(`rpos-reclaim-${pairedDevice.id}`, '1');
+          // Also generate a fresh token for this reclaim
+          sessionStorage.removeItem(SESSION_TOKEN_KEY);
+        }}
         style={{ padding:'14px 32px', borderRadius:12, background:'#6366f1', color:'#fff', fontWeight:700, fontSize:15, textDecoration:'none', fontFamily:'inherit', display:'inline-block' }}>
         Reconnect this terminal
       </a>
