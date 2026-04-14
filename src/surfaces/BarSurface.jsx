@@ -198,7 +198,7 @@ export default function BarSurface() {
       || item.name
       || item.label
       || 'Item';
-    console.log('[BAR] addToRound item keys:', Object.keys(item), '| resolved name:', name, '| opts.displayName:', opts.displayName, '| item.name:', item.name, '| item.menuName:', item.menuName, '| item.menu_name:', item.menu_name);
+
     setRoundItems(prev=>{
       // Same item+mods → increment qty
       const idx = prev.findIndex(r=>r.itemId===item.id && JSON.stringify(r.mods)===JSON.stringify(mods) && !opts.notes);
@@ -417,7 +417,7 @@ export default function BarSurface() {
                       {round.items.map((item,i)=>(
                         <div key={i} style={{ display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:3 }}>
                           <div>
-                            <span style={{ color:'var(--t2)' }}>{item.qty}× {item.name}</span>
+                            <span style={{ color:'var(--t2)' }}>{item.qty}× {item.menuName||item.menu_name||item.name||'Item'}</span>
                             {item.mods?.length>0&&<span style={{ color:'var(--t3)',marginLeft:5 }}>({item.mods.map(m=>m.label).join(', ')})</span>}
                             {item.notes&&<span style={{ color:'#f97316',marginLeft:5,fontStyle:'italic' }}>· {item.notes}</span>}
                           </div>
@@ -513,7 +513,7 @@ export default function BarSurface() {
                   <div style={{ height:3,background:is86?'var(--bg5)':m.color+'66',width:'100%' }}/>
                   <div style={{ padding:'10px 10px 9px',flex:1,display:'flex',flexDirection:'column' }}>
                     <div style={{ fontSize:20,marginBottom:6 }}>{m.icon}</div>
-                    <div style={{ fontSize:12,fontWeight:700,color:'var(--t1)',lineHeight:1.3,marginBottom:3,flex:1 }}>{item.name}</div>
+                    <div style={{ fontSize:12,fontWeight:700,color:'var(--t1)',lineHeight:1.3,marginBottom:3,flex:1 }}>{item.menuName||item.menu_name||item.name||'Item'}</div>
                     {item.description&&<div style={{ fontSize:10,color:'var(--t3)',lineHeight:1.3,marginBottom:4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{item.description}</div>}
                     <div style={{ fontSize:14,fontWeight:800,color:m.color,fontFamily:'DM Mono,monospace',marginTop:'auto' }}>
                       {item.type==='variants'?`from £${(fromPrice||0).toFixed(2)}`:`£${(fromPrice||0).toFixed(2)}`}
@@ -619,7 +619,7 @@ function RoundItem({ item, onQty, onRemove }) {
     <div style={{ marginBottom:6, paddingBottom:6, borderBottom:'1px solid rgba(232,160,32,.15)' }}>
       <div style={{ display:'flex',alignItems:'flex-start',gap:8 }}>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:12,fontWeight:600,color:'var(--t1)' }}>{item.name}</div>
+          <div style={{ fontSize:12,fontWeight:600,color:'var(--t1)' }}>{item.menuName||item.menu_name||item.name||'Item'}</div>
           {item.mods?.length>0&&<div style={{ fontSize:10,color:'var(--t3)' }}>{item.mods.map(m=>m.label).join(', ')}</div>}
           {item.notes&&!editNote&&<div style={{ fontSize:10,color:'#f97316',fontStyle:'italic' }}>📝 {item.notes}</div>}
           {editNote&&(
@@ -680,12 +680,12 @@ function QuickItemBuilder({ item, menuItems=[], modifierGroupDefs=[], onConfirm,
   };
 
   const selVariantName = selectedVariant ? (selectedVariant.menuName||selectedVariant.name) : null;
-  const displayName = item.type==='variants' && selVariantName ? `${item.menuName||item.name} — ${selVariantName}` : (item.menuName||item.name);
+  const displayName = item.type==='variants' && selVariantName ? `${item.menuName||item.menu_name||item.name} — ${selVariantName}` : (item.menuName||item.menu_name||item.name||'Item');
 
   return (
     <div style={{ padding:20 }}>
       <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16 }}>
-        <div style={{ fontSize:16,fontWeight:700,color:'var(--t1)' }}>{item.menuName||item.name}</div>
+        <div style={{ fontSize:16,fontWeight:700,color:'var(--t1)' }}>{item.menuName||item.menu_name||item.name||'Item'}</div>
         <button onClick={onCancel} style={{ background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:20 }}>×</button>
       </div>
 
