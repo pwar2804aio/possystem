@@ -187,8 +187,18 @@ export default function BarSurface() {
     const price = opts.linePrice!=null
       ? opts.linePrice/(opts.qty||1)
       : (item.price ?? item.pricing?.base ?? item.pricing?.dineIn ?? 0);
-    // name: displayName override → menuName (camelCase) → menu_name (snake from Supabase) → name → 'Item'
-    const name  = opts.displayName || item.menuName || item.menu_name || item.name || 'Item';
+    // name: ALL possible name fields resolved in order
+    const name = opts.displayName
+      || item.menuName
+      || item.menu_name
+      || item.kitchenName
+      || item.kitchen_name
+      || item.receiptName
+      || item.receipt_name
+      || item.name
+      || item.label
+      || 'Item';
+    console.log('[BAR] addToRound item keys:', Object.keys(item), '| resolved name:', name, '| opts.displayName:', opts.displayName, '| item.name:', item.name, '| item.menuName:', item.menuName, '| item.menu_name:', item.menu_name);
     setRoundItems(prev=>{
       // Same item+mods → increment qty
       const idx = prev.findIndex(r=>r.itemId===item.id && JSON.stringify(r.mods)===JSON.stringify(mods) && !opts.notes);
