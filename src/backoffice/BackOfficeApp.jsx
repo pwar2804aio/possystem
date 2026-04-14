@@ -281,10 +281,14 @@ function PushToPOSButton() {
     setPushing(true);
 
     // Build config snapshot — layout + menu config (not operational/session state)
+    // Include print routing config in snapshot
+    const printRouting = (() => { try { return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null'); } catch { return null; } })();
+
     const snapshot = {
       version: Date.now(),
       pushedAt: new Date().toISOString(),
       pushedBy: staff?.name || 'Manager',
+      printRouting: printRouting || { centres:[], routing:{} },
       tables: tables.map(t => ({
         id:t.id, label:t.label, x:t.x, y:t.y, w:t.w, h:t.h,
         shape:t.shape, maxCovers:t.maxCovers, section:t.section,

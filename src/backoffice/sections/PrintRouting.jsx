@@ -1,172 +1,441 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../../store';
-import { PRINTERS, PRODUCTION_CENTRES } from '../../data/seed';
 import { isMock, supabase, getLocationId } from '../../lib/supabase';
 
-export default function PrintRouting() {
-  const { printJobs, showToast } = useStore();
-  const [printers, setPrinters] = useState(isMock ? PRINTERS : []);
-  const [kdsDevices, setKdsDevices] = useState([]);
-  const [routing, setRouting] = useState(() => {
-    const m = {};
-    PRODUCTION_CENTRES.forEach(pc => { m[pc.id] = pc.printerId || null; });
-    return m;
-  });
-  const [reassigning, setReassigning] = useState(null);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const uid = () => `pc-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
 
+const CENTRE_ICONS = ['🔥','❄️','🍕','🍸','📋','🥗','🍔','🍣','🫕','🧁','🍳','🥩'];
+const CENTRE_TYPES = [
+  { id:'kitchen', label:'Kitchen' },
+  { id:'bar',     label:'Bar' },
+  { id:'expo',    label:'Expo / Pass' },
+  { id:'cold',    label:'Cold section' },
+];
+const PRINTER_MODELS = ['Sunmi NT311','Epson TM-T88','Star TSP100','Generic ESC/POS'];
+
+const load = () => {
+  try { return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres:[], routing:{} }; }
+  catch { return { centres:[], routing:{} }; }
+};
+const save = (data) => localStorage.setItem('rpos-print-routing', JSON.stringify(data));
+
+// Default routing entry for a centre
+const emptyRouting = () => ({ assignedCategories:[], excludedItems:[] });
+
+const S = {
+  page: { display:'flex', height:'100%', overflow:'hidden' },
+  left: { width:280, flexShrink:0, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden' },
+  right: { flex:1, overflowY:'auto', padding:28 },
+  h2: { fontSize:13, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', padding:'16px 14px 8px' },
+  centreRow: (active) => ({
+    padding:'10px 14px', cursor:'pointer', display:'flex', alignItems:'center', gap:10,
+    background: active ? 'var(--acc-d)' : 'transparent',
+    borderLeft: active ? '3px solid var(--acc)' : '3px solid transparent',
+    transition:'all .12s',
+  }),
+  btn: { padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:'inherit' },
+  btnPrimary: { background:'var(--acc)', color:'#fff' },
+  btnGhost: { background:'var(--bg3)', color:'var(--t2)', border:'1px solid var(--bdr)' },
+  btnDanger: { background:'#fef2f2', color:'#dc2626', border:'1px solid #fecaca' },
+  input: { width:'100%', padding:'8px 11px', borderRadius:8, border:'1px solid var(--bdr)', background:'var(--bg)', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' },
+  label: { fontSize:12, fontWeight:600, color:'var(--t3)', marginBottom:4, display:'block' },
+  card: { background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:20, marginBottom:16 },
+  cardTitle: { fontSize:14, fontWeight:700, color:'var(--t1)', marginBottom:14 },
+  row: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 },
+};
+
+// ─── Category/Item routing picker ─────────────────────────────────────────────
+function CategoryRouter({ centreId, routing, setRouting, menuCategories, menuItems }) {
+  const [expanded, setExpanded] = useState({});
+  const r = routing[centreId] || emptyRouting();
+
+  const toggleCategory = (catId) => {
+    const assigned = r.assignedCategories.includes(catId)
+      ? r.assignedCategories.filter(c => c !== catId)
+      : [...r.assignedCategories, catId];
+    // When unchecking a category, remove its items from excludedItems too
+    const excluded = r.assignedCategories.includes(catId)
+      ? r.excludedItems.filter(id => !menuItems.filter(i => i.cat===catId||i.cats?.includes(catId)).map(i=>i.id).includes(id))
+      : r.excludedItems;
+    setRouting(prev => ({ ...prev, [centreId]: { assignedCategories:assigned, excludedItems:excluded } }));
+  };
+
+  const toggleItem = (itemId) => {
+    const excluded = r.excludedItems.includes(itemId)
+      ? r.excludedItems.filter(id => id !== itemId)
+      : [...r.excludedItems, itemId];
+    setRouting(prev => ({ ...prev, [centreId]: { ...r, excludedItems:excluded } }));
+  };
+
+  const topLevelCats = menuCategories.filter(c => !c.parentId && !c.parent_id);
+
+  if (!topLevelCats.length) return (
+    <div style={{ textAlign:'center', padding:'32px 0', color:'var(--t3)', fontSize:13 }}>
+      No menu categories — add some in Menu Builder first
+    </div>
+  );
+
+  return (
+    <div>
+      {topLevelCats.map(cat => {
+        const catId = cat.id;
+        const isAssigned = r.assignedCategories.includes(catId);
+        const isExpanded = expanded[catId];
+        const catItems = menuItems.filter(i => !i.archived && (i.cat===catId || i.cats?.includes(catId)));
+        const excludedCount = catItems.filter(i => r.excludedItems.includes(i.id)).length;
+
+        return (
+          <div key={catId} style={{ marginBottom:6 }}>
+            {/* Category row */}
+            <div style={{
+              display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
+              background: isAssigned ? 'var(--acc-d)' : 'var(--bg3)',
+              border: `1.5px solid ${isAssigned ? 'var(--acc-b)' : 'var(--bdr)'}`,
+              borderRadius: isExpanded ? '10px 10px 0 0' : 10,
+              cursor:'pointer', transition:'all .12s',
+            }}>
+              {/* Checkbox */}
+              <div onClick={() => toggleCategory(catId)} style={{
+                width:18, height:18, borderRadius:5, flexShrink:0,
+                border:`2px solid ${isAssigned ? 'var(--acc)' : 'var(--bdr2)'}`,
+                background: isAssigned ? 'var(--acc)' : 'transparent',
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}>
+                {isAssigned && <span style={{ color:'#fff', fontSize:11, lineHeight:1 }}>✓</span>}
+              </div>
+
+              <span style={{ fontSize:18, lineHeight:1 }}>{cat.icon || '🍽'}</span>
+              <span onClick={() => toggleCategory(catId)} style={{ flex:1, fontSize:14, fontWeight:600, color: isAssigned ? 'var(--acc)' : 'var(--t1)' }}>
+                {cat.label || cat.name}
+              </span>
+
+              {isAssigned && excludedCount > 0 && (
+                <span style={{ fontSize:11, padding:'2px 7px', borderRadius:20, background:'var(--red)', color:'#fff', fontWeight:700 }}>
+                  {excludedCount} excluded
+                </span>
+              )}
+
+              {isAssigned && catItems.length > 0 && (
+                <button onClick={() => setExpanded(e => ({ ...e, [catId]: !isExpanded }))}
+                  style={{ background:'none', border:'none', cursor:'pointer', color:'var(--acc)', fontSize:14, padding:'0 4px' }}>
+                  {isExpanded ? '▲' : '▼'}
+                </button>
+              )}
+            </div>
+
+            {/* Expanded items */}
+            {isAssigned && isExpanded && catItems.length > 0 && (
+              <div style={{ border:'1.5px solid var(--acc-b)', borderTop:'none', borderRadius:'0 0 10px 10px', overflow:'hidden' }}>
+                {catItems.map((item, idx) => {
+                  const isExcluded = r.excludedItems.includes(item.id);
+                  const name = item.menuName || item.menu_name || item.name || 'Item';
+                  const price = item.pricing?.base ?? item.price ?? 0;
+                  return (
+                    <div key={item.id} onClick={() => toggleItem(item.id)} style={{
+                      display:'flex', alignItems:'center', gap:10, padding:'8px 14px',
+                      background: isExcluded ? 'rgba(220,38,38,0.04)' : 'var(--bg)',
+                      borderBottom: idx < catItems.length-1 ? '1px solid var(--bdr)' : 'none',
+                      cursor:'pointer', transition:'background .1s',
+                    }}>
+                      <div style={{
+                        width:16, height:16, borderRadius:4, flexShrink:0,
+                        border:`2px solid ${!isExcluded ? 'var(--acc)' : 'var(--bdr2)'}`,
+                        background: !isExcluded ? 'var(--acc)' : 'transparent',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                      }}>
+                        {!isExcluded && <span style={{ color:'#fff', fontSize:9, lineHeight:1 }}>✓</span>}
+                      </div>
+                      <span style={{ flex:1, fontSize:13, color: isExcluded ? 'var(--t4)' : 'var(--t1)', textDecoration: isExcluded ? 'line-through' : 'none' }}>
+                        {name}
+                      </span>
+                      <span style={{ fontSize:12, color:'var(--t3)', fontFamily:'monospace' }}>£{price.toFixed(2)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
+export default function PrintRouting() {
+  const { menuCategories, menuItems, markBOChange } = useStore();
+  const [data, setData] = useState(load);
+  const [routing, setRouting] = useState(load().routing || {});
+  const [selected, setSelected] = useState(null); // selected centre id
+  const [showAdd, setShowAdd] = useState(false);
+  const [editCentre, setEditCentre] = useState(null); // centre being edited
+  const [kdsDevices, setKdsDevices] = useState([]);
+  const [form, setForm] = useState({ name:'', icon:'🔥', type:'kitchen', printerName:'', printerIp:'', printerModel:'Sunmi NT311', kdsDeviceId:'' });
+
+  // Load KDS devices from Supabase
   useEffect(() => {
     if (isMock) return;
     (async () => {
       const locId = await getLocationId();
       if (!locId) return;
-      const { data } = await supabase.from('devices').select('id, name, centre_id, status').eq('location_id', locId).eq('type', 'kds');
-      if (data) setKdsDevices(data);
+      const { data: devs } = await supabase.from('devices').select('id,name,centre_id,status').eq('location_id',locId).eq('type','kds');
+      if (devs) setKdsDevices(devs);
     })();
   }, []);
 
-  const toggle = id => setPrinters(ps => ps.map(p => p.id === id ? { ...p, status: p.status === 'online' ? 'offline' : 'online' } : p));
-  const recentJobs = printJobs.slice(0, 20);
+  // Persist changes
+  useEffect(() => {
+    const saved = { centres: data.centres, routing };
+    save(saved);
+    markBOChange?.();
+  }, [data.centres, routing]);
+
+  const f = (k,v) => setForm(p => ({ ...p, [k]:v }));
+
+  const addCentre = () => {
+    if (!form.name.trim()) return;
+    const centre = {
+      id: uid(),
+      name: form.name.trim(),
+      icon: form.icon,
+      type: form.type,
+      printer: form.printerName ? { name:form.printerName, ip:form.printerIp, model:form.printerModel } : null,
+      kdsDeviceId: form.kdsDeviceId || null,
+    };
+    setData(d => ({ ...d, centres:[...d.centres, centre] }));
+    setRouting(r => ({ ...r, [centre.id]: emptyRouting() }));
+    setSelected(centre.id);
+    setShowAdd(false);
+    setForm({ name:'', icon:'🔥', type:'kitchen', printerName:'', printerIp:'', printerModel:'Sunmi NT311', kdsDeviceId:'' });
+  };
+
+  const saveCentre = () => {
+    setData(d => ({ ...d, centres: d.centres.map(c => c.id===editCentre.id ? {
+      ...c, name:form.name, icon:form.icon, type:form.type,
+      printer: form.printerName ? { name:form.printerName, ip:form.printerIp, model:form.printerModel } : null,
+      kdsDeviceId: form.kdsDeviceId || null,
+    } : c) }));
+    setEditCentre(null);
+  };
+
+  const deleteCentre = (id) => {
+    if (!confirm('Delete this production center?')) return;
+    setData(d => ({ ...d, centres: d.centres.filter(c => c.id !== id) }));
+    setRouting(r => { const copy = {...r}; delete copy[id]; return copy; });
+    if (selected === id) setSelected(null);
+  };
+
+  const startEdit = (c) => {
+    setEditCentre(c);
+    setForm({ name:c.name, icon:c.icon, type:c.type,
+      printerName: c.printer?.name||'', printerIp: c.printer?.ip||'', printerModel: c.printer?.model||'Sunmi NT311',
+      kdsDeviceId: c.kdsDeviceId||'' });
+    setShowAdd(false);
+  };
+
+  const activeCentre = data.centres.find(c => c.id === selected);
+
+  // Merge Supabase KDS data into centre display
+  const kdsForCentre = (centreId) => kdsDevices.find(k => k.centre_id === centreId);
+  const unassignedKds = kdsDevices.filter(k => !k.centre_id || !data.centres.find(c=>c.id===k.centre_id?.toString()));
+
+  const CentreForm = ({ onSave, onCancel }) => (
+    <div style={{ ...S.card, border:'2px solid var(--acc)' }}>
+      <div style={S.cardTitle}>{editCentre ? 'Edit production center' : 'New production center'}</div>
+      <div style={S.row}>
+        <div>
+          <label style={S.label}>Name *</label>
+          <input style={S.input} value={form.name} onChange={e=>f('name',e.target.value)} placeholder="e.g. Hot kitchen" autoFocus />
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'60px 1fr', gap:8 }}>
+          <div>
+            <label style={S.label}>Icon</label>
+            <select style={S.input} value={form.icon} onChange={e=>f('icon',e.target.value)}>
+              {CENTRE_ICONS.map(i=><option key={i} value={i}>{i}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Type</label>
+            <select style={S.input} value={form.type} onChange={e=>f('type',e.target.value)}>
+              {CENTRE_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', marginBottom:10, marginTop:4 }}>🖨 Printer (optional)</div>
+      <div style={S.row}>
+        <div>
+          <label style={S.label}>Printer name</label>
+          <input style={S.input} value={form.printerName} onChange={e=>f('printerName',e.target.value)} placeholder="Hot kitchen printer" />
+        </div>
+        <div>
+          <label style={S.label}>IP address</label>
+          <input style={S.input} value={form.printerIp} onChange={e=>f('printerIp',e.target.value)} placeholder="192.168.1.101" />
+        </div>
+      </div>
+      <div style={{ marginBottom:12 }}>
+        <label style={S.label}>Printer model</label>
+        <select style={{ ...S.input, maxWidth:300 }} value={form.printerModel} onChange={e=>f('printerModel',e.target.value)}>
+          {PRINTER_MODELS.map(m=><option key={m} value={m}>{m}</option>)}
+        </select>
+      </div>
+
+      {kdsDevices.length > 0 && (
+        <>
+          <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', marginBottom:10 }}>📺 KDS screen</div>
+          <div style={{ marginBottom:14 }}>
+            <label style={S.label}>Assign a KDS device</label>
+            <select style={{ ...S.input, maxWidth:300 }} value={form.kdsDeviceId} onChange={e=>f('kdsDeviceId',e.target.value)}>
+              <option value="">None</option>
+              {kdsDevices.map(k=><option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          </div>
+        </>
+      )}
+
+      <div style={{ display:'flex', gap:8 }}>
+        <button onClick={onSave} style={{ ...S.btn, ...S.btnPrimary }}>{editCentre ? 'Save changes' : 'Add center →'}</button>
+        <button onClick={onCancel} style={{ ...S.btn, ...S.btnGhost }}>Cancel</button>
+      </div>
+    </div>
+  );
 
   return (
-    <div style={{ flex:1, overflowY:'auto', padding:28 }}>
-
-      {/* Live job log */}
-      {recentJobs.length > 0 && (
-        <div style={{ marginBottom:28 }}>
-          <div style={{ fontSize:14, fontWeight:700, color:'var(--t2)', marginBottom:12 }}>Recent print jobs</div>
-          <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, overflow:'hidden' }}>
-            {recentJobs.map((job, i) => (
-              <div key={job.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 16px', borderBottom: i < recentJobs.length - 1 ? '1px solid var(--bdr)' : 'none', fontSize:12 }}>
-                <div style={{ width:8, height:8, borderRadius:'50%', background:'var(--grn)', flexShrink:0 }}/>
-                <span style={{ fontWeight:600, color:'var(--t1)', minWidth:80 }}>{job.tableLabel}</span>
-                <span style={{ color:'var(--t3)', flex:1 }}>{job.printerName}</span>
-                <span style={{ color:'var(--t4)', fontFamily:'var(--font-mono)' }}>
-                  {new Date(job.sentAt).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}
-                </span>
-                <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:20, background:'var(--grn-d)', border:'1px solid var(--grn-b)', color:'var(--grn)' }}>sent</span>
-              </div>
-            ))}
-          </div>
+    <div style={S.page}>
+      {/* ── Left: center list ── */}
+      <div style={S.left}>
+        <div style={{ padding:'16px 14px 8px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
+          <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)', marginBottom:2 }}>Print routing</div>
+          <div style={{ fontSize:12, color:'var(--t3)' }}>Route categories to production centers</div>
         </div>
-      )}
 
-      {/* Production centre routing */}
-      <div style={{ marginBottom:28 }}>
-        <div style={{ fontSize:14, fontWeight:700, color:'var(--t2)', marginBottom:4 }}>Production centre routing</div>
-        <div style={{ fontSize:12, color:'var(--t3)', marginBottom:12 }}>Each production centre routes tickets to one printer. Change assignment at any time.</div>
-        {PRODUCTION_CENTRES.map(pc => {
-          const assignedId = routing[pc.id];
-          const printer = printers.find(p => p.id === assignedId);
-          const isOnline = printer?.status === 'online';
-          return (
-            <div key={pc.id} style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:'14px 16px', marginBottom:8, display:'flex', alignItems:'center', gap:14 }}>
-              <div style={{ fontSize:24, flexShrink:0 }}>{pc.icon}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:14, fontWeight:600, color:'var(--t1)' }}>{pc.name}</div>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:3 }}>
-                  {/* KDS device for this centre */}
-                  {kdsDevices.filter(k => k.centre_id === pc.id).map(kds => (
-                    <span key={kds.id} style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.3)', color:'#818cf8', marginRight:6 }}>
-                      📺 {kds.name}
-                    </span>
-                  ))}
-                  {printer ? (
-                    <>
-                      <div style={{ width:7, height:7, borderRadius:'50%', background: isOnline ? 'var(--grn)' : 'var(--red)', flexShrink:0 }}/>
-                      <span style={{ fontSize:12, color:'var(--t3)' }}>→ {printer.name}</span>
-                      <span style={{ fontSize:11, color:'var(--t4)', fontFamily:'monospace' }}>{printer.ip}</span>
-                    </>
-                  ) : (
-                    <span style={{ fontSize:12, color:'var(--red)' }}>⚠ No printer assigned</span>
-                  )}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          <div style={S.h2}>Production centers</div>
+          {data.centres.length === 0 && (
+            <div style={{ padding:'12px 14px', fontSize:12, color:'var(--t3)' }}>No centers yet — add one below</div>
+          )}
+          {data.centres.map(c => {
+            const kds = kdsForCentre(c.id);
+            const r = routing[c.id] || emptyRouting();
+            const catCount = r.assignedCategories.length;
+            return (
+              <div key={c.id} onClick={()=>{ setSelected(c.id); setShowAdd(false); setEditCentre(null); }}
+                style={S.centreRow(selected===c.id)}>
+                <span style={{ fontSize:22, lineHeight:1 }}>{c.icon}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.name}</div>
+                  <div style={{ fontSize:11, color:'var(--t3)', display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
+                    {c.printer && <span>🖨 {c.printer.name}</span>}
+                    {kds && <span>📺 {kds.name}</span>}
+                    {catCount > 0 && <span style={{ color:'var(--acc)' }}>{catCount} categor{catCount===1?'y':'ies'}</span>}
+                  </div>
                 </div>
               </div>
-              <button onClick={() => setReassigning(pc.id)} style={{
-                padding:'6px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
-                background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:12, fontWeight:600,
-              }}>Reassign</button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Printers on network */}
-      <div>
-        <div style={{ fontSize:14, fontWeight:700, color:'var(--t2)', marginBottom:12 }}>Printers on network</div>
-        {printers.map(p => (
-          <div key={p.id} style={{ background:'var(--bg1)', border:`1px solid ${p.status === 'online' ? 'var(--grn-b)' : 'var(--red-b)'}`, borderRadius:12, padding:'14px 16px', marginBottom:8 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
-              <div style={{ width:10, height:10, borderRadius:'50%', background: p.status === 'online' ? 'var(--grn)' : 'var(--red)', flexShrink:0 }}/>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:14, fontWeight:600 }}>{p.name}</div>
-                <div style={{ fontSize:11, color:'var(--t3)', fontFamily:'monospace' }}>{p.model} · {p.ip}</div>
-              </div>
-              <span style={{
-                fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20,
-                background: p.status === 'online' ? 'var(--grn-d)' : 'var(--red-d)',
-                border:`1px solid ${p.status === 'online' ? 'var(--grn-b)' : 'var(--red-b)'}`,
-                color: p.status === 'online' ? 'var(--grn)' : 'var(--red)',
-              }}>{p.status}</span>
-            </div>
-            <div style={{ display:'flex', gap:6 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => showToast(`Test print sent to ${p.name}`, 'info')}>🖨 Test print</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => toggle(p.id)}>{p.status === 'online' ? 'Take offline' : 'Bring online'}</button>
-            </div>
-          </div>
-        ))}
-        <button className="btn btn-ghost" style={{ marginTop:8 }} onClick={() => showToast('Scanning for Sunmi NT311 printers…', 'info')}>+ Scan for printers</button>
-      </div>
-
-      {/* Reassign modal */}
-      {reassigning && (
-        <div className="modal-back" onClick={e => e.target === e.currentTarget && setReassigning(null)}>
-          <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:20, width:'100%', maxWidth:380, boxShadow:'var(--sh3)', overflow:'hidden' }}>
-            <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--bdr)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div style={{ fontSize:15, fontWeight:800 }}>Assign printer — {PRODUCTION_CENTRES.find(pc => pc.id === reassigning)?.name}</div>
-              <button onClick={() => setReassigning(null)} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:20 }}>×</button>
-            </div>
-            <div style={{ padding:'16px 20px' }}>
-              <div style={{ fontSize:12, color:'var(--t3)', marginBottom:14 }}>Select which printer receives tickets from this station.</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
-                {printers.map(p => {
-                  const selected = routing[reassigning] === p.id;
-                  return (
-                    <button key={p.id} onClick={() => setRouting(r => ({ ...r, [reassigning]: p.id }))} style={{
-                      padding:'12px 14px', borderRadius:10, cursor:'pointer', fontFamily:'inherit',
-                      textAlign:'left', display:'flex', alignItems:'center', gap:12,
-                      background: selected ? 'var(--acc-d)' : 'var(--bg3)',
-                      border:`1.5px solid ${selected ? 'var(--acc)' : 'var(--bdr)'}`,
-                      transition:'all .1s',
-                    }}>
-                      <div style={{ width:8, height:8, borderRadius:'50%', background: p.status === 'online' ? 'var(--grn)' : 'var(--red)', flexShrink:0 }}/>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight:600, color: selected ? 'var(--acc)' : 'var(--t1)' }}>{p.name}</div>
-                        <div style={{ fontSize:11, color:'var(--t4)', fontFamily:'monospace' }}>{p.model} · {p.ip}</div>
-                      </div>
-                      {selected && <span style={{ fontSize:12, fontWeight:800, color:'var(--acc)' }}>✓</span>}
-                    </button>
-                  );
-                })}
-                <button onClick={() => setRouting(r => ({ ...r, [reassigning]: null }))} style={{
-                  padding:'10px 14px', borderRadius:10, cursor:'pointer', fontFamily:'inherit',
-                  background: !routing[reassigning] ? 'var(--red-d)' : 'var(--bg3)',
-                  border:`1.5px solid ${!routing[reassigning] ? 'var(--red)' : 'var(--bdr)'}`,
-                  color: !routing[reassigning] ? 'var(--red)' : 'var(--t3)',
-                  fontSize:12, fontWeight:600, textAlign:'left',
-                }}>No printer (tickets not printed)</button>
-              </div>
-              <div style={{ display:'flex', gap:8 }}>
-                <button className="btn btn-ghost" style={{ flex:1 }} onClick={() => setReassigning(null)}>Cancel</button>
-                <button className="btn btn-acc" style={{ flex:2, height:40 }} onClick={() => {
-                  const p = printers.find(x => x.id === routing[reassigning]);
-                  showToast(p ? `${PRODUCTION_CENTRES.find(pc=>pc.id===reassigning)?.name} → ${p.name}` : 'Printer unassigned', 'success');
-                  setReassigning(null);
-                }}>Save routing</button>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      )}
+
+        <div style={{ padding:12, borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
+          <button onClick={()=>{ setShowAdd(true); setSelected(null); setEditCentre(null); setForm({name:'',icon:'🔥',type:'kitchen',printerName:'',printerIp:'',printerModel:'Sunmi NT311',kdsDeviceId:''}); }}
+            style={{ ...S.btn, ...S.btnPrimary, width:'100%' }}>
+            + Add production center
+          </button>
+        </div>
+      </div>
+
+      {/* ── Right: detail panel ── */}
+      <div style={S.right}>
+        {/* Add new center form */}
+        {showAdd && (
+          <CentreForm onSave={addCentre} onCancel={()=>setShowAdd(false)} />
+        )}
+
+        {/* Edit center form */}
+        {editCentre && (
+          <CentreForm onSave={saveCentre} onCancel={()=>setEditCentre(null)} />
+        )}
+
+        {/* Center detail */}
+        {activeCentre && !editCentre && (
+          <>
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+              <span style={{ fontSize:36 }}>{activeCentre.icon}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:22, fontWeight:800, color:'var(--t1)' }}>{activeCentre.name}</div>
+                <div style={{ fontSize:12, color:'var(--t3)' }}>
+                  {CENTRE_TYPES.find(t=>t.id===activeCentre.type)?.label}
+                  {activeCentre.printer && ` · 🖨 ${activeCentre.printer.name} (${activeCentre.printer.ip})`}
+                  {kdsForCentre(activeCentre.id) && ` · 📺 ${kdsForCentre(activeCentre.id).name}`}
+                </div>
+              </div>
+              <button onClick={()=>startEdit(activeCentre)} style={{ ...S.btn, ...S.btnGhost, fontSize:12 }}>Edit</button>
+              <button onClick={()=>deleteCentre(activeCentre.id)} style={{ ...S.btn, ...S.btnDanger, fontSize:12 }}>Delete</button>
+            </div>
+
+            {/* Hardware summary */}
+            <div style={{ ...S.card, display:'flex', gap:16 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>🖨 Printer</div>
+                {activeCentre.printer ? (
+                  <>
+                    <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>{activeCentre.printer.name}</div>
+                    <div style={{ fontSize:12, color:'var(--t3)' }}>{activeCentre.printer.model} · {activeCentre.printer.ip || 'IP not set'}</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize:13, color:'var(--t3)' }}>No printer assigned — <button onClick={()=>startEdit(activeCentre)} style={{ background:'none', border:'none', color:'var(--acc)', cursor:'pointer', fontFamily:'inherit', fontSize:13, padding:0 }}>Add one</button></div>
+                )}
+              </div>
+              <div style={{ width:1, background:'var(--bdr)' }}/>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>📺 KDS Screen</div>
+                {kdsForCentre(activeCentre.id) ? (
+                  <>
+                    <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>{kdsForCentre(activeCentre.id).name}</div>
+                    <div style={{ fontSize:12, color:'var(--t3)' }}>Kitchen display · {kdsForCentre(activeCentre.id).status || 'active'}</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize:13, color:'var(--t3)' }}>No KDS assigned{kdsDevices.length > 0 ? ' — ' : ''}{kdsDevices.length > 0 && <button onClick={()=>startEdit(activeCentre)} style={{ background:'none', border:'none', color:'var(--acc)', cursor:'pointer', fontFamily:'inherit', fontSize:13, padding:0 }}>Assign one</button>}</div>
+                )}
+              </div>
+            </div>
+
+            {/* Category routing */}
+            <div style={{ ...S.card }}>
+              <div style={S.cardTitle}>
+                📋 Category routing
+                <span style={{ fontSize:12, fontWeight:400, color:'var(--t3)', marginLeft:8 }}>
+                  Select which categories print/display at this center
+                </span>
+              </div>
+              <CategoryRouter
+                centreId={activeCentre.id}
+                routing={routing}
+                setRouting={setRouting}
+                menuCategories={menuCategories || []}
+                menuItems={menuItems || []}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Empty state */}
+        {!activeCentre && !showAdd && !editCentre && (
+          <div style={{ textAlign:'center', padding:'80px 40px', color:'var(--t3)' }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>🖨</div>
+            <div style={{ fontSize:18, fontWeight:700, color:'var(--t2)', marginBottom:8 }}>Print routing</div>
+            <div style={{ fontSize:14, lineHeight:1.6, marginBottom:24 }}>
+              Create production centers for your kitchen, bar and expo stations.<br/>
+              Assign printers, KDS screens and menu categories to each.
+            </div>
+            <button onClick={()=>setShowAdd(true)} style={{ ...S.btn, ...S.btnPrimary, fontSize:14 }}>
+              + Add your first production center
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
