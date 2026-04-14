@@ -137,7 +137,7 @@ const labelStyle = { display:'block', fontSize:11, fontWeight:700, color:'var(--
 
 // ─── Main Bar Surface ─────────────────────────────────────────────────────────
 export default function BarSurface() {
-  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, quickScreenIds, menuItems: storeMenuItems, modifierGroupDefs, menus, deviceConfig } = useStore();
+  const { tabs, activeTabId, setActiveTab, openTab, addRoundToTab, updateTabNote, updateTabStatus, closeTab, voidTabRound, seedTabs, showToast, eightySixIds, allergens, setPendingItem, clearPendingItem, pendingItem, menuCategories, quickScreenIds, menuItems: storeMenuItems, modifierGroupDefs, menus, deviceConfig, staff, recordWalkInClosedCheck } = useStore();
 
   const [showOpenModal, setShowOpenModal]   = useState(false);
   const [cat, setCat]                       = useState('all');
@@ -536,8 +536,25 @@ export default function BarSurface() {
             tableId={activeTab.tableId}
             tabName={activeTab.name}
             onClose={() => setShowTabCheckout(false)}
-            onComplete={() => {
+            onComplete={(payInfo) => {
               setShowTabCheckout(false);
+              // Record the tab payment to closed checks (for reports + history)
+              const allItems = activeTab.rounds.flatMap(r => r.items.filter(i => !i.voided));
+              const subtotal = activeTab.total || 0;
+              recordWalkInClosedCheck({
+                ref: `#TAB-${Math.floor(1000+Math.random()*9000)}`,
+                server: staff?.name || 'Staff',
+                covers: 1,
+                orderType: 'bar-tab',
+                customer: { name: activeTab.name },
+                items: allItems,
+                discounts: [],
+                subtotal,
+                service: 0,
+                tip: payInfo?.tip || 0,
+                total: payInfo?.grand || subtotal,
+                method: payInfo?.method || 'card',
+              });
               closeTab(activeTab.id);
               setActiveTab(null);
               showToast(`${activeTab.name}'s tab paid and closed`, 'success');

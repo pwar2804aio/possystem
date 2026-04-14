@@ -926,6 +926,12 @@ export const useStore = create((set, get) => ({
         if(t.id!==activeTableId||!t.session)return t;
         return {...t,session:{...t.session,items:t.session.items.map(i=>i.uid===itemUid?{...i,course}:i)}};
       })}) );
+    } else {
+      // Walk-in / takeaway / collection order
+      set(s=>({ walkInOrder: s.walkInOrder ? {
+        ...s.walkInOrder,
+        items: (s.walkInOrder.items||[]).map(i=>i.uid===itemUid?{...i,course}:i)
+      } : s.walkInOrder }));
     }
   },
 
@@ -1264,6 +1270,20 @@ export const useStore = create((set, get) => ({
     set(s => ({ closedChecks: [record, ...s.closedChecks] }));
     import('../lib/db.js').then(({ insertClosedCheck }) => insertClosedCheck(record));
     return record;
+  },
+
+  // Direct record insertion — used by bar tabs and other ad-hoc payment flows
+  recordWalkInClosedCheck: (record) => {
+    const fullRecord = {
+      id: `chk-${Date.now()}`,
+      closedAt: Date.now(),
+      status: 'paid',
+      refunds: [],
+      ...record,
+    };
+    set(s => ({ closedChecks: [fullRecord, ...s.closedChecks] }));
+    import('../lib/db.js').then(({ insertClosedCheck }) => insertClosedCheck(fullRecord).catch(()=>{}));
+    return fullRecord;
   },
 
   recordWalkInClosed: (walkInOrder, orderType, customer, paymentInfo = {}) => {
