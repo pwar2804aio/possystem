@@ -12,24 +12,25 @@ export default function PairingScreen({ onPaired }) {
     if (!clean) return setError('Enter the pairing code from your back office');
     setLoading(true); setError('');
 
-    // Look up the code in Supabase
+    // Look up the code in Supabase — allow re-pairing even if already active
     const { data, error: err } = await supabase
       .from('devices')
       .select('*, locations(*)')
       .eq('pairing_code', clean)
-      .eq('status', 'unpaired')
+      .neq('status', 'removed')  // only block explicitly removed devices
       .single();
 
     if (err || !data) {
       setLoading(false);
-      return setError('Invalid or already-used pairing code. Generate a new one in your back office.');
+      return setError('Pairing code not found. Check the code and try again.');
     }
 
-    // Mark device as active
+    // Mark device as active (re-pairing kicks any existing session via session_token realtime)
     await supabase.from('devices').update({
       status: 'active',
       paired_at: new Date().toISOString(),
       last_seen: new Date().toISOString(),
+      session_token: null,  // clear session token so old session gets kicked on next check
     }).eq('id', data.id);
 
     // Store device identity in localStorage
