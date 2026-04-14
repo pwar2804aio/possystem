@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
 
-const PRODUCTION_CENTRES = [
+const DEFAULT_PRODUCTION_CENTRES = [
   { id:'pc1', name:'Hot kitchen',  icon:'🔥' },
   { id:'pc2', name:'Cold section', icon:'❄️'  },
   { id:'pc3', name:'Pizza oven',   icon:'🍕' },
   { id:'pc4', name:'Bar',          icon:'🍸' },
   { id:'pc5', name:'Expo / pass',  icon:'📋' },
 ];
+
+function getProductionCentres() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('rpos-print-routing') || 'null');
+    // Use user-created centres if they exist, otherwise fall back to defaults
+    return stored?.centres?.length ? stored.centres : DEFAULT_PRODUCTION_CENTRES;
+  } catch { return DEFAULT_PRODUCTION_CENTRES; }
+}
 
 const ADJECTIVES = ['APPLE','BAKER','CEDAR','DONUT','EMBER','FROST','GROVE','HONEY','IVORY','JAZZY'];
 const genCode = () => `${ADJECTIVES[Math.floor(Math.random()*10)]}-${Math.floor(1000+Math.random()*9000)}`;
@@ -191,7 +199,7 @@ export default function DeviceRegistry() {
                       <label style={S.label}>Production center</label>
                       <select style={S.input} value={newDevice.centreId||''} onChange={e=>setNewDevice(d=>({...d,centreId:e.target.value}))}>
                         <option value="">Select production center…</option>
-                        {PRODUCTION_CENTRES.map(pc=><option key={pc.id} value={pc.id}>{pc.icon} {pc.name}</option>)}
+                        {getProductionCentres().map(pc=><option key={pc.id} value={pc.id}>{pc.icon} {pc.name}</option>)}
                       </select>
                     </>
                   ) : (
@@ -285,7 +293,7 @@ export default function DeviceRegistry() {
                         <label style={S.label}>Production center</label>
                         <select style={S.input} value={editForm.centreId||''} onChange={e=>setEditForm(f=>({...f,centreId:e.target.value}))}>
                           <option value="">Select center…</option>
-                          {PRODUCTION_CENTRES.map(pc=><option key={pc.id} value={pc.id}>{pc.icon} {pc.name}</option>)}
+                          {getProductionCentres().map(pc=><option key={pc.id} value={pc.id}>{pc.icon} {pc.name}</option>)}
                         </select>
                       </>
                     ) : (
