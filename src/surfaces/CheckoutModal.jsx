@@ -5,6 +5,7 @@ import SplitModal from '../components/SplitModal';
 
 // ─── Tip picker ───────────────────────────────────────────────────────────────
 function TipPicker({ total, onSelect }) {
+  const compact = useCompact();
   const [custom, setCustom] = useState('');
   const [active, setActive] = useState(12.5);
   const presets = [0, 10, 12.5, 15, 20];
@@ -76,6 +77,7 @@ function TipPicker({ total, onSelect }) {
 
 // ─── Card terminal ────────────────────────────────────────────────────────────
 function CardTerminal({ grand, onComplete, onBack }) {
+  const compact = useCompact();
   const [state, setState] = useState('waiting');
 
   useEffect(()=>{
@@ -157,6 +159,7 @@ function CardTerminal({ grand, onComplete, onBack }) {
 
 // ─── Cash transaction ─────────────────────────────────────────────────────────
 function CashTransaction({ grand, onComplete, onBack }) {
+  const compact = useCompact();
   const [entered, setEntered] = useState('');
   const tendered = parseFloat(entered) || 0;
   const change   = Math.max(0, tendered - grand);

@@ -915,7 +915,8 @@ export default function POSSurface() {
   );
 }
 
-function OrderItem({ item, covers, orderType, seatList, onQty, onRemove, onNote, onSeat, onCourse, onVoid, onDiscount, onRemoveDiscount }) {
+function OrderItem({
+  const compact = useCompact(); item, covers, orderType, seatList, onQty, onRemove, onNote, onSeat, onCourse, onVoid, onDiscount, onRemoveDiscount }) {
   const [showMenu, setShowMenu] = useState(false);
   const [editNote, setEditNote] = useState(false);
   const [noteVal, setNoteVal]   = useState(item.notes||'');
