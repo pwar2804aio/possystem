@@ -7,45 +7,39 @@ const S = {
   sidebar: { width:220, background:'#1a1d27', borderRight:'1px solid #2d3148', display:'flex', flexDirection:'column', padding:'24px 0' },
   brand: { padding:'0 20px 24px', borderBottom:'1px solid #2d3148', marginBottom:16 },
   brandBadge: { width:36, height:36, borderRadius:10, background:'#6366f1', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800, color:'#fff', marginBottom:10 },
-  brandName: { fontSize:14, fontWeight:800, color:'#f1f5f9' },
-  brandSub: { fontSize:11, color:'#6366f1', fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase' },
   main: { flex:1, overflowY:'auto', padding:'32px 40px' },
   h1: { fontSize:22, fontWeight:800, color:'#f1f5f9', marginBottom:4 },
-  sub: { fontSize:13, color:'#64748b', marginBottom:32 },
+  sub: { fontSize:13, color:'#64748b', marginBottom:28 },
   card: { background:'#1a1d27', border:'1px solid #2d3148', borderRadius:12, padding:24, marginBottom:20 },
-  cardTitle: { fontSize:14, fontWeight:700, color:'#e2e8f0', marginBottom:16 },
   label: { fontSize:12, fontWeight:600, color:'#94a3b8', marginBottom:5, display:'block' },
   input: { width:'100%', padding:'9px 12px', borderRadius:8, border:'1px solid #2d3148', background:'#0f1117', color:'#f1f5f9', fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' },
   row: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 },
   row3: { display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 },
-  btn: { padding:'9px 18px', borderRadius:8, border:'none', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:'inherit' },
+  btn: { padding:'8px 16px', borderRadius:8, border:'none', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:'inherit' },
   btnPrimary: { background:'#6366f1', color:'#fff' },
-  btnGhost: { background:'#1a1d27', color:'#94a3b8', border:'1px solid #2d3148' },
-  table: { width:'100%', borderCollapse:'collapse', fontSize:13 },
-  th: { textAlign:'left', padding:'8px 12px', borderBottom:'1px solid #2d3148', fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.05em' },
-  td: { padding:'12px', borderBottom:'1px solid #1e2235', color:'#94a3b8', verticalAlign:'top' },
+  btnGhost: { background:'transparent', color:'#94a3b8', border:'1px solid #2d3148' },
+  btnDanger: { background:'transparent', color:'#ef4444', border:'1px solid #7f1d1d' },
   badge: { padding:'3px 8px', borderRadius:20, fontSize:11, fontWeight:700 },
 };
 
-// Direct REST fetch — bypasses supabase client auth init delay
 async function sbFetch(path, opts = {}) {
   const auth = JSON.parse(localStorage.getItem('rpos-auth') || 'null');
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
   const url = import.meta.env.VITE_SUPABASE_URL;
-  if (!url || !key) return { data: null, error: { message: 'Supabase not configured' } };
+  if (!url || !key) return { data: null, error: { message: 'Not configured' } };
   const res = await fetch(`${url}/rest/v1/${path}`, {
     headers: {
       'apikey': key,
       'Authorization': `Bearer ${auth?.access_token || key}`,
       'Content-Type': 'application/json',
-      'Prefer': opts.prefer || 'return=representation',
+      'Prefer': opts.prefer !== undefined ? opts.prefer : 'return=representation',
     },
     method: opts.method || 'GET',
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) return { data: null, error: { message: data?.message || res.statusText } };
+  const data = text ? (() => { try { return JSON.parse(text); } catch { return null; } })() : null;
+  if (!res.ok) return { data: null, error: { message: data?.message || data?.details || res.statusText } };
   return { data, error: null };
 }
 
@@ -54,17 +48,11 @@ export default function CompanyAdminApp() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const fallback = setTimeout(() => setAuthChecked(true), 4000);
-    // Check session via direct REST (faster than supabase client init)
     const auth = JSON.parse(localStorage.getItem('rpos-auth') || 'null');
     if (auth?.user && auth?.expires_at && Date.now() < auth.expires_at * 1000) {
-      clearTimeout(fallback);
       setAuthUser(auth.user);
-      setAuthChecked(true);
-    } else {
-      clearTimeout(fallback);
-      setAuthChecked(true);
     }
+    setAuthChecked(true);
   }, []);
 
   if (!authChecked) return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0f1117', color:'#64748b', fontSize:13 }}>Loading…</div>;
@@ -79,7 +67,9 @@ function AdminPanel({ authUser }) {
   const [selectedOrg, setSelectedOrg] = useState(null);
   const [locations, setLocations] = useState([]);
   const [users, setUsers] = useState([]);
-  const [editUsersFor, setEditUsersFor] = useState(null); // location id being edited
+  const [editUsersFor, setEditUsersFor] = useState(null);
+  const [editingOrg, setEditingOrg] = useState(null);   // { id, name }
+  const [editingLoc, setEditingLoc] = useState(null);   // { id, name }
   const [form, setForm] = useState({});
   const [working, setWorking] = useState(false);
   const [msg, setMsg] = useState({ type:'', text:'' });
@@ -91,33 +81,13 @@ function AdminPanel({ authUser }) {
     try {
       const { data } = await sbFetch('organisations?select=*&order=created_at.desc');
       setOrgs(Array.isArray(data) ? data : []);
-    } catch(e) { setOrgs([]); }
+    } catch { setOrgs([]); }
     setLoading(false);
   };
 
-  const [gmvByLocation, setGmvByLocation] = useState({});
-
   const loadLocations = async (orgId) => {
     const { data } = await sbFetch(`locations?select=*,subscriptions(plan,gmv_this_month),location_features(feature,price_per_month)&org_id=eq.${orgId}&order=created_at.asc`);
-    const locs = Array.isArray(data) ? data : [];
-    setLocations(locs);
-    // Load real GMV from closed_checks for current month
-    if (locs.length) {
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-      const locIds = locs.map(l => l.id).join(',');
-      const { data: checks } = await sbFetch(`closed_checks?select=location_id,total&created_at=gte.${monthStart}&location_id=in.(${locIds})&status=neq.refunded`);
-      if (Array.isArray(checks)) {
-        const gmv = {};
-        checks.forEach(c => {
-          gmv[c.location_id] = (gmv[c.location_id] || 0) + (parseFloat(c.total) || 0);
-        });
-        setGmvByLocation(gmv);
-        // Update subscriptions table with live GMV
-        for (const [locId, amount] of Object.entries(gmv)) {
-          await sbFetch(`subscriptions?location_id=eq.${locId}`, { method:'PATCH', body:{ gmv_this_month: amount }, prefer:'' });
-        }
-      }
-    }
+    setLocations(Array.isArray(data) ? data : []);
   };
 
   const loadUsers = async (orgId) => {
@@ -130,6 +100,7 @@ function AdminPanel({ authUser }) {
     setSection('org-detail');
     setMsg({ type:'', text:'' });
     setEditUsersFor(null);
+    setEditingLoc(null);
     await Promise.all([loadLocations(org.id), loadUsers(org.id)]);
   };
 
@@ -137,8 +108,101 @@ function AdminPanel({ authUser }) {
   const ok = t => setMsg({ type:'ok', text:t });
   const err = t => setMsg({ type:'err', text:t });
 
+  // ── Rename org ──────────────────────────────────────────────────────────────
+  const saveRenameOrg = async () => {
+    if (!editingOrg?.name?.trim()) return;
+    await sbFetch(`organisations?id=eq.${editingOrg.id}`, { method:'PATCH', body:{ name: editingOrg.name.trim() }, prefer:'' });
+    setEditingOrg(null);
+    await loadOrgs();
+    if (selectedOrg?.id === editingOrg.id) setSelectedOrg(o => ({ ...o, name: editingOrg.name.trim() }));
+    ok('✓ Organisation renamed');
+  };
+
+  // ── Delete org ───────────────────────────────────────────────────────────────
+  const deleteOrg = async (org) => {
+    if (!confirm(`Delete "${org.name}" and ALL its locations, devices, menus and data? This cannot be undone.`)) return;
+    setWorking(true);
+    setMsg({ type:'', text:'' });
+    try {
+      // Get all locations for this org
+      const { data: locs } = await sbFetch(`locations?org_id=eq.${org.id}&select=id`);
+      const locIds = (locs || []).map(l => l.id);
+      // Delete location data in order
+      for (const locId of locIds) {
+        await sbFetch(`kds_tickets?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`closed_checks?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`config_pushes?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`devices?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`staff_members?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`floor_tables?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`menu_items?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`menu_categories?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`menus?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`sections?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`subscriptions?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`location_features?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+        await sbFetch(`eighty_six?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      }
+      // Delete user_locations and user_profiles for this org
+      const { data: ups } = await sbFetch(`user_profiles?org_id=eq.${org.id}&select=id`);
+      for (const up of ups || []) {
+        await sbFetch(`user_locations?user_id=eq.${up.id}`, { method:'DELETE', prefer:'' });
+      }
+      await sbFetch(`user_profiles?org_id=eq.${org.id}`, { method:'DELETE', prefer:'' });
+      // Finally delete locations and org
+      if (locIds.length) await sbFetch(`locations?org_id=eq.${org.id}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`organisations?id=eq.${org.id}`, { method:'DELETE', prefer:'' });
+      if (selectedOrg?.id === org.id) { setSelectedOrg(null); setSection('orgs'); }
+      await loadOrgs();
+      ok(`✓ "${org.name}" and all its data permanently deleted`);
+    } catch(e) { err('Delete failed: ' + e.message); }
+    setWorking(false);
+  };
+
+  // ── Rename location ──────────────────────────────────────────────────────────
+  const saveRenameLocation = async () => {
+    if (!editingLoc?.name?.trim()) return;
+    await sbFetch(`locations?id=eq.${editingLoc.id}`, { method:'PATCH', body:{ name: editingLoc.name.trim() }, prefer:'' });
+    setEditingLoc(null);
+    await loadLocations(selectedOrg.id);
+    ok('✓ Location renamed');
+  };
+
+  // ── Delete location ──────────────────────────────────────────────────────────
+  const deleteLocation = async (loc) => {
+    if (!confirm(`Delete "${loc.name}" and ALL its devices, menus, floor plan and data? This cannot be undone.`)) return;
+    setWorking(true);
+    setMsg({ type:'', text:'' });
+    try {
+      const locId = loc.id;
+      await sbFetch(`kds_tickets?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`closed_checks?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`config_pushes?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`devices?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`staff_members?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`floor_tables?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`menu_items?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`menu_categories?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`menus?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`sections?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`subscriptions?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`location_features?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await sbFetch(`eighty_six?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      // Remove user_locations links but keep user_profiles
+      await sbFetch(`user_locations?location_id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      // Null out primary location_id on any user who had this as primary
+      await sbFetch(`user_profiles?location_id=eq.${locId}`, { method:'PATCH', body:{ location_id: null }, prefer:'' });
+      await sbFetch(`locations?id=eq.${locId}`, { method:'DELETE', prefer:'' });
+      await loadLocations(selectedOrg.id);
+      await loadUsers(selectedOrg.id);
+      ok(`✓ "${loc.name}" and all its data permanently deleted`);
+    } catch(e) { err('Delete failed: ' + e.message); }
+    setWorking(false);
+  };
+
+  // ── Create org ───────────────────────────────────────────────────────────────
   const createOrg = async () => {
-    if (!form.name?.trim()) return err('Organisation name is required');
+    if (!form.name?.trim()) return err('Name required');
     setWorking(true); setMsg({ type:'', text:'' });
     const slug = (form.slug || form.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
     const { data, error:e } = await sbFetch('organisations', { method:'POST', body:{ name:form.name.trim(), slug, status:'active' } });
@@ -151,8 +215,9 @@ function AdminPanel({ authUser }) {
     await selectOrg(org);
   };
 
+  // ── Create location ──────────────────────────────────────────────────────────
   const createLocation = async () => {
-    if (!form.locName?.trim()) return err('Location name required');
+    if (!form.locName?.trim()) return err('Name required');
     setWorking(true); setMsg({ type:'', text:'' });
     const { data, error:e } = await sbFetch('locations', { method:'POST', body:{
       org_id: selectedOrg.id, name: form.locName.trim(),
@@ -171,17 +236,17 @@ function AdminPanel({ authUser }) {
     await loadLocations(selectedOrg.id);
   };
 
+  // ── Create user ──────────────────────────────────────────────────────────────
   const createUser = async () => {
     if (!form.inviteEmail?.trim()) return err('Email required');
     if (!form.invitePassword?.trim() || form.invitePassword.length < 8) return err('Password min 8 chars');
     setWorking(true); setMsg({ type:'', text:'' });
     const auth = JSON.parse(localStorage.getItem('rpos-auth') || 'null');
-    const assignLocationId = form.inviteLocationId || locations[0]?.id || null;
     try {
       const resp = await fetch('https://tbetcegmszzotrwdtqhi.supabase.co/functions/v1/create-user', {
         method:'POST',
         headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${auth?.access_token}` },
-        body: JSON.stringify({ email:form.inviteEmail.trim(), password:form.invitePassword, fullName:form.inviteName||'', orgId:selectedOrg.id, locationId:assignLocationId, role:'owner' }),
+        body: JSON.stringify({ email:form.inviteEmail.trim(), password:form.invitePassword, fullName:form.inviteName||'', orgId:selectedOrg.id, locationId:form.inviteLocationId||locations[0]?.id||null, role:'owner' }),
       });
       const result = await resp.json();
       setWorking(false);
@@ -198,9 +263,8 @@ function AdminPanel({ authUser }) {
       await sbFetch(`user_locations?user_id=eq.${userId}&location_id=eq.${locationId}`, { method:'DELETE', prefer:'' });
     } else {
       await sbFetch('user_locations', { method:'POST', body:{ user_id:userId, location_id:locationId } });
-      // Set as primary location if they don't have one
       const u = users.find(u => u.id === userId);
-      if (!u?.location_id) await sbFetch(`user_profiles?id=eq.${userId}`, { method:'PATCH', body:{ location_id:locationId } });
+      if (!u?.location_id) await sbFetch(`user_profiles?id=eq.${userId}`, { method:'PATCH', body:{ location_id:locationId }, prefer:'' });
     }
     await loadUsers(selectedOrg.id);
   };
@@ -213,35 +277,42 @@ function AdminPanel({ authUser }) {
 
   return (
     <div style={S.shell}>
+      {/* ── Sidebar ── */}
       <div style={S.sidebar}>
         <div style={S.brand}>
           <div style={S.brandBadge}>R</div>
-          <div style={S.brandName}>Restaurant OS</div>
-          <div style={S.brandSub}>Company Admin</div>
+          <div style={{ fontSize:14, fontWeight:800, color:'#f1f5f9' }}>Restaurant OS</div>
+          <div style={{ fontSize:11, color:'#6366f1', fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase' }}>Company Admin</div>
         </div>
-        {[{ id:'orgs', label:'All organisations', icon:'🏢' }, { id:'new-org', label:'+ New organisation', icon:'' }].map(n => (
+        {[{ id:'orgs', label:'All organisations', icon:'🏢' }, { id:'new-org', label:'+ New organisation' }].map(n => (
           <button key={n.id} onClick={() => { setSection(n.id); setMsg({ type:'', text:'' }); }}
-            style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 16px', margin:'1px 8px', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:(section===n.id||section==='org-detail'&&n.id==='orgs')?700:400, background:(section===n.id||section==='org-detail'&&n.id==='orgs')?'#2d3148':'none', color:(section===n.id||section==='org-detail'&&n.id==='orgs')?'#f1f5f9':'#94a3b8', border:'none', fontFamily:'inherit', width:'calc(100% - 16px)', textAlign:'left' }}>
+            style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 16px', margin:'1px 8px', borderRadius:8, cursor:'pointer', fontSize:13,
+              fontWeight: section===n.id ? 700 : 400,
+              background: section===n.id ? '#2d3148' : 'none',
+              color: section===n.id ? '#f1f5f9' : '#94a3b8',
+              border:'none', fontFamily:'inherit', width:'calc(100% - 16px)', textAlign:'left' }}>
             {n.icon} {n.label}
           </button>
         ))}
         {selectedOrg && (
-          <div style={{ padding:'4px 8px' }}>
-            <button onClick={() => setSection('org-detail')} style={{ display:'block', width:'100%', textAlign:'left', padding:'6px 16px', borderRadius:8, border:'none', cursor:'pointer', fontSize:12, color:'#6366f1', background:section==='org-detail'?'#1e1a3a':'none', fontFamily:'inherit' }}>
-              └ {selectedOrg.name}
-            </button>
-          </div>
+          <button onClick={() => setSection('org-detail')}
+            style={{ display:'block', width:'calc(100% - 16px)', margin:'1px 8px', textAlign:'left', padding:'6px 16px', borderRadius:8, border:'none', cursor:'pointer', fontSize:12, color:'#6366f1', background:section==='org-detail'?'#1e1a3a':'none', fontFamily:'inherit' }}>
+            └ {selectedOrg.name}
+          </button>
         )}
         <div style={{ flex:1 }} />
         <div style={{ padding:'0 12px' }}>
           <div style={{ fontSize:11, color:'#475569', padding:'0 6px', marginBottom:6 }}>{authUser.email}</div>
           <button onClick={() => { localStorage.removeItem('rpos-auth'); window.location.reload(); }} style={{ ...S.btn, ...S.btnGhost, width:'100%', fontSize:12 }}>Sign out</button>
-          <button onClick={() => { localStorage.removeItem('rpos-device-mode'); window.location.href = '/'; }} style={{ width:'100%', padding:'6px', background:'none', border:'none', cursor:'pointer', fontSize:11, color:'#475569', marginTop:4, fontFamily:'inherit' }}>← Switch device mode</button>
+          <button onClick={() => { localStorage.removeItem('rpos-device-mode'); window.location.href='/'; }} style={{ width:'100%', padding:'6px', background:'none', border:'none', cursor:'pointer', fontSize:11, color:'#475569', marginTop:4, fontFamily:'inherit' }}>← Switch device mode</button>
         </div>
       </div>
 
+      {/* ── Main ── */}
       <div style={S.main}>
-        {ms && msg.text && <div style={{ background:ms.bg, border:`1px solid ${ms.border}`, color:ms.color, borderRadius:10, padding:'12px 16px', marginBottom:20, fontSize:13 }}>{msg.text}</div>}
+        {ms && msg.text && (
+          <div style={{ background:ms.bg, border:`1px solid ${ms.border}`, color:ms.color, borderRadius:10, padding:'12px 16px', marginBottom:20, fontSize:13 }}>{msg.text}</div>
+        )}
 
         {/* ── Orgs list ── */}
         {section === 'orgs' && (
@@ -250,44 +321,60 @@ function AdminPanel({ authUser }) {
             <div style={S.sub}>All restaurants on the platform · {orgs.length} total</div>
             <button onClick={() => setSection('new-org')} style={{ ...S.btn, ...S.btnPrimary, marginBottom:20 }}>+ New organisation</button>
             <div style={S.card}>
-              {loading ? <div style={{ color:'#64748b', fontSize:13 }}>Loading… <button onClick={loadOrgs} style={{ ...S.btn, ...S.btnGhost, padding:'3px 10px', fontSize:11, marginLeft:8 }}>Retry</button></div> : (
-                <table style={S.table}>
-                  <thead><tr><th style={S.th}>Name</th><th style={S.th}>Slug</th><th style={S.th}>Status</th><th style={S.th}>Created</th><th style={S.th}></th></tr></thead>
-                  <tbody>
-                    {orgs.map(o => (
-                      <tr key={o.id}>
-                        <td style={{ ...S.td, fontWeight:700, color:'#f1f5f9' }}>{o.name}</td>
-                        <td style={{ ...S.td, fontFamily:'monospace', fontSize:12, color:'#64748b' }}>{o.slug}</td>
-                        <td style={S.td}><span style={{ ...S.badge, background:'#0d2e1a', color:'#86efac' }}>{o.status}</span></td>
-                        <td style={{ ...S.td, fontSize:12 }}>{new Date(o.created_at).toLocaleDateString('en-GB')}</td>
-                        <td style={S.td}><button onClick={() => selectOrg(o)} style={{ ...S.btn, ...S.btnGhost, padding:'5px 12px', fontSize:12 }}>Manage →</button></td>
-                      </tr>
-                    ))}
-                    {!orgs.length && <tr><td colSpan={5} style={{ ...S.td, textAlign:'center', padding:40 }}>No organisations yet</td></tr>}
-                  </tbody>
-                </table>
-              )}
+              {loading
+                ? <div style={{ color:'#64748b', fontSize:13 }}>Loading… <button onClick={loadOrgs} style={{ ...S.btn, ...S.btnGhost, padding:'3px 10px', fontSize:11, marginLeft:8 }}>Retry</button></div>
+                : orgs.length === 0
+                  ? <div style={{ color:'#64748b', fontSize:13, padding:'20px 0' }}>No organisations yet</div>
+                  : orgs.map(o => (
+                    <div key={o.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 0', borderBottom:'1px solid #2d3148' }}>
+                      {editingOrg?.id === o.id ? (
+                        <>
+                          <input autoFocus value={editingOrg.name} onChange={e => setEditingOrg(x => ({ ...x, name:e.target.value }))}
+                            onKeyDown={e => { if(e.key==='Enter') saveRenameOrg(); if(e.key==='Escape') setEditingOrg(null); }}
+                            style={{ ...S.input, flex:1, maxWidth:280 }} />
+                          <button onClick={saveRenameOrg} style={{ ...S.btn, ...S.btnPrimary, padding:'6px 14px', fontSize:12 }}>Save</button>
+                          <button onClick={() => setEditingOrg(null)} style={{ ...S.btn, ...S.btnGhost, padding:'6px 14px', fontSize:12 }}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:14, fontWeight:700, color:'#f1f5f9' }}>{o.name}</div>
+                            <div style={{ fontSize:12, color:'#64748b', fontFamily:'monospace' }}>{o.slug}</div>
+                          </div>
+                          <span style={{ ...S.badge, background:'#0d2e1a', color:'#86efac' }}>{o.status}</span>
+                          <div style={{ fontSize:12, color:'#64748b' }}>{new Date(o.created_at).toLocaleDateString('en-GB')}</div>
+                          <button onClick={() => selectOrg(o)} style={{ ...S.btn, ...S.btnGhost, padding:'5px 12px', fontSize:12 }}>Manage →</button>
+                          <button onClick={() => setEditingOrg({ id:o.id, name:o.name })} style={{ ...S.btn, ...S.btnGhost, padding:'5px 12px', fontSize:12 }}>✏️</button>
+                          <button onClick={() => deleteOrg(o)} disabled={working} style={{ ...S.btn, ...S.btnDanger, padding:'5px 12px', fontSize:12 }}>🗑</button>
+                        </>
+                      )}
+                    </div>
+                  ))
+              }
             </div>
           </>
         )}
 
-        {/* ── New org form ── */}
+        {/* ── New org ── */}
         {section === 'new-org' && (
           <>
             <div style={S.h1}>New Organisation</div>
-            <div style={S.sub}>Create a new restaurant company</div>
+            <div style={S.sub}>Create a new restaurant company on the platform</div>
             <div style={S.card}>
               <div style={S.row}>
                 <div><label style={S.label}>Name *</label><input style={S.input} placeholder="e.g. Dougboy Donuts" value={form.name||''} onChange={e=>f('name',e.target.value)} /></div>
                 <div><label style={S.label}>Slug (auto)</label><input style={S.input} placeholder="dougboy-donuts" value={form.slug||''} onChange={e=>f('slug',e.target.value)} /></div>
               </div>
-              <button onClick={createOrg} disabled={working} style={{ ...S.btn, ...S.btnPrimary }}>{working?'Creating…':'Create →'}</button>
+              <div style={{ display:'flex', gap:10 }}>
+                <button onClick={createOrg} disabled={working} style={{ ...S.btn, ...S.btnPrimary }}>{working?'Creating…':'Create →'}</button>
+                <button onClick={() => setSection('orgs')} style={{ ...S.btn, ...S.btnGhost }}>Cancel</button>
+              </div>
             </div>
           </>
         )}
 
         {/* ── Org detail ── */}
-        {(section === 'org-detail' || section === 'new-location' || section === 'create-user') && selectedOrg && (
+        {['org-detail','new-location','create-user'].includes(section) && selectedOrg && (
           <>
             <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
               <div style={S.h1}>{selectedOrg.name}</div>
@@ -302,73 +389,88 @@ function AdminPanel({ authUser }) {
                   <button onClick={() => { setSection('create-user'); setMsg({type:'',text:''}); }} style={{ ...S.btn, ...S.btnGhost }}>👤 Create user</button>
                 </div>
 
-                {/* ── Locations with inline user management ── */}
                 <div style={S.card}>
-                  <div style={S.cardTitle}>📍 Locations & User Access</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'#e2e8f0', marginBottom:20 }}>📍 Locations & User Access</div>
                   {locations.length === 0
-                    ? <div style={{ color:'#64748b', fontSize:13, padding:'20px 0' }}>No locations yet</div>
-                    : locations.map(loc => {
+                    ? <div style={{ color:'#64748b', fontSize:13 }}>No locations yet — add one above</div>
+                    : locations.map((loc, idx) => {
                         const maxDev = loc.location_features?.find(f=>f.feature==='max_devices')?.price_per_month || 3;
                         const plan = loc.subscriptions?.[0]?.plan || 'free';
-                        const gmv = gmvByLocation[loc.id] ?? loc.subscriptions?.[0]?.gmv_this_month ?? 0;
+                        const gmv = loc.subscriptions?.[0]?.gmv_this_month || 0;
                         const locUsers = usersForLocation(loc.id);
-                        const isEditing = editUsersFor === loc.id;
+                        const isEditingUsers = editUsersFor === loc.id;
+                        const isEditingName = editingLoc?.id === loc.id;
 
                         return (
-                          <div key={loc.id} style={{ borderBottom:'1px solid #2d3148', paddingBottom:20, marginBottom:20, ':last-child':{ borderBottom:'none' } }}>
-                            {/* Location header row */}
-                            <div style={{ display:'flex', alignItems:'flex-start', gap:16, flexWrap:'wrap' }}>
-                              <div style={{ flex:1, minWidth:200 }}>
-                                <div style={{ fontSize:15, fontWeight:700, color:'#f1f5f9', marginBottom:4 }}>{loc.name}</div>
-                                <div style={{ fontSize:12, color:'#64748b', display:'flex', gap:12 }}>
-                                  <span style={{ ...S.badge, background:'#1e1a3a', color:'#a5b4fc' }}>{plan}</span>
-                                  <span>{maxDev} max devices</span>
-                                  <span>£{parseFloat(gmv).toFixed(2)} GMV</span>
-                                </div>
-                              </div>
+                          <div key={loc.id} style={{ paddingBottom:24, marginBottom:24, borderBottom: idx < locations.length-1 ? '1px solid #2d3148' : 'none' }}>
+                            {/* Location name row */}
+                            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                              {isEditingName ? (
+                                <>
+                                  <input autoFocus value={editingLoc.name} onChange={e => setEditingLoc(x => ({ ...x, name:e.target.value }))}
+                                    onKeyDown={e => { if(e.key==='Enter') saveRenameLocation(); if(e.key==='Escape') setEditingLoc(null); }}
+                                    style={{ ...S.input, flex:1, maxWidth:280, fontSize:14, fontWeight:700 }} />
+                                  <button onClick={saveRenameLocation} style={{ ...S.btn, ...S.btnPrimary, padding:'5px 12px', fontSize:12 }}>Save</button>
+                                  <button onClick={() => setEditingLoc(null)} style={{ ...S.btn, ...S.btnGhost, padding:'5px 12px', fontSize:12 }}>Cancel</button>
+                                </>
+                              ) : (
+                                <>
+                                  <div style={{ fontSize:15, fontWeight:700, color:'#f1f5f9' }}>{loc.name}</div>
+                                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                                    <span style={{ ...S.badge, background:'#1e1a3a', color:'#a5b4fc' }}>{plan}</span>
+                                    <span style={{ fontSize:12, color:'#64748b' }}>{maxDev} devices</span>
+                                    <span style={{ fontSize:12, color:'#64748b' }}>£{parseFloat(gmv).toFixed(2)} GMV</span>
+                                  </div>
+                                  <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+                                    <button onClick={() => setEditingLoc({ id:loc.id, name:loc.name })} style={{ ...S.btn, ...S.btnGhost, padding:'4px 10px', fontSize:11 }}>✏️ Rename</button>
+                                    <button onClick={() => deleteLocation(loc)} disabled={working} style={{ ...S.btn, ...S.btnDanger, padding:'4px 10px', fontSize:11 }}>🗑 Delete</button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
 
-                              {/* Users for this location */}
-                              <div style={{ flex:2, minWidth:260 }}>
-                                <div style={{ fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:8 }}>Users with access</div>
-                                {isEditing ? (
-                                  <div>
-                                    {users.length === 0
-                                      ? <div style={{ fontSize:12, color:'#475569' }}>No users in this org yet — create one first</div>
-                                      : users.map(u => {
-                                          const has = locUsers.some(lu => lu.id === u.id);
-                                          return (
-                                            <label key={u.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, cursor:'pointer' }}>
-                                              <input type="checkbox" checked={has}
-                                                onChange={() => toggleUserLocation(u.id, loc.id, has)}
-                                                style={{ accentColor:'#6366f1', width:16, height:16 }}
-                                              />
-                                              <div>
-                                                <div style={{ fontSize:13, color:'#e2e8f0', fontWeight:600 }}>{u.full_name || '—'}</div>
-                                                <div style={{ fontSize:11, color:'#6366f1', fontFamily:'monospace' }}>{u.email}</div>
-                                              </div>
-                                            </label>
-                                          );
-                                        })
-                                    }
-                                    <button onClick={() => setEditUsersFor(null)} style={{ ...S.btn, ...S.btnGhost, padding:'5px 14px', fontSize:12, marginTop:4 }}>Done</button>
-                                  </div>
-                                ) : (
-                                  <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                                    {locUsers.length === 0
-                                      ? <span style={{ fontSize:12, color:'#475569' }}>No users assigned</span>
-                                      : locUsers.map(u => (
-                                          <div key={u.id} style={{ background:'#1e1a3a', border:'1px solid #3730a3', borderRadius:8, padding:'4px 10px' }}>
-                                            <div style={{ fontSize:12, fontWeight:700, color:'#e2e8f0' }}>{u.full_name || u.email}</div>
-                                            <div style={{ fontSize:11, color:'#6366f1', fontFamily:'monospace' }}>{u.email}</div>
-                                          </div>
-                                        ))
-                                    }
-                                    <button onClick={() => setEditUsersFor(loc.id)} style={{ ...S.btn, ...S.btnGhost, padding:'5px 12px', fontSize:12 }}>
-                                      {locUsers.length ? 'Edit access' : '+ Add user'}
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
+                            {/* Users section */}
+                            <div style={{ paddingLeft:0 }}>
+                              <div style={{ fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Users with access</div>
+                              {isEditingUsers ? (
+                                <div style={{ background:'#0f1117', borderRadius:10, padding:16, border:'1px solid #2d3148' }}>
+                                  {users.length === 0
+                                    ? <div style={{ fontSize:13, color:'#475569', marginBottom:12 }}>No users in this organisation yet — create one first</div>
+                                    : users.map(u => {
+                                        const has = locUsers.some(lu => lu.id === u.id);
+                                        return (
+                                          <label key={u.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12, cursor:'pointer' }}>
+                                            <input type="checkbox" checked={has}
+                                              onChange={() => toggleUserLocation(u.id, loc.id, has)}
+                                              style={{ accentColor:'#6366f1', width:16, height:16, flexShrink:0 }}
+                                            />
+                                            <div>
+                                              <div style={{ fontSize:13, fontWeight:600, color:'#e2e8f0' }}>{u.full_name || u.email}</div>
+                                              <div style={{ fontSize:11, color:'#6366f1', fontFamily:'monospace' }}>{u.email || '—'}</div>
+                                            </div>
+                                            {has && <span style={{ ...S.badge, background:'#0d2e1a', color:'#86efac', marginLeft:'auto' }}>✓ Access</span>}
+                                          </label>
+                                        );
+                                      })
+                                  }
+                                  <button onClick={() => setEditUsersFor(null)} style={{ ...S.btn, ...S.btnGhost, padding:'6px 16px', fontSize:12, marginTop:4 }}>Done</button>
+                                </div>
+                              ) : (
+                                <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                                  {locUsers.length === 0
+                                    ? <span style={{ fontSize:13, color:'#475569' }}>No users assigned to this location</span>
+                                    : locUsers.map(u => (
+                                        <div key={u.id} style={{ background:'#1e1a3a', border:'1px solid #3730a3', borderRadius:8, padding:'6px 12px' }}>
+                                          <div style={{ fontSize:12, fontWeight:700, color:'#e2e8f0' }}>{u.full_name || u.email}</div>
+                                          <div style={{ fontSize:11, color:'#6366f1', fontFamily:'monospace' }}>{u.email}</div>
+                                        </div>
+                                      ))
+                                  }
+                                  <button onClick={() => setEditUsersFor(loc.id)} style={{ ...S.btn, ...S.btnGhost, padding:'5px 12px', fontSize:12 }}>
+                                    {locUsers.length ? '✏️ Edit access' : '+ Add user'}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -381,10 +483,10 @@ function AdminPanel({ authUser }) {
             {/* ── Add location form ── */}
             {section === 'new-location' && (
               <div style={S.card}>
-                <div style={S.cardTitle}>Add location to {selectedOrg.name}</div>
+                <div style={{ fontSize:14, fontWeight:700, color:'#e2e8f0', marginBottom:16 }}>Add location to {selectedOrg.name}</div>
                 <div style={S.row}>
                   <div><label style={S.label}>Location name *</label><input style={S.input} placeholder="e.g. Oxford Street" value={form.locName||''} onChange={e=>f('locName',e.target.value)} /></div>
-                  <div><label style={S.label}>Address</label><input style={S.input} placeholder="123 High St" value={form.locAddress||''} onChange={e=>f('locAddress',e.target.value)} /></div>
+                  <div><label style={S.label}>Address</label><input style={S.input} placeholder="123 High St, London" value={form.locAddress||''} onChange={e=>f('locAddress',e.target.value)} /></div>
                 </div>
                 <div style={S.row3}>
                   <div><label style={S.label}>Timezone</label>
@@ -397,7 +499,10 @@ function AdminPanel({ authUser }) {
                   </div>
                   <div><label style={S.label}>Currency</label>
                     <select style={S.input} value={form.locCurrency||'GBP'} onChange={e=>f('locCurrency',e.target.value)}>
-                      <option value="GBP">GBP £</option><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="AED">AED</option>
+                      <option value="GBP">GBP £</option>
+                      <option value="EUR">EUR €</option>
+                      <option value="USD">USD $</option>
+                      <option value="AED">AED</option>
                     </select>
                   </div>
                   <div><label style={S.label}>Max POS devices</label><input style={S.input} type="number" min="1" max="20" placeholder="3" value={form.maxDevices||''} onChange={e=>f('maxDevices',e.target.value)} /></div>
@@ -412,7 +517,7 @@ function AdminPanel({ authUser }) {
             {/* ── Create user form ── */}
             {section === 'create-user' && (
               <div style={S.card}>
-                <div style={S.cardTitle}>👤 Create user for {selectedOrg.name}</div>
+                <div style={{ fontSize:14, fontWeight:700, color:'#e2e8f0', marginBottom:16 }}>👤 Create back-office user for {selectedOrg.name}</div>
                 <div style={S.row}>
                   <div><label style={S.label}>Email *</label><input type="email" style={S.input} placeholder="owner@restaurant.com" value={form.inviteEmail||''} onChange={e=>f('inviteEmail',e.target.value)} /></div>
                   <div><label style={S.label}>Full name</label><input style={S.input} placeholder="Sarah Smith" value={form.inviteName||''} onChange={e=>f('inviteName',e.target.value)} /></div>
