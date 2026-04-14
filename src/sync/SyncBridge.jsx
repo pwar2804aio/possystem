@@ -58,20 +58,34 @@ export default function SyncBridge({ onSyncPulse }) {
       }
     } catch {}
 
-    // Apply config snapshot on every mount — only in mock mode
-    // In real mode, config comes from Supabase
-    if (!isMock) return;
-    try {
-      const snap = localStorage.getItem('rpos-config-snapshot');
-      if (snap) {
-        const parsed = JSON.parse(snap);
-        // Always apply — store just reset to seed, snapshot has the live config
-        useStore.getState().applyConfigUpdate();
-        // Pre-load so applyConfigUpdate can find it
-        useStore.getState().setConfigUpdate(parsed);
-        useStore.getState().applyConfigUpdate();
-      }
-    } catch {}
+    // Apply config snapshot on mount
+    // In mock mode: read from localStorage snapshot
+    // In real mode: fetch latest push from Supabase for this location
+    if (isMock) {
+      try {
+        const snap = localStorage.getItem('rpos-config-snapshot');
+        if (snap) {
+          const parsed = JSON.parse(snap);
+          useStore.getState().setConfigUpdate(parsed);
+          useStore.getState().applyConfigUpdate();
+        }
+      } catch {}
+    } else {
+      // Load latest config push from Supabase for this location
+      (async () => {
+        try {
+          const paired = JSON.parse(localStorage.getItem('rpos-device') || 'null');
+          const locationId = paired?.locationId;
+          if (!locationId) return;
+          const { fetchLatestConfigPush } = await import('../lib/db.js');
+          const { data } = await fetchLatestConfigPush(locationId);
+          if (data?.snapshot) {
+            useStore.getState().setConfigUpdate(data.snapshot);
+            useStore.getState().applyConfigUpdate();
+          }
+        } catch {}
+      })();
+    }
 
     if (!('BroadcastChannel' in window)) return;
 

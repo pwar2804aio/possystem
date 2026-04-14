@@ -7,7 +7,7 @@ import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface } from './surfaces/OtherSurfaces';
 import BackOfficeApp from './backoffice/BackOfficeApp';
-import { isMock } from './lib/supabase';
+import { isMock, supabase } from './lib/supabase';
 import PairingScreen from './surfaces/PairingScreen';
 import ModeSelector from './surfaces/ModeSelector';
 import CompanyAdminApp from './admin/CompanyAdminApp';
@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.0.8';
+const VERSION = '3.0.9';
 
 const CHANGELOG = [
   {
@@ -897,6 +897,35 @@ export default function App() {
   // POS mode — check if paired to a location
   const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
   if (!pairedDevice) return <PairingScreen onPaired={() => window.location.reload()} />;
+
+  // Validate device against Supabase (checks if admin removed it)
+  // Uses a component so hooks work properly
+  return <ValidatedPOSApp pairedDevice={pairedDevice} staff={staff} surface={surface} setSurface={setSurface} toast={toast} shift={shift} theme={theme} setTheme={setTheme} syncPulse={syncPulse} handleSyncPulse={handleSyncPulse} showWhatsNew={showWhatsNew} setShowWhatsNew={setShowWhatsNew} deviceConfig={deviceConfig} />;
+}
+
+function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shift, theme, setTheme, syncPulse, handleSyncPulse, showWhatsNew, setShowWhatsNew, deviceConfig }) {
+  const [deviceValid, setDeviceValid] = useState(null); // null=checking, true=ok, false=revoked
+
+  useEffect(() => {
+    if (isMock) { setDeviceValid(true); return; }
+    // Check device still active in Supabase
+    supabase.from('devices').select('id, status').eq('id', pairedDevice.id).single().then(({ data }) => {
+      if (!data || data.status === 'removed' || data.status === 'unpaired') {
+        // Device removed — clear pairing
+        localStorage.removeItem('rpos-device');
+        setDeviceValid(false);
+      } else {
+        setDeviceValid(true);
+      }
+    }).catch(() => setDeviceValid(true)); // network error — allow access
+  }, []);
+
+  if (deviceValid === null) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)', color:'var(--t3)', fontSize:14 }}>
+      Checking device…
+    </div>
+  );
+  if (deviceValid === false) return <PairingScreen onPaired={() => window.location.reload()} />;
 
   if (!staff) return <><SyncBridge onSyncPulse={handleSyncPulse}/><PINScreen /></>;
   // Kiosk — full screen, no staff sidebar, no shift bar

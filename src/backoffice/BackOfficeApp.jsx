@@ -299,11 +299,12 @@ function PushToPOSButton() {
     } catch {}
 
     // Write to Supabase so physical devices on other machines receive it
-    import('../lib/db.js').then(({ insertConfigPush }) => insertConfigPush({
-      pushed_by: staff?.name || 'Manager',
-      snapshot,
-      change_count: pendingBOChanges,
-    }));
+    // Write to Supabase scoped to this location so POS devices on other machines receive it
+    import('../lib/db.js').then(async ({ insertConfigPush }) => {
+      const { getLocationId } = await import('../lib/supabase.js');
+      const locationId = await getLocationId();
+      insertConfigPush({ pushed_by: staff?.name || 'Manager', snapshot, change_count: pendingBOChanges }, locationId);
+    });
 
     // Broadcast to all open POS terminals in this browser session
     broadcastConfigPush(snapshot);
