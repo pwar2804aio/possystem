@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import { loadSessions, subscribeToSessions, scheduleFlush, teardown as teardownSessions } from './SessionSync';
 import { isMock } from '../lib/supabase';
 
 export const CHANNEL_NAME = 'rpos-sync';
@@ -121,6 +122,12 @@ export default function SyncBridge({ onSyncPulse }) {
 
     if (!('BroadcastChannel' in window)) return;
 
+    // Load active sessions from Supabase and subscribe to live updates
+    if (!isMock) {
+      loadSessions();
+      subscribeToSessions();
+    }
+
     channelInstance = new BroadcastChannel(CHANNEL_NAME);
 
     channelInstance.onmessage = ({ data: msg }) => {
@@ -155,6 +162,13 @@ export default function SyncBridge({ onSyncPulse }) {
     let timer = null;
     let pending = {};
 
+    // Write table session changes to Supabase for cross-device sync
+    const unsubSessions = !isMock ? useStore.subscribe((state, prev) => {
+      if (state.tables !== prev.tables) {
+        scheduleFlush();
+      }
+    }) : () => {};
+
     const unsub = useStore.subscribe((state, prev) => {
       if (isApplyingRef.current) return;
       const changed = {};
@@ -177,7 +191,7 @@ export default function SyncBridge({ onSyncPulse }) {
       }, 80);
     });
 
-    return () => { clearTimeout(timer); channelInstance?.close(); channelInstance = null; unsub(); };
+    return () => { clearTimeout(timer); channelInstance?.close(); channelInstance = null; unsub(); unsubSessions(); if (!isMock) teardownSessions(); };
   }, []);
 
   return null;

@@ -269,6 +269,7 @@ function CashTransaction({ grand, onComplete, onBack }) {
 export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
   const compact = useCompact();
   const [screen, setScreen] = useState('review');
+  const [namesOnly, setNamesOnly] = useState(false);
   const [tipAmt, setTipAmt] = useState(0);
   const [showSplit, setShowSplit] = useState(false);
 
@@ -351,9 +352,9 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                     : item.price;
                   const isLast = idx === courseGroups[cNum].length - 1;
                   return (
-                    <div key={item.uid} style={{ display:'flex', justifyContent:'space-between', gap:compact?8:12, padding:compact?'7px 10px':'11px 14px', borderBottom:isLast?'none':'1px solid var(--bdr)', background:idx%2===0?'var(--bg2)':'var(--bg1)' }}>
+                    <div key={item.uid} style={{ display:'flex', justifyContent:'space-between', gap:namesOnly?4:compact?8:12, padding:namesOnly?'3px 10px':compact?'7px 10px':'11px 14px', borderBottom:isLast?'none':'1px solid var(--bdr)', background:namesOnly?'transparent':idx%2===0?'var(--bg2)':'var(--bg1)' }}>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:compact?12:14, fontWeight:600, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        <div style={{ fontSize:namesOnly?11:compact?12:14, fontWeight:namesOnly?500:600, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                           {item.qty>1 && <span style={{ fontWeight:800, color:'var(--acc)', marginRight:5, fontFamily:'var(--font-mono)' }}>{item.qty}×</span>}
                           {item.name}
                         </div>
@@ -363,8 +364,8 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                             {m.price>0&&<span style={{ color:'var(--acc)', marginLeft:6, fontFamily:'var(--font-mono)' }}>+£{m.price.toFixed(2)}</span>}
                           </div>
                         ))}
-                        {item.notes && <div style={{ fontSize:11, color:'var(--orn)', marginTop:2 }}>📝 {item.notes}</div>}
-                        {disc && <div style={{ fontSize:11, color:'var(--grn)', marginTop:2, fontWeight:600 }}>🏷 {disc.label}</div>}
+                        {!namesOnly && item.notes && <div style={{ fontSize:11, color:'var(--orn)', marginTop:2 }}>📝 {item.notes}</div>}
+                        {!namesOnly && disc && <div style={{ fontSize:11, color:'var(--grn)', marginTop:2, fontWeight:600 }}>🏷 {disc.label}</div>}
                         {item.allergens?.length>0 && (
                           <div style={{ fontSize:10, color:'var(--red)', marginTop:2, fontWeight:600 }}>
                             ⚠ {item.allergens.map(a=>ALLERGENS.find(x=>x.id===a)?.label).filter(Boolean).join(' · ')}
@@ -372,8 +373,8 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                         )}
                       </div>
                       <div style={{ textAlign:'right', flexShrink:0 }}>
-                        <div style={{ fontSize:compact?12:14, fontWeight:700, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>£{(price*item.qty).toFixed(2)}</div>
-                        {disc && <div style={{ fontSize:11, color:'var(--t4)', textDecoration:'line-through', fontFamily:'var(--font-mono)' }}>£{(item.price*item.qty).toFixed(2)}</div>}
+                        <div style={{ fontSize:namesOnly?11:compact?12:14, fontWeight:namesOnly?500:700, color:namesOnly?'var(--t3)':'var(--t1)', fontFamily:'var(--font-mono)' }}>£{(price*item.qty).toFixed(2)}</div>
+                        {!namesOnly && disc && <div style={{ fontSize:11, color:'var(--t4)', textDecoration:'line-through', fontFamily:'var(--font-mono)' }}>£{(item.price*item.qty).toFixed(2)}</div>}
                       </div>
                     </div>
                   );

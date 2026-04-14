@@ -590,7 +590,7 @@ export default function POSSurface() {
                 })}
               </div>
             )}
-            <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?100:160}px,1fr))`,gap:compact?4:8}}>
+            <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?115:155}px,1fr))`,gridAutoRows:compact?'80px':'110px',gap:compact?4:8}}>
                 {displayItems.map(item=>{
                   // Resolve category colour/icon from store (Menu Manager categories)
                   const storeCat = menuCategories.find(c => c.id === item.cat);
