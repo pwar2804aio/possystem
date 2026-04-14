@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
-import { loadSessions, subscribeToSessions, scheduleFlush, teardown as teardownSessions } from './SessionSync';
+import { subscribeToSessions, scheduleFlush, teardown as teardownSessions } from './SessionSync';
 import { initOfflineQueue } from './OfflineQueue';
 import { isMock, supabase } from '../lib/supabase';
 
@@ -88,22 +88,36 @@ export default function SyncBridge({ onSyncPulse }) {
             useStore.getState().applyConfigUpdate();
           }
 
-          // Also load floor plan directly from Supabase in case Push to POS hasn't been done
-          const [floorRes, itemsRes, catsRes, menusRes] = await Promise.all([
+          // Load floor plan + active sessions atomically — never set session:null then restore
+          const { supabase: sb, getLocationId } = await import('../lib/supabase.js');
+          const [floorRes, itemsRes, catsRes, menusRes, sessionsRes] = await Promise.all([
             fetchFloorPlan(locationId),
             fetchMenuItems(locationId),
             fetchMenuCategories(locationId),
             fetchMenus(locationId),
+            // Load active sessions in the same batch
+            sb ? sb.from('active_sessions').select('table_id,session').eq('location_id', locationId) : Promise.resolve({ data: [] }),
           ]);
           const patch = {};
           if (floorRes.data?.tables?.length) {
-            // Merge with any existing tables (preserve session state)
-            const existing = useStore.getState().tables;
-            const existingIds = new Set(existing.map(t => t.id));
-            const newTables = floorRes.data.tables
-              .filter(t => !existingIds.has(t.id))
-              .map(t => ({ ...t, status:'available', session:null, firedCourses:[], sentAt:null }));
-            if (newTables.length) patch.tables = [...existing, ...newTables];
+            // Build a session map from Supabase active_sessions
+            const sessionMap = {};
+            (sessionsRes?.data || []).forEach(row => {
+              if (row.table_id && row.session) sessionMap[row.table_id] = row.session;
+            });
+            // Also check localStorage backup for any sessions not yet written to Supabase
+            try {
+              const lsBackup = JSON.parse(localStorage.getItem('rpos-session-backup') || '{}');
+              Object.entries(lsBackup).forEach(([tid, sess]) => {
+                if (!sessionMap[tid]) sessionMap[tid] = sess;
+              });
+            } catch {}
+            // Build tables with sessions already applied — never flash as empty
+            const tables = floorRes.data.tables.map(t => {
+              const session = sessionMap[t.id] || null;
+              return { ...t, status: session ? 'occupied' : 'available', session, firedCourses: session?.firedCourses || [], sentAt: session?.sentAt || null };
+            });
+            patch.tables = tables;
           }
           if (itemsRes.data?.length) patch.menuItems = itemsRes.data.map(item => ({
             ...item,
@@ -135,9 +149,8 @@ export default function SyncBridge({ onSyncPulse }) {
     // Init offline queue for durable writes
     if (!isMock) initOfflineQueue(supabase);
 
-    // Load active sessions from Supabase and subscribe to live updates
+    // Subscribe to live session updates from other devices
     if (!isMock) {
-      loadSessions();
       subscribeToSessions();
     }
 

@@ -31,6 +31,13 @@ export async function flushSessions() {
     if (_lastSent[t.id] === payload) continue; // no change
     _lastSent[t.id] = payload;
 
+    // Write to localStorage backup immediately (instant, never fails)
+    try {
+      const backup = JSON.parse(localStorage.getItem('rpos-session-backup') || '{}');
+      backup[t.id] = t.session;
+      localStorage.setItem('rpos-session-backup', JSON.stringify(backup));
+    } catch {}
+
     // Queue write — works offline, replays when back online
     queueWrite({
       type: 'upsert',
@@ -63,6 +70,13 @@ export async function flushSessions() {
   for (const tid of availableIds) {
     if (_lastSent[tid] !== 'cleared') {
       _lastSent[tid] = 'cleared';
+      // Remove from localStorage backup too
+      try {
+        const backup = JSON.parse(localStorage.getItem('rpos-session-backup') || '{}');
+        delete backup[tid];
+        localStorage.setItem('rpos-session-backup', JSON.stringify(backup));
+      } catch {}
+
       queueWrite({
         type: 'delete',
         table: 'active_sessions',
