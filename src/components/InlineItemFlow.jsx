@@ -65,7 +65,7 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
                    || buildModGroups(item).length > 0      || buildInstGroups(item).length > 0;
       if (!hasMods) {
         // No modifiers anywhere — confirm directly
-        const displayName = `${item.menuName || item.name} — ${variant.menuName || variant.name || variant.label}`;
+        const displayName = `${item.menuName || item.menu_name || item.name} — ${variant.menuName || variant.menu_name || variant.name || variant.label}`;
         onConfirm(childItem, [], null, {
           notes: '', qty, linePrice: (variant.pricing?.base ?? variant.price ?? 0) * qty, displayName
         });
@@ -135,7 +135,7 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
       ? ` — ${selectedVariant.menuName || selectedVariant.name || selectedVariant.label}`
       : '';
     const nameSuffix = instParts.length ? ` · ${instParts.join(', ')}` : '';
-    const displayName = `${item.menuName || item.name}${variantPart}${nameSuffix}`;
+    const displayName = `${item.menuName || item.menu_name || item.name}${variantPart}${nameSuffix}`;
     const targetItem = selectedVariant?._childItem || item;
     onConfirm(targetItem, mods, null, { notes: notes.trim(), qty, linePrice: total, displayName });
   };

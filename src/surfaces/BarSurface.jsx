@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../store';
 import { MENU_ITEMS, ALLERGENS } from '../data/seed';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
+import InlineItemFlow from '../components/InlineItemFlow';
 import CheckoutModal from './CheckoutModal';
 
 const CAT_META = {
@@ -208,7 +209,9 @@ export default function BarSurface() {
   };
 
   const openItemFlow = (item) => {
-    if (item.type==='simple') addToRound(item,[],{displayName: item.menuName||item.menu_name||item.name||item.kitchenName});
+    // Treat null/undefined type as simple — Supabase items may not have type set
+    const isSimple = !item.type || item.type==='simple';
+    if (isSimple) addToRound(item,[],{displayName: item.menuName||item.menu_name||item.name||item.kitchen_name||item.kitchenName});
     else setModalItem(item);
   };
 
@@ -520,7 +523,15 @@ export default function BarSurface() {
       {modalItem&&(
         <div className="modal-back">
           <div style={{ background:'var(--bg2)',border:'1px solid var(--bdr2)',borderRadius:20,width:'100%',maxWidth:460,maxHeight:'88vh',overflow:'auto',boxShadow:'var(--sh3)' }}>
-            <QuickItemBuilder item={modalItem} menuItems={storeMenuItems||MENU_ITEMS} modifierGroupDefs={modifierGroupDefs} onConfirm={(mods,opts)=>{addToRound(modalItem,mods,opts);setModalItem(null);}} onCancel={()=>setModalItem(null)}/>
+            {modalItem.type==='pizza' ? (
+              <ProductModal key={modalItem.id} item={modalItem} activeAllergens={allergens}
+                onConfirm={(item,mods,cfg,opts)=>{ addToRound(item,mods,opts); setModalItem(null); }}
+                onCancel={()=>setModalItem(null)} />
+            ) : (
+              <InlineItemFlow key={modalItem.id} item={modalItem} menuItems={storeMenuItems||MENU_ITEMS} activeAllergens={allergens}
+                onConfirm={(item,mods,cfg,opts)=>{ addToRound(item,mods,opts); setModalItem(null); showToast(`${opts?.displayName||item.menuName||item.menu_name||item.name} added`,'success'); }}
+                onCancel={()=>setModalItem(null)} />
+            )}
           </div>
         </div>
       )}
