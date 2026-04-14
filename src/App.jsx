@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.1.1';
+const VERSION = '3.1.2';
 
 const CHANGELOG = [
   {
@@ -962,7 +962,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
       <SyncBridge onSyncPulse={handleSyncPulse}/>
-      <ShiftBar shift={shift} version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} syncPulse={syncPulse}/>
+      <ShiftBar version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} syncPulse={syncPulse}/>
       <ConfigSyncBanner />
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
         <Sidebar surface={surface} setSurface={setSurface} />
@@ -988,8 +988,9 @@ const NAV = [
   { id:'kds',     label:'KDS',    icon:'▣' },
 ];
 
-function ShiftBar({ shift, version, onWhatsNew, theme, onToggleTheme, syncPulse }) {
-  const { deviceConfig, setSurface, orderQueue, tables, tabs } = useStore();
+function ShiftBar({ version, onWhatsNew, theme, onToggleTheme, syncPulse }) {
+  // Subscribe to closedChecks directly so shift stats re-render when checks are added
+  const { deviceConfig, setSurface, orderQueue, tables, tabs, closedChecks, shift } = useStore();
   const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
   const terminalName = deviceConfig?.terminalName || pairedDevice?.name || 'POS';
   // Resolve profile name from paired device's profileId

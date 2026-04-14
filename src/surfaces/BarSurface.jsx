@@ -182,8 +182,12 @@ export default function BarSurface() {
   const roundCount = roundItems.reduce((s,i)=>s+i.qty,0);
 
   const addToRound = (item, mods=[], opts={}) => {
-    const price = opts.linePrice!=null ? opts.linePrice/(opts.qty||1) : item.price;
-    const name  = opts.displayName || item.name;
+    // price: linePrice override → flat price → pricing.base → 0 (never NaN)
+    const price = opts.linePrice!=null
+      ? opts.linePrice/(opts.qty||1)
+      : (item.price ?? item.pricing?.base ?? item.pricing?.dineIn ?? 0);
+    // name: displayName override → menuName (camelCase) → menu_name (snake from Supabase) → name → 'Item'
+    const name  = opts.displayName || item.menuName || item.menu_name || item.name || 'Item';
     setRoundItems(prev=>{
       // Same item+mods → increment qty
       const idx = prev.findIndex(r=>r.itemId===item.id && JSON.stringify(r.mods)===JSON.stringify(mods) && !opts.notes);
@@ -204,7 +208,7 @@ export default function BarSurface() {
   };
 
   const openItemFlow = (item) => {
-    if (item.type==='simple') addToRound(item,[],{});
+    if (item.type==='simple') addToRound(item,[],{displayName: item.menuName||item.menu_name||item.name||item.kitchenName});
     else setModalItem(item);
   };
 

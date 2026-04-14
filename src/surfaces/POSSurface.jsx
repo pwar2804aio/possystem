@@ -244,7 +244,7 @@ export default function POSSurface() {
     <div style={{display:'flex',flex:1,overflow:'hidden',minWidth:0}}>
 
       {/* ══ ORDER PANEL ════════════════════════════════════════ */}
-      <div style={{width:'var(--ord)',minWidth:320,flexShrink:0,display:'flex',flexDirection:'column',background:'var(--bg1)',borderRight:'1px solid var(--bdr)',overflow:'hidden'}}>
+      <div style={{width:420,minWidth:360,maxWidth:500,flexShrink:0,display:'flex',flexDirection:'column',background:'var(--bg1)',borderRight:'1px solid var(--bdr)',overflow:'hidden'}}>
 
         {/* Context header */}
         <div style={{padding:'10px 12px 8px',borderBottom:'1px solid var(--bdr)',flexShrink:0}}>
