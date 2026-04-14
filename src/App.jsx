@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.3.4';
+const VERSION = '3.3.5';
 
 const CHANGELOG = [
   {
@@ -1047,6 +1047,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
       <SyncBridge onSyncPulse={handleSyncPulse}/>
+      {!isMock && <DevSwitcher />}
       <ShiftBar version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} syncPulse={syncPulse}/>
       <ConfigSyncBanner />
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
