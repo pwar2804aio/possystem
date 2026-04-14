@@ -363,7 +363,7 @@ function AdminPanel({ authUser }) {
                                                 await sbFetch(`user_locations?user_id=eq.${u.id}&location_id=eq.${loc.id}`, { method:'DELETE' });
                                               }
                                               await loadUsers(selectedOrg.id);
-                                            }}`}}`}}
+                                            }}
                                             style={{ accentColor:'#6366f1' }}
                                           />
                                           <span style={{ color:'#e2e8f0' }}>{u.email || u.full_name}</span>
