@@ -36,6 +36,7 @@ export default function BackOfficeApp() {
   const [authChecked, setAuthChecked] = useState(isMock);
   const [section, setSection] = useState('overview');
   const [orgCtx, setOrgCtx] = useState(null); // { orgName, locationName, locationId, orgId, role }
+  const [showLocationSwitcher, setShowLocationSwitcher] = useState(false);
 
   // Check Supabase session on mount
   useEffect(() => {
