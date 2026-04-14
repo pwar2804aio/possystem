@@ -929,7 +929,7 @@ export default function POSSurface() {
 }
 
 function OrderItem({
-  item, covers, orderType, seatList, onQty, onRemove, onNote, onSeat, onCourse, onVoid, onDiscount, onRemoveDiscount }) {
+  item, covers, orderType, seatList, onQty, onRemove, onNote, onSeat, onCourse, onVoid, onDiscount, onRemoveDiscount, namesOnly=false }) {
   const compact = useCompact();
   const [showMenu, setShowMenu] = useState(false);
   const [editNote, setEditNote] = useState(false);
