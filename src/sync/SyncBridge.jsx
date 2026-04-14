@@ -80,6 +80,7 @@ export default function SyncBridge({ onSyncPulse }) {
           const locationId = paired?.locationId;
           if (!locationId) return;
           const { fetchLatestConfigPush, fetchFloorPlan, fetchMenuItems, fetchMenuCategories, fetchMenus } = await import('../lib/db.js');
+          const { supabase: sb2 } = await import('../lib/supabase.js');
 
           // Load config push (menus, layout, sections)
           const { data } = await fetchLatestConfigPush(locationId);
@@ -90,14 +91,26 @@ export default function SyncBridge({ onSyncPulse }) {
 
           // Load floor plan + active sessions atomically — never set session:null then restore
           const { supabase: sb, getLocationId } = await import('../lib/supabase.js');
-          const [floorRes, itemsRes, catsRes, menusRes, sessionsRes] = await Promise.all([
+          const [floorRes, itemsRes, catsRes, menusRes, sessionsRes, profilesRes] = await Promise.all([
             fetchFloorPlan(locationId),
             fetchMenuItems(locationId),
             fetchMenuCategories(locationId),
             fetchMenus(locationId),
-            // Load active sessions in the same batch
             sb ? sb.from('active_sessions').select('table_id,session').eq('location_id', locationId) : Promise.resolve({ data: [] }),
+            sb2 ? sb2.from('device_profiles').select('*').eq('location_id', locationId) : Promise.resolve({ data: [] }),
           ]);
+          // Cache profiles to localStorage so they survive offline
+          if (profilesRes?.data?.length) {
+            const mapped = profilesRes.data.map(p => ({
+              id: p.id, name: p.name, color: p.color,
+              defaultSurface: p.default_surface, enabledOrderTypes: p.enabled_order_types || ['dine-in'],
+              assignedSection: p.assigned_section, hiddenFeatures: p.hidden_features || [],
+              tableServiceEnabled: p.table_service_enabled !== false,
+              quickScreenEnabled: p.quick_screen_enabled !== false,
+              menuId: p.menu_id,
+            }));
+            try { localStorage.setItem('rpos-device-profiles', JSON.stringify(mapped)); } catch {}
+          }
           const patch = {};
           if (floorRes.data?.tables?.length) {
             // Build a session map from Supabase active_sessions

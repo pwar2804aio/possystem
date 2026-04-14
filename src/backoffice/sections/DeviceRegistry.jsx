@@ -32,6 +32,7 @@ const DEFAULT_PROFILES = [
   { id:'prof-2', name:'Bar terminal' },
   { id:'prof-3', name:'Server handheld' },
 ];
+// getProfiles reads from localStorage which is kept in sync with Supabase device_profiles by SyncBridge
 
 const S = {
   page: { padding:'32px 40px', maxWidth:860 },

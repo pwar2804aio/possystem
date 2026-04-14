@@ -52,45 +52,89 @@ const DEFAULT_PROFILES = [
 
 export default function DeviceProfiles() {
   const { showToast, devices, setDeviceConfig, markBOChange } = useStore();
-  const stored = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null'); } catch { return null; } })();
-  const [profiles, setProfiles] = useState(stored || (isMock ? DEFAULT_PROFILES : []));
+  const lsStored = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null'); } catch { return null; } })();
+  const [profiles, setProfiles] = useState(lsStored || (isMock ? DEFAULT_PROFILES : []));
   const [editing, setEditing] = useState(null);
   const [showNew, setShowNew] = useState(false);
+  const [locationId, setLocationId] = useState(null);
 
-  // Persist profiles to localStorage so DeviceRegistry can read them
+  // Load profiles from Supabase on mount
   useEffect(() => {
-    localStorage.setItem('rpos-device-profiles', JSON.stringify(profiles));
-  }, [profiles]);
+    if (isMock) return;
+    const loadFromDB = async () => {
+      const { getLocationId } = await import('../../lib/supabase.js');
+      const locId = await getLocationId().catch(() => null);
+      if (!locId) return;
+      setLocationId(locId);
+      const { data } = await supabase.from('device_profiles').select('*').eq('location_id', locId).order('sort_order');
+      if (data?.length) {
+        const mapped = data.map(p => ({
+          id: p.id, name: p.name, color: p.color || '#3b82f6',
+          defaultSurface: p.default_surface || 'tables',
+          enabledOrderTypes: p.enabled_order_types || ['dine-in'],
+          assignedSection: p.assigned_section, hiddenFeatures: p.hidden_features || [],
+          tableServiceEnabled: p.table_service_enabled !== false,
+          quickScreenEnabled: p.quick_screen_enabled !== false,
+          menuId: p.menu_id, deviceCount: 0,
+        }));
+        setProfiles(mapped);
+        // Also keep localStorage in sync as backup
+        try { localStorage.setItem('rpos-device-profiles', JSON.stringify(mapped)); } catch {}
+      }
+    };
+    loadFromDB();
+  }, []);
+
+  const toDbRow = (p, locId) => ({
+    id: p.id, location_id: locId || locationId,
+    name: p.name, color: p.color,
+    default_surface: p.defaultSurface,
+    enabled_order_types: p.enabledOrderTypes,
+    assigned_section: p.assignedSection,
+    hidden_features: p.hiddenFeatures,
+    table_service_enabled: p.tableServiceEnabled,
+    quick_screen_enabled: p.quickScreenEnabled,
+    menu_id: p.menuId || null,
+  });
 
   const save = async (updated) => {
     setProfiles(ps => ps.map(p => p.id === updated.id ? updated : p));
     markBOChange();
-    showToast(`"${updated.name}" profile saved`, 'success');
-    setEditing(null);
-    // Push profile change to all devices using this profile — triggers realtime on POS
-    if (!isMock) {
+    if (!isMock && locationId) {
+      await supabase.from('device_profiles').upsert(toDbRow(updated), { onConflict: 'id' });
+      // Update localStorage backup
       try {
-        // Touch the device rows to trigger realtime update on connected POS terminals
-        const { data: devices } = await supabase.from('devices').select('id').eq('profile_id', updated.id);
-        if (devices?.length) {
-          // Update last_seen to trigger postgres_changes event
-          await supabase.from('devices').update({ last_seen: new Date().toISOString() }).eq('profile_id', updated.id);
-          showToast(`Profile pushed to ${devices.length} device(s)`, 'success');
-        }
-      } catch(e) {}
+        const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+        localStorage.setItem('rpos-device-profiles', JSON.stringify(cur.map(p => p.id === updated.id ? updated : p)));
+      } catch {}
     }
+    showToast(`"${updated.name}" saved to all devices`, 'success');
+    setEditing(null);
   };
 
-  const addProfile = (profile) => {
+  const addProfile = async (profile) => {
     const nextId = `prof-${Date.now().toString(36).slice(-4)}`;
-    setProfiles(ps => [...ps, { ...profile, id:nextId, deviceCount:0 }]);
+    const newProfile = { ...profile, id: nextId, deviceCount: 0 };
+    setProfiles(ps => [...ps, newProfile]);
+    if (!isMock && locationId) {
+      await supabase.from('device_profiles').insert(toDbRow(newProfile));
+      try {
+        const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+        localStorage.setItem('rpos-device-profiles', JSON.stringify([...cur, newProfile]));
+      } catch {}
+    }
     markBOChange();
     showToast(`"${profile.name}" profile created`, 'success');
     setShowNew(false);
   };
 
-  const deleteProfile = (id) => {
+  const deleteProfile = async (id) => {
     setProfiles(ps => ps.filter(p => p.id !== id));
+    if (!isMock) await supabase.from('device_profiles').delete().eq('id', id);
+    try {
+      const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+      localStorage.setItem('rpos-device-profiles', JSON.stringify(cur.filter(p => p.id !== id)));
+    } catch {}
     markBOChange();
     showToast('Profile deleted', 'info');
   };
