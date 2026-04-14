@@ -20,7 +20,7 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.20';
+const VERSION = '3.5.21';
 
 const CHANGELOG = [
   {
@@ -857,8 +857,14 @@ export default function App() {
   useEffect(() => {
     let cleanup;
     import('./lib/realtime.js').then(({ startRealtime }) => {
-      Promise.resolve().then(() => {
-        cleanup = startRealtime(useStore);
+      import('./lib/supabase.js').then(({ getLocationId }) => {
+        getLocationId().then(locationId => {
+          if (locationId) {
+            cleanup = startRealtime(useStore, locationId);
+          }
+        }).catch(() => {
+          cleanup = startRealtime(useStore);
+        });
       });
     }).catch(() => {});
     return () => cleanup?.();

@@ -9,7 +9,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../store';
-import { isMock } from './supabase';
+import { isMock, getLocationId } from './supabase';
 import {
   fetchMenuItems, fetchFloorPlan, fetch86List,
   fetchKDSTickets, fetchClosedChecks, fetchLatestConfigPush,
@@ -68,7 +68,8 @@ export default function useSupabaseInit() {
       }
 
       // Latest config push — check if this terminal is behind
-      const { data: push } = await fetchLatestConfigPush();
+      const locId = await getLocationId().catch(() => null);
+      const { data: push } = await fetchLatestConfigPush(locId);
       if (push?.snapshot) {
         const currentVersion = parseInt(sessionStorage.getItem('rpos-config-version') || '0');
         if (push.snapshot.version > currentVersion) {
