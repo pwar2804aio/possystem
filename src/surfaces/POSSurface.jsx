@@ -73,6 +73,7 @@ export default function POSSurface() {
 
   const [cat, setCat]             = useState('quick');
   const [subCat, setSubCat]       = useState(null);
+  const [expandedCats, setExpandedCats] = useState(new Set());
   const [modalItem, setModalItem] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [search, setSearch]       = useState('');

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { loadSessions, subscribeToSessions, scheduleFlush, teardown as teardownSessions } from './SessionSync';
 import { initOfflineQueue } from './OfflineQueue';
-import { isMock } from '../lib/supabase';
+import { isMock, supabase } from '../lib/supabase';
 
 export const CHANNEL_NAME = 'rpos-sync';
 export const STORAGE_KEY  = 'rpos-shared-state';

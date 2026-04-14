@@ -20,7 +20,7 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.17';
+const VERSION = '3.5.18';
 
 const CHANGELOG = [
   {
