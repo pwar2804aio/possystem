@@ -165,15 +165,14 @@ function AdminPanel({ authUser }) {
     if (!form.name?.trim()) return err('Organisation name is required');
     setWorking(true); setMsg({ type:'', text:'' });
     const slug = (form.slug || form.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-    const { data, error:e } = await sbFetch('organisations', { method:'POST', body:{ name:form.name.trim(), slug, status:'active' }, prefer:'return=representation' });
-    const orgData = Array.isArray(data) ? data[0] : data;
+    const { data: orgArr, error:e } = await sbFetch('organisations', { method:'POST', body:{ name:form.name.trim(), slug, status:'active' }, prefer:'return=representation' });
+    const orgData = Array.isArray(orgArr) ? orgArr[0] : orgArr;
     setWorking(false);
     if (e) return err(e.message);
-    const data = orgData;
-    ok(`✓ "${data.name}" created`);
+    ok(`✓ "${orgData.name}" created`);
     setForm({});
     await loadOrgs();
-    await selectOrg(data);
+    await selectOrg(orgData);
   };
 
   const createLocation = async () => {
