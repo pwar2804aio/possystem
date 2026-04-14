@@ -20,7 +20,7 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.5';
+const VERSION = '3.5.6';
 
 const CHANGELOG = [
   {
@@ -971,14 +971,21 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             localStorage.setItem('rpos-device-config', JSON.stringify(config));
             useStore.getState().setDeviceConfig(config);
           } else {
-            // Profile not in localStorage — no profile found, keep existing config
+            // Profile ID not found in local profiles — use device name from Supabase
             const existingConfig = JSON.parse(localStorage.getItem('rpos-device-config') || 'null');
-            if (!existingConfig) {
-              // Write a minimal config so device shows something
-              const minConfig = { profileId: data.profile_id, profileName: 'Custom profile', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true };
-              localStorage.setItem('rpos-device-config', JSON.stringify(minConfig));
-              useStore.getState().setDeviceConfig(minConfig);
-            }
+            const deviceName = data.name || pairedDevice.name || 'POS Terminal';
+            const minConfig = {
+              profileId: data.profile_id || 'custom',
+              profileName: deviceName,
+              defaultSurface: existingConfig?.defaultSurface || 'tables',
+              enabledOrderTypes: existingConfig?.enabledOrderTypes || ['dine-in','takeaway','collection'],
+              assignedSection: existingConfig?.assignedSection || null,
+              hiddenFeatures: existingConfig?.hiddenFeatures || [],
+              tableServiceEnabled: existingConfig?.tableServiceEnabled !== false,
+              quickScreenEnabled: existingConfig?.quickScreenEnabled !== false,
+            };
+            localStorage.setItem('rpos-device-config', JSON.stringify(minConfig));
+            useStore.getState().setDeviceConfig(minConfig);
           }
         } catch(e) {}
       }
