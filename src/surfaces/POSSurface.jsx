@@ -74,6 +74,7 @@ export default function POSSurface() {
   const [cat, setCat]             = useState('quick');
   const [subCat, setSubCat]       = useState(null);
   const [expandedCats, setExpandedCats] = useState(new Set());
+  const [namesOnly, setNamesOnly] = useState(false);
   const [modalItem, setModalItem] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [search, setSearch]       = useState('');
@@ -307,11 +308,22 @@ export default function POSSurface() {
           <span style={{fontSize:10,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'.08em'}}>
             {activeTable?`${activeTable.label}`:orderType} · {staff?.name}
           </span>
-          {items.length>0&&(
-            <button onClick={()=>activeTableId?clearTable(activeTableId):clearWalkIn()} style={{fontSize:11,fontWeight:700,color:'var(--t4)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',padding:0,transition:'color .12s'}}
-              onMouseEnter={e=>e.currentTarget.style.color='var(--red)'}
-              onMouseLeave={e=>e.currentTarget.style.color='var(--t4)'}>Clear</button>
-          )}
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            {items.length>0&&(
+              <button
+                onClick={()=>setNamesOnly(n=>!n)}
+                style={{fontSize:9,fontWeight:700,padding:'2px 7px',borderRadius:5,cursor:'pointer',fontFamily:'inherit',
+                  border:`1px solid ${namesOnly?'var(--acc-b)':'var(--bdr)'}`,
+                  background:namesOnly?'var(--acc-d)':'transparent',
+                  color:namesOnly?'var(--acc)':'var(--t4)',transition:'all .12s'}}
+              >≡ Names</button>
+            )}
+            {items.length>0&&(
+              <button onClick={()=>activeTableId?clearTable(activeTableId):clearWalkIn()} style={{fontSize:11,fontWeight:700,color:'var(--t4)',cursor:'pointer',background:'none',border:'none',fontFamily:'inherit',padding:0,transition:'color .12s'}}
+                onMouseEnter={e=>e.currentTarget.style.color='var(--red)'}
+                onMouseLeave={e=>e.currentTarget.style.color='var(--t4)'}>Clear</button>
+            )}
+          </div>
         </div>
 
         {/* Items by course */}
@@ -343,7 +355,7 @@ export default function POSSurface() {
                   </div>
                 )}
                 {byCourse[courseNum].map(item=>(
-                  <OrderItem key={item.uid} item={item} covers={covers} orderType={orderType} seatList={seatList}
+                  <OrderItem key={item.uid} item={item} covers={covers} orderType={orderType} seatList={seatList} namesOnly={namesOnly}
                     onQty={d=>updateItemQty(item.uid,d)}
                     onRemove={()=>removeItem(item.uid)}
                     onNote={n=>updateItemNote(item.uid,n)}
@@ -932,6 +944,25 @@ function OrderItem({
         : Math.max(0, item.price - item.discount.value/item.qty))
     : item.price;
   const lineTotal = discountedPrice * item.qty;
+
+  if (namesOnly) {
+    const price = item.price * item.qty;
+    return (
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',
+        padding:'4px 10px',borderBottom:'1px solid var(--bdr)',gap:8,
+        opacity:isVoided?0.4:1}}>
+        <span style={{fontSize:11,color:'var(--t1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>
+          {item.qty>1&&<span style={{fontWeight:800,color:'var(--acc)',marginRight:4}}>{item.qty}×</span>}
+          {item.menuName||item.name}
+          {item.variantName&&<span style={{color:'var(--t4)'}}> · {item.variantName}</span>}
+          {isVoided&&<span style={{color:'var(--red)',marginLeft:4,fontSize:9}}>VOID</span>}
+        </span>
+        <span style={{fontSize:11,fontWeight:700,color:'var(--t2)',fontFamily:'var(--font-mono)',flexShrink:0}}>
+          £{price.toFixed(2)}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div style={{

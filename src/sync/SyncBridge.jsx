@@ -114,7 +114,16 @@ export default function SyncBridge({ onSyncPulse }) {
             parentId: item.parent_id ?? item.parentId ?? null,
             soldAlone: item.sold_alone ?? item.soldAlone,
           }));
-          if (catsRes.data?.length) patch.menuCategories = catsRes.data;
+          if (catsRes.data?.length) patch.menuCategories = catsRes.data.map(cat => ({
+            ...cat,
+            parentId: cat.parent_id ?? cat.parentId ?? null,
+            menuId: cat.menu_id ?? cat.menuId,
+            sortOrder: cat.sort_order ?? cat.sortOrder ?? 0,
+            accountingGroup: cat.accounting_group ?? cat.accountingGroup ?? '',
+            label: cat.label ?? cat.name ?? 'Category',
+            icon: cat.icon ?? '🍽',
+            color: cat.color ?? '#3b82f6',
+          }));
           if (menusRes.data?.length) patch.menus = menusRes.data;
           if (Object.keys(patch).length) useStore.setState(patch);
         } catch(e) { console.warn('[SyncBridge] boot load error:', e.message); }
