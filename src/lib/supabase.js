@@ -21,7 +21,13 @@ export const getLocationId = async () => {
   if (_resolvedLocationId) return _resolvedLocationId;
   if (!supabase) return null;
 
-  // Try authenticated user first (back office)
+  // Back office explicit location override (from location switcher)
+  try {
+    const boLoc = JSON.parse(localStorage.getItem('rpos-bo-location') || 'null');
+    if (boLoc) { _resolvedLocationId = boLoc; return boLoc; }
+  } catch {}
+
+  // Try authenticated user (back office)
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -33,7 +39,7 @@ export const getLocationId = async () => {
     }
   } catch {}
 
-  // Fallback: paired device in localStorage (POS has no email auth session)
+  // POS fallback: paired device locationId
   try {
     const paired = JSON.parse(localStorage.getItem('rpos-device') || 'null');
     if (paired?.locationId) {

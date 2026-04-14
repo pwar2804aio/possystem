@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { broadcastConfigPush } from '../sync/SyncBridge';
 import { supabase, isMock, setResolvedLocationId, clearResolvedLocationId } from '../lib/supabase';
 import BOLogin from './BOLogin';
+import LocationSwitcher from './LocationSwitcher';
 import { VERSION } from '../lib/version';
 import MenuManager from './sections/MenuManager';
 import FloorPlanBuilder from './sections/FloorPlanBuilder';
@@ -212,6 +213,18 @@ export default function BackOfficeApp() {
           }}>
             <span style={{ fontSize:16 }}>←</span> Back to POS
           </button>
+          {!isMock && (
+            <button onClick={() => setShowLocationSwitcher(true)} style={{
+              width:'100%', padding:'9px 10px', borderRadius:9,
+              cursor:'pointer', textAlign:'left', fontSize:12,
+              fontWeight:600, border:'1px solid var(--bdr)',
+              fontFamily:'inherit', background:'transparent',
+              color:'var(--t3)', display:'flex', alignItems:'center', gap:8,
+              marginBottom:6, transition:'all .1s',
+            }}>
+              <span>📍</span> Switch location
+            </button>
+          )}
           {authUser && !isMock && (
             <button onClick={() => { clearResolvedLocationId(); supabase.auth.signOut(); }} style={{
               width:'100%', padding:'8px 10px', borderRadius:9,
