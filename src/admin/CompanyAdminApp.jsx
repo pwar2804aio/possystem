@@ -46,17 +46,35 @@ async function sbFetch(path, opts = {}) {
 export default function CompanyAdminApp() {
   const [authUser, setAuthUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     const auth = JSON.parse(localStorage.getItem('rpos-auth') || 'null');
     if (auth?.user && auth?.expires_at && Date.now() < auth.expires_at * 1000) {
       setAuthUser(auth.user);
+      // Verify role from DB — don't trust localStorage alone
+      sbFetch(`user_profiles?id=eq.${auth.user.id}&select=role`)
+        .then(({ data }) => {
+          const role = Array.isArray(data) ? data[0]?.role : data?.role;
+          setIsSuperAdmin(role === 'super_admin');
+          setAuthChecked(true);
+        })
+        .catch(() => setAuthChecked(true));
+    } else {
+      setAuthChecked(true);
     }
-    setAuthChecked(true);
   }, []);
 
   if (!authChecked) return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0f1117', color:'#64748b', fontSize:13 }}>Loading…</div>;
-  if (!authUser) return <BOLogin onLogin={(u) => { setAuthUser(u); }} />;
+  if (!authUser) return <BOLogin onLogin={(u) => { setAuthUser(u); window.location.reload(); }} />;
+  if (!isSuperAdmin) return (
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#0f1117', color:'#64748b', gap:16 }}>
+      <div style={{ fontSize:32 }}>🔒</div>
+      <div style={{ fontSize:16, fontWeight:700, color:'#f1f5f9' }}>Access denied</div>
+      <div style={{ fontSize:13 }}>This area requires super_admin access.</div>
+      <button onClick={() => { localStorage.removeItem('rpos-auth'); window.location.reload(); }} style={{ marginTop:8, padding:'8px 20px', borderRadius:8, border:'1px solid #2d3148', background:'transparent', color:'#94a3b8', cursor:'pointer', fontFamily:'inherit', fontSize:13 }}>Sign out</button>
+    </div>
+  );
   return <AdminPanel authUser={authUser} />;
 }
 
