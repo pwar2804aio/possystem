@@ -246,17 +246,17 @@ export default function POSSurface() {
     <div style={{display:'flex',flex:1,overflow:'hidden',minWidth:0}}>
 
       {/* ══ ORDER PANEL ════════════════════════════════════════ */}
-      <div style={{width:420,minWidth:360,maxWidth:500,flexShrink:0,display:'flex',flexDirection:'column',background:'var(--bg1)',borderRight:'1px solid var(--bdr)',overflow:'hidden'}}>
+      <div style={{width:compact?300:420,minWidth:compact?260:360,maxWidth:compact?350:500,flexShrink:0,display:'flex',flexDirection:'column',background:'var(--bg1)',borderRight:'1px solid var(--bdr)',overflow:'hidden'}}>
 
         {/* Context header */}
         <div style={{padding:'10px 12px 8px',borderBottom:'1px solid var(--bdr)',flexShrink:0}}>
           {activeTable ? (
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div onClick={()=>setShowTableActions(true)} style={{width:40,height:40,borderRadius:activeTable.shape==='rd'?'50%':10,background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:activeTable.parentId?9:11,fontWeight:800,color:'var(--acc)',flexShrink:0,letterSpacing:'-.01em',textAlign:'center',lineHeight:1.1,cursor:'pointer'}}>
+              <div onClick={()=>setShowTableActions(true)} style={{width:compact?30:40,height:compact?30:40,borderRadius:activeTable.shape==='rd'?'50%':compact?7:10,background:'var(--acc-d)',border:'1.5px solid var(--acc-b)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:activeTable.parentId?(compact?8:9):(compact?9:11),fontWeight:800,color:'var(--acc)',flexShrink:0,letterSpacing:'-.01em',textAlign:'center',lineHeight:1.1,cursor:'pointer'}}>
                 {activeTable.label}
               </div>
               <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={()=>setShowTableActions(true)}>
-                <div style={{fontSize:15,fontWeight:800,color:'var(--t1)',letterSpacing:'-.01em',display:'flex',alignItems:'center',gap:6}}>
+                <div style={{fontSize:compact?12:15,fontWeight:800,color:'var(--t1)',letterSpacing:'-.01em',display:'flex',alignItems:'center',gap:6}}>
                   {activeTable.label}
                   {activeTable.parentId && (
                     <span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:20,background:'var(--acc)',color:'#0b0c10'}}>Check 2</span>
@@ -318,8 +318,8 @@ export default function POSSurface() {
 
           {/* Empty state */}
           {items.length===0&&(
-            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'52px 20px',textAlign:'center'}}>
-              <div style={{width:56,height:56,borderRadius:16,background:'var(--bg3)',border:'1px solid var(--bdr)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,marginBottom:14,opacity:.6}}>🧾</div>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:compact?'16px 12px':'52px 20px',textAlign:'center'}}>
+              <div style={{width:compact?36:56,height:compact?36:56,borderRadius:compact?10:16,background:'var(--bg3)',border:'1px solid var(--bdr)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:compact?18:26,marginBottom:compact?8:14,opacity:.6}}>🧾</div>
               <div style={{fontSize:14,fontWeight:700,color:'var(--t3)',marginBottom:4}}>Order is empty</div>
               <div style={{fontSize:12,color:'var(--t4)'}}>Tap items from the menu →</div>
             </div>
@@ -453,7 +453,7 @@ export default function POSSurface() {
         <div style={{padding:'12px 10px 8px',borderBottom:'1px solid var(--bdr)',flexShrink:0}}>
           <div style={{fontSize:9,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'.12em',paddingLeft:2}}>Menu</div>
         </div>
-        <div style={{flex:1,overflowY:'auto',padding:'6px 7px'}}>
+        <div style={{flex:1,overflowY:'auto',padding:compact?'4px':'6px 7px'}}>
           {/* Quick screen always first */}
           {[{ id:'quick', label:'Quick', icon:'⚡', color:'var(--acc)' }].concat(
             menuCategories.filter(c => !c.parentId && !c.isSpecial && (!deviceMenuId||c.menuId===deviceMenuId)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0))
@@ -474,7 +474,7 @@ export default function POSSurface() {
                 <div style={{width:3,height:32,borderRadius:2,background:isActive?color:'var(--bg5)',flexShrink:0,transition:'all .14s'}}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:1}}>
-                    <span style={{fontSize:20,lineHeight:1,flexShrink:0}}>{c.icon||'•'}</span>
+                    <span style={{fontSize:compact?15:20,lineHeight:1,flexShrink:0}}>{c.icon||'•'}</span>
                     <span style={{fontSize:12,fontWeight:700,color:isActive?color:'var(--t2)',letterSpacing:.01,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.label}</span>
                     {hasSubcats && <span style={{fontSize:8,color:'var(--t4)',flexShrink:0}}>▾</span>}
                   </div>
@@ -517,7 +517,7 @@ export default function POSSurface() {
                 borderBottom:`2px solid ${isActive?'var(--acc)':'transparent'}`,
                 background:'transparent',
                 color:isActive?'var(--acc)':'var(--t3)',
-                fontSize:13,fontWeight:isActive?700:500,
+                fontSize:compact?11:13,fontWeight:isActive?700:500,
                 display:'flex',alignItems:'center',gap:6,
                 transition:'all .12s',
               }}>
@@ -590,7 +590,7 @@ export default function POSSurface() {
                 })}
               </div>
             )}
-            <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?120:160}px,1fr))`,gap:compact?5:8}}>
+            <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?100:160}px,1fr))`,gap:compact?4:8}}>
                 {displayItems.map(item=>{
                   // Resolve category colour/icon from store (Menu Manager categories)
                   const storeCat = menuCategories.find(c => c.id === item.cat);
@@ -639,7 +639,7 @@ export default function POSSurface() {
                         background:is86?'var(--bg5)':flagged?'var(--red)':isHot?catColor:`${catColor}60`,
                         borderRadius:'14px 0 0 14px',
                       }}/>
-                      <div style={{padding:compact?'8px 8px 7px 10px':'12px 12px 11px 16px',flex:1,display:'flex',flexDirection:'column'}}>
+                      <div style={{padding:compact?'6px 6px 5px 8px':'12px 12px 11px 16px',flex:1,display:'flex',flexDirection:'column'}}>
                         {/* Top row: emoji + badges */}
                         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
                           <span style={{fontSize:24,lineHeight:1}}>{is86?'🚫':flagged?'⚠️':catIcon}</span>
@@ -665,7 +665,7 @@ export default function POSSurface() {
                         <div style={{fontSize:13,fontWeight:700,color:is86?'var(--t4)':flagged?'var(--red)':'var(--t1)',lineHeight:1.3,flex:1,marginBottom:8}}>{item.name}</div>
                         {/* Bottom: price + type + 86 button */}
                         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:4}}>
-                          <div style={{fontSize:compact?14:18,fontWeight:800,color:accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>
+                          <div style={{fontSize:compact?13:18,fontWeight:800,color:accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>
                             {item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}
                           </div>
                           <div style={{display:'flex',gap:3,alignItems:'center',flexShrink:0}}>

@@ -311,15 +311,15 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
     <div className="modal-back">
       <div style={{
         background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:24,
-        width:'100%', maxWidth:compact?420:500, maxHeight:'94vh',
+        width:'100%', maxWidth:compact?380:500, maxHeight:compact?'92vh':'94vh',
         display:'flex', flexDirection:'column',
         boxShadow:'var(--sh3)', overflow:'hidden',
       }}>
 
         {/* ── Header ── */}
-        <div style={{ padding:'16px 20px 12px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+        <div style={{ padding:compact?'10px 14px 8px':'16px 20px 12px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
           <div>
-            <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>{SCREENS[screen]||'Checkout'}</div>
+            <div style={{ fontSize:compact?15:18, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>{SCREENS[screen]||'Checkout'}</div>
             <div style={{ fontSize:12, color:'var(--t3)', marginTop:2, textTransform:'capitalize' }}>{contextLabel}</div>
           </div>
           <div style={{ display:'flex', gap:6, alignItems:'center' }}>
@@ -330,7 +330,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
           </div>
         </div>
 
-        <div style={{ flex:1, overflowY:'auto', padding:'18px 20px' }}>
+        <div style={{ flex:1, overflowY:'auto', padding:compact?'10px 14px':'18px 20px' }}>
 
           {/* ══ REVIEW ══════════════════════════════════════════════ */}
           {screen==='review' && (
