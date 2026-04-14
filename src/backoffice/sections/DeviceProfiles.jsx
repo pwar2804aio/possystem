@@ -82,7 +82,8 @@ export default function DeviceProfiles() {
   };
 
   const addProfile = (profile) => {
-    setProfiles(ps => [...ps, { ...profile, id:`prof-${Date.now()}`, deviceCount:0 }]);
+    const nextId = `prof-${Date.now().toString(36).slice(-4)}`;
+    setProfiles(ps => [...ps, { ...profile, id:nextId, deviceCount:0 }]);
     markBOChange();
     showToast(`"${profile.name}" profile created`, 'success');
     setShowNew(false);

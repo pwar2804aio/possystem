@@ -20,7 +20,7 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.14';
+const VERSION = '3.5.15';
 
 const CHANGELOG = [
   {
@@ -971,12 +971,31 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             localStorage.setItem('rpos-device-config', JSON.stringify(config));
             useStore.getState().setDeviceConfig(config);
           } else {
-            // Profile ID not found in local profiles — use device name from Supabase
+            // Profile ID not found in hardcoded list — try to find it in config push payload
             const existingConfig = JSON.parse(localStorage.getItem('rpos-device-config') || 'null');
-            const deviceName = data.name || pairedDevice.name || 'POS Terminal';
+            // Check if we have a name for this profile from a previous config push
+            let profileName = existingConfig?.profileName;
+            if (!profileName || profileName === data.name) {
+              // Try config pushes for profile name
+              try {
+                const { data: pushData } = await supabase
+                  .from('config_pushes')
+                  .select('payload')
+                  .eq('location_id', pairedDevice.location_id)
+                  .order('pushed_at', { ascending: false })
+                  .limit(1)
+                  .single();
+                const profiles = pushData?.payload?.profiles || [];
+                const found = profiles.find(p => p.id === data.profile_id);
+                if (found) profileName = found.name;
+              } catch {}
+              if (!profileName || profileName === data.name) {
+                profileName = data.name || pairedDevice.name || 'POS Terminal';
+              }
+            }
             const minConfig = {
               profileId: data.profile_id || 'custom',
-              profileName: deviceName,
+              profileName: profileName,
               defaultSurface: existingConfig?.defaultSurface || 'tables',
               enabledOrderTypes: existingConfig?.enabledOrderTypes || ['dine-in','takeaway','collection'],
               assignedSection: existingConfig?.assignedSection || null,
