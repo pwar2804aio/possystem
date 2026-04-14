@@ -164,6 +164,12 @@ export const useStore = create((set, get) => ({
   // ── Back Office config push workflow ────────────────────────────────────────
   // pendingBOChanges: count of BO changes not yet pushed to POS
   // configVersion: incremented on each push — POS compares this to know if it's stale
+  // Print routing config — read from localStorage, updated via Push to POS
+  printRouting: (() => {
+    try { return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres:[], routing:{} }; }
+    catch { return { centres:[], routing:{} }; }
+  })(),
+
   // configUpdateAvailable: true on POS when a push has been received but not applied
   // configUpdateSnapshot: the incoming config snapshot waiting to be applied
   pendingBOChanges: 0,
@@ -193,10 +199,17 @@ export const useStore = create((set, get) => ({
       // Menu categories — full replace
       ...(snap.menuCategories ? { menuCategories: snap.menuCategories } : {}),
 
+      // Print routing config from back office
+      ...(snap.printRouting ? { printRouting: snap.printRouting } : {}),
+
       configVersion: snap.version,
       configUpdateAvailable: false,
       configUpdateSnapshot: null,
     });
+    // Persist print routing to localStorage so it survives reload
+    if (snap.printRouting) {
+      try { localStorage.setItem('rpos-print-routing', JSON.stringify(snap.printRouting)); } catch {}
+    }
     try { sessionStorage.setItem('rpos-config-version', String(snap.version)); } catch {}
   },
   locationSections: [
@@ -940,19 +953,56 @@ export const useStore = create((set, get) => ({
   sendToKitchen: () => {
     const { activeTableId, staff, orderType, customer, addToQueue, tables } = get();
 
+    // Get routing config — prefer store value (pushed from back office), fall back to localStorage
+    const getRoutingConfig = () => {
+      try {
+        const stored = useStore.getState().printRouting;
+        if (stored?.centres?.length) return stored;
+        return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres:[], routing:{} };
+      } catch { return { centres:[], routing:{} }; }
+    };
+
+    // Determine which production center(s) an item routes to based on its category
+    const getCentresForItem = (item, config) => {
+      const { centres, routing } = config;
+      if (!centres?.length || !routing) return [item.centreId || 'pc1'];
+
+      const itemCat = item.cat || item.cats?.[0] || null;
+      const matched = [];
+      centres.forEach(centre => {
+        const r = routing[centre.id];
+        if (!r?.assignedCategories?.length) return;
+        // Check if this item's category is assigned to this centre
+        if (itemCat && r.assignedCategories.includes(itemCat)) {
+          // Check it's not excluded
+          if (!r.excludedItems?.includes(item.id)) {
+            matched.push(centre.id);
+          }
+        }
+      });
+      // Fall back: if no routing configured, use item's own centreId or first centre
+      if (!matched.length) {
+        return [item.centreId || centres[0]?.id || 'pc1'];
+      }
+      return matched;
+    };
+
     const createKdsTickets = (items, tableLabel, serverName, covers) => {
+      const routingConfig = getRoutingConfig();
       const byCenter = {};
       items.filter(i => [0,1].includes(i.course) && !i.voided && i.status==='pending').forEach(item => {
-        const cid = item.centreId || 'pc1';
-        if (!byCenter[cid]) byCenter[cid] = [];
-        byCenter[cid].push(item);
+        const centres = getCentresForItem(item, routingConfig);
+        centres.forEach(cid => {
+          if (!byCenter[cid]) byCenter[cid] = [];
+          byCenter[cid].push(item);
+        });
       });
       return Object.entries(byCenter).map(([centreId, centreItems]) => ({
         id: `kds-${Date.now()}-${centreId}-${Math.random().toString(36).slice(2,6)}`,
         table: tableLabel, server: serverName, covers, centreId,
         sentAt: Date.now(), minutes: 0,
         items: centreItems.map(i => ({
-          qty: i.qty, name: i.kitchenName || i.name,
+          qty: i.qty, name: i.kitchenName || i.menu_name || i.menuName || i.name,
           mods: [
             ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
             ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
@@ -969,9 +1019,13 @@ export const useStore = create((set, get) => ({
       const pendingItems = session?.items?.filter(i => i.status === 'pending' && !i.voided) || [];
       const newTickets = createKdsTickets(pendingItems, table?.label || activeTableId, staff?.name || 'Server', session?.covers || 2);
       // Route print jobs for each ticket (fires to mapped printer per centre)
-      const CENTRE_PRINTERS = { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' };
+      const printConfig = getRoutingConfig();
+      const getCentrePrinter = (centreId) => {
+        const centre = printConfig.centres?.find(c => c.id === centreId);
+        return centre?.printer?.name || centre?.name || { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' }[centreId] || 'Kitchen';
+      };
       newTickets.forEach(t => {
-        if (t.items.length) get().routePrintJob({ centreId:t.centreId, printerName:CENTRE_PRINTERS[t.centreId]||'Kitchen', tableLabel:t.table, items:t.items, type:'kitchen' });
+        if (t.items.length) get().routePrintJob({ centreId:t.centreId, printerName:getCentrePrinter(t.centreId), tableLabel:t.table, items:t.items, type:'kitchen' });
       });
       set(s=>({
         tables: s.tables.map(t=>{
@@ -1022,15 +1076,36 @@ export const useStore = create((set, get) => ({
     if (activeTableId) {
       const table = tables.find(t => t.id === activeTableId);
       const session = table?.session;
-      // Items in this course that haven't been sent yet
       const courseItems = session?.items?.filter(i => i.course === courseNum && i.status === 'pending' && !i.voided) || [];
 
-      // Group by production centre and create KDS tickets
+      // Use routing config to determine centres
+      const routingConfig = (() => {
+        try {
+          const stored = useStore.getState().printRouting;
+          if (stored?.centres?.length) return stored;
+          return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres:[], routing:{} };
+        } catch { return { centres:[], routing:{} }; }
+      })();
+      const getCentresForItem = (item) => {
+        const { centres, routing } = routingConfig;
+        if (!centres?.length) return [item.centreId || 'pc1'];
+        const itemCat = item.cat || item.cats?.[0] || null;
+        const matched = [];
+        centres.forEach(centre => {
+          const r = routing[centre.id];
+          if (itemCat && r?.assignedCategories?.includes(itemCat) && !r?.excludedItems?.includes(item.id)) {
+            matched.push(centre.id);
+          }
+        });
+        return matched.length ? matched : [item.centreId || centres[0]?.id || 'pc1'];
+      };
+
       const byCenter = {};
       courseItems.forEach(item => {
-        const cid = item.centreId || 'pc1';
-        if (!byCenter[cid]) byCenter[cid] = [];
-        byCenter[cid].push(item);
+        getCentresForItem(item).forEach(cid => {
+          if (!byCenter[cid]) byCenter[cid] = [];
+          byCenter[cid].push(item);
+        });
       });
       const newTickets = Object.entries(byCenter).map(([centreId, centreItems]) => ({
         id: `kds-${Date.now()}-${centreId}-c${courseNum}`,
@@ -1039,7 +1114,7 @@ export const useStore = create((set, get) => ({
         covers: session?.covers || 2,
         centreId, sentAt: Date.now(), minutes: 0,
         items: centreItems.map(i => ({
-          qty: i.qty, name: i.kitchenName || i.name,
+          qty: i.qty, name: i.kitchenName || i.menu_name || i.menuName || i.name,
           mods: [
             ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
             ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
