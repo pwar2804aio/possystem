@@ -260,13 +260,16 @@ function AdminPanel({ authUser }) {
 
   const toggleUserLocation = async (userId, locationId, hasAccess) => {
     if (hasAccess) {
-      await sbFetch(`user_locations?user_id=eq.${userId}&location_id=eq.${locationId}`, { method:'DELETE', prefer:'' });
+      const { error } = await sbFetch(`user_locations?user_id=eq.${userId}&location_id=eq.${locationId}`, { method:'DELETE', prefer:'' });
+      if (error) return err('Failed to remove: ' + error.message);
     } else {
-      await sbFetch('user_locations', { method:'POST', body:{ user_id:userId, location_id:locationId } });
+      const { error } = await sbFetch('user_locations', { method:'POST', body:{ user_id:userId, location_id:locationId } });
+      if (error) return err('Failed to add: ' + error.message);
       const u = users.find(u => u.id === userId);
       if (!u?.location_id) await sbFetch(`user_profiles?id=eq.${userId}`, { method:'PATCH', body:{ location_id:locationId }, prefer:'' });
     }
     await loadUsers(selectedOrg.id);
+    ok(hasAccess ? 'Access removed' : '✓ Access granted');
   };
 
   const usersForLocation = (locId) =>
