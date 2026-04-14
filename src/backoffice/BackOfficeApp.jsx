@@ -298,6 +298,7 @@ export default function BackOfficeApp() {
           {section === 'admin'       && <CompanyAdmin />}
         </div>
       </div>
+      {showLocationSwitcher && <LocationSwitcher onClose={() => setShowLocationSwitcher(false)} />}
     </div>
   );
 }
