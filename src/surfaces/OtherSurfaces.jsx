@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { ALLERGENS, INITIAL_TABLES, MENU_ITEMS, PRINTERS, PRODUCTION_CENTRES, STAFF } from '../data/seed';
+import { VERSION } from '../lib/version';
+import { VERSION } from '../lib/version';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Payment Screen
@@ -400,7 +402,7 @@ export function KDSSurface() {
           <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>{kdsName}</div>
           <div style={{ fontSize:10, color:'var(--t3)', fontWeight:600 }}>
             {centreName && <span style={{ marginRight:6 }}>{centreName} ·</span>}
-            {displayed.length} ticket{displayed.length!==1?'s':''} · live
+            {displayed.length} ticket{displayed.length!==1?'s':''} · live · <span style={{ fontFamily:'monospace' }}>v{VERSION}</span>
           </div>
         </div>
 
