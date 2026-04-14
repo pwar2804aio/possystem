@@ -17,10 +17,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug  // Use debug keystore for sideloading
-        }
-        debug {
-            applicationIdSuffix ".debug"
+            debuggable false
         }
     }
 
