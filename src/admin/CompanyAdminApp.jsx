@@ -308,6 +308,7 @@ function AdminPanel({ authUser }) {
           <div style={{ fontSize:11, color:'#475569', padding:'0 6px', marginBottom:6 }}>{authUser.email}</div>
           <button onClick={() => { localStorage.removeItem('rpos-auth'); window.location.reload(); }} style={{ ...S.btn, ...S.btnGhost, width:'100%', fontSize:12 }}>Sign out</button>
           <button onClick={() => { localStorage.removeItem('rpos-device-mode'); window.location.href='/'; }} style={{ width:'100%', padding:'6px', background:'none', border:'none', cursor:'pointer', fontSize:11, color:'#475569', marginTop:4, fontFamily:'inherit' }}>← Switch device mode</button>
+          <div style={{ fontSize:10, color:'#334155', textAlign:'center', marginTop:8, fontFamily:'monospace' }}>v{VERSION}</div>
         </div>
       </div>
 
