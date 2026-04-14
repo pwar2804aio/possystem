@@ -1,43 +1,24 @@
 name: Build Android APK
-
 on:
   push:
-      branches: [ main ]
-        workflow_dispatch:
-
-        jobs:
-          build-apk:
-              runs-on: ubuntu-latest
-                  steps:
-                        - uses: actions/checkout@v4
-
-                              - uses: actions/setup-java@v4
-                                      with:
-                                                java-version: '17'
-                                                          distribution: 'temurin'
-
-                                                                - uses: android-actions/setup-android@v3
-
-                                                                      - uses: actions/cache@v4
-                                                                              with:
-                                                                                        path: |
-                                                                                                    ~/.gradle/caches
-                                                                                                                ~/.gradle/wrapper
-                                                                                                                          key: gradle-${{ hashFiles('android/**/*.gradle*') }}
-                                                                                                                          
-                                                                                                                                - run: chmod +x android/gradlew
-                                                                                                                                
-                                                                                                                                      - name: Build APK
-                                                                                                                                              working-directory: android
-                                                                                                                                                      run: ./gradlew assembleRelease --no-daemon
-                                                                                                                                                      
-                                                                                                                                                            - name: Rename APK
-                                                                                                                                                                    run: |
-                                                                                                                                                                              mkdir -p artifacts
-                                                                                                                                                                                        cp android/app/build/outputs/apk/release/app-release.apk artifacts/RestaurantOS.apk
-                                                                                                                                                                                        
-                                                                                                                                                                                              - uses: actions/upload-artifact@v4
-                                                                                                                                                                                                      with:
-                                                                                                                                                                                                                name: RestaurantOS-APK
-                                                                                                                                                                                                                          path: artifacts/RestaurantOS.apk
-                                                                                                                                                                                                                                    retention-days: 90
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: android-actions/setup-android@v3
+      - run: chmod +x android/gradlew
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RestaurantOS-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 90
