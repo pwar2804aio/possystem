@@ -1,6 +1,29 @@
 import { useState, useEffect } from 'react';
 import { VERSION } from '../lib/version';
 import { supabase } from '../lib/supabase';
+
+// Helper: call Supabase REST directly using current session token
+// This bypasses the supabase client's auth initialization delay
+async function sbFetch(path, opts = {}) {
+  const auth = JSON.parse(localStorage.getItem('rpos-auth') || 'null');
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  if (!url || !key) return { data: null, error: { message: 'Not configured' } };
+  const res = await fetch(`${url}/rest/v1/${path}`, {
+    headers: {
+      'apikey': key,
+      'Authorization': `Bearer ${auth?.access_token || key}`,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation',
+      ...opts.headers,
+    },
+    method: opts.method || 'GET',
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json();
+  if (!res.ok) return { data: null, error: { message: data?.message || res.statusText } };
+  return { data: Array.isArray(data) ? data : data, error: null };
+}
 import BOLogin from '../backoffice/BOLogin';
 
 const S = {
@@ -96,11 +119,7 @@ function AdminPanel({ authUser }) {
   }, []);
 
   const loadUsers = async (orgId) => {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('*, user_locations(location_id)')
-      .eq('org_id', orgId)
-      .order('created_at');
+    const { data } = await sbFetch(`user_profiles?select=*,user_locations(location_id)&org_id=eq.${orgId}&order=created_at.asc`);
     setUsers(data || []);
   };
 
@@ -114,18 +133,18 @@ function AdminPanel({ authUser }) {
   const loadOrgs = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('organisations').select('*').order('created_at', { ascending:false });
+      const { data, error } = await sbFetch('organisations?select=*&order=created_at.desc');
       if (error) console.error('[Admin] loadOrgs error:', error.message);
       setOrgs(data || []);
     } catch(e) {
-      console.error('[Admin] loadOrgs exception:', e.message);
+      console.warn('[Admin] loadOrgs failed:', e.message);
       setOrgs([]);
     }
     setLoading(false);
   };
 
   const loadLocations = async (orgId) => {
-    const { data } = await supabase.from('locations').select('*, subscriptions(plan, gmv_this_month), location_features(feature, price_per_month)').eq('org_id', orgId).order('created_at');
+    const { data } = await sbFetch(`locations?select=*,subscriptions(plan,gmv_this_month),location_features(feature,price_per_month)&org_id=eq.${orgId}&order=created_at.asc`);
     setLocations(data || []);
   };
 
@@ -146,9 +165,11 @@ function AdminPanel({ authUser }) {
     if (!form.name?.trim()) return err('Organisation name is required');
     setWorking(true); setMsg({ type:'', text:'' });
     const slug = (form.slug || form.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-    const { data, error:e } = await supabase.from('organisations').insert({ name:form.name.trim(), slug, status:'active' }).select().single();
+    const { data, error:e } = await sbFetch('organisations', { method:'POST', body:{ name:form.name.trim(), slug, status:'active' }, prefer:'return=representation' });
+    const orgData = Array.isArray(data) ? data[0] : data;
     setWorking(false);
     if (e) return err(e.message);
+    const data = orgData;
     ok(`✓ "${data.name}" created`);
     setForm({});
     await loadOrgs();
@@ -158,15 +179,12 @@ function AdminPanel({ authUser }) {
   const createLocation = async () => {
     if (!form.locName?.trim()) return err('Location name required');
     setWorking(true); setMsg({ type:'', text:'' });
-    const { data:loc, error:e } = await supabase.from('locations').insert({
-      org_id:selectedOrg.id, name:form.locName.trim(),
-      address:form.locAddress||'', timezone:form.locTz||'Europe/London',
-      currency:form.locCurrency||'GBP', status:'active',
-    }).select().single();
-    if (e) { setWorking(false); return err(e.message); }
+    const { data:locArr, error:e } = await sbFetch('locations', { method:'POST', body:{ org_id:selectedOrg.id, name:form.locName.trim(), address:form.locAddress||'', timezone:form.locTz||'Europe/London', currency:form.locCurrency||'GBP', status:'active' } });
+    const loc = Array.isArray(locArr) ? locArr[0] : locArr;
+    if (e || !loc) { setWorking(false); return err(e?.message || 'Failed to create location'); }
     const maxDevices = parseInt(form.maxDevices)||3;
-    await supabase.from('subscriptions').insert({ org_id:selectedOrg.id, location_id:loc.id, plan:'free', gmv_this_month:0, billing_period_start:new Date().toISOString().slice(0,10) });
-    await supabase.from('location_features').insert({ location_id:loc.id, feature:'max_devices', enabled:true, price_per_month:maxDevices });
+    await sbFetch('subscriptions', { method:'POST', body:{ org_id:selectedOrg.id, location_id:loc.id, plan:'free', gmv_this_month:0, billing_period_start:new Date().toISOString().slice(0,10) } });
+    await sbFetch('location_features', { method:'POST', body:{ location_id:loc.id, feature:'max_devices', enabled:true, price_per_month:maxDevices } });
     setWorking(false);
     ok(`✓ Location "${loc.name}" created · max ${maxDevices} devices`);
     setForm(f => ({ ...f, locName:'', locAddress:'', maxDevices:'' }));
@@ -339,13 +357,13 @@ function AdminPanel({ authUser }) {
                                           <input type="checkbox" checked={hasAccess}
                                             onChange={async (e) => {
                                               if (e.target.checked) {
-                                                await supabase.from('user_locations').insert({ user_id:u.id, location_id:loc.id });
-                                                if (!u.location_id) await supabase.from('user_profiles').update({ location_id:loc.id }).eq('id',u.id);
+                                                await sbFetch('user_locations', { method:'POST', body:{ user_id:u.id, location_id:loc.id } });
+                                                if (!u.location_id) await sbFetch(`user_profiles?id=eq.${u.id}`, { method:'PATCH', body:{ location_id:loc.id } });
                                               } else {
-                                                await supabase.from('user_locations').delete().eq('user_id',u.id).eq('location_id',loc.id);
+                                                await sbFetch(`user_locations?user_id=eq.${u.id}&location_id=eq.${loc.id}`, { method:'DELETE' });
                                               }
                                               await loadUsers(selectedOrg.id);
-                                            }}
+                                            }}`}}`}}
                                             style={{ accentColor:'#6366f1' }}
                                           />
                                           <span style={{ color:'#e2e8f0' }}>{u.email || u.full_name}</span>
