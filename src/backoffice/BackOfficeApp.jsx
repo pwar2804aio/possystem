@@ -202,7 +202,7 @@ export default function BackOfficeApp() {
               <div style={{ fontSize:10, color:'var(--t4)' }}>{staff?.role || 'Admin'}</div>
             </div>
           </div>
-          <button onClick={() => { window.location.href = '?mode=pos'; }} style={{
+          <button onClick={() => { localStorage.removeItem('rpos-device'); localStorage.removeItem('rpos-device-config'); localStorage.setItem('rpos-device-mode','pos'); window.location.href = '?mode=pos'; }} style={{
             width:'100%', padding:'9px 10px', borderRadius:9,
             cursor:'pointer', textAlign:'left', fontSize:12,
             fontWeight:600, border:'1px solid var(--bdr)',
@@ -252,7 +252,7 @@ export default function BackOfficeApp() {
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
             {/* Quick nav — switch between modes */}
             <div style={{ display:'flex', gap:4 }}>
-              <a href="?mode=pos" style={{ padding:'5px 12px', borderRadius:7, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', textDecoration:'none', display:'flex', alignItems:'center', gap:5 }}>🖥 POS</a>
+              <a href="?mode=pos" onClick={() => { localStorage.removeItem('rpos-device'); localStorage.removeItem('rpos-device-config'); }} style={{ padding:'5px 12px', borderRadius:7, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', textDecoration:'none', display:'flex', alignItems:'center', gap:5 }}>🖥 POS</a>
               <a href="?mode=office" style={{ padding:'5px 12px', borderRadius:7, border:'1px solid var(--acc-b)', background:'var(--acc-d)', color:'var(--acc)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', textDecoration:'none' }}>🏢 Office</a>
               <a href="?mode=admin" style={{ padding:'5px 12px', borderRadius:7, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t3)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', textDecoration:'none' }}>🔐 Admin</a>
             </div>
