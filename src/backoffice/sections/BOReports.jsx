@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store';
+import { supabase, isMock } from '../../lib/supabase';
 
 const PERIODS = [
   { id:'today',  label:'Today'      },
@@ -25,8 +26,34 @@ function StatCard({ label, value, sub, color, icon }) {
 
 export default function BOReports() {
   const { closedChecks } = useStore();
-  const [period, setPeriod]   = useState('today');
-  const [view, setView]       = useState('overview');
+  const [period, setPeriod]       = useState('today');
+  const [view, setView]           = useState('overview');
+  const [locationFilter, setLocationFilter] = useState('all');
+  const [locations, setLocations] = useState([]);
+
+  // Load accessible locations for the filter dropdown
+  useEffect(() => {
+    if (isMock) return;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase.from('user_profiles').select('org_id, location_id').eq('id', user.id).single();
+        if (!profile) return;
+
+        // Get all locations user has access to
+        const { data: userLocs } = await supabase.from('user_locations').select('location_id').eq('user_id', user.id);
+        const ids = [...new Set([
+          ...(userLocs||[]).map(ul => ul.location_id),
+          profile.location_id,
+        ].filter(Boolean))];
+
+        if (ids.length === 0) return;
+        const { data: locs } = await supabase.from('locations').select('id, name').in('id', ids).order('name');
+        if (locs && locs.length > 1) setLocations(locs); // only show if multiple
+      } catch {}
+    })();
+  }, []);
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -34,13 +61,16 @@ export default function BOReports() {
     const sow = new Date(sod); sow.setDate(sod.getDate() - sod.getDay());
     const som = new Date(now.getFullYear(), now.getMonth(), 1);
     return closedChecks.filter(c => {
+      // Location filter
+      if (locationFilter !== 'all' && c.location_id && c.location_id !== locationFilter) return false;
+      // Period filter
       const d = new Date(c.closedAt);
       if (period==='today') return d >= sod;
       if (period==='week')  return d >= sow;
       if (period==='month') return d >= som;
       return true;
     });
-  }, [closedChecks, period]);
+  }, [closedChecks, period, locationFilter]);
 
   const stats = useMemo(() => {
     const revenue   = filtered.reduce((s,c) => s + c.total, 0);
@@ -52,7 +82,6 @@ export default function BOReports() {
     const avgCheck  = filtered.length ? revenue/filtered.length : 0;
     const avgCover  = covers ? revenue/covers : 0;
 
-    // Product mix
     const itemMap = {};
     filtered.forEach(c => {
       (c.items||[]).forEach(i => {
@@ -63,12 +92,10 @@ export default function BOReports() {
     });
     const topItems = Object.values(itemMap).sort((a,b)=>b.rev-a.rev).slice(0,10);
 
-    // Hourly breakdown (0-23)
     const byHour = Array(24).fill(0);
     filtered.forEach(c => { const h = new Date(c.closedAt).getHours(); byHour[h] += c.total; });
     const maxHour = Math.max(...byHour, 1);
 
-    // By server
     const serverMap = {};
     filtered.forEach(c => {
       const s = c.server || c.staff || 'Unknown';
@@ -79,7 +106,6 @@ export default function BOReports() {
     });
     const byServer = Object.values(serverMap).sort((a,b)=>b.revenue-a.revenue);
 
-    // By order type
     const typeMap = {};
     filtered.forEach(c => {
       const t = c.orderType || 'dine-in';
@@ -101,14 +127,42 @@ export default function BOReports() {
 
   const typeIcons = { 'dine-in':'⬚', takeaway:'🥡', collection:'📦', delivery:'🛵', bar:'🍸', counter:'🏷' };
 
+  const activeLoc = locations.find(l => l.id === locationFilter);
+
   return (
     <div style={{ padding:'20px 24px', maxWidth:960 }}>
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:20 }}>
-        <div style={{ flex:1 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20, flexWrap:'wrap' }}>
+        <div style={{ flex:1, minWidth:120 }}>
           <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)', marginBottom:2 }}>Reports</div>
-          <div style={{ fontSize:12, color:'var(--t3)' }}>{filtered.length} checks · {fmt(stats.revenue)} revenue</div>
+          <div style={{ fontSize:12, color:'var(--t3)' }}>
+            {filtered.length} checks · {fmt(stats.revenue)} revenue
+            {activeLoc && <span style={{ marginLeft:6, color:'var(--acc)', fontWeight:600 }}>· {activeLoc.name}</span>}
+          </div>
         </div>
+
+        {/* Location filter — only shown if user has multiple locations */}
+        {locations.length > 0 && (
+          <div style={{ display:'flex', gap:4, background:'var(--bg3)', padding:3, borderRadius:10 }}>
+            <button onClick={() => setLocationFilter('all')} style={{
+              padding:'5px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', border:'none',
+              background:locationFilter==='all'?'var(--bg1)':'transparent',
+              color:locationFilter==='all'?'var(--t1)':'var(--t3)',
+              fontSize:12, fontWeight:locationFilter==='all'?700:400,
+              boxShadow:locationFilter==='all'?'0 1px 3px rgba(0,0,0,.15)':'none',
+            }}>All locations</button>
+            {locations.map(l => (
+              <button key={l.id} onClick={() => setLocationFilter(l.id)} style={{
+                padding:'5px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', border:'none',
+                background:locationFilter===l.id?'var(--bg1)':'transparent',
+                color:locationFilter===l.id?'var(--t1)':'var(--t3)',
+                fontSize:12, fontWeight:locationFilter===l.id?700:400,
+                boxShadow:locationFilter===l.id?'0 1px 3px rgba(0,0,0,.15)':'none',
+              }}>{l.name}</button>
+            ))}
+          </div>
+        )}
+
         {/* Period selector */}
         <div style={{ display:'flex', gap:4, background:'var(--bg3)', padding:3, borderRadius:10 }}>
           {PERIODS.map(p => (
@@ -145,7 +199,6 @@ export default function BOReports() {
             <StatCard label="Tips"      value={fmt(stats.tips)}       sub={`${fmt(stats.refunds)} refunded`}  color="var(--grn)" icon="🙏"/>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:20 }}>
-            {/* Payment split */}
             <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:'14px 16px' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:12 }}>Payment method</div>
               {[['💳 Card', stats.card, '#3b82f6'], ['💵 Cash', stats.cash, '#22c55e']].map(([label, val, color]) => {
@@ -164,7 +217,6 @@ export default function BOReports() {
                 );
               })}
             </div>
-            {/* Order type split */}
             <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:'14px 16px' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:12 }}>By order type</div>
               {stats.byType.length === 0
@@ -183,7 +235,6 @@ export default function BOReports() {
               }
             </div>
           </div>
-          {/* Top items preview */}
           {stats.topItems.length > 0 && (
             <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:'14px 16px' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:12 }}>Top items</div>
