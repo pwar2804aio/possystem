@@ -387,9 +387,9 @@ export function KDSSurface() {
 
   // Read device name from localStorage
   const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
-  const deviceConfig = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-config') || 'null'); } catch { return null; } })();
-  const kdsName = pairedDevice?.name || deviceConfig?.profileName || 'Kitchen display';
-  const centreName = deviceConfig?.centreName || null;
+  const localDeviceConfig = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-config') || 'null'); } catch { return null; } })();
+  const kdsName = pairedDevice?.name || localDeviceConfig?.profileName || 'Kitchen display';
+  const centreName = localDeviceConfig?.centreName || null;
 
   return (
     <div style={{ display:'flex', flex:1, flexDirection:'column', overflow:'hidden', background:'var(--bg)' }}>
