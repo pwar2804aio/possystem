@@ -244,6 +244,7 @@ function TableNode({ table, onClick }) {
 
 // ─── Main Tables Surface ─────────────────────────────────────────────────────
 export default function TablesSurface() {
+  const compact = useCompact();
   const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff, locationSections, deviceConfig } = useStore();
   const [selected, setSelected]   = useState(null);
   const [showSeat, setShowSeat]   = useState(false);

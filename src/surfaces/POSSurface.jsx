@@ -24,6 +24,7 @@ const COURSE_COLORS = {
 };
 
 export default function POSSurface() {
+  const compact = useCompact();
   const {
     staff, allergens, toggleAllergen, clearAllergens,
     addItem, addCustomItem, removeItem, updateItemQty, updateItemNote,

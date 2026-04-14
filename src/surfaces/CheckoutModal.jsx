@@ -264,6 +264,7 @@ function CashTransaction({ grand, onComplete, onBack }) {
 
 // ─── Main checkout modal ──────────────────────────────────────────────────────
 export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
+  const compact = useCompact();
   const [screen, setScreen] = useState('review');
   const [tipAmt, setTipAmt] = useState(0);
   const [showSplit, setShowSplit] = useState(false);
