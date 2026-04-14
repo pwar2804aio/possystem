@@ -1,20 +1,24 @@
-const CACHE = 'rpos-v1';
-const OFFLINE_ASSETS = ['/'];
+// Restaurant OS Service Worker
+// skipWaiting is NOT called on install — new SW waits until user approves update
+// This lets the UpdateBanner show and give staff control over when to refresh
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(OFFLINE_ASSETS)));
-  self.skipWaiting();
+  // Do NOT call skipWaiting() here — we want the new SW to wait
+  // so the update banner can prompt the user
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-  ));
+  // Clean up old caches when we activate
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.map(k => caches.delete(k)))
+    )
+  );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
-  // Network first — always fetch fresh for navigation
+  // Network first — always fetch fresh content
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).catch(() => caches.match('/'))
@@ -22,7 +26,7 @@ self.addEventListener('fetch', e => {
   }
 });
 
-// Allow app to trigger update programmatically
+// App sends this message when user taps "Update now"
 self.addEventListener('message', e => {
   if (e.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
