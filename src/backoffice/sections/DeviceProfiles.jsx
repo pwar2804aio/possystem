@@ -16,16 +16,15 @@ const ORDER_TYPES = [
 ];
 
 const FEATURES = [
-  { id:'floorPlan',   label:'Floor plan',          desc:'Table layout and dine-in surface' },
-  { id:'barTabs',     label:'Bar tabs',             desc:'Bar tab management surface' },
-  { id:'courses',     label:'Course management',    desc:'Fire course buttons on orders' },
-  { id:'kds',         label:'KDS screen',           desc:'Kitchen display screen in sidebar' },
-  { id:'kiosk',       label:'Kiosk mode',           desc:'Self-service kiosk capability' },
-  { id:'reports',     label:'Reports access',       desc:'Shift reports in back office tab' },
-  { id:'discounts',   label:'Discounts',            desc:'Apply discounts without manager PIN' },
-  { id:'voids',       label:'Voids (no PIN)',        desc:'Void items without manager PIN' },
-  { id:'splitCheck',  label:'Split checks',          desc:'Allow creating split checks' },
-  { id:'tableTransfer',label:'Table transfer',      desc:'Transfer tables to other terminals' },
+  { id:'barTabs',      label:'Bar tabs',             desc:'Hide bar tab surface from POS sidebar' },
+  { id:'courses',      label:'Course management',    desc:'Fire course buttons on orders' },
+  { id:'kds',          label:'KDS screen',           desc:'Kitchen display screen in sidebar' },
+  { id:'kiosk',        label:'Kiosk mode',           desc:'Self-service kiosk capability' },
+  { id:'reports',      label:'Reports access',       desc:'Shift reports in back office tab' },
+  { id:'discounts',    label:'Discounts',            desc:'Apply discounts without manager PIN' },
+  { id:'voids',        label:'Voids (no PIN)',        desc:'Void items without manager PIN' },
+  { id:'splitCheck',   label:'Split checks',         desc:'Allow creating split checks' },
+  { id:'tableTransfer',label:'Table transfer',       desc:'Transfer tables to other terminals' },
 ];
 
 const DEFAULT_PROFILES = [

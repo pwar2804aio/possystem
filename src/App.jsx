@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.1.3';
+const VERSION = '3.1.4';
 
 const CHANGELOG = [
   {
@@ -1177,8 +1177,11 @@ function Sidebar({ surface, setSurface }) {
   const hidden = deviceConfig?.hiddenFeatures || [];
   const allOk = syncStatus.printerOnline && syncStatus.paymentTerminalOnline && !syncStatus.pendingChanges;
 
-  const FEATURE_MAP = { kds:'kds', reports:'backoffice', floorPlan:'tables', barTabs:'bar' };
+  const FEATURE_MAP = { kds:'kds', reports:'backoffice', barTabs:'bar' };
   const visibleNav = NAV.filter(n => {
+    // Table service disabled → hide floor plan
+    if (n.id === 'tables' && deviceConfig && deviceConfig.tableServiceEnabled === false) return false;
+    // Hidden features → hide matching nav
     const featureKey = Object.entries(FEATURE_MAP).find(([,v]) => v === n.id)?.[0];
     return !featureKey || !hidden.includes(featureKey);
   });
