@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.3.1';
+const VERSION = '3.3.2';
 
 const CHANGELOG = [
   {
@@ -1001,22 +1001,18 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   );
   if (deviceValid === false) return <PairingScreen onPaired={() => window.location.reload()} />;
 
-  // Kicked — another session claimed this device
   if (deviceValid === 'kicked') return (
-    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#0f1117', fontFamily:'inherit', gap:20, padding:40 }}>
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#0f1117', fontFamily:'inherit', gap:20, padding:40, position:'relative', zIndex:9999 }}>
       <div style={{ fontSize:48 }}>⚠️</div>
       <div style={{ fontSize:22, fontWeight:800, color:'#f1f5f9', textAlign:'center' }}>This terminal has been disconnected</div>
       <div style={{ fontSize:15, color:'#64748b', textAlign:'center', maxWidth:400, lineHeight:1.7 }}>
         Another device or browser window has connected to <strong style={{color:'#e2e8f0'}}>{pairedDevice.name}</strong>.<br/>
         Each POS device can only be active in one place at a time.
       </div>
-      <button onClick={() => {
-        // Reclaim this session
-        sessionStorage.removeItem(SESSION_TOKEN_KEY);
-        window.location.reload();
-      }} style={{ padding:'14px 32px', borderRadius:12, background:'#6366f1', color:'#fff', fontWeight:700, fontSize:15, border:'none', cursor:'pointer', fontFamily:'inherit' }}>
+      <a href={window.location.href} onClick={() => sessionStorage.removeItem(SESSION_TOKEN_KEY)}
+        style={{ padding:'14px 32px', borderRadius:12, background:'#6366f1', color:'#fff', fontWeight:700, fontSize:15, textDecoration:'none', fontFamily:'inherit', display:'inline-block' }}>
         Reconnect this terminal
-      </button>
+      </a>
       <div style={{ fontSize:12, color:'#334155' }}>v{VERSION}</div>
     </div>
   );

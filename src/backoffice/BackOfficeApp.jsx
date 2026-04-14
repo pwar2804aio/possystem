@@ -87,8 +87,25 @@ export default function BackOfficeApp() {
     const { useStore } = await import('../store/index.js');
     const patch = {};
     if (menusRes.data?.length)   patch.menus          = menusRes.data;
-    if (catsRes.data?.length)    patch.menuCategories  = catsRes.data;
-    if (itemsRes.data?.length)   patch.menuItems       = itemsRes.data;
+    if (catsRes.data?.length)    patch.menuCategories  = catsRes.data.map(c => ({
+      ...c,
+      menuId: c.menu_id ?? c.menuId,
+      parentId: c.parent_id ?? c.parentId,
+      accountingGroup: c.accounting_group ?? c.accountingGroup,
+      sortOrder: c.sort_order ?? c.sortOrder,
+    }));
+    if (itemsRes.data?.length)   patch.menuItems       = itemsRes.data.map(item => ({
+      ...item,
+      // Map snake_case Supabase columns to camelCase store format
+      menuName:    item.menu_name    ?? item.menuName    ?? item.name ?? 'Item',
+      receiptName: item.receipt_name ?? item.receiptName ?? item.name ?? 'Item',
+      kitchenName: item.kitchen_name ?? item.kitchenName ?? item.name ?? 'Item',
+      sortOrder:   item.sort_order   ?? item.sortOrder   ?? 0,
+      isDefault:   item.is_default   ?? item.isDefault,
+      soldAlone:   item.sold_alone   ?? item.soldAlone,
+      parentId:    item.parent_id    ?? item.parentId,
+      assignedModifierGroups: item.assigned_modifier_groups ?? item.assignedModifierGroups ?? [],
+    }));
     if (floorRes.data?.tables?.length)   patch.tables  = floorRes.data.tables;
     if (Object.keys(patch).length) useStore.setState(patch);
   };
