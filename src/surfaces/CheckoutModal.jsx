@@ -324,6 +324,15 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
             <div style={{ fontSize:12, color:'var(--t3)', marginTop:2, textTransform:'capitalize' }}>{contextLabel}</div>
           </div>
           <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            {screen==='review' && (
+              <button onClick={()=>setNamesOnly(n=>!n)} style={{
+                padding:'4px 10px', borderRadius:7,
+                border:`1px solid ${namesOnly?'var(--acc-b)':'var(--bdr)'}`,
+                background:namesOnly?'var(--acc-d)':'transparent',
+                color:namesOnly?'var(--acc)':'var(--t3)',
+                fontSize:10, fontWeight:700, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
+              }}>≡ Names</button>
+            )}
             {screen!=='review' && (
               <button className="btn btn-ghost btn-sm" onClick={()=>setScreen('review')}>← Back</button>
             )}

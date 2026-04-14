@@ -9,6 +9,7 @@
  */
 
 import { supabase, getLocationId } from '../lib/supabase';
+import { queueWrite, isOnline } from './OfflineQueue';
 import { useStore } from '../store';
 
 let _locationId = null;
@@ -30,13 +31,27 @@ export async function flushSessions() {
     if (_lastSent[t.id] === payload) continue; // no change
     _lastSent[t.id] = payload;
 
-    supabase.from('active_sessions').upsert({
-      location_id: _locationId,
-      table_id: t.id,
-      session: t.session,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'location_id,table_id' }).then(({ error }) => {
-      if (error) console.warn('[SessionSync] upsert error:', error.message);
+    // Queue write — works offline, replays when back online
+    queueWrite({
+      type: 'upsert',
+      table: 'active_sessions',
+      payload: {
+        location_id: _locationId,
+        table_id: t.id,
+        session: t.session,
+        updated_at: new Date().toISOString(),
+      },
+      onConflict: 'location_id,table_id',
+    }).then(() => {
+      // If online, also write directly for immediate sync
+      if (isOnline()) {
+        supabase.from('active_sessions').upsert({
+          location_id: _locationId,
+          table_id: t.id,
+          session: t.session,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'location_id,table_id' }).catch(e => console.warn('[SessionSync]', e.message));
+      }
     });
   }
 
@@ -48,11 +63,16 @@ export async function flushSessions() {
   for (const tid of availableIds) {
     if (_lastSent[tid] !== 'cleared') {
       _lastSent[tid] = 'cleared';
-      supabase.from('active_sessions')
-        .delete()
-        .eq('location_id', _locationId)
-        .eq('table_id', tid)
-        .then(() => {});
+      queueWrite({
+        type: 'delete',
+        table: 'active_sessions',
+        match: { location_id: _locationId, table_id: tid },
+      });
+      if (isOnline()) {
+        supabase.from('active_sessions')
+          .delete().eq('location_id', _locationId).eq('table_id', tid)
+          .catch(e => console.warn('[SessionSync] delete error:', e.message));
+      }
     }
   }
 }

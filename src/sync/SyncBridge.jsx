@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { loadSessions, subscribeToSessions, scheduleFlush, teardown as teardownSessions } from './SessionSync';
+import { initOfflineQueue } from './OfflineQueue';
 import { isMock } from '../lib/supabase';
 
 export const CHANNEL_NAME = 'rpos-sync';
@@ -121,6 +122,9 @@ export default function SyncBridge({ onSyncPulse }) {
     }
 
     if (!('BroadcastChannel' in window)) return;
+
+    // Init offline queue for durable writes
+    if (!isMock) initOfflineQueue(supabase);
 
     // Load active sessions from Supabase and subscribe to live updates
     if (!isMock) {
