@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { broadcastConfigPush } from '../sync/SyncBridge';
 import { supabase, isMock, setResolvedLocationId, clearResolvedLocationId } from '../lib/supabase';
 import BOLogin from './BOLogin';
+import { VERSION } from '../lib/version';
 import MenuManager from './sections/MenuManager';
 import FloorPlanBuilder from './sections/FloorPlanBuilder';
 import DeviceProfiles from './sections/DeviceProfiles';
@@ -245,6 +246,8 @@ export default function BackOfficeApp() {
               <span>Live</span>
               <span style={{ color:'var(--bdr2)' }}>·</span>
               <span>{new Date().toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })}</span>
+              <span style={{ color:'var(--bdr2)' }}>·</span>
+              <span style={{ fontFamily:'monospace', fontSize:11, color:'var(--t4)' }}>{VERSION}</span>
             </div>
           </div>
         </div>
