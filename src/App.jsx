@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.1.2';
+const VERSION = '3.1.3';
 
 const CHANGELOG = [
   {
@@ -908,44 +908,68 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
 
   useEffect(() => {
     if (isMock) { setDeviceValid(true); return; }
-    // Check device still active in Supabase AND refresh profile settings
-    supabase.from('devices').select('id, status, profile_id, name').eq('id', pairedDevice.id).single().then(({ data }) => {
+
+    const refreshDevice = async () => {
+      const { data } = await supabase.from('devices').select('id, status, profile_id, name').eq('id', pairedDevice.id).single();
       if (!data || data.status === 'removed' || data.status === 'unpaired') {
         localStorage.removeItem('rpos-device');
         setDeviceValid(false);
-      } else {
-        // Refresh device name in case it was edited
-        const current = JSON.parse(localStorage.getItem('rpos-device') || '{}');
-        if (data.name !== current.name || data.profile_id !== current.profileId) {
-          localStorage.setItem('rpos-device', JSON.stringify({ ...current, name: data.name, profileId: data.profile_id }));
-        }
-        // Refresh profile settings if profile changed
-        if (data.profile_id) {
-          try {
-            const storedProfiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
-            const DEFAULT_PROFILES = [
-              { id:'prof-1', name:'Main counter', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null, hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true },
-              { id:'prof-2', name:'Bar terminal', defaultSurface:'bar', enabledOrderTypes:['dine-in'], assignedSection:'bar', hiddenFeatures:['courses','kiosk','reports'], tableServiceEnabled:false, quickScreenEnabled:true },
-              { id:'prof-3', name:'Server handheld', defaultSurface:'pos', enabledOrderTypes:['dine-in'], assignedSection:null, hiddenFeatures:['kiosk','reports'], tableServiceEnabled:true, quickScreenEnabled:true },
-            ];
-            const allProfiles = storedProfiles || DEFAULT_PROFILES;
-            const profile = allProfiles.find(p => p.id === data.profile_id);
-            if (profile) {
-              localStorage.setItem('rpos-device-config', JSON.stringify({
-                profileId: profile.id, profileName: profile.name,
-                defaultSurface: profile.defaultSurface || 'tables',
-                enabledOrderTypes: profile.enabledOrderTypes || ['dine-in'],
-                assignedSection: profile.assignedSection || null,
-                hiddenFeatures: profile.hiddenFeatures || [],
-                tableServiceEnabled: profile.tableServiceEnabled !== false,
-                quickScreenEnabled: profile.quickScreenEnabled !== false,
-              }));
-            }
-          } catch(e) {}
-        }
-        setDeviceValid(true);
+        return;
       }
-    }).catch(() => setDeviceValid(true));
+      // Refresh device name + profile
+      const current = JSON.parse(localStorage.getItem('rpos-device') || '{}');
+      if (data.name !== current.name || data.profile_id !== current.profileId) {
+        localStorage.setItem('rpos-device', JSON.stringify({ ...current, name: data.name, profileId: data.profile_id }));
+      }
+      // Apply profile settings
+      if (data.profile_id) {
+        try {
+          const storedProfiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
+          const DEFAULT_PROFILES = [
+            { id:'prof-1', name:'Main counter', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null, hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true },
+            { id:'prof-2', name:'Bar terminal', defaultSurface:'bar', enabledOrderTypes:['dine-in'], assignedSection:'bar', hiddenFeatures:['courses','kiosk','reports'], tableServiceEnabled:false, quickScreenEnabled:true },
+            { id:'prof-3', name:'Server handheld', defaultSurface:'pos', enabledOrderTypes:['dine-in'], assignedSection:null, hiddenFeatures:['kiosk','reports'], tableServiceEnabled:true, quickScreenEnabled:true },
+          ];
+          const allProfiles = storedProfiles || DEFAULT_PROFILES;
+          const profile = allProfiles.find(p => p.id === data.profile_id);
+          if (profile) {
+            const config = {
+              profileId: profile.id, profileName: profile.name,
+              defaultSurface: profile.defaultSurface || 'tables',
+              enabledOrderTypes: profile.enabledOrderTypes || ['dine-in'],
+              assignedSection: profile.assignedSection || null,
+              hiddenFeatures: profile.hiddenFeatures || [],
+              tableServiceEnabled: profile.tableServiceEnabled !== false,
+              quickScreenEnabled: profile.quickScreenEnabled !== false,
+            };
+            localStorage.setItem('rpos-device-config', JSON.stringify(config));
+            // Apply to store immediately so POS updates without reload
+            const { useStore: store } = await import('./store/index.js');
+            store.getState().setDeviceConfig(config);
+          }
+        } catch(e) {}
+      }
+      setDeviceValid(true);
+    };
+
+    // Initial check
+    refreshDevice().catch(() => setDeviceValid(true));
+
+    // Subscribe to realtime changes on this device row
+    const channel = supabase
+      .channel(`device-${pairedDevice.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'devices',
+        filter: `id=eq.${pairedDevice.id}`,
+      }, () => {
+        // Device updated in back office — refresh profile immediately
+        refreshDevice().catch(() => {});
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   if (deviceValid === null) return (
@@ -1153,7 +1177,7 @@ function Sidebar({ surface, setSurface }) {
   const hidden = deviceConfig?.hiddenFeatures || [];
   const allOk = syncStatus.printerOnline && syncStatus.paymentTerminalOnline && !syncStatus.pendingChanges;
 
-  const FEATURE_MAP = { kds:'kds', reports:'backoffice' };
+  const FEATURE_MAP = { kds:'kds', reports:'backoffice', floorPlan:'tables', barTabs:'bar' };
   const visibleNav = NAV.filter(n => {
     const featureKey = Object.entries(FEATURE_MAP).find(([,v]) => v === n.id)?.[0];
     return !featureKey || !hidden.includes(featureKey);

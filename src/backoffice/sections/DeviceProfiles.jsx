@@ -16,13 +16,16 @@ const ORDER_TYPES = [
 ];
 
 const FEATURES = [
-  { id:'courses',     label:'Course management',  desc:'Fire course buttons on orders' },
-  { id:'kiosk',       label:'Kiosk mode',          desc:'Self-service kiosk capability' },
-  { id:'reports',     label:'Reports access',      desc:'Shift reports in back office tab' },
-  { id:'discounts',   label:'Discounts',           desc:'Apply discounts without manager PIN' },
-  { id:'voids',       label:'Voids (no PIN)',       desc:'Void items without manager PIN' },
-  { id:'splitCheck',  label:'Split checks',         desc:'Allow creating split checks' },
-  { id:'tableTransfer','label':'Table transfer',   desc:'Transfer tables to other terminals' },
+  { id:'floorPlan',   label:'Floor plan',          desc:'Table layout and dine-in surface' },
+  { id:'barTabs',     label:'Bar tabs',             desc:'Bar tab management surface' },
+  { id:'courses',     label:'Course management',    desc:'Fire course buttons on orders' },
+  { id:'kds',         label:'KDS screen',           desc:'Kitchen display screen in sidebar' },
+  { id:'kiosk',       label:'Kiosk mode',           desc:'Self-service kiosk capability' },
+  { id:'reports',     label:'Reports access',       desc:'Shift reports in back office tab' },
+  { id:'discounts',   label:'Discounts',            desc:'Apply discounts without manager PIN' },
+  { id:'voids',       label:'Voids (no PIN)',        desc:'Void items without manager PIN' },
+  { id:'splitCheck',  label:'Split checks',          desc:'Allow creating split checks' },
+  { id:'tableTransfer',label:'Table transfer',      desc:'Transfer tables to other terminals' },
 ];
 
 const DEFAULT_PROFILES = [
@@ -60,11 +63,23 @@ export default function DeviceProfiles() {
     localStorage.setItem('rpos-device-profiles', JSON.stringify(profiles));
   }, [profiles]);
 
-  const save = (updated) => {
+  const save = async (updated) => {
     setProfiles(ps => ps.map(p => p.id === updated.id ? updated : p));
     markBOChange();
     showToast(`"${updated.name}" profile saved`, 'success');
     setEditing(null);
+    // Push profile change to all devices using this profile — triggers realtime on POS
+    if (!isMock) {
+      try {
+        // Touch the device rows to trigger realtime update on connected POS terminals
+        const { data: devices } = await supabase.from('devices').select('id').eq('profile_id', updated.id);
+        if (devices?.length) {
+          // Update last_seen to trigger postgres_changes event
+          await supabase.from('devices').update({ last_seen: new Date().toISOString() }).eq('profile_id', updated.id);
+          showToast(`Profile pushed to ${devices.length} device(s)`, 'success');
+        }
+      } catch(e) {}
+    }
   };
 
   const addProfile = (profile) => {
