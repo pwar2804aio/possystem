@@ -95,9 +95,29 @@ function AdminPanel({ authUser }) {
     setLoading(false);
   };
 
+  const [gmvByLocation, setGmvByLocation] = useState({});
+
   const loadLocations = async (orgId) => {
     const { data } = await sbFetch(`locations?select=*,subscriptions(plan,gmv_this_month),location_features(feature,price_per_month)&org_id=eq.${orgId}&order=created_at.asc`);
-    setLocations(Array.isArray(data) ? data : []);
+    const locs = Array.isArray(data) ? data : [];
+    setLocations(locs);
+    // Load real GMV from closed_checks for current month
+    if (locs.length) {
+      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+      const locIds = locs.map(l => l.id).join(',');
+      const { data: checks } = await sbFetch(`closed_checks?select=location_id,total&created_at=gte.${monthStart}&location_id=in.(${locIds})&status=neq.refunded`);
+      if (Array.isArray(checks)) {
+        const gmv = {};
+        checks.forEach(c => {
+          gmv[c.location_id] = (gmv[c.location_id] || 0) + (parseFloat(c.total) || 0);
+        });
+        setGmvByLocation(gmv);
+        // Update subscriptions table with live GMV
+        for (const [locId, amount] of Object.entries(gmv)) {
+          await sbFetch(`subscriptions?location_id=eq.${locId}`, { method:'PATCH', body:{ gmv_this_month: amount }, prefer:'' });
+        }
+      }
+    }
   };
 
   const loadUsers = async (orgId) => {
@@ -290,7 +310,7 @@ function AdminPanel({ authUser }) {
                     : locations.map(loc => {
                         const maxDev = loc.location_features?.find(f=>f.feature==='max_devices')?.price_per_month || 3;
                         const plan = loc.subscriptions?.[0]?.plan || 'free';
-                        const gmv = loc.subscriptions?.[0]?.gmv_this_month || 0;
+                        const gmv = gmvByLocation[loc.id] ?? loc.subscriptions?.[0]?.gmv_this_month ?? 0;
                         const locUsers = usersForLocation(loc.id);
                         const isEditing = editUsersFor === loc.id;
 
