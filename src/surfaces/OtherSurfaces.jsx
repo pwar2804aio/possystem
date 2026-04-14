@@ -385,14 +385,21 @@ export function KDSSurface() {
     ok:      displayed.filter(t=>urgency(getLiveMinutes(t))==='ok').length,
   };
 
+  // Read device name from localStorage
+  const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
+  const deviceConfig = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-config') || 'null'); } catch { return null; } })();
+  const kdsName = pairedDevice?.name || deviceConfig?.profileName || 'Kitchen display';
+  const centreName = deviceConfig?.centreName || null;
+
   return (
     <div style={{ display:'flex', flex:1, flexDirection:'column', overflow:'hidden', background:'var(--bg)' }}>
 
       {/* Header */}
       <div style={{ height:52, display:'flex', alignItems:'center', gap:14, padding:'0 18px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
         <div>
-          <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>Kitchen display</div>
+          <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>{kdsName}</div>
           <div style={{ fontSize:10, color:'var(--t3)', fontWeight:600 }}>
+            {centreName && <span style={{ marginRight:6 }}>{centreName} ·</span>}
             {displayed.length} ticket{displayed.length!==1?'s':''} · live
           </div>
         </div>
