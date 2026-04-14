@@ -38,19 +38,28 @@ export default function CompanyAdminApp() {
       const user = data?.session?.user || null;
       setAuthUser(user);
       if (user) {
-        const { data: p } = await supabase.from('user_profiles').select('role').eq('id', user.id).single();
-        setUserRole(p?.role);
+        try {
+          const { data: p } = await supabase.from('user_profiles').select('role').eq('id', user.id).single();
+          setUserRole(p?.role || null);
+        } catch(e) {}
       }
       setAuthChecked(true);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_, session) => {
-      setAuthUser(session?.user || null);
-      if (session?.user) {
-        const { data: p } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single();
-        setUserRole(p?.role);
-      }
-    });
-    return () => subscription.unsubscribe();
+    }).catch(() => setAuthChecked(true));
+
+    let subscription;
+    try {
+      const result = supabase.auth.onAuthStateChange(async (_, session) => {
+        setAuthUser(session?.user || null);
+        if (session?.user) {
+          try {
+            const { data: p } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single();
+            setUserRole(p?.role || null);
+          } catch(e) {}
+        }
+      });
+      subscription = result?.data?.subscription;
+    } catch(e) {}
+    return () => subscription?.unsubscribe?.();
   }, []);
 
   if (!authChecked) return <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0f1117', color:'#64748b', fontSize:13 }}>Loading…</div>;
