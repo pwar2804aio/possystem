@@ -1,19 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 import { PRINTERS, PRODUCTION_CENTRES } from '../../data/seed';
-import { isMock, supabase } from '../../lib/supabase';
-import { getLocationId } from '../../lib/supabase';
+import { isMock, supabase, getLocationId } from '../../lib/supabase';
 
 export default function PrintRouting() {
   const { printJobs, showToast } = useStore();
   const [printers, setPrinters] = useState(isMock ? PRINTERS : []);
+  const [kdsDevices, setKdsDevices] = useState([]);
   const [routing, setRouting] = useState(() => {
-    // centreId -> printerId mapping
     const m = {};
     PRODUCTION_CENTRES.forEach(pc => { m[pc.id] = pc.printerId || null; });
     return m;
   });
-  const [reassigning, setReassigning] = useState(null); // centreId being reassigned
+  const [reassigning, setReassigning] = useState(null);
+
+  useEffect(() => {
+    if (isMock) return;
+    (async () => {
+      const locId = await getLocationId();
+      if (!locId) return;
+      const { data } = await supabase.from('devices').select('id, name, centre_id, status').eq('location_id', locId).eq('type', 'kds');
+      if (data) setKdsDevices(data);
+    })();
+  }, []);
 
   const toggle = id => setPrinters(ps => ps.map(p => p.id === id ? { ...p, status: p.status === 'online' ? 'offline' : 'online' } : p));
   const recentJobs = printJobs.slice(0, 20);
