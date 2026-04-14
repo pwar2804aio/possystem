@@ -99,8 +99,10 @@ export const fetchKDSTickets = async (locationId = null) => {
     .order('sent_at', { ascending: true });
 };
 
-export const insertKDSTicket = async (ticket, locationId = LOCATION_ID) => {
+export const insertKDSTicket = async (ticket, locationId = null) => {
   if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId();
+  if (!locationId) return { data: null, error: new Error('No location') };
   return supabase.from('kds_tickets').insert({ ...ticket, location_id: locationId });
 };
 

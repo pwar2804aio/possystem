@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { ALLERGENS, INITIAL_TABLES, MENU_ITEMS, PRINTERS, PRODUCTION_CENTRES, STAFF } from '../data/seed';
 import { VERSION } from '../lib/version';
+import { supabase, isMock } from '../lib/supabase';
 // ══════════════════════════════════════════════════════════════════════════════
 // Payment Screen
 // ══════════════════════════════════════════════════════════════════════════════
@@ -341,21 +342,97 @@ export function TablesSurface() {
 // KDS Surface — redesigned
 // ══════════════════════════════════════════════════════════════════════════════
 export function KDSSurface() {
-  const { kdsTickets, bumpTicket, showToast, deviceConfig } = useStore();
+  const { kdsTickets: storeTickets, bumpTicket, showToast, deviceConfig } = useStore();
 
-  const CENTRE_LABELS = { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo' };
+  // Read device info from localStorage
+  const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
+  const localDeviceConfig = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-config') || 'null'); } catch { return null; } })();
+  const kdsName = pairedDevice?.name || localDeviceConfig?.profileName || 'Kitchen display';
+  const centreName = localDeviceConfig?.centreName || null;
+  const locationId = pairedDevice?.locationId || null;
+  const centreId = localDeviceConfig?.centreId || pairedDevice?.centreId || null;
 
-  // If device profile specifies a centre (future: ?t=kds&centre=pc1), auto-filter
-  const defaultFilter = (() => {
-    const params = new URLSearchParams(window.location.search);
-    const c = params.get('centre');
-    if (c && CENTRE_LABELS[c]) return c;
-    if (deviceConfig?.assignedSection === 'bar') return 'pc4';
-    return 'all';
-  })();
-
-  const [filter, setFilter] = useState(defaultFilter);
+  // Local tickets state — loaded from Supabase + synced via realtime
+  const [liveTickets, setLiveTickets] = useState(null); // null = loading
   const [, setTick] = useState(0);
+
+  // Filter: default to this device's assigned centre
+  const [filter, setFilter] = useState(centreId || 'all');
+
+  // Load tickets from Supabase and subscribe to realtime
+  useEffect(() => {
+    if (isMock || !locationId) {
+      setLiveTickets(null); // fall back to store tickets
+      return;
+    }
+
+    // Initial fetch
+    const load = async () => {
+      try {
+        let q = supabase.from('kds_tickets').select('*').eq('location_id', locationId).eq('status', 'pending').order('sent_at', { ascending: true });
+        if (centreId) q = q.eq('centre_id', centreId);
+        const { data } = await q;
+        if (data) setLiveTickets(data.map(mapRow));
+      } catch(e) { setLiveTickets(null); }
+    };
+    load();
+
+    // Realtime subscription — picks up new tickets from any POS terminal
+    const channel = supabase
+      .channel(`kds-tickets-${locationId}${centreId ? `-${centreId}` : ''}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'kds_tickets',
+        filter: `location_id=eq.${locationId}`,
+      }, (payload) => {
+        const ticket = mapRow(payload.new);
+        // Filter by centre if this KDS is assigned to one
+        if (centreId && ticket.centreId !== centreId) return;
+        setLiveTickets(prev => prev ? [...prev, ticket] : [ticket]);
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'kds_tickets',
+        filter: `location_id=eq.${locationId}`,
+      }, (payload) => {
+        if (payload.new.status === 'bumped') {
+          setLiveTickets(prev => prev ? prev.filter(t => t.id !== payload.new.id) : prev);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [locationId, centreId]);
+
+  // Map Supabase snake_case row to store camelCase format
+  const mapRow = (row) => ({
+    id: row.id,
+    table: row.table_label || row.table,
+    server: row.server,
+    covers: row.covers,
+    centreId: row.centre_id || row.centreId,
+    sentAt: row.sent_at ? new Date(row.sent_at).getTime() : Date.now(),
+    minutes: 0,
+    items: typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []),
+  });
+
+  // Bump a ticket — update Supabase + remove from local state
+  const handleBump = async (ticketId) => {
+    if (liveTickets !== null) {
+      setLiveTickets(prev => prev.filter(t => t.id !== ticketId));
+      if (!isMock) {
+        await supabase.from('kds_tickets').update({ status: 'bumped', bumped_at: new Date().toISOString() }).eq('id', ticketId);
+      }
+    } else {
+      bumpTicket(ticketId);
+    }
+    showToast('Ticket bumped', 'success');
+  };
+
+  // Use live Supabase tickets if available, fall back to store
+  const tickets = liveTickets !== null ? liveTickets : storeTickets;
 
   // Tick every 30s to update live timers
   useEffect(() => {
@@ -377,19 +454,13 @@ export function KDSSurface() {
     return Math.max(0, Math.floor((Date.now() - ts) / 60000));
   }
 
-  const stations = ['all', ...new Set(kdsTickets.map(t=>t.centreId||t.station||'pc1').filter(Boolean))];
-  const displayed = kdsTickets.filter(t => filter==='all' || (t.centreId||t.station||'pc1')===filter);
+  const stations = ['all', ...new Set(tickets.map(t=>t.centreId||t.station||'pc1').filter(Boolean))];
+  const displayed = tickets.filter(t => filter==='all' || (t.centreId||t.station||'pc1')===filter);
   const counts = {
     urgent:  displayed.filter(t=>urgency(getLiveMinutes(t))==='urgent').length,
     warning: displayed.filter(t=>urgency(getLiveMinutes(t))==='warning').length,
     ok:      displayed.filter(t=>urgency(getLiveMinutes(t))==='ok').length,
   };
-
-  // Read device name from localStorage
-  const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
-  const localDeviceConfig = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-config') || 'null'); } catch { return null; } })();
-  const kdsName = pairedDevice?.name || localDeviceConfig?.profileName || 'Kitchen display';
-  const centreName = localDeviceConfig?.centreName || null;
 
   return (
     <div style={{ display:'flex', flex:1, flexDirection:'column', overflow:'hidden', background:'var(--bg)' }}>
@@ -494,7 +565,7 @@ export function KDSSurface() {
                   background:'var(--grn)', border:'none', color:'#fff', fontSize:13, fontWeight:800,
                   transition:'all .12s',
                 }}
-                onClick={()=>{ bumpTicket(ticket.id); showToast(`${ticket.table} bumped ✓`,'success'); }}
+                onClick={()=>handleBump(ticket.id)}
                 onMouseEnter={e=>e.currentTarget.style.background='#16a34a'}
                 onMouseLeave={e=>e.currentTarget.style.background='var(--grn)'}>
                   Bump ✓
