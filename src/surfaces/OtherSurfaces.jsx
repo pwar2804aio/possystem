@@ -493,7 +493,7 @@ export function KDSSurface() {
                 border:`1px solid ${filter===s?'var(--acc-b)':'var(--bdr)'}`,
                 color:filter===s?'var(--acc)':'var(--t3)',
                 fontSize:11, fontWeight:700,
-              }}>{s==='all' ? 'All stations' : CENTRE_LABELS[s] || s}</button>
+              }}>{s==='all' ? 'All stations' : ((() => { try { const r = JSON.parse(localStorage.getItem('rpos-print-routing')||'null'); return r?.centres?.find(c=>c.id===s)?.name; } catch{} })() || s)}</button>
             ))}
           </div>
         )}
@@ -512,7 +512,7 @@ export function KDSSurface() {
           const liveMin = ticket.sentAt ? Math.floor((Date.now()-(ticket.sentAt instanceof Date ? ticket.sentAt.getTime() : Number(ticket.sentAt)))/60000) : (ticket.minutes||0);
           const urg = urgency(liveMin);
           const u   = URG[urg];
-          const stationLabel = CENTRE_LABELS[ticket.centreId||ticket.station] || ticket.station || 'Kitchen';
+          const stationLabel = (() => { try { const r = JSON.parse(localStorage.getItem('rpos-print-routing')||'null'); return r?.centres?.find(c=>c.id===(ticket.centreId||ticket.station))?.name; } catch{} })() || ticket.station || 'Kitchen';
           return (
             <div key={ticket.id} style={{
               background:u.bg, border:`1.5px solid ${u.border}`,
