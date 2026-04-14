@@ -256,7 +256,11 @@ export const useStore = create((set, get) => ({
       }
       // Then check sessionStorage (tab-specific — each tab is a separate terminal)
       const saved = sessionStorage.getItem('rpos-terminal-config');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) return JSON.parse(saved);
+      // Fall back to localStorage device config (set when device was paired/profiled)
+      const localConfig = localStorage.getItem('rpos-device-config');
+      if (localConfig) return JSON.parse(localConfig);
+      return null;
     } catch { return null; }
   })(),
   setDeviceConfig: (config) => {
@@ -1439,7 +1443,11 @@ export const useStore = create((set, get) => ({
   get shift() {
     const checks = useStore.getState().closedChecks;
     const seed = SHIFT;
-    if (!checks.length) return seed; // show seed values on first load before any checks
+    // Only use seed values in mock mode — real mode starts with a clean shift
+    if (!checks.length) return isMock ? seed : {
+      name: 'Current shift', opened: new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }),
+      covers: 0, sales: 0, avgCheck: 0, cashSales: 0, cardSales: 0, tips: 0, voids: 0, voidValue: 0,
+    };
     const revenue  = checks.reduce((s,c) => s + c.total, 0);
     const covers   = checks.reduce((s,c) => s + (c.covers || 1), 0);
     const tips     = checks.reduce((s,c) => s + (c.tip || 0), 0);
@@ -1447,16 +1455,10 @@ export const useStore = create((set, get) => ({
     const card     = checks.filter(c => c.method !== 'cash').reduce((s,c) => s + c.total, 0);
     const cash     = checks.filter(c => c.method === 'cash').reduce((s,c) => s + c.total, 0);
     return {
-      name: seed.name,
-      opened: seed.opened,
-      covers,
-      sales: revenue,
-      avgCheck: covers > 0 ? revenue / covers : 0,
-      cashSales: cash,
-      cardSales: card,
-      tips,
-      voids,
-      voidValue: 0,
+      name: isMock ? seed.name : 'Current shift',
+      opened: isMock ? seed.opened : new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }),
+      covers, sales: revenue, avgCheck: covers > 0 ? revenue / covers : 0,
+      cashSales: cash, cardSales: card, tips, voids, voidValue: 0,
     };
   },
 

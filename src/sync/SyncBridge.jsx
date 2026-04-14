@@ -50,6 +50,8 @@ export default function SyncBridge({ onSyncPulse }) {
           delete parsed.tables;
           delete parsed.sections;
           delete parsed.eightySix;
+          delete parsed.tabs;          // bar tabs are session-only in real mode
+          delete parsed.closedChecks;  // closed checks loaded from Supabase
         }
         useStore.setState(parsed);
         isApplyingRef.current = false;
