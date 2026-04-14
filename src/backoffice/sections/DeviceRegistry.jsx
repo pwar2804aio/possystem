@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
 
+const PRODUCTION_CENTRES = [
+  { id:'pc1', name:'Hot kitchen',  icon:'🔥' },
+  { id:'pc2', name:'Cold section', icon:'❄️'  },
+  { id:'pc3', name:'Pizza oven',   icon:'🍕' },
+  { id:'pc4', name:'Bar',          icon:'🍸' },
+  { id:'pc5', name:'Expo / pass',  icon:'📋' },
+];
+
 const ADJECTIVES = ['APPLE','BAKER','CEDAR','DONUT','EMBER','FROST','GROVE','HONEY','IVORY','JAZZY'];
 const genCode = () => `${ADJECTIVES[Math.floor(Math.random()*10)]}-${Math.floor(1000+Math.random()*9000)}`;
 
@@ -50,7 +58,7 @@ export default function DeviceRegistry() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [pairStep, setPairStep] = useState(1);
-  const [newDevice, setNewDevice] = useState({ name:'', type:'pos', profileId:'' });
+  const [newDevice, setNewDevice] = useState({ name:'', type:'pos', profileId:'', centreId:'' });
   const [pairingCode, setPairingCode] = useState('');
   const [pairedDeviceId, setPairedDeviceId] = useState(null);
   const [editId, setEditId] = useState(null);
@@ -88,7 +96,8 @@ export default function DeviceRegistry() {
       name: newDevice.name.trim(),
       type: newDevice.type,
       pairing_code: code,
-      profile_id: newDevice.profileId || null,
+      profile_id: newDevice.type !== 'kds' ? (newDevice.profileId || null) : null,
+      centre_id: newDevice.type === 'kds' ? (newDevice.centreId || null) : null,
       status: 'unpaired',
     }).select().single();
     setWorking(false);
@@ -121,7 +130,7 @@ export default function DeviceRegistry() {
 
   const startEdit = (d) => {
     setEditId(d.id);
-    setEditForm({ name: d.name, type: d.type, profileId: d.profile_id || '' });
+    setEditForm({ name: d.name, type: d.type, profileId: d.profile_id || '', centreId: d.centre_id || '' });
   };
 
   const saveEdit = async () => {
@@ -130,7 +139,8 @@ export default function DeviceRegistry() {
     await supabase.from('devices').update({
       name: editForm.name.trim(),
       type: editForm.type,
-      profile_id: editForm.profileId || null,
+      profile_id: editForm.type !== 'kds' ? (editForm.profileId || null) : null,
+      centre_id: editForm.type === 'kds' ? (editForm.centreId || null) : null,
     }).eq('id', editId);
     setEditId(null);
     setWorking(false);
@@ -176,8 +186,20 @@ export default function DeviceRegistry() {
                   </select>
                 </div>
                 <div>
-                  <label style={S.label}>Device profile</label>
-                  <ProfileSelect value={newDevice.profileId} onChange={v=>setNewDevice(d=>({...d,profileId:v}))} />
+                  {newDevice.type === 'kds' ? (
+                    <>
+                      <label style={S.label}>Production center</label>
+                      <select style={S.input} value={newDevice.centreId||''} onChange={e=>setNewDevice(d=>({...d,centreId:e.target.value}))}>
+                        <option value="">Select production center…</option>
+                        {PRODUCTION_CENTRES.map(pc=><option key={pc.id} value={pc.id}>{pc.icon} {pc.name}</option>)}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <label style={S.label}>Device profile</label>
+                      <ProfileSelect value={newDevice.profileId} onChange={v=>setNewDevice(d=>({...d,profileId:v}))} />
+                    </>
+                  )}
                 </div>
               </div>
               {error && <div style={{ padding:'8px 12px', borderRadius:8, background:'#fef2f2', color:'#dc2626', fontSize:13, marginBottom:12 }}>{error}</div>}
@@ -258,8 +280,20 @@ export default function DeviceRegistry() {
                     </select>
                   </div>
                   <div>
-                    <label style={S.label}>Profile</label>
-                    <ProfileSelect value={editForm.profileId} onChange={v=>setEditForm(f=>({...f,profileId:v}))} />
+                    {editForm.type === 'kds' ? (
+                      <>
+                        <label style={S.label}>Production center</label>
+                        <select style={S.input} value={editForm.centreId||''} onChange={e=>setEditForm(f=>({...f,centreId:e.target.value}))}>
+                          <option value="">Select center…</option>
+                          {PRODUCTION_CENTRES.map(pc=><option key={pc.id} value={pc.id}>{pc.icon} {pc.name}</option>)}
+                        </select>
+                      </>
+                    ) : (
+                      <>
+                        <label style={S.label}>Profile</label>
+                        <ProfileSelect value={editForm.profileId} onChange={v=>setEditForm(f=>({...f,profileId:v}))} />
+                      </>
+                    )}
                   </div>
                   <div style={{ display:'flex', gap:6 }}>
                     <button onClick={saveEdit} disabled={working} style={{ ...S.btn, ...S.btnPrimary, padding:'9px 12px' }}>Save</button>
@@ -273,7 +307,7 @@ export default function DeviceRegistry() {
                   <div style={{ flex:1 }}>
                     <div style={{ fontWeight:700, color:'var(--t1)', fontSize:14 }}>{d.name}</div>
                     <div style={{ fontSize:12, color:'var(--t3)' }}>
-                      {dtype.label} · Profile: {profileName}
+                      {dtype.label} · {d.type === 'kds' ? 'Center' : 'Profile'}: {profileName}
                       {d.last_seen && <span> · Last seen {new Date(d.last_seen).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>}
                     </div>
 

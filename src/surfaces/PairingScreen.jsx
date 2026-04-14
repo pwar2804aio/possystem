@@ -45,6 +45,20 @@ export default function PairingScreen({ onPaired }) {
     };
     localStorage.setItem('rpos-device', JSON.stringify(deviceEntry));
 
+    // KDS devices get a special config — boot straight to KDS surface, no PIN, no nav
+    if (data.type === 'kds') {
+      localStorage.setItem('rpos-device-config', JSON.stringify({
+        profileId: 'kds', profileName: 'Kitchen Display',
+        defaultSurface: 'kds',
+        centreId: data.centre_id || null,
+        centreName: data.centre_id ? ({pc1:'Hot kitchen',pc2:'Cold section',pc3:'Pizza oven',pc4:'Bar',pc5:'Expo / pass'}[data.centre_id] || data.centre_id) : null,
+        enabledOrderTypes: [],
+        hiddenFeatures: ['reports','discounts','voids','courses'],
+        tableServiceEnabled: false,
+        quickScreenEnabled: false,
+      }));
+    }
+
     // Apply device profile settings to rpos-device-config
     if (data.profile_id) {
       try {

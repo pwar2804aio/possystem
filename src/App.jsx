@@ -19,7 +19,7 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 
-const VERSION = '3.1.4';
+const VERSION = '3.1.5';
 
 const CHANGELOG = [
   {
@@ -979,6 +979,12 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   );
   if (deviceValid === false) return <PairingScreen onPaired={() => window.location.reload()} />;
 
+  // KDS devices skip PIN and staff login — boot straight to KDS surface
+  const pairedDeviceType = pairedDevice?.type;
+  if (pairedDeviceType === 'kds' || deviceConfig?.defaultSurface === 'kds') {
+    return <><SyncBridge onSyncPulse={handleSyncPulse}/><KDSSurface /></>;
+  }
+
   if (!staff) return <><SyncBridge onSyncPulse={handleSyncPulse}/><PINScreen /></>;
   // Kiosk — full screen, no staff sidebar, no shift bar
   if (surface === 'kiosk' || deviceConfig?.defaultSurface === 'kiosk') return <><SyncBridge onSyncPulse={handleSyncPulse}/><KioskSurface /></>;
@@ -1009,7 +1015,7 @@ const NAV = [
   { id:'tables',  label:'Floor',  icon:'⬚' },
   { id:'pos',     label:'POS',    icon:'⊞' },
   { id:'orders',  label:'Orders', icon:'📋' },
-  { id:'kds',     label:'KDS',    icon:'▣' },
+  // KDS is NOT in the nav — KDS devices are separate terminals that boot straight to KDS surface
 ];
 
 function ShiftBar({ version, onWhatsNew, theme, onToggleTheme, syncPulse }) {

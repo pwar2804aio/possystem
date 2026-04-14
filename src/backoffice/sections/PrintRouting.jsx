@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 import { PRINTERS, PRODUCTION_CENTRES } from '../../data/seed';
-import { isMock } from '../../lib/supabase';
+import { isMock, supabase } from '../../lib/supabase';
+import { getLocationId } from '../../lib/supabase';
 
 export default function PrintRouting() {
   const { printJobs, showToast } = useStore();
@@ -54,6 +55,12 @@ export default function PrintRouting() {
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:600, color:'var(--t1)' }}>{pc.name}</div>
                 <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:3 }}>
+                  {/* KDS device for this centre */}
+                  {kdsDevices.filter(k => k.centre_id === pc.id).map(kds => (
+                    <span key={kds.id} style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:20, background:'rgba(99,102,241,0.12)', border:'1px solid rgba(99,102,241,0.3)', color:'#818cf8', marginRight:6 }}>
+                      📺 {kds.name}
+                    </span>
+                  ))}
                   {printer ? (
                     <>
                       <div style={{ width:7, height:7, borderRadius:'50%', background: isOnline ? 'var(--grn)' : 'var(--red)', flexShrink:0 }}/>
