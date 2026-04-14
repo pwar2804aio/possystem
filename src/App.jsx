@@ -20,7 +20,7 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.24';
+const VERSION = '3.5.25';
 
 const CHANGELOG = [
   {
@@ -953,22 +953,42 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
       if (data.name !== current.name || data.profile_id !== current.profileId) {
         localStorage.setItem('rpos-device', JSON.stringify({ ...current, name: data.name, profileId: data.profile_id }));
       }
-      // Apply profile settings — always re-apply on boot to prevent stale configs
+      // Apply profile settings — fetch directly from Supabase for accuracy
       if (data.profile_id) {
         try {
-          const storedProfiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
-          // Also check the latest config push snapshot for profiles (populated by Back Office Push to POS)
-          const snapProfiles = (() => {
-            try { return JSON.parse(localStorage.getItem('rpos-config-snapshot') || '{}')?.profiles || null; } catch { return null; }
-          })();
-          const DEFAULT_PROFILES = [
-            { id:'prof-1', name:'Main counter', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null, hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true },
-            { id:'prof-2', name:'Bar terminal', defaultSurface:'bar', enabledOrderTypes:['dine-in'], assignedSection:'bar', hiddenFeatures:['courses','kiosk','reports'], tableServiceEnabled:false, quickScreenEnabled:true },
-            { id:'prof-3', name:'Server handheld', defaultSurface:'pos', enabledOrderTypes:['dine-in'], assignedSection:null, hiddenFeatures:['kiosk','reports'], tableServiceEnabled:true, quickScreenEnabled:true },
-          ];
-          // Priority: local device profiles > config push profiles > hardcoded defaults
-          const allProfiles = [...(storedProfiles || []), ...(snapProfiles || []), ...DEFAULT_PROFILES];
-          const profile = allProfiles.find(p => p.id === data.profile_id);
+          // Always fetch from Supabase first — this is the single source of truth
+          let profile = null;
+          try {
+            const { data: dbProfile } = await supabase
+              .from('device_profiles')
+              .select('*')
+              .eq('id', data.profile_id)
+              .single();
+            if (dbProfile) {
+              profile = {
+                id: dbProfile.id,
+                name: dbProfile.name,
+                defaultSurface: dbProfile.default_surface || 'tables',
+                enabledOrderTypes: dbProfile.enabled_order_types || ['dine-in'],
+                assignedSection: dbProfile.assigned_section || null,
+                hiddenFeatures: dbProfile.hidden_features || [],
+                tableServiceEnabled: dbProfile.table_service_enabled !== false,
+                quickScreenEnabled: dbProfile.quick_screen_enabled !== false,
+              };
+            }
+          } catch {}
+          // Fallback: localStorage > config snapshot > hardcoded
+          if (!profile) {
+            const storedProfiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
+            const snapProfiles = (() => { try { return JSON.parse(localStorage.getItem('rpos-config-snapshot') || '{}')?.profiles || null; } catch { return null; } })();
+            const DEFAULT_PROFILES = [
+              { id:'prof-1', name:'Main counter', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null, hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true },
+              { id:'prof-2', name:'Bar terminal', defaultSurface:'bar', enabledOrderTypes:['dine-in'], assignedSection:'bar', hiddenFeatures:['courses','kiosk','reports'], tableServiceEnabled:false, quickScreenEnabled:true },
+              { id:'prof-3', name:'Server handheld', defaultSurface:'pos', enabledOrderTypes:['dine-in'], assignedSection:null, hiddenFeatures:['kiosk','reports'], tableServiceEnabled:true, quickScreenEnabled:true },
+            ];
+            const allProfiles = [...(storedProfiles || []), ...(snapProfiles || []), ...DEFAULT_PROFILES];
+            profile = allProfiles.find(p => p.id === data.profile_id) || null;
+          }
           if (profile) {
             const config = {
               profileId: profile.id, profileName: profile.name,
