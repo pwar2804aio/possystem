@@ -29,7 +29,7 @@ const CHANGELOG = [
       'POS loads todays closed checks from Supabase on boot — history always intact',
       'localStorage used as fast fallback — any local-only checks merged in on load',
       'closed_checks table schema fixed — inserts now succeed with correct column mapping',
-      'Today's 2 checks (00a321.25) recovered and saved to Supabase',
+      'Today 2 checks (GBP21.25) recovered and saved to Supabase',
     ],
   },
   {
