@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.45', date: 'Apr 2026', label: 'Production routing fix + category rename/delete',
+    changes: [
+      'Production routing: items not assigned to any centre no longer fall back to KDS Bar — they go nowhere',
+      'Simple product and other unrouted items will only appear on KDS if their category is explicitly assigned there',
+      'Category rename/delete: ✎ and × buttons now appear inline on each category row — no more hidden bottom panel',
+      'Deleting a category warns that items will become uncategorised',
+      'After any category change, Push to POS propagates the update to all terminals',
+    ],
+  },
+  {
     version: '3.5.44', date: 'Apr 2026', label: 'KDS test fix: routes to correct centre',
     changes: [
       'KDS test now sends ticket to the correct production centre — BAR KDS receives its own test ticket',

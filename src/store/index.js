@@ -1021,25 +1021,24 @@ export const useStore = create((set, get) => ({
     // Determine which production center(s) an item routes to based on its category
     const getCentresForItem = (item, config) => {
       const { centres, routing } = config;
-      if (!centres?.length || !routing) return [item.centreId || 'pc1'];
+      // No routing configured at all — no KDS/production centres
+      if (!centres?.length || !routing) return [];
 
       const itemCat = item.cat || item.cats?.[0] || null;
       const matched = [];
       centres.forEach(centre => {
         const r = routing[centre.id];
         if (!r?.assignedCategories?.length) return;
-        // Check if this item's category is assigned to this centre
+        // Item's category must be explicitly assigned to this centre
         if (itemCat && r.assignedCategories.includes(itemCat)) {
-          // Check it's not excluded
+          // Check item is not individually excluded from this centre
           if (!r.excludedItems?.includes(item.id)) {
             matched.push(centre.id);
           }
         }
       });
-      // Fall back: if no routing configured, use item's own centreId or first centre
-      if (!matched.length) {
-        return [item.centreId || centres[0]?.id || 'pc1'];
-      }
+      // If routing is configured but item doesn't match any centre → send nowhere
+      // (no fallback to first centre — unrouted items should not appear on any KDS)
       return matched;
     };
 
@@ -1144,7 +1143,7 @@ export const useStore = create((set, get) => ({
       })();
       const getCentresForItem = (item) => {
         const { centres, routing } = routingConfig;
-        if (!centres?.length) return [item.centreId || 'pc1'];
+        if (!centres?.length) return [];
         const itemCat = item.cat || item.cats?.[0] || null;
         const matched = [];
         centres.forEach(centre => {
@@ -1153,7 +1152,7 @@ export const useStore = create((set, get) => ({
             matched.push(centre.id);
           }
         });
-        return matched.length ? matched : [item.centreId || centres[0]?.id || 'pc1'];
+        return matched; // no fallback — unrouted items go nowhere
       };
 
       const byCenter = {};

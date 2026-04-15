@@ -283,7 +283,10 @@ function MenuTab() {
                   <span style={{ fontSize:14, flexShrink:0 }}>{cat.icon}</span>
                   <span style={{ fontSize:11, fontWeight:active?700:500, color:active?color:'var(--t2)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cat.label}</span>
                   <span style={{ fontSize:9, color:'var(--t4)', flexShrink:0 }}>{count}</span>
+                  <button onClick={e=>{e.stopPropagation();setEditingCat(cat);}} title="Rename category" style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--bdr)',background:'var(--bg3)',color:'var(--t3)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0, opacity:0, transition:'opacity .1s' }}
+                    onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0'}>✎</button>
                   <button onClick={e=>{e.stopPropagation();setMovingCatId(cat.id);}} title="Move / nest this category" style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--bdr)',background:'var(--bg3)',color:'var(--t4)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>↕</button>
+                  <button onClick={e=>{e.stopPropagation();if(confirm(`Delete "${cat.label}"? Items in this category will become uncategorised.`)){removeCategory(cat.id);if(selCatId===cat.id)setSelCatId(null);markBOChange();}}} title="Delete category" style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>×</button>
                 </div>
                 {/* Subcats */}
                 {children.map(sub=>{
@@ -300,7 +303,10 @@ function MenuTab() {
                         <span style={{ fontSize:13 }}>{sub.icon}</span>
                         <span style={{ fontSize:10, fontWeight:sa?700:400, color:sa?sc:'var(--t3)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sub.label}</span>
                         <span style={{ fontSize:9, color:'var(--t4)' }}>{menuItems.filter(i=>!i.archived&&i.type!=='subitem'&&i.cat===sub.id).length}</span>
+                        <button onClick={e=>{e.stopPropagation();setEditingCat(sub);}} title="Rename" style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--bdr)',background:'var(--bg3)',color:'var(--t3)',cursor:'pointer',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0, opacity:0, transition:'opacity .1s' }}
+                          onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0'}>✎</button>
                         <button onClick={e=>{e.stopPropagation();setMovingCatId(sub.id);}} title="Move / un-nest" style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--bdr)',background:'var(--bg3)',color:'var(--t4)',cursor:'pointer',fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>↕</button>
+                        <button onClick={e=>{e.stopPropagation();if(confirm(`Delete "${sub.label}"?`)){removeCategory(sub.id);if(selCatId===sub.id)setSelCatId(null);markBOChange();}}} title="Delete" style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>×</button>
                       </div>
                     </div>
                   );
@@ -310,13 +316,6 @@ function MenuTab() {
           })}
           {roots.length===0 && <div style={{ textAlign:'center', padding:'20px 6px', color:'var(--t4)', fontSize:10 }}>No categories.<br/>Click + to add one.</div>}
         </div>
-
-        {selCat && (
-          <div style={{ padding:'6px 8px', borderTop:'1px solid var(--bdr)', display:'flex', gap:4, flexShrink:0 }}>
-            <button onClick={()=>setEditingCat(selCat)} style={{ flex:1, padding:'5px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t2)', fontSize:10, fontWeight:600 }}>✎ Edit</button>
-            <button onClick={()=>{if(confirm(`Delete "${selCat.label}"?`)){removeCategory(selCatId);setSelCatId(null);markBOChange();}}} style={{ padding:'5px 8px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:10 }}>✕</button>
-          </div>
-        )}
       </div>
 
       {/* ── PANEL 2: Item GRID (mirrors POS) ───────────────────────────── */}
