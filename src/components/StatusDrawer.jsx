@@ -208,11 +208,11 @@ export default function StatusDrawer({ onClose }) {
           <Section label={`Print queue${printJobs.filter(j=>j.status==='failed'||j.status==='pending').length > 0 ? ` ⚠` : ''}`}>
             {jobsLoading ? (
               <div style={{ fontSize:11, color:'var(--t4)', padding:'8px 0' }}>Loading…</div>
-            ) : printJobs.length === 0 ? (
-              <div style={{ fontSize:11, color:'var(--t4)', padding:'8px 0' }}>No recent print jobs</div>
+            ) : printJobs.filter(j => j.status !== 'done').length === 0 ? (
+              <div style={{ fontSize:11, color:'var(--t4)', padding:'8px 0' }}>No pending or failed jobs</div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {printJobs.slice(0, 10).map(job => {
+                {printJobs.filter(j => j.status !== 'done').slice(0, 10).map(job => {
                   const printer = printerForId(job.printer_id);
                   const isStale = job.status === 'pending' && Date.now() - new Date(job.created_at).getTime() > 30000;
                   const effectiveStatus = isStale ? 'failed' : job.status;

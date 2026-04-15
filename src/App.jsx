@@ -23,6 +23,10 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.41', date: 'Apr 2026', label: 'Print queue: hide completed jobs',
+    changes: ['Print queue in Status drawer only shows pending and failed jobs — completed prints are hidden'],
+  },
+  {
     version: '3.5.40', date: 'Apr 2026', label: 'Printer status: real hardware only',
     changes: [
       'Status drawer (⊙) now shows only real configured printers — no fake Stripe/KDS hardware',
