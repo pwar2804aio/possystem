@@ -98,15 +98,27 @@ export default function DeviceProfiles() {
   const save = async (updated) => {
     setProfiles(ps => ps.map(p => p.id === updated.id ? updated : p));
     markBOChange();
-    if (!isMock && locationId) {
-      await supabase.from('device_profiles').upsert(toDbRow(updated), { onConflict: 'id' });
-      // Update localStorage backup
+    if (!isMock) {
       try {
-        const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
-        localStorage.setItem('rpos-device-profiles', JSON.stringify(cur.map(p => p.id === updated.id ? updated : p)));
-      } catch {}
+        const { getLocationId } = await import('../../lib/supabase.js');
+        const locId = locationId || await getLocationId();
+        const { error } = await supabase.from('device_profiles').upsert(
+          { ...toDbRow(updated), location_id: locId },
+          { onConflict: 'id' }
+        );
+        if (error) throw error;
+        // Update localStorage cache
+        try {
+          const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+          localStorage.setItem('rpos-device-profiles', JSON.stringify(cur.map(p => p.id === updated.id ? updated : p)));
+        } catch {}
+      } catch (err) {
+        console.error('Profile save failed:', err);
+        showToast('Save failed — check connection', 'error');
+        return;
+      }
     }
-    showToast(`"${updated.name}" saved to all devices`, 'success');
+    showToast(`"${updated.name}" saved — changes will apply to POS immediately`, 'success');
     setEditing(null);
   };
 

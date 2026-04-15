@@ -23,6 +23,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.36', date: 'Apr 2026', label: 'Profile changes now reach POS instantly',
+    changes: [
+      'Fixed: profile saves now always reach Supabase — locationId no longer silently blocks saves',
+      'Save errors now surface as a toast instead of failing silently',
+      'device_profiles added to Supabase realtime — POS receives profile changes within 1 second',
+      'Flow: edit profile in back office → save → POS sidebar updates immediately, no Push to POS needed',
+    ],
+  },
+  {
     version: '3.5.35', date: 'Apr 2026', label: 'Device profiles: properly fixed',
     changes: [
       'Profiles load instantly from cache then confirm with Supabase — no blank flash on open',
