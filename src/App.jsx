@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.46', date: 'Apr 2026', label: 'Routing: subcategory inheritance',
+    changes: [
+      'Production routing now includes subcategories — if Hot Drinks is assigned to KDS Bar, items in Coffee (a subcategory) also route there',
+      'Latte (in Coffee, sub of Hot Drinks) now correctly routes to KDS Bar',
+      'Simple product (in Cat 1, not assigned anywhere) correctly goes nowhere',
+    ],
+  },
+  {
     version: '3.5.45', date: 'Apr 2026', label: 'Production routing fix + category rename/delete',
     changes: [
       'Production routing: items not assigned to any centre no longer fall back to KDS Bar — they go nowhere',

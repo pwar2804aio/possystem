@@ -1018,6 +1018,26 @@ export const useStore = create((set, get) => ({
       } catch { return { centres:[], routing:{} }; }
     };
 
+    // Build a map of catId → parentId for hierarchy traversal
+    const buildCatParentMap = () => {
+      try {
+        const snap = JSON.parse(localStorage.getItem('rpos-config-snapshot') || '{}');
+        const cats = snap.menuCategories || useStore.getState().menuCategories || [];
+        const map = {};
+        cats.forEach(c => { map[c.id] = c.parentId || null; });
+        return map;
+      } catch { return {}; }
+    };
+
+    // Check if catId or any of its ancestors is in the assignedCategories set
+    const catOrAncestorMatches = (catId, assignedSet, parentMap, depth = 0) => {
+      if (!catId || depth > 5) return false;
+      if (assignedSet.has(catId)) return true;
+      const parentId = parentMap[catId];
+      if (!parentId) return false;
+      return catOrAncestorMatches(parentId, assignedSet, parentMap, depth + 1);
+    };
+
     // Determine which production center(s) an item routes to based on its category
     const getCentresForItem = (item, config) => {
       const { centres, routing } = config;
@@ -1025,12 +1045,14 @@ export const useStore = create((set, get) => ({
       if (!centres?.length || !routing) return [];
 
       const itemCat = item.cat || item.cats?.[0] || null;
+      const parentMap = buildCatParentMap();
       const matched = [];
       centres.forEach(centre => {
         const r = routing[centre.id];
         if (!r?.assignedCategories?.length) return;
-        // Item's category must be explicitly assigned to this centre
-        if (itemCat && r.assignedCategories.includes(itemCat)) {
+        const assignedSet = new Set(r.assignedCategories);
+        // Match if item's category OR any of its parent categories is assigned to this centre
+        if (itemCat && catOrAncestorMatches(itemCat, assignedSet, parentMap)) {
           // Check item is not individually excluded from this centre
           if (!r.excludedItems?.includes(item.id)) {
             matched.push(centre.id);
@@ -1038,7 +1060,6 @@ export const useStore = create((set, get) => ({
         }
       });
       // If routing is configured but item doesn't match any centre → send nowhere
-      // (no fallback to first centre — unrouted items should not appear on any KDS)
       return matched;
     };
 
@@ -1145,10 +1166,21 @@ export const useStore = create((set, get) => ({
         const { centres, routing } = routingConfig;
         if (!centres?.length) return [];
         const itemCat = item.cat || item.cats?.[0] || null;
+        // Build category parent map for hierarchy check
+        const snap = (() => { try { return JSON.parse(localStorage.getItem('rpos-config-snapshot')||'{}'); } catch { return {}; } })();
+        const cats = snap.menuCategories || [];
+        const parentMap = {};
+        cats.forEach(c => { parentMap[c.id] = c.parentId || null; });
+        const catOrAncestorMatches = (catId, assignedSet, depth = 0) => {
+          if (!catId || depth > 5) return false;
+          if (assignedSet.has(catId)) return true;
+          const pid = parentMap[catId];
+          return pid ? catOrAncestorMatches(pid, assignedSet, depth + 1) : false;
+        };
         const matched = [];
         centres.forEach(centre => {
           const r = routing[centre.id];
-          if (itemCat && r?.assignedCategories?.includes(itemCat) && !r?.excludedItems?.includes(item.id)) {
+          if (itemCat && r?.assignedCategories?.length && catOrAncestorMatches(itemCat, new Set(r.assignedCategories)) && !r?.excludedItems?.includes(item.id)) {
             matched.push(centre.id);
           }
         });
