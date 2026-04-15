@@ -19,10 +19,16 @@ import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
-
-const VERSION = '3.5.29';
+import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.5.30', date: 'Apr 2026', label: 'Back office version fix',
+    changes: [
+      'Back office version number now matches POS — both read from a single source (lib/version.js)',
+      'Previously the back office was stuck on v3.5.25 while the POS showed the correct version',
+    ],
+  },
   {
     version: '3.5.29', date: 'Apr 2026', label: 'Printer registry',
     changes: [
