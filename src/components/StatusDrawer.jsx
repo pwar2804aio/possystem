@@ -60,25 +60,6 @@ export default function StatusDrawer({ onClose }) {
       });
       setStatuses(prev => ({ ...prev, ...s }));
     } catch {}
-  }, []); = useCallback(async () => {
-    if (!supabase) return;
-    try {
-      const locId = await getLocationId();
-      if (!locId) return;
-      const { data } = await supabase
-        .from('devices')
-        .select('id,name,type,last_seen,status')
-        .eq('location_id', locId)
-        .eq('type', 'kds');
-      setKdsDevices(data || []);
-      // Determine online/offline from last_seen
-      const s = {};
-      (data || []).forEach(d => {
-        const age = d.last_seen ? Date.now() - new Date(d.last_seen).getTime() : Infinity;
-        s[d.id] = age < ONLINE_THRESHOLD_MS ? 'online' : 'offline';
-      });
-      setStatuses(prev => ({ ...prev, ...s }));
-    } catch {}
   }, []);
 
   // Check printer statuses from recent print_jobs
