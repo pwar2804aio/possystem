@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.31', date: 'Apr 2026', label: 'Supabase print queue',
+    changes: [
+      'Print jobs now go via Supabase — no HTTP bridge server, no port forwarding, no CORS',
+      'print-agent.js: lightweight Node script, runs on any LAN machine, outbound connections only',
+      'Agent subscribes to Supabase realtime for instant job pickup, polls as fallback',
+      'Works from iOS, Android, any browser — submit from anywhere, agent prints locally',
+      'Test button queues a job via Supabase rather than calling localhost',
+    ],
+  },
+  {
     version: '3.5.30', date: 'Apr 2026', label: 'Back office version fix',
     changes: [
       'Back office version number now matches POS — both read from a single source (lib/version.js)',

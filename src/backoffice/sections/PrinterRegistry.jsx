@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
+import { printService } from '../../lib/printer';
 
 const MODELS = [
   { id:'sunmi-nt311', label:'Sunmi NT311', icon:'🖨', desc:'80mm cloud printer — WiFi/LAN/BT/USB' },
@@ -204,17 +205,10 @@ export default function PrinterRegistry() {
     setTesting(t => ({ ...t, [printer.id]: true }));
     setTestResult(r => ({ ...r, [printer.id]: null }));
     try {
-      const bridgeUrl = JSON.parse(localStorage.getItem('rpos-printer-config') || '{}').bridgeUrl || 'http://localhost:3001';
-      const res = await fetch(`${bridgeUrl}/print?ip=${printer.address}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream', 'X-Printer-IP': printer.address },
-        body: new Uint8Array([0x1b,0x40, 0x1b,0x61,0x01, 0x1b,0x21,0x10, ...Array.from('TEST OK\n'), 0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00]),
-        signal: AbortSignal.timeout(5000),
-      });
-      const ok = res.ok;
-      persist(printers.map(p => p.id === printer.id ? { ...p, status: ok ? 'online' : 'offline', lastSeen: Date.now() } : p));
-      setTestResult(r => ({ ...r, [printer.id]: ok ? 'online' : 'error' }));
-    } catch {
+      await printService.printTestPage(printer);
+      persist(printers.map(p => p.id === printer.id ? { ...p, status: 'online', lastSeen: Date.now() } : p));
+      setTestResult(r => ({ ...r, [printer.id]: 'online' }));
+    } catch (err) {
       persist(printers.map(p => p.id === printer.id ? { ...p, status: 'offline' } : p));
       setTestResult(r => ({ ...r, [printer.id]: 'error' }));
     }
@@ -279,7 +273,7 @@ export default function PrinterRegistry() {
                   )}
                   {result && (
                     <div style={{ fontSize:11, marginTop:5, color: result === 'online' ? 'var(--grn)' : 'var(--red)', fontWeight:600 }}>
-                      {result === 'online' ? '✓ Test page sent successfully' : '✗ Could not reach printer'}
+                      {result === 'online' ? '✓ Test job queued — check printer for output' : '✗ Failed to queue job — is the agent running?'}
                     </div>
                   )}
                 </div>
