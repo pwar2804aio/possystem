@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.47', date: 'Apr 2026', label: 'Sub-items view + required modifier errors',
+    changes: [
+      'Items tab: new ⊕ Sub items filter shows dedicated grouped view for all sub-items',
+      'Sub-items can be tagged with a Group label (Milks, Sauces, Proteins…) to stay organised as the list grows',
+      'Add new sub-items directly within a group using the + Add button on each group header',
+      'Required modifier error: Add button turns red and shows which groups need a selection — no more silently blocked orders',
+      'Missing required groups highlighted with red border when user tries to add without selecting them',
+    ],
+  },
+  {
     version: '3.5.46', date: 'Apr 2026', label: 'Production routing: subcategory inheritance fixed',
     changes: [
       'Root cause found: order line items did not carry cat or parentId — routing looked at empty fields',

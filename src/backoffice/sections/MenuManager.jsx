@@ -757,6 +757,27 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
 // Search, filter by type or category, click to edit, add new items.
 // Sub-items (variants) always shown indented under their parent.
 // ═══════════════════════════════════════════════════════════════════════════
+// ── AddSubGroupRow — creates a new named group in sub-items view ──────────────
+function AddSubGroupRow({ onAdd, existingGroups }) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  if (!adding) return (
+    <button onClick={()=>setAdding(true)} style={{ width:'100%', padding:'8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1.5px dashed var(--bdr2)', color:'var(--t4)', fontSize:11, fontWeight:600 }}>
+      + New sub-item group
+    </button>
+  );
+  return (
+    <div style={{ display:'flex', gap:6 }}>
+      <input style={{ flex:1, ...inp, fontSize:12 }} value={name} onChange={e=>setName(e.target.value)}
+        onKeyDown={e=>{ if(e.key==='Enter'&&name.trim()){onAdd(name.trim());setName('');setAdding(false);} if(e.key==='Escape')setAdding(false); }}
+        placeholder="Group name e.g. Milks, Sauces…" autoFocus/>
+      <button onClick={()=>{ if(name.trim()){onAdd(name.trim());setName('');setAdding(false);} }} disabled={!name.trim()} style={{ padding:'6px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700, opacity:name.trim()?1:.4 }}>Add</button>
+      <button onClick={()=>setAdding(false)} style={{ padding:'6px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t3)', fontSize:12 }}>✕</button>
+    </div>
+  );
+}
+
+// ── Items Library ─────────────────────────────────────────────────────────────
 function ItemsLibrary() {
   const { menuItems, menuCategories, addMenuItem, updateMenuItem, archiveMenuItem,
           eightySixIds, toggle86, markBOChange, showToast } = useStore();
@@ -773,14 +794,24 @@ function ItemsLibrary() {
 
   // All top-level items, filtered and sorted by category then sortOrder
   const parents = useMemo(() => {
-    let items = menuItems.filter(i => !i.archived && !i.parentId);
+    // Sub-items view: show all sub-items (no parentId filter)
+    let items = typeFilter === 'subitem'
+      ? menuItems.filter(i => !i.archived && i.type === 'subitem')
+      : menuItems.filter(i => !i.archived && !i.parentId);
     if (search.trim()) {
       const q = search.toLowerCase();
       items = items.filter(i => (i.menuName||i.name||'').toLowerCase().includes(q) || (i.description||'').toLowerCase().includes(q));
     }
     if (typeFilter !== 'all') items = items.filter(i => (i.type||'simple') === typeFilter);
     if (catFilter !== 'all')  items = items.filter(i => i.cat===catFilter||(i.cats||[]).includes(catFilter));
-    // Sort by category order then item sortOrder
+    // Sort by subGroup then sortOrder for sub-items, otherwise category order
+    if (typeFilter === 'subitem') {
+      return items.sort((a,b) => {
+        const ga = a.subGroup||'', gb = b.subGroup||'';
+        if (ga !== gb) return ga.localeCompare(gb);
+        return (a.sortOrder??999)-(b.sortOrder??999);
+      });
+    }
     return items.sort((a,b) => {
       const ca = allCats.findIndex(c=>c.id===a.cat);
       const cb = allCats.findIndex(c=>c.id===b.cat);
@@ -832,6 +863,7 @@ function ItemsLibrary() {
             <option value="modifiable">Options (modifiable)</option>
             <option value="variants">Has sizes / variants</option>
             <option value="pizza">Pizza</option>
+            <option value="subitem">⊕ Sub items</option>
           </select>
           <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ ...inp, width:'auto', cursor:'pointer', fontSize:11 }}>
             <option value="all">All categories</option>
@@ -857,7 +889,76 @@ function ItemsLibrary() {
 
         {/* Scrollable list */}
         <div style={{ flex:1, overflowY:'auto' }}>
-          {parents.length === 0 && (
+
+          {/* ── Sub-items grouped view ── */}
+          {typeFilter === 'subitem' && (() => {
+            const addSubItem = (subGroup='') => {
+              addMenuItem({ name:'New sub item', menuName:'New sub item', receiptName:'New sub item', kitchenName:'New sub item',
+                type:'subitem', cat:'', allergens:[], pricing:{base:0}, subGroup,
+                assignedModifierGroups:[], assignedInstructionGroups:[], cats:[], sortOrder:999 });
+              markBOChange();
+              setTimeout(()=>{ const last=useStore.getState().menuItems.slice(-1)[0]; if(last) setSelItemId(last.id); }, 30);
+            };
+
+            const groups = [...new Set(parents.map(i=>i.subGroup||'').filter(Boolean))].sort();
+            const ungrouped = parents.filter(i=>!i.subGroup);
+            const allGroups = [...groups.map(g => ({ label:g, items: parents.filter(i=>i.subGroup===g) })), ...(ungrouped.length ? [{ label:'', items:ungrouped }] : [])];
+
+            if (parents.length === 0 && !search) return (
+              <div style={{ textAlign:'center', padding:'48px', color:'var(--t4)', fontSize:13 }}>
+                <div style={{ fontSize:36, opacity:.12, marginBottom:12 }}>⊕</div>
+                <div style={{ fontWeight:600, color:'var(--t3)', marginBottom:8 }}>No sub-items yet</div>
+                <div style={{ fontSize:12, color:'var(--t4)', marginBottom:16, lineHeight:1.6 }}>Sub-items are modifier options — Whole Milk, Oat Milk, Chips, etc.<br/>Create them here, then add to modifier groups.</div>
+                <button onClick={()=>addSubItem()} style={{ padding:'8px 18px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700 }}>+ Add first sub-item</button>
+              </div>
+            );
+
+            return (
+              <>
+                {allGroups.map(({ label, items: gItems }) => (
+                  <div key={label||'__ungrouped'}>
+                    {/* Group header */}
+                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px 4px', position:'sticky', top:0, background:'var(--bg1)', zIndex:1, borderBottom:'1px solid var(--bdr)' }}>
+                      <span style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', flex:1 }}>
+                        {label || '— Ungrouped'}
+                      </span>
+                      <span style={{ fontSize:9, color:'var(--t4)' }}>{gItems.length} items</span>
+                      <button onClick={()=>addSubItem(label)} style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:6, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10' }}>+ Add</button>
+                    </div>
+                    {gItems.map(item => {
+                      const isSel = selItemId === item.id;
+                      const price = item.pricing?.base ?? item.price ?? 0;
+                      return (
+                        <div key={item.id} onClick={()=>setSelItemId(isSel?null:item.id)}
+                          style={{ display:'grid', gridTemplateColumns:'1fr 80px 44px', gap:0, padding:'8px 12px', cursor:'pointer', alignItems:'center',
+                            background:isSel?'var(--acc-d)':'transparent', borderBottom:'1px solid var(--bdr)', transition:'background .1s' }}>
+                          <div style={{ minWidth:0 }}>
+                            <div style={{ fontSize:12, fontWeight:600, color:isSel?'var(--acc)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              {item.menuName||item.name}
+                            </div>
+                            {item.soldAlone && <span style={{ fontSize:9, color:'var(--grn)', fontWeight:700 }}>✓ Also sold standalone</span>}
+                          </div>
+                          <span style={{ fontSize:12, fontWeight:700, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>
+                            {price > 0 ? `£${price.toFixed(2)}` : 'Free'}
+                          </span>
+                          <span style={{ fontSize:10, color:(item.allergens||[]).length>0?'var(--red)':'var(--t4)' }}>
+                            {(item.allergens||[]).length > 0 ? `⚠${(item.allergens||[]).length}` : ''}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+
+                {/* Add group button */}
+                <div style={{ padding:'12px', borderTop:'1px solid var(--bdr)' }}>
+                  <AddSubGroupRow onAdd={name => addSubItem(name)} existingGroups={groups}/>
+                </div>
+              </>
+            );
+          })()}
+
+          {typeFilter !== 'subitem' && parents.length === 0 && (
             <div style={{ textAlign:'center', padding:'48px', color:'var(--t4)', fontSize:13 }}>
               <div style={{ fontSize:36, opacity:.12, marginBottom:12 }}>📋</div>
               <div style={{ fontWeight:600, color:'var(--t3)', marginBottom:8 }}>No items found</div>
@@ -865,7 +966,7 @@ function ItemsLibrary() {
             </div>
           )}
 
-          {parents.map(item => {
+          {typeFilter !== 'subitem' && parents.map(item => {
             const variants = variantsOf(item.id);
             const hasVars  = variants.length > 0 || (item.type||'simple')==='variants';
             const isSel    = selItemId === item.id;
@@ -1153,7 +1254,16 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
             )}
 
             {isSub && (
-              <div style={{ padding:'8px 10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>Sub items are modifier options. Use the toggle in the Items tab to also sell them as standalone POS items.</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <div style={{ padding:'8px 10px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t3)', lineHeight:1.5 }}>
+                  Sub items are modifier options — e.g. Whole Milk, Oat Milk, Chips. Assign them to modifier groups in the Modifier groups tab.
+                </div>
+                <div>
+                  <span style={lbl}>Group tag</span>
+                  <input style={inp} value={item.subGroup||''} onChange={e=>f('subGroup',e.target.value)} placeholder="e.g. Milks, Sauces, Proteins…"/>
+                  <div style={{ fontSize:10, color:'var(--t4)', marginTop:4 }}>Groups sub-items in the Items → Sub items view. Not shown on POS.</div>
+                </div>
+              </div>
             )}
 
           </div>

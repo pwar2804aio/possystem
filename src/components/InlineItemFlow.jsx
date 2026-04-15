@@ -47,6 +47,7 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selections, setSelections]   = useState({});    // modifierId → option/[options]
   const [instSelections, setInstSel]  = useState({});    // instructionGroupId → string
+  const [requireErr, setRequireErr] = useState(false);
   const [qty, setQty]                 = useState(1);
   const [notes, setNotes]             = useState('');
   const [animDir, setAnimDir]         = useState('in');  // 'in' | 'out'
@@ -95,15 +96,13 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
     return buildInstGroups(item);
   }, [activeItem, item, instructionGroupDefs]);
 
-  const allRequired = modGroups
-    .filter(g => g.required || (g.min || 0) > 0)
-    .every(g => {
-      const sel = selections[g.id];
-      if (Array.isArray(sel)) return sel.length >= (g.min || 1);
-      return !!sel;
-    });
-
-  const canAdd = step === 'variant' ? false : allRequired;
+  const missingRequired = modGroups.filter(g => {
+    if (!(g.required || (g.min || 0) > 0)) return false;
+    const sel = selections[g.id];
+    if (Array.isArray(sel)) return sel.length < (g.min || 1);
+    return !sel;
+  });
+  const canAdd = step === 'variant' ? false : missingRequired.length === 0;
 
   const extraCost = Object.values(selections).flat().filter(Boolean)
     .reduce((s, m) => s + (m?.price || 0), 0);
@@ -113,7 +112,7 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
   const total = (basePrice + extraCost) * qty;
 
   const handleAdd = () => {
-    if (!canAdd) return;
+    if (!canAdd) { setRequireErr(true); setTimeout(() => setRequireErr(false), 3000); return; }
     const mods = Object.entries(selections).flatMap(([gid, val]) => {
       if (!val) return [];
       const group = modGroups.find(g => g.id === gid);
@@ -221,6 +220,7 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
             instSelections={instSelections}
             qty={qty}
             notes={notes}
+            missingRequired={requireErr ? missingRequired.map(g => g.id) : []}
             onToggleSingle={toggleSingle}
             onAddMulti={addMulti}
             onRemoveMulti={removeMulti}
@@ -234,6 +234,18 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
       {/* ── Footer ─────────────────────────────────────────────────────── */}
       {step === 'modifiers' && (
         <div style={{ padding:'12px 16px', borderTop:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+          {/* Required field error */}
+          {requireErr && missingRequired.length > 0 && (
+            <div style={{ marginBottom:10, padding:'10px 12px', background:'var(--red-d)', border:'1px solid var(--red-b)', borderRadius:10, display:'flex', alignItems:'flex-start', gap:8 }}>
+              <span style={{ fontSize:16, flexShrink:0 }}>⚠</span>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--red)', marginBottom:2 }}>Required options needed</div>
+                <div style={{ fontSize:11, color:'var(--red)', opacity:.85 }}>
+                  Please choose: {missingRequired.map(g => g.name || g.label).join(', ')}
+                </div>
+              </div>
+            </div>
+          )}
           <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:10 }}>
             <span style={{ fontSize:12, color:'var(--t3)' }}>Qty</span>
             <div style={{ display:'flex', gap:8, alignItems:'center', marginLeft:'auto' }}>
@@ -244,10 +256,11 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
           </div>
           <button
             onClick={handleAdd}
-            disabled={!canAdd}
             className="btn btn-acc"
-            style={{ width:'100%', height:52, fontSize:16, fontWeight:800, borderRadius:14, opacity: canAdd ? 1 : 0.4 }}>
-            Add to order · £{total.toFixed(2)}
+            style={{ width:'100%', height:52, fontSize:16, fontWeight:800, borderRadius:14,
+              background: canAdd ? 'var(--acc)' : 'var(--red)',
+              opacity: 1, cursor: 'pointer' }}>
+            {canAdd ? `Add to order · £${total.toFixed(2)}` : `Choose required options first`}
           </button>
         </div>
       )}
@@ -295,7 +308,7 @@ function VariantStep({ item, variantChildren, onPick }) {
 }
 
 // ── Modifier step: sequential groups ─────────────────────────────────────────
-function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelections, qty, notes, onToggleSingle, onAddMulti, onRemoveMulti, onToggleInst, onQty, onNotes }) {
+function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelections, qty, notes, missingRequired = [], onToggleSingle, onAddMulti, onRemoveMulti, onToggleInst, onQty, onNotes }) {
   const hasContent = modGroups.length > 0 || instGroups.length > 0;
   if (!hasContent) {
     return (
@@ -309,13 +322,14 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
       {modGroups.map(group => {
         const isRequired  = group.required || (group.min || 0) > 0;
+        const isMissing   = missingRequired.includes(group.id);
         const max         = group.max >= 99 || !group.max ? 999 : group.max;
         const isMulti     = max > 1;
         const cur         = selections[group.id];
         const selectedCount = Array.isArray(cur) ? cur.length : (cur ? 1 : 0);
 
         return (
-          <div key={group.id}>
+          <div key={group.id} style={{ padding: isMissing ? '10px 12px' : 0, borderRadius: isMissing ? 12 : 0, border: isMissing ? '2px solid var(--red-b)' : 'none', background: isMissing ? 'var(--red-d)' : 'transparent', transition: 'all .2s' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
               <span style={{ fontSize:12, fontWeight:800, color:'var(--t1)', textTransform:'uppercase', letterSpacing:'.06em' }}>
                 {group.name || group.label}
