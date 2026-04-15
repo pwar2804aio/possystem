@@ -53,7 +53,8 @@ export default function SyncBridge({ onSyncPulse }) {
           delete parsed.sections;
           delete parsed.eightySix;
           delete parsed.tabs;          // bar tabs are session-only in real mode
-          delete parsed.closedChecks;  // closed checks loaded from Supabase
+          // NOTE: closedChecks are kept from localStorage as fast fallback
+          // They get confirmed/refreshed from Supabase below
         }
         useStore.setState(parsed);
         isApplyingRef.current = false;
@@ -152,6 +153,25 @@ export default function SyncBridge({ onSyncPulse }) {
             color: cat.color ?? '#3b82f6',
           }));
           if (menusRes.data?.length) patch.menus = menusRes.data;
+
+          // Load today's closed checks from Supabase — CRITICAL for sales history
+          try {
+            const { fetchClosedChecks } = await import('../lib/db.js');
+            const checksRes = await fetchClosedChecks(locationId, 500);
+            if (checksRes.data?.length) {
+              // Merge with any localStorage checks not yet written to Supabase
+              const supabaseIds = new Set(checksRes.data.map(c => c.id));
+              const lsChecks = (() => {
+                try {
+                  const s = JSON.parse(localStorage.getItem('rpos-shared-state') || '{}');
+                  return (s.closedChecks || []).filter(c => !supabaseIds.has(c.id));
+                } catch { return []; }
+              })();
+              patch.closedChecks = [...checksRes.data, ...lsChecks]
+                .sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
+            }
+          } catch(e) { console.warn('[SyncBridge] closed checks load error:', e.message); }
+
           if (Object.keys(patch).length) useStore.setState(patch);
         } catch(e) { console.warn('[SyncBridge] boot load error:', e.message); }
       })();

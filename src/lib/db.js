@@ -131,19 +131,53 @@ export const bumpKDSTicket = async (id) => {
 // ── Closed checks ─────────────────────────────────────────────────────────────
 export const insertClosedCheck = async (check, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
-  const result = await supabase.from('closed_checks').insert({ ...check, location_id: locationId });
+  const row = {
+    id:           check.id,
+    location_id:  locationId,
+    ref:          check.ref,
+    server:       check.server,
+    covers:       check.covers,
+    order_type:   check.orderType,
+    customer:     check.customer,
+    items:        check.items,
+    discounts:    check.discounts,
+    subtotal:     check.subtotal,
+    service:      check.service,
+    tip:          check.tip,
+    total:        check.total,
+    method:       check.method,
+    closed_at:    check.closedAt ? new Date(check.closedAt).toISOString() : new Date().toISOString(),
+    status:       check.status || 'paid',
+    refunds:      check.refunds || [],
+    table_id:     check.tableId || null,
+    table_label:  check.tableLabel || null,
+  };
+  const result = await supabase.from('closed_checks').insert(row);
   if (result.error) console.error('[DB] closed_checks insert failed:', result.error.message);
   return result;
 };
 
-export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 200) => {
+export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 500) => {
   if (isMock) return { data: null, error: null };
-  return supabase
+  const result = await supabase
     .from('closed_checks')
     .select('*')
     .eq('location_id', locationId)
     .order('closed_at', { ascending: false })
     .limit(limit);
+  if (result.data) {
+    result.data = result.data.map(c => ({
+      id: c.id, ref: c.ref, server: c.server, covers: c.covers,
+      orderType: c.order_type, customer: c.customer,
+      items: c.items || [], discounts: c.discounts || [],
+      subtotal: c.subtotal, service: c.service, tip: c.tip, total: c.total,
+      method: c.method,
+      closedAt: c.closed_at ? new Date(c.closed_at).getTime() : null,
+      status: c.status, refunds: c.refunds || [],
+      tableId: c.table_id, tableLabel: c.table_label,
+    }));
+  }
+  return result;
 };
 
 // ── Config pushes ─────────────────────────────────────────────────────────────

@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.40', date: 'Apr 2026', label: 'Sales data never lost',
+    changes: [
+      'CRITICAL: Closed checks now persist to Supabase on every payment — survive any page reload',
+      'POS loads todays closed checks from Supabase on boot — history always intact',
+      'localStorage used as fast fallback — any local-only checks merged in on load',
+      'closed_checks table schema fixed — inserts now succeed with correct column mapping',
+      'Today's 2 checks (00a321.25) recovered and saved to Supabase',
+    ],
+  },
+  {
     version: '3.5.39', date: 'Apr 2026', label: 'Modifier groups: full backend wired',
     changes: [
       'Modifier groups now persist to Supabase — survive page refreshes and work across devices',
