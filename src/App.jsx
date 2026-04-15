@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.43', date: 'Apr 2026', label: 'KDS status: use ticket activity as online signal',
+    changes: [
+      'KDS online detection: 15min last_seen threshold (was 3min)',
+      'KDS also shown as online if tickets were bumped within the last 10 minutes',
+      'BAR KDS correctly shows online when in active use',
+    ],
+  },
+  {
     version: '3.5.42', date: 'Apr 2026', label: 'Status drawer: KDS status + test all hardware',
     changes: [
       'KDS screens now shown in Status drawer with online/offline status based on last_seen heartbeat',

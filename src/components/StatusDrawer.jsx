@@ -4,7 +4,7 @@ import { supabase, getLocationId } from '../lib/supabase';
 import { printService } from '../lib/printer';
 import { VERSION } from '../lib/version';
 
-const ONLINE_THRESHOLD_MS = 3 * 60 * 1000; // 3 min — KDS considered online if seen within this window
+const ONLINE_THRESHOLD_MS = 15 * 60 * 1000; // 15 min last_seen threshold
 
 export default function StatusDrawer({ onClose }) {
   const { deviceConfig, clearDeviceConfig, syncStatus, setAppMode } = useStore();
@@ -38,8 +38,29 @@ export default function StatusDrawer({ onClose }) {
     return () => { window.removeEventListener('rpos-printers-updated', update); window.removeEventListener('storage', update); };
   }, []);
 
-  // Load KDS devices from Supabase
+  // Load KDS devices from Supabase — also checks recent ticket activity as online signal
   const loadKDS = useCallback(async () => {
+    if (!supabase) return;
+    try {
+      const locId = await getLocationId();
+      if (!locId) return;
+      const [devicesRes, ticketsRes] = await Promise.all([
+        supabase.from('devices').select('id,name,type,last_seen,status').eq('location_id', locId).eq('type', 'kds'),
+        // Recent bumped tickets = KDS was actively used
+        supabase.from('kds_tickets').select('bumped_at').eq('location_id', locId).not('bumped_at', 'is', null).order('bumped_at', { ascending: false }).limit(1),
+      ]);
+      setKdsDevices(devicesRes.data || []);
+      const latestBump = ticketsRes.data?.[0]?.bumped_at ? new Date(ticketsRes.data[0].bumped_at).getTime() : 0;
+      const s = {};
+      (devicesRes.data || []).forEach(d => {
+        const lastSeenAge = d.last_seen ? Date.now() - new Date(d.last_seen).getTime() : Infinity;
+        const bumpAge = latestBump ? Date.now() - latestBump : Infinity;
+        // Online if seen within 15min OR if tickets were bumped within 10min
+        s[d.id] = (lastSeenAge < ONLINE_THRESHOLD_MS || bumpAge < 10 * 60 * 1000) ? 'online' : 'offline';
+      });
+      setStatuses(prev => ({ ...prev, ...s }));
+    } catch {}
+  }, []); = useCallback(async () => {
     if (!supabase) return;
     try {
       const locId = await getLocationId();
