@@ -30,7 +30,7 @@ const PAPER = [
   { id:58, label:'58mm' },
 ];
 
-const EMPTY = { name:'', model:'sunmi-nt311', connectionType:'network', address:'', port:9100, paperWidth:80, roles:['receipt'], location:'' };
+const EMPTY = { name:'', model:'sunmi-nt311', connectionType:'network', address:'', paperWidth:80, roles:['receipt'], location:'' };
 
 function loadPrinters() {
   try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; }
@@ -119,16 +119,11 @@ function PrinterForm({ initial, onSave, onCancel }) {
         </div>
 
         {form.connectionType !== 'usb' && (
-          <div style={S.row}>
-            <div>
-              <label style={S.label}>{form.connectionType === 'bluetooth' ? 'Bluetooth address' : 'IP address'}</label>
-              <input style={S.input} value={form.address} onChange={e=>f('address',e.target.value)} placeholder={conn.placeholder}/>
-            </div>
+          <div style={{ marginBottom:14 }}>
+            <label style={S.label}>{form.connectionType === 'bluetooth' ? 'Bluetooth address' : 'IP address'}</label>
+            <input style={S.input} value={form.address} onChange={e=>f('address',e.target.value)} placeholder={conn.placeholder}/>
             {form.connectionType === 'network' && (
-              <div>
-                <label style={S.label}>Port</label>
-                <input style={S.input} type="number" value={form.port} onChange={e=>f('port',parseInt(e.target.value)||9100)} placeholder="9100"/>
-              </div>
+              <div style={{ fontSize:11, color:'var(--t4)', marginTop:4 }}>Standard ESC/POS port 9100 is used automatically</div>
             )}
           </div>
         )}
@@ -188,9 +183,9 @@ export default function PrinterRegistry() {
 
   const handleSave = (form) => {
     if (form.id) {
-      persist(printers.map(p => p.id === form.id ? form : p));
+      persist(printers.map(p => p.id === form.id ? { ...form, port: 9100 } : p));
     } else {
-      persist([...printers, { ...form, id: `prn-${Date.now()}`, status: 'unknown', addedAt: Date.now() }]);
+      persist([...printers, { ...form, port: 9100, id: `prn-${Date.now()}`, status: 'unknown', addedAt: Date.now() }]);
     }
     setShowForm(false);
     setEditId(null);

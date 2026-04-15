@@ -1239,11 +1239,9 @@ const NAV = [
 ];
 
 function ShiftBar({ version, onWhatsNew, theme, onToggleTheme, syncPulse }) {
-  // Subscribe to closedChecks directly so shift stats re-render when checks are added
   const { deviceConfig, setSurface, orderQueue, tables, tabs, closedChecks, shift } = useStore();
   const pairedDevice = (() => { try { return JSON.parse(localStorage.getItem('rpos-device') || 'null'); } catch { return null; } })();
   const terminalName = deviceConfig?.terminalName || pairedDevice?.name || 'POS';
-  // Resolve profile name from paired device's profileId
   const storedProfiles = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null'); } catch { return null; } })();
   const DEFAULT_PROFILES = [
     { id:'prof-1', name:'Main counter' },
@@ -1255,11 +1253,39 @@ function ShiftBar({ version, onWhatsNew, theme, onToggleTheme, syncPulse }) {
     || allProfiles.find(p => p.id === pairedDevice?.profileId)?.name
     || null;
 
-  // Active order count for Orders Hub button
   const activeOrders = (orderQueue?.filter(o => !['collected','paid'].includes(o.status)).length || 0)
     + (tables?.filter(t => t.status !== 'available').length || 0)
     + (tabs?.filter(t => t.status !== 'closed').length || 0);
-  const urlParam     = deviceConfig?.param;
+  const urlParam = deviceConfig?.param;
+
+  // Printer status — poll bridge every 30s
+  const [printerStatus, setPrinterStatus] = useState(null); // null | 'online' | 'offline'
+  const [printers, setPrinters] = useState(() => { try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; } });
+
+  useEffect(() => {
+    const update = () => { try { setPrinters(JSON.parse(localStorage.getItem('rpos-printers') || '[]')); } catch {} };
+    window.addEventListener('rpos-printers-updated', update);
+    window.addEventListener('storage', update);
+    return () => { window.removeEventListener('rpos-printers-updated', update); window.removeEventListener('storage', update); };
+  }, []);
+
+  useEffect(() => {
+    if (!printers.length) return;
+    const check = async () => {
+      const cfg = (() => { try { return JSON.parse(localStorage.getItem('rpos-printer-config') || '{}'); } catch { return {}; } })();
+      const bridgeUrl = cfg.bridgeUrl || 'http://localhost:3001';
+      try {
+        const res = await fetch(`${bridgeUrl}/status`, { signal: AbortSignal.timeout(3000) });
+        const data = await res.json();
+        setPrinterStatus(data.ok ? 'online' : 'offline');
+      } catch {
+        setPrinterStatus('offline');
+      }
+    };
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, [printers.length]);
 
   return (
     <div style={{ height:42, display:'flex', alignItems:'center', background:'var(--bg1)', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
@@ -1323,6 +1349,20 @@ function ShiftBar({ version, onWhatsNew, theme, onToggleTheme, syncPulse }) {
             </span>
           )}
         </button>
+        {/* Printer status — only shown when printers are configured */}
+        {printers.length > 0 && (
+          <div title={printerStatus === 'online' ? 'Print bridge online' : printerStatus === 'offline' ? 'Print bridge offline — check bridge server' : 'Checking printer…'} style={{
+            display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
+            background: printerStatus === 'online' ? 'var(--grn-d)' : printerStatus === 'offline' ? 'var(--red-d)' : 'var(--bg3)',
+            border:`1px solid ${printerStatus === 'online' ? 'var(--grn-b)' : printerStatus === 'offline' ? 'var(--red-b)' : 'var(--bdr)'}`,
+            fontSize:11, fontWeight:700,
+            color: printerStatus === 'online' ? 'var(--grn)' : printerStatus === 'offline' ? 'var(--red)' : 'var(--t4)',
+            cursor:'default',
+          }}>
+            <div style={{ width:6, height:6, borderRadius:'50%', background: printerStatus === 'online' ? 'var(--grn)' : printerStatus === 'offline' ? 'var(--red)' : 'var(--t4)', boxShadow: printerStatus === 'online' ? '0 0 4px var(--grn)' : 'none' }}/>
+            🖨 {printerStatus === 'online' ? 'Online' : printerStatus === 'offline' ? 'Offline' : '…'}
+          </div>
+        )}
         <button onClick={onWhatsNew} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, cursor:'pointer', background:'var(--bg3)', border:'1px solid var(--bdr)', fontFamily:'inherit', fontSize:11, fontWeight:700, color:'var(--t3)', transition:'all .14s' }}
           onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--acc-b)';e.currentTarget.style.color='var(--acc)';}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr)';e.currentTarget.style.color='var(--t3)';}}>

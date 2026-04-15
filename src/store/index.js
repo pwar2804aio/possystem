@@ -221,6 +221,11 @@ export const useStore = create((set, get) => ({
     if (snap.printRouting) {
       try { localStorage.setItem('rpos-print-routing', JSON.stringify(snap.printRouting)); } catch {}
     }
+    // Sync printers registry to this device so FOH and print service can read them
+    if (snap.printers?.length) {
+      try { localStorage.setItem('rpos-printers', JSON.stringify(snap.printers)); } catch {}
+      try { window.dispatchEvent(new Event('rpos-printers-updated')); } catch {}
+    }
     try { sessionStorage.setItem('rpos-config-version', String(snap.version)); } catch {}
   },
   locationSections: [

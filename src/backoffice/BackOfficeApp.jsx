@@ -323,12 +323,14 @@ function PushToPOSButton() {
       { id:'prof-2', name:'Bar terminal' },
       { id:'prof-3', name:'Server handheld' },
     ]; } catch { return []; } })();
+    const printers = (() => { try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; } })();
 
     const snapshot = {
       version: Date.now(),
       pushedAt: new Date().toISOString(),
       pushedBy: staff?.name || 'Manager',
       printRouting: printRouting || { centres:[], routing:{} },
+      printers,
       tables: tables.map(t => ({
         id:t.id, label:t.label, x:t.x, y:t.y, w:t.w, h:t.h,
         shape:t.shape, maxCovers:t.maxCovers, section:t.section,
