@@ -20,9 +20,18 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.28';
+const VERSION = '3.5.29';
 
 const CHANGELOG = [
+  {
+    version: '3.5.29', date: 'Apr 2026', label: 'Printer registry',
+    changes: [
+      'Devices → Printers: add and manage physical printers (name, model, IP, connection type, paper width, roles)',
+      'Production printing: printer field is now a dropdown — choose from registered printers',
+      'Devices: each terminal can be assigned a receipt printer',
+      'Test button sends a test print via WiFi bridge to verify connectivity',
+    ],
+  },
   {
     version: '3.5.28', date: 'Apr 2026', label: 'Production printing rename',
     changes: [

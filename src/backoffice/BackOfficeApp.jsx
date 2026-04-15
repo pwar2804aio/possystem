@@ -11,6 +11,7 @@ import DeviceProfiles from './sections/DeviceProfiles';
 import DeviceRegistry from './sections/DeviceRegistry';
 import StaffManager from './sections/StaffManager';
 import PrintRouting from './sections/PrintRouting';
+import PrinterRegistry from './sections/PrinterRegistry';
 import BOReports from './sections/BOReports';
 import EODClose from './sections/EODClose';
 import Inventory from './sections/Inventory';
@@ -24,6 +25,7 @@ const NAV = [
   { id:'inventory',  label:'Inventory',       icon:'📦',  group:'Configuration' },
   { id:'profiles',   label:'Device profiles', icon:'📋',  group:'Devices' },
   { id:'devices',    label:'Devices',         icon:'📱',  group:'Devices' },
+  { id:'printers',   label:'Printers',        icon:'🖨',  group:'Devices' },
   { id:'staff',      label:'Staff & access',  icon:'👥',  group:'Configuration' },
   { id:'printing',   label:'Production printing',   icon:'🖨',  group:'Configuration' },
   { id:'reports',    label:'Reports',         icon:'📊',  group:'Analytics' },
@@ -291,6 +293,7 @@ export default function BackOfficeApp() {
           {section === 'inventory'  && <Inventory />}
           {section === 'profiles'   && <DeviceProfiles />}
           {section === 'devices'    && <DeviceRegistry />}
+          {section === 'printers'   && <PrinterRegistry />}
           {section === 'staff'      && <StaffManager />}
           {section === 'printing'   && <PrintRouting />}
           {section === 'reports'    && <BOReports />}
@@ -413,9 +416,10 @@ function BOOverview({ setSection, orgCtx }) {
     { icon:'🍽', label:'Edit menu',        sub:'Update items, prices, allergens',  target:'menu' },
     { icon:'⬚',  label:'Floor plan',       sub:'Move tables, add sections',       target:'floorplan' },
     { icon:'📋', label:'Device profiles',  sub:'Configure terminal behaviour',    target:'profiles' },
-    { icon:'📱', label:'Add terminal',     sub:'Pair a new Sunmi device',         target:'devices' },
-    { icon:'👥', label:'Manage staff',     sub:'Add servers, change PINs',        target:'staff' },
-    { icon:'🖨', label:'Production printing',    sub:'Route orders to kitchen & receipt printers',      target:'printing' },
+    { icon:'📱', label:'Add terminal',       sub:'Pair a new Sunmi device',                    target:'devices' },
+    { icon:'🖨', label:'Manage printers',    sub:'Add NT311 and other ESC/POS printers',       target:'printers' },
+    { icon:'👥', label:'Manage staff',       sub:'Add servers, change PINs',                   target:'staff' },
+    { icon:'🗺', label:'Production printing', sub:'Route orders to kitchen & receipt printers', target:'printing' },
   ];
 
   return (

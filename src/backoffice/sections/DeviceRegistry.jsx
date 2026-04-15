@@ -52,6 +52,25 @@ function getProfiles() {
   catch { return DEFAULT_PROFILES; }
 }
 
+function getPrinters() {
+  try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; }
+}
+
+function PrinterSelect({ value, onChange, placeholder = 'No receipt printer' }) {
+  const [printers, setPrinters] = useState(getPrinters);
+  useEffect(() => {
+    const handler = () => setPrinters(getPrinters());
+    window.addEventListener('rpos-printers-updated', handler);
+    return () => window.removeEventListener('rpos-printers-updated', handler);
+  }, []);
+  return (
+    <select style={S.input} value={value || ''} onChange={e => onChange(e.target.value)}>
+      <option value="">{placeholder}</option>
+      {printers.map(p => <option key={p.id} value={p.id}>🖨 {p.name}{p.location ? ` (${p.location})` : ''}</option>)}
+    </select>
+  );
+}
+
 function ProfileSelect({ value, onChange }) {
   return (
     <select style={S.input} value={value||''} onChange={e=>onChange(e.target.value)}>
@@ -139,7 +158,7 @@ export default function DeviceRegistry() {
 
   const startEdit = (d) => {
     setEditId(d.id);
-    setEditForm({ name: d.name, type: d.type, profileId: d.profile_id || '', centreId: d.centre_id || '' });
+    setEditForm({ name: d.name, type: d.type, profileId: d.profile_id || '', centreId: d.centre_id || '', receiptPrinterId: d.receipt_printer_id || '' });
   };
 
   const saveEdit = async () => {
@@ -150,6 +169,7 @@ export default function DeviceRegistry() {
       type: editForm.type,
       profile_id: editForm.type !== 'kds' ? (editForm.profileId || null) : null,
       centre_id: editForm.type === 'kds' ? (editForm.centreId || null) : null,
+      receipt_printer_id: editForm.receiptPrinterId || null,
     }).eq('id', editId);
     setEditId(null);
     setWorking(false);
@@ -277,7 +297,7 @@ export default function DeviceRegistry() {
             <div key={d.id} style={{ padding:'16px 0', borderBottom:'1px solid var(--bdr)' }}>
               {isEditing ? (
                 /* Edit mode */
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr auto', gap:10, alignItems:'end' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr auto', gap:10, alignItems:'end' }}>
                   <div>
                     <label style={S.label}>Name</label>
                     <input style={S.input} value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))} />
@@ -304,6 +324,12 @@ export default function DeviceRegistry() {
                       </>
                     )}
                   </div>
+                  {editForm.type !== 'kds' && (
+                    <div>
+                      <label style={S.label}>Receipt printer</label>
+                      <PrinterSelect value={editForm.receiptPrinterId} onChange={v=>setEditForm(f=>({...f,receiptPrinterId:v}))} />
+                    </div>
+                  )}
                   <div style={{ display:'flex', gap:6 }}>
                     <button onClick={saveEdit} disabled={working} style={{ ...S.btn, ...S.btnPrimary, padding:'9px 12px' }}>Save</button>
                     <button onClick={()=>setEditId(null)} style={{ ...S.btn, ...S.btnGhost, padding:'9px 12px' }}>✕</button>
@@ -317,6 +343,7 @@ export default function DeviceRegistry() {
                     <div style={{ fontWeight:700, color:'var(--t1)', fontSize:14 }}>{d.name}</div>
                     <div style={{ fontSize:12, color:'var(--t3)' }}>
                       {dtype.label} · {d.type === 'kds' ? 'Center' : 'Profile'}: {profileName}
+                      {d.receipt_printer_id && (() => { const p = getPrinters().find(x=>x.id===d.receipt_printer_id); return p ? <span> · 🖨 {p.name}</span> : null; })()}
                       {d.last_seen && <span> · Last seen {new Date(d.last_seen).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>}
                     </div>
 

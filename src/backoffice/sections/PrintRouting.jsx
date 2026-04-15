@@ -171,7 +171,16 @@ export default function PrintRouting() {
   const [showAdd, setShowAdd] = useState(false);
   const [editCentre, setEditCentre] = useState(null); // centre being edited
   const [kdsDevices, setKdsDevices] = useState([]);
-  const [form, setForm] = useState({ name:'', icon:'🔥', type:'kitchen', printerName:'', printerIp:'', printerModel:'Sunmi NT311', kdsDeviceId:'' });
+  const [form, setForm] = useState({ name:'', icon:'🔥', type:'kitchen', printerId:'', kdsDeviceId:'' });
+  const [printers, setPrinters] = useState(() => { try { return JSON.parse(localStorage.getItem('rpos-printers')||'[]'); } catch { return []; } });
+
+  // Keep printer list live if user adds a printer in another tab
+  useEffect(() => {
+    const h = () => { try { setPrinters(JSON.parse(localStorage.getItem('rpos-printers')||'[]')); } catch {} };
+    window.addEventListener('rpos-printers-updated', h);
+    window.addEventListener('storage', h);
+    return () => { window.removeEventListener('rpos-printers-updated', h); window.removeEventListener('storage', h); };
+  }, []);
 
   // Load KDS devices from Supabase
   useEffect(() => {
@@ -200,20 +209,22 @@ export default function PrintRouting() {
       name: form.name.trim(),
       icon: form.icon,
       type: form.type,
-      printer: form.printerName ? { name:form.printerName, ip:form.printerIp, model:form.printerModel } : null,
+      printerId: form.printerId || null,
+      printer: form.printerId ? printers.find(p => p.id === form.printerId) || null : null,
       kdsDeviceId: form.kdsDeviceId || null,
     };
     setData(d => ({ ...d, centres:[...d.centres, centre] }));
     setRouting(r => ({ ...r, [centre.id]: emptyRouting() }));
     setSelected(centre.id);
     setShowAdd(false);
-    setForm({ name:'', icon:'🔥', type:'kitchen', printerName:'', printerIp:'', printerModel:'Sunmi NT311', kdsDeviceId:'' });
+    setForm({ name:'', icon:'🔥', type:'kitchen', printerId:'', kdsDeviceId:'' });
   };
 
   const saveCentre = () => {
     setData(d => ({ ...d, centres: d.centres.map(c => c.id===editCentre.id ? {
       ...c, name:form.name, icon:form.icon, type:form.type,
-      printer: form.printerName ? { name:form.printerName, ip:form.printerIp, model:form.printerModel } : null,
+      printerId: form.printerId || null,
+      printer: form.printerId ? printers.find(p => p.id === form.printerId) || null : null,
       kdsDeviceId: form.kdsDeviceId || null,
     } : c) }));
     setEditCentre(null);
@@ -229,7 +240,7 @@ export default function PrintRouting() {
   const startEdit = (c) => {
     setEditCentre(c);
     setForm({ name:c.name, icon:c.icon, type:c.type,
-      printerName: c.printer?.name||'', printerIp: c.printer?.ip||'', printerModel: c.printer?.model||'Sunmi NT311',
+      printerId: c.printerId || '',
       kdsDeviceId: c.kdsDeviceId||'' });
     setShowAdd(false);
   };
@@ -264,22 +275,23 @@ export default function PrintRouting() {
         </div>
       </div>
 
-      <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', marginBottom:10, marginTop:4 }}>🖨 Printer (optional)</div>
-      <div style={S.row}>
-        <div>
-          <label style={S.label}>Printer name</label>
-          <input style={S.input} value={form.printerName} onChange={e=>f('printerName',e.target.value)} placeholder="Hot kitchen printer" />
-        </div>
-        <div>
-          <label style={S.label}>IP address</label>
-          <input style={S.input} value={form.printerIp} onChange={e=>f('printerIp',e.target.value)} placeholder="192.168.1.101" />
-        </div>
-      </div>
-      <div style={{ marginBottom:12 }}>
-        <label style={S.label}>Printer model</label>
-        <select style={{ ...S.input, maxWidth:300 }} value={form.printerModel} onChange={e=>f('printerModel',e.target.value)}>
-          {PRINTER_MODELS.map(m=><option key={m} value={m}>{m}</option>)}
-        </select>
+      <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', marginBottom:10, marginTop:4 }}>🖨 Printer</div>
+      <div style={{ marginBottom:14 }}>
+        <label style={S.label}>Assign printer</label>
+        {printers.length === 0 ? (
+          <div style={{ padding:'10px 14px', borderRadius:8, background:'var(--acc-d)', border:'1px solid var(--acc-b)', fontSize:12, color:'var(--acc)' }}>
+            No printers added yet — go to <strong>Devices → Printers</strong> to add your Sunmi NT311 first.
+          </div>
+        ) : (
+          <select style={{ ...S.input, maxWidth:380 }} value={form.printerId} onChange={e=>f('printerId',e.target.value)}>
+            <option value="">No printer assigned</option>
+            {printers.map(p => (
+              <option key={p.id} value={p.id}>
+                🖨 {p.name}{p.location ? ` — ${p.location}` : ''}{p.address ? ` (${p.address})` : ''}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {kdsDevices.length > 0 && (
@@ -338,7 +350,7 @@ export default function PrintRouting() {
         </div>
 
         <div style={{ padding:12, borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
-          <button onClick={()=>{ setShowAdd(true); setSelected(null); setEditCentre(null); setForm({name:'',icon:'🔥',type:'kitchen',printerName:'',printerIp:'',printerModel:'Sunmi NT311',kdsDeviceId:''}); }}
+          <button onClick={()=>{ setShowAdd(true); setSelected(null); setEditCentre(null); setForm({name:'',icon:'🔥',type:'kitchen',printerId:'',kdsDeviceId:''}); }}
             style={{ ...S.btn, ...S.btnPrimary, width:'100%' }}>
             + Add production center
           </button>
@@ -367,7 +379,7 @@ export default function PrintRouting() {
                 <div style={{ fontSize:22, fontWeight:800, color:'var(--t1)' }}>{activeCentre.name}</div>
                 <div style={{ fontSize:12, color:'var(--t3)' }}>
                   {CENTRE_TYPES.find(t=>t.id===activeCentre.type)?.label}
-                  {activeCentre.printer && ` · 🖨 ${activeCentre.printer.name} (${activeCentre.printer.ip})`}
+                  {activeCentre.printer && ` · 🖨 ${activeCentre.printer.name}`}
                   {kdsForCentre(activeCentre.id) && ` · 📺 ${kdsForCentre(activeCentre.id).name}`}
                 </div>
               </div>
@@ -382,10 +394,14 @@ export default function PrintRouting() {
                 {activeCentre.printer ? (
                   <>
                     <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)' }}>{activeCentre.printer.name}</div>
-                    <div style={{ fontSize:12, color:'var(--t3)' }}>{activeCentre.printer.model} · {activeCentre.printer.ip || 'IP not set'}</div>
+                    <div style={{ fontSize:12, color:'var(--t3)' }}>
+                      {activeCentre.printer.model ? activeCentre.printer.model.replace(/-/g,' ') : 'ESC/POS printer'}
+                      {activeCentre.printer.address ? ` · ${activeCentre.printer.address}` : ''}
+                      {activeCentre.printer.location ? ` · ${activeCentre.printer.location}` : ''}
+                    </div>
                   </>
                 ) : (
-                  <div style={{ fontSize:13, color:'var(--t3)' }}>No printer assigned — <button onClick={()=>startEdit(activeCentre)} style={{ background:'none', border:'none', color:'var(--acc)', cursor:'pointer', fontFamily:'inherit', fontSize:13, padding:0 }}>Add one</button></div>
+                  <div style={{ fontSize:13, color:'var(--t3)' }}>No printer assigned — <button onClick={()=>startEdit(activeCentre)} style={{ background:'none', border:'none', color:'var(--acc)', cursor:'pointer', fontFamily:'inherit', fontSize:13, padding:0 }}>Assign one</button></div>
                 )}
               </div>
               <div style={{ width:1, background:'var(--bdr)' }}/>
