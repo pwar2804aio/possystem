@@ -318,12 +318,8 @@ function PushToPOSButton() {
     // Build config snapshot — layout + menu config (not operational/session state)
     // Include print routing config in snapshot
     const printRouting = (() => { try { return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null'); } catch { return null; } })();
-    const deviceProfiles = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null') || [
-      { id:'prof-1', name:'Main counter' },
-      { id:'prof-2', name:'Bar terminal' },
-      { id:'prof-3', name:'Server handheld' },
-    ]; } catch { return []; } })();
     const printers = (() => { try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; } })();
+    const deviceProfiles = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null') || []; } catch { return []; } })();
 
     const snapshot = {
       version: Date.now(),

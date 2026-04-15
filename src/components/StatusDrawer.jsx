@@ -15,6 +15,26 @@ export default function StatusDrawer({ onClose }) {
     return () => clearInterval(id);
   }, []);
 
+  // Poll print bridge to get real printer status
+  useEffect(() => {
+    const printers = (() => { try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; } })();
+    if (!printers.length) return;
+    const poll = async () => {
+      const cfg = (() => { try { return JSON.parse(localStorage.getItem('rpos-printer-config') || '{}'); } catch { return {}; } })();
+      const bridgeUrl = cfg.bridgeUrl || 'http://localhost:3001';
+      try {
+        const res = await fetch(`${bridgeUrl}/status`, { signal: AbortSignal.timeout(3000) });
+        const data = await res.json();
+        setSyncStatus({ printerOnline: !!data.ok });
+      } catch {
+        setSyncStatus({ printerOnline: false });
+      }
+    };
+    poll();
+    const id = setInterval(poll, 30000);
+    return () => clearInterval(id);
+  }, []);
+
   const timeSince = (ts) => {
     if (!ts) return 'never';
     const t = ts instanceof Date ? ts.getTime() : typeof ts === 'string' ? new Date(ts).getTime() : Number(ts);

@@ -23,6 +23,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.33', date: 'Apr 2026', label: 'Device profiles fixed + printer status moved',
+    changes: [
+      'Hidden features now correctly hide floor plan, bar, orders nav items',
+      'Deleted profiles no longer come back — hardcoded prof-1/2/3 fallbacks removed',
+      'Printer status moved into Status drawer (sidebar ⊙), not shift bar',
+      'Status drawer polls print bridge live, dot goes amber when offline',
+    ],
+  },
+  {
     version: '3.5.32', date: 'Apr 2026', label: 'Printer: remove port, Push to POS sync, FOH status',
     changes: [
       'Port field removed from printer form — ESC/POS port 9100 always used automatically',
@@ -1041,16 +1050,11 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
               };
             }
           } catch {}
-          // Fallback: localStorage > config snapshot > hardcoded
+          // Fallback: localStorage > config snapshot only (NO hardcoded defaults — deleted means deleted)
           if (!profile) {
             const storedProfiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
             const snapProfiles = (() => { try { return JSON.parse(localStorage.getItem('rpos-config-snapshot') || '{}')?.profiles || null; } catch { return null; } })();
-            const DEFAULT_PROFILES = [
-              { id:'prof-1', name:'Main counter', defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'], assignedSection:null, hiddenFeatures:[], tableServiceEnabled:true, quickScreenEnabled:true },
-              { id:'prof-2', name:'Bar terminal', defaultSurface:'bar', enabledOrderTypes:['dine-in'], assignedSection:'bar', hiddenFeatures:['courses','kiosk','reports'], tableServiceEnabled:false, quickScreenEnabled:true },
-              { id:'prof-3', name:'Server handheld', defaultSurface:'pos', enabledOrderTypes:['dine-in'], assignedSection:null, hiddenFeatures:['kiosk','reports'], tableServiceEnabled:true, quickScreenEnabled:true },
-            ];
-            const allProfiles = [...(storedProfiles || []), ...(snapProfiles || []), ...DEFAULT_PROFILES];
+            const allProfiles = [...(storedProfiles || []), ...(snapProfiles || [])];
             profile = allProfiles.find(p => p.id === data.profile_id) || null;
           }
           if (profile) {
@@ -1358,20 +1362,7 @@ function ShiftBar({ version, onWhatsNew, theme, onToggleTheme, syncPulse }) {
             </span>
           )}
         </button>
-        {/* Printer status — only shown when printers are configured */}
-        {printers.length > 0 && (
-          <div title={printerStatus === 'online' ? 'Print bridge online' : printerStatus === 'offline' ? 'Print bridge offline — check bridge server' : 'Checking printer…'} style={{
-            display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20,
-            background: printerStatus === 'online' ? 'var(--grn-d)' : printerStatus === 'offline' ? 'var(--red-d)' : 'var(--bg3)',
-            border:`1px solid ${printerStatus === 'online' ? 'var(--grn-b)' : printerStatus === 'offline' ? 'var(--red-b)' : 'var(--bdr)'}`,
-            fontSize:11, fontWeight:700,
-            color: printerStatus === 'online' ? 'var(--grn)' : printerStatus === 'offline' ? 'var(--red)' : 'var(--t4)',
-            cursor:'default',
-          }}>
-            <div style={{ width:6, height:6, borderRadius:'50%', background: printerStatus === 'online' ? 'var(--grn)' : printerStatus === 'offline' ? 'var(--red)' : 'var(--t4)', boxShadow: printerStatus === 'online' ? '0 0 4px var(--grn)' : 'none' }}/>
-            🖨 {printerStatus === 'online' ? 'Online' : printerStatus === 'offline' ? 'Offline' : '…'}
-          </div>
-        )}
+        {/* Printer status moved to Status drawer (sidebar button) */}
         <button onClick={onWhatsNew} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, cursor:'pointer', background:'var(--bg3)', border:'1px solid var(--bdr)', fontFamily:'inherit', fontSize:11, fontWeight:700, color:'var(--t3)', transition:'all .14s' }}
           onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--acc-b)';e.currentTarget.style.color='var(--acc)';}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr)';e.currentTarget.style.color='var(--t3)';}}>
@@ -1452,13 +1443,12 @@ function Sidebar({ surface, setSurface }) {
   const hidden = deviceConfig?.hiddenFeatures || [];
   const allOk = syncStatus.printerOnline && syncStatus.paymentTerminalOnline && !syncStatus.pendingChanges;
 
-  const FEATURE_MAP = { kds:'kds', reports:'backoffice', barTabs:'bar' };
+  const FEATURE_MAP = { kds:'kds', reports:'backoffice', barTabs:'bar', bar:'bar', floorplan:'tables', tables:'tables', floor:'tables', orders:'orders' };
   const visibleNav = NAV.filter(n => {
     // Table service disabled → hide floor plan
     if (n.id === 'tables' && deviceConfig && deviceConfig.tableServiceEnabled === false) return false;
-    // Hidden features → hide matching nav
-    const featureKey = Object.entries(FEATURE_MAP).find(([,v]) => v === n.id)?.[0];
-    return !featureKey || !hidden.includes(featureKey);
+    // Hidden features → hide matching nav item
+    return !hidden.some(f => FEATURE_MAP[f] === n.id);
   });
 
   return (
