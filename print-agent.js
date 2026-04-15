@@ -24,6 +24,10 @@
 
 const net = require('net');
 
+// Auto-load print-agent.env if present
+try { const fs=require('fs'),path=require('path'),ef=path.join(__dirname,'print-agent.env'); if(fs.existsSync(ef)) { fs.readFileSync(ef,'utf8').split('
+').forEach(l=>{const m=l.match(/^([A-Z_]+)=(.*)$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].trim();}); } } catch {}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://tbetcegmszzotrwdtqhi.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || '';
