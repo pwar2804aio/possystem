@@ -32,6 +32,7 @@ const CHANGELOG = [
       'Toast confirms when a profile update has been received',
     ],
   },
+  {
     version: '1.1.1', date: 'Apr 2026', label: 'Store-driven login, kiosk and quick screen fixes',
     changes: [
       'PIN login screen now reads from store staffMembers — staff added in Staff Manager appear on the login screen immediately.',
