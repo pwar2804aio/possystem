@@ -1044,22 +1044,24 @@ export const useStore = create((set, get) => ({
       // No routing configured at all — no KDS/production centres
       if (!centres?.length || !routing) return [];
 
+      // For variant items, also consider the parent item's category
       const itemCat = item.cat || item.cats?.[0] || null;
+      const allItems = useStore.getState().menuItems || [];
+      const parentItem = item.parentId ? allItems.find(i => i.id === item.parentId) : null;
+      const parentCat = parentItem?.cat || parentItem?.cats?.[0] || null;
+
       const parentMap = buildCatParentMap();
       const matched = [];
       centres.forEach(centre => {
         const r = routing[centre.id];
         if (!r?.assignedCategories?.length) return;
+        if (r.excludedItems?.includes(item.id)) return; // item individually excluded
         const assignedSet = new Set(r.assignedCategories);
-        // Match if item's category OR any of its parent categories is assigned to this centre
-        if (itemCat && catOrAncestorMatches(itemCat, assignedSet, parentMap)) {
-          // Check item is not individually excluded from this centre
-          if (!r.excludedItems?.includes(item.id)) {
-            matched.push(centre.id);
-          }
-        }
+        // Match if item's category OR parent item's category (for variants) or any ancestor matches
+        const catMatches = (itemCat && catOrAncestorMatches(itemCat, assignedSet, parentMap)) ||
+                           (parentCat && catOrAncestorMatches(parentCat, assignedSet, parentMap));
+        if (catMatches) matched.push(centre.id);
       });
-      // If routing is configured but item doesn't match any centre → send nowhere
       return matched;
     };
 
@@ -1166,9 +1168,11 @@ export const useStore = create((set, get) => ({
         const { centres, routing } = routingConfig;
         if (!centres?.length) return [];
         const itemCat = item.cat || item.cats?.[0] || null;
-        // Build category parent map for hierarchy check
         const snap = (() => { try { return JSON.parse(localStorage.getItem('rpos-config-snapshot')||'{}'); } catch { return {}; } })();
         const cats = snap.menuCategories || [];
+        const allItems = useStore.getState().menuItems || [];
+        const parentItem = item.parentId ? allItems.find(i => i.id === item.parentId) : null;
+        const parentCat = parentItem?.cat || parentItem?.cats?.[0] || null;
         const parentMap = {};
         cats.forEach(c => { parentMap[c.id] = c.parentId || null; });
         const catOrAncestorMatches = (catId, assignedSet, depth = 0) => {
@@ -1180,11 +1184,14 @@ export const useStore = create((set, get) => ({
         const matched = [];
         centres.forEach(centre => {
           const r = routing[centre.id];
-          if (itemCat && r?.assignedCategories?.length && catOrAncestorMatches(itemCat, new Set(r.assignedCategories)) && !r?.excludedItems?.includes(item.id)) {
-            matched.push(centre.id);
-          }
+          if (!r?.assignedCategories?.length) return;
+          if (r.excludedItems?.includes(item.id)) return;
+          const assignedSet = new Set(r.assignedCategories);
+          const catMatches = (itemCat && catOrAncestorMatches(itemCat, assignedSet)) ||
+                             (parentCat && catOrAncestorMatches(parentCat, assignedSet));
+          if (catMatches) matched.push(centre.id);
         });
-        return matched; // no fallback — unrouted items go nowhere
+        return matched;
       };
 
       const byCenter = {};

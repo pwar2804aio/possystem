@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.46', date: 'Apr 2026', label: 'Production routing: variant sizes route via parent category',
+    changes: [
+      'Variant sizes (Small/Medium/Large) now route using their parent item category if their own category does not match',
+      'Latte sizes now correctly appear on KDS Bar because Latte is in Coffee → Hot Drinks → assigned to KDS Bar',
+      'Both table and bar tab routing paths updated',
+    ],
+  },
+  {
     version: '3.5.46', date: 'Apr 2026', label: 'Routing: subcategory inheritance',
     changes: [
       'Production routing now includes subcategories — if Hot Drinks is assigned to KDS Bar, items in Coffee (a subcategory) also route there',
