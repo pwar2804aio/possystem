@@ -18,7 +18,7 @@ const net = require('net');
 
 // ─── Config (pre-filled for your restaurant) ──────────────────────────────────
 const SUPABASE_URL  = 'https://tbetcegmszzotrwdtqhi.supabase.co';
-const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXRjZWdtc3p6b3Ryd2R0cWhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ0ODgyMjksImV4cCI6MjA2MDA2NDIyOX0.K-pMPMBkEIJAaEJMzPRVKGBFtdSVwAtHJlROZwFoLi4';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXRjZWdtc3p6b3Ryd2R0cWhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMzI0MTgsImV4cCI6MjA5MTYwODQxOH0.Iy5pz4V7OFLujSa-4Hh8whWCA0-8RoXypDKS1mMtbX8';
 const LOCATION_ID   = '7218c716-eeb4-4f96-b284-f3500823595c';
 const POLL_MS       = 2000;  // check for jobs every 2 seconds
 
