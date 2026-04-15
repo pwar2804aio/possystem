@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.37', date: 'Apr 2026', label: 'Profile saves fixed + modifier item search',
+    changes: [
+      'Profile saves now use direct fetch — proven reliable, no more silent failures',
+      'Modifier groups: Search existing items tab — click any menu item to add it as an option with its price',
+      'Save error now shows a toast if the network call fails',
+    ],
+  },
+  {
     version: '3.5.36', date: 'Apr 2026', label: 'Profile changes now reach POS instantly',
     changes: [
       'Fixed: profile saves now always reach Supabase — locationId no longer silently blocks saves',

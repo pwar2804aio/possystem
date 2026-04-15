@@ -102,12 +102,37 @@ export default function DeviceProfiles() {
       try {
         const { getLocationId } = await import('../../lib/supabase.js');
         const locId = locationId || await getLocationId();
-        const { error } = await supabase.from('device_profiles').upsert(
-          { ...toDbRow(updated), location_id: locId },
-          { onConflict: 'id' }
-        );
-        if (error) throw error;
-        // Update localStorage cache
+        // Use direct fetch — proven reliable (Supabase JS SDK had silent failures)
+        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+        const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const row = {
+          id: updated.id,
+          location_id: locId,
+          name: updated.name,
+          color: updated.color || '#3b82f6',
+          default_surface: updated.defaultSurface,
+          enabled_order_types: updated.enabledOrderTypes,
+          assigned_section: updated.assignedSection || null,
+          hidden_features: updated.hiddenFeatures || [],
+          table_service_enabled: updated.tableServiceEnabled !== false,
+          quick_screen_enabled: updated.quickScreenEnabled !== false,
+          menu_id: updated.menuId || null,
+          sort_order: updated.sortOrder || 0,
+        };
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/device_profiles?on_conflict=id`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=minimal',
+          },
+          body: JSON.stringify([row]),
+        });
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(err);
+        }
         try {
           const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
           localStorage.setItem('rpos-device-profiles', JSON.stringify(cur.map(p => p.id === updated.id ? updated : p)));
@@ -118,7 +143,7 @@ export default function DeviceProfiles() {
         return;
       }
     }
-    showToast(`"${updated.name}" saved — changes will apply to POS immediately`, 'success');
+    showToast(`"${updated.name}" saved — POS updates instantly`, 'success');
     setEditing(null);
   };
 

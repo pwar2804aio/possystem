@@ -1688,6 +1688,9 @@ function ModifiersTab() {
   const [selId, setSelId]     = useState(null);
   const [newName, setNewName] = useState('');
   const [newOpt, setNewOpt]   = useState({ name:'', price:'' });
+  const [optTab, setOptTab]   = useState('new'); // 'new' | 'existing'
+  const [itemSearch, setItemSearch] = useState('');
+  const { menuItems } = useStore();
   const [dragGIdx, setDragGIdx] = useState(null);
   const [overGIdx, setOverGIdx] = useState(null);
   const [dragOIdx, setDragOIdx] = useState(null);
@@ -1829,15 +1832,61 @@ function ModifiersTab() {
 
             {/* Add option */}
             <div style={{ marginTop:6, padding:'10px', background:'var(--bg3)', borderRadius:10, border:'1.5px dashed var(--bdr2)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', marginBottom:7 }}>Add option</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 90px auto', gap:6, alignItems:'center' }}>
-                <input style={{ ...inp, fontSize:12 }} value={newOpt.name} onChange={e=>setNewOpt(o=>({...o,name:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()} placeholder="e.g. Chips, Peppercorn sauce" autoComplete="off"/>
-                <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
-                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:12 }} value={newOpt.price} placeholder="0.00" onChange={e=>setNewOpt(o=>({...o,price:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()}/>
-                </div>
-                <button onClick={addOpt} disabled={!newOpt.name.trim()} style={{ width:32,height:36,borderRadius:8,border:'none',background:'var(--acc)',color:'#0b0c10',cursor:'pointer',fontSize:18,display:'flex',alignItems:'center',justifyContent:'center',opacity:newOpt.name.trim()?1:.4 }}>+</button>
+              {/* Tab toggle */}
+              <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+                {[['new','+ New option'],['existing','Search existing items']].map(([t,l])=>(
+                  <button key={t} onClick={()=>setOptTab(t)} style={{ flex:1, padding:'4px 0', borderRadius:6, cursor:'pointer', fontFamily:'inherit', fontSize:10, fontWeight:700, border:`1.5px solid ${optTab===t?'var(--acc)':'var(--bdr)'}`, background:optTab===t?'var(--acc-d)':'transparent', color:optTab===t?'var(--acc)':'var(--t4)' }}>{l}</button>
+                ))}
               </div>
+
+              {optTab === 'new' ? (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 90px auto', gap:6, alignItems:'center' }}>
+                  <input style={{ ...inp, fontSize:12 }} value={newOpt.name} onChange={e=>setNewOpt(o=>({...o,name:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()} placeholder="e.g. Chips, Peppercorn sauce" autoComplete="off"/>
+                  <div style={{ position:'relative' }}>
+                    <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
+                    <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:12 }} value={newOpt.price} placeholder="0.00" onChange={e=>setNewOpt(o=>({...o,price:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()}/>
+                  </div>
+                  <button onClick={addOpt} disabled={!newOpt.name.trim()} style={{ width:32,height:36,borderRadius:8,border:'none',background:'var(--acc)',color:'#0b0c10',cursor:'pointer',fontSize:18,display:'flex',alignItems:'center',justifyContent:'center',opacity:newOpt.name.trim()?1:.4 }}>+</button>
+                </div>
+              ) : (
+                <div>
+                  <input
+                    style={{ ...inp, fontSize:12, width:'100%', marginBottom:6 }}
+                    value={itemSearch}
+                    onChange={e=>setItemSearch(e.target.value)}
+                    placeholder="Search menu items by name…"
+                    autoFocus
+                  />
+                  <div style={{ maxHeight:180, overflowY:'auto', display:'flex', flexDirection:'column', gap:3 }}>
+                    {(menuItems||[])
+                      .filter(it => it.name?.toLowerCase().includes(itemSearch.toLowerCase()))
+                      .filter(it => !(sel.options||[]).some(o => o.name === it.name))
+                      .slice(0,20)
+                      .map(it => (
+                        <button key={it.id} onClick={()=>{
+                          const opt = { id:`opt-${Date.now()}-${it.id}`, name:it.name, price: it.price || 0 };
+                          upd({ options:[...(sel.options||[]),opt] });
+                          setItemSearch('');
+                        }} style={{
+                          display:'flex', alignItems:'center', justifyContent:'space-between',
+                          padding:'6px 10px', borderRadius:7, cursor:'pointer', fontFamily:'inherit',
+                          background:'var(--bg2)', border:'1px solid var(--bdr)',
+                          fontSize:12, color:'var(--t1)', textAlign:'left',
+                        }}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor='var(--acc)'}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor='var(--bdr)'}
+                        >
+                          <span style={{ fontWeight:600 }}>{it.name}</span>
+                          <span style={{ color:'var(--acc)', fontFamily:'var(--font-mono)', fontSize:11 }}>£{(it.price||0).toFixed(2)}</span>
+                        </button>
+                      ))
+                    }
+                    {(menuItems||[]).filter(it=>it.name?.toLowerCase().includes(itemSearch.toLowerCase())).length===0 && (
+                      <div style={{ fontSize:11, color:'var(--t4)', textAlign:'center', padding:'8px 0' }}>No items match "{itemSearch}"</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
