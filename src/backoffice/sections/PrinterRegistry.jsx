@@ -200,12 +200,38 @@ export default function PrinterRegistry() {
     setTesting(t => ({ ...t, [printer.id]: true }));
     setTestResult(r => ({ ...r, [printer.id]: null }));
     try {
-      await printService.printTestPage(printer);
-      persist(printers.map(p => p.id === printer.id ? { ...p, status: 'online', lastSeen: Date.now() } : p));
-      setTestResult(r => ({ ...r, [printer.id]: 'online' }));
+      const result = await printService.printTestPage(printer);
+      // Job queued — now watch it for up to 20s to see if agent picks it up
+      const jobId = result?.jobId;
+      if (jobId && printService.watchJob) {
+        setTestResult(r => ({ ...r, [printer.id]: 'queued' }));
+        await new Promise((resolve) => {
+          const unsub = printService.watchJob(jobId, (updated) => {
+            if (updated.status === 'done') {
+              persist(printers.map(p => p.id === printer.id ? { ...p, status: 'online', lastSeen: Date.now() } : p));
+              setTestResult(r => ({ ...r, [printer.id]: 'online' }));
+              unsub(); resolve();
+            } else if (updated.status === 'failed') {
+              persist(printers.map(p => p.id === printer.id ? { ...p, status: 'offline' } : p));
+              setTestResult(r => ({ ...r, [printer.id]: 'agent-failed', error: updated.error || 'Agent reported failure' }));
+              unsub(); resolve();
+            }
+          });
+          // Timeout after 20s — agent probably not running
+          setTimeout(() => {
+            unsub();
+            persist(printers.map(p => p.id === printer.id ? { ...p, status: 'offline' } : p));
+            setTestResult(r => ({ ...r, [printer.id]: 'timeout', error: 'Print agent not responding — is it running?' }));
+            resolve();
+          }, 20000);
+        });
+      } else {
+        // No watchJob support — mark as queued only
+        setTestResult(r => ({ ...r, [printer.id]: 'queued' }));
+      }
     } catch (err) {
       persist(printers.map(p => p.id === printer.id ? { ...p, status: 'offline' } : p));
-      setTestResult(r => ({ ...r, [printer.id]: 'error' }));
+      setTestResult(r => ({ ...r, [printer.id]: 'error', error: err.message }));
     }
     setTesting(t => ({ ...t, [printer.id]: false }));
   };
@@ -267,16 +293,24 @@ export default function PrinterRegistry() {
                     </div>
                   )}
                   {result && (
-                    <div style={{ fontSize:11, marginTop:5, color: result === 'online' ? 'var(--grn)' : 'var(--red)', fontWeight:600 }}>
-                      {result === 'online' ? '✓ Test job queued — check printer for output' : '✗ Failed to queue job — is the agent running?'}
+                    <div style={{ fontSize:11, marginTop:5, fontWeight:600,
+                      color: result === 'online' ? 'var(--grn)' : result === 'queued' ? 'var(--acc)' : 'var(--red)' }}>
+                      {result === 'online'       && '✓ Printed successfully'}
+                      {result === 'queued'       && '⏳ Job sent — waiting for agent (up to 20s)…'}
+                      {result === 'timeout'      && `✗ Agent not responding — is the print agent running?\n${testResult[printer.id]?.error || ''}`}
+                      {result === 'agent-failed' && `✗ Agent failed to print — ${testResult[printer.id]?.error || 'check printer connection'}`}
+                      {result === 'error'        && `✗ Failed to queue job — ${testResult[printer.id]?.error || 'Supabase error'}`}
                     </div>
+                  )}
+                  {testing[printer.id] && result === 'queued' && (
+                    <div style={{ fontSize:10, color:'var(--t4)', marginTop:3 }}>Waiting for print agent to deliver…</div>
                   )}
                 </div>
               </div>
 
               <div style={{ display:'flex', gap:6, flexShrink:0 }}>
                 <button onClick={() => handleTest(printer)} disabled={testing[printer.id] || printer.connectionType === 'usb'} style={{ ...S.btn, background:'var(--bg3)', color:'var(--t2)', border:'1px solid var(--bdr)', fontSize:12 }}>
-                  {testing[printer.id] ? '…' : '🖨 Test'}
+                  {testing[printer.id] ? (testResult[printer.id] === 'queued' ? '⏳ Waiting…' : '…') : '🖨 Test'}
                 </button>
                 <button onClick={() => setEditId(printer.id)} style={{ ...S.btn, background:'var(--bg3)', color:'var(--t2)', border:'1px solid var(--bdr)', fontSize:12 }}>Edit</button>
                 <button onClick={() => handleDelete(printer.id)} style={{ ...S.btn, background:'var(--red-d)', color:'var(--red)', border:'1px solid var(--red-b)', fontSize:12 }}>Remove</button>

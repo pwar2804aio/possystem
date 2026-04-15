@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.40', date: 'Apr 2026', label: 'Printer status: real hardware only',
+    changes: [
+      'Status drawer (⊙) now shows only real configured printers — no fake Stripe/KDS hardware',
+      'Printer status derived from actual print_jobs outcomes — online if last job succeeded, offline if failed or agent not responding',
+      'Live print queue in Status drawer shows all recent jobs with status, errors, and retry button',
+      'Back office Test button now waits up to 20s for agent confirmation — shows timeout error if agent not running',
+      'Test result is honest: queued → printed ✓ or timeout/failed with clear message',
+    ],
+  },
+  {
     version: '3.5.40', date: 'Apr 2026', label: 'Sales data never lost',
     changes: [
       'CRITICAL: Closed checks now persist to Supabase on every payment — survive any page reload',
@@ -1504,7 +1514,9 @@ function Sidebar({ surface, setSurface }) {
   const [showStatus, setShowStatus] = useState(false);
 
   const hidden = deviceConfig?.hiddenFeatures || [];
-  const allOk = syncStatus.printerOnline && syncStatus.paymentTerminalOnline && !syncStatus.pendingChanges;
+  const allOk = syncStatus.printerOnline && !syncStatus.pendingChanges;
+  const printers = (() => { try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; } })();
+  const hasPrinters = printers.length > 0;
 
   const FEATURE_MAP = { kds:'kds', reports:'backoffice', barTabs:'bar', bar:'bar', floorplan:'tables', tables:'tables', floor:'tables', orders:'orders' };
   const visibleNav = NAV.filter(n => {
@@ -1540,7 +1552,7 @@ function Sidebar({ surface, setSurface }) {
       onMouseLeave={e=>{e.currentTarget.style.background='transparent';}}>
         <span style={{ fontSize:17, lineHeight:1 }}>⊙</span>
         <span style={{ fontSize:9, fontWeight:700, letterSpacing:'.04em' }}>Status</span>
-        {!allOk && <div style={{ position:'absolute', top:6, right:8, width:7, height:7, borderRadius:'50%', background:'var(--acc)', boxShadow:'0 0 6px var(--acc)' }}/>}
+        {!allOk && hasPrinters && <div style={{ position:'absolute', top:6, right:8, width:7, height:7, borderRadius:'50%', background:'var(--acc)', boxShadow:'0 0 6px var(--acc)' }}/>}
         {!deviceConfig && <div style={{ position:'absolute', top:6, right:8, width:7, height:7, borderRadius:'50%', background:'var(--red)', boxShadow:'0 0 6px var(--red)' }}/>}
       </button>
 

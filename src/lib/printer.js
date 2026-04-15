@@ -224,7 +224,7 @@ class PrintService {
 
     const payload = btoa(String.fromCharCode(...bytes));
 
-    const { error } = await supabase.from('print_jobs').insert({
+    const { error, data } = await supabase.from('print_jobs').insert({
       location_id: locationId,
       printer_id:  printer.id,
       printer_ip:  printer.address,
@@ -232,10 +232,11 @@ class PrintService {
       job_type:    jobType,
       payload,
       status:      'pending',
-    });
+    }).select('id');
 
     if (error) throw new Error(`Supabase insert failed: ${error.message}`);
-    return { ok: true, transport: 'supabase', printer: printer.name };
+    // Return jobId so callers can watch the job's outcome
+    return { ok: true, transport: 'supabase', printer: printer.name, jobId: data?.[0]?.id };
   }
 
   // Public API
