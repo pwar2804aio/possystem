@@ -20,10 +20,18 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.25';
+const VERSION = '3.5.26';
 
 const CHANGELOG = [
   {
+    version: '3.5.26', date: 'Apr 2026', label: 'Live device profile sync',
+    changes: [
+      'Device profile changes now apply instantly — no reload required',
+      'Realtime subscription on device_profiles table detects any edit to order types, features, sections, or defaults',
+      'Front end updates immediately when profile settings are changed in back office or Supabase',
+      'Toast confirms when a profile update has been received',
+    ],
+  },
     version: '1.1.1', date: 'Apr 2026', label: 'Store-driven login, kiosk and quick screen fixes',
     changes: [
       'PIN login screen now reads from store staffMembers — staff added in Staff Manager appear on the login screen immediately.',
@@ -1065,7 +1073,50 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Also subscribe to changes on the device_profiles table for this device's profile.
+    // This means: if someone edits the profile settings (order types, features, etc.),
+    // the front end picks them up immediately without a reload.
+    let profileChannel = null;
+    const wireProfileChannel = (profileId) => {
+      if (!profileId) return;
+      if (profileChannel) supabase.removeChannel(profileChannel);
+      profileChannel = supabase
+        .channel(`profile-${profileId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'device_profiles',
+          filter: `id=eq.${profileId}`,
+        }, (payload) => {
+          // Profile settings changed — re-apply immediately
+          const p = payload.new;
+          if (!p) return;
+          const config = {
+            profileId: p.id,
+            profileName: p.name,
+            defaultSurface: p.default_surface || 'tables',
+            enabledOrderTypes: p.enabled_order_types || ['dine-in'],
+            assignedSection: p.assigned_section || null,
+            hiddenFeatures: p.hidden_features || [],
+            tableServiceEnabled: p.table_service_enabled !== false,
+            quickScreenEnabled: p.quick_screen_enabled !== false,
+            terminalName: useStore.getState().deviceConfig?.terminalName,
+          };
+          localStorage.setItem('rpos-device-config', JSON.stringify(config));
+          useStore.getState().setDeviceConfig(config);
+          useStore.getState().showToast('Device profile updated', 'info');
+        })
+        .subscribe();
+    };
+
+    // Wire up now with current profile_id
+    const currentProfileId = JSON.parse(localStorage.getItem('rpos-device') || '{}')?.profileId;
+    wireProfileChannel(currentProfileId);
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (profileChannel) supabase.removeChannel(profileChannel);
+    };
   }, []);
 
   if (deviceValid === null) return (
