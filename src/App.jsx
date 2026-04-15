@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.32', date: 'Apr 2026', label: 'Printer: remove port, Push to POS sync, FOH status',
+    changes: [
+      'Port field removed from printer form — ESC/POS port 9100 always used automatically',
+      'Printers now included in Push to POS snapshot — sync to all POS devices instantly',
+      'FOH shift bar shows live 🖨 Online/Offline printer bridge status indicator',
+      'Status polls bridge every 30s, green glow when online, red when bridge unreachable',
+    ],
+  },
     version: '3.5.31', date: 'Apr 2026', label: 'Supabase print queue',
     changes: [
       'Print jobs now go via Supabase — no HTTP bridge server, no port forwarding, no CORS',
