@@ -52,19 +52,20 @@ const DEFAULT_PROFILES = [
 
 export default function DeviceProfiles() {
   const { showToast, devices, setDeviceConfig, markBOChange } = useStore();
-  const [profiles, setProfiles] = useState([]);
+  const [profiles, setProfiles] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]'); } catch { return []; }
+  });
   const [editing, setEditing] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [locationId, setLocationId] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  // Load profiles from Supabase on mount — Supabase is single source of truth
+  // Load from Supabase on mount — replaces localStorage cache with fresh data
   useEffect(() => {
-    if (isMock) { setProfiles(DEFAULT_PROFILES); setLoading(false); return; }
+    if (isMock) { setProfiles(DEFAULT_PROFILES); return; }
     const loadFromDB = async () => {
       const { getLocationId } = await import('../../lib/supabase.js');
       const locId = await getLocationId().catch(() => null);
-      if (!locId) { setLoading(false); return; }
+      if (!locId) return;
       setLocationId(locId);
       const { data } = await supabase.from('device_profiles').select('*').eq('location_id', locId).order('sort_order');
       const mapped = (data || []).map(p => ({
@@ -77,9 +78,7 @@ export default function DeviceProfiles() {
         menuId: p.menu_id, deviceCount: 0,
       }));
       setProfiles(mapped);
-      // Sync localStorage — only what's in Supabase, nothing extra
       try { localStorage.setItem('rpos-device-profiles', JSON.stringify(mapped)); } catch {}
-      setLoading(false);
     };
     loadFromDB();
   }, []);

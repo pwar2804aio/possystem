@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.35', date: 'Apr 2026', label: 'Device profiles: properly fixed',
+    changes: [
+      'Profiles load instantly from cache then confirm with Supabase — no blank flash on open',
+      'device_profiles added to Supabase realtime — profile changes now reach POS devices live',
+      'Profile edits save to Supabase and propagate via realtime subscription immediately',
+    ],
+  },
+  {
     version: '3.5.34', date: 'Apr 2026', label: 'Device profiles: permanently fixed',
     changes: [
       'Deleted profiles now stay deleted — Supabase is the only source of truth, no localStorage or hardcoded fallbacks',
