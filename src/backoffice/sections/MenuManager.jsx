@@ -1850,39 +1850,53 @@ function ModifiersTab() {
                 </div>
               ) : (
                 <div>
+                  <div style={{ fontSize:10, color:'var(--t4)', marginBottom:6 }}>Only items marked as "Sub item" type appear here</div>
                   <input
                     style={{ ...inp, fontSize:12, width:'100%', marginBottom:6 }}
                     value={itemSearch}
                     onChange={e=>setItemSearch(e.target.value)}
-                    placeholder="Search menu items by name…"
+                    placeholder="Search sub-items by name…"
                     autoFocus
                   />
                   <div style={{ maxHeight:180, overflowY:'auto', display:'flex', flexDirection:'column', gap:3 }}>
                     {(menuItems||[])
-                      .filter(it => it.name?.toLowerCase().includes(itemSearch.toLowerCase()))
-                      .filter(it => !(sel.options||[]).some(o => o.name === it.name))
+                      .filter(it => it.type === 'subitem')
+                      .filter(it => {
+                        const n = it.menuName || it.name || '';
+                        return n.toLowerCase().includes(itemSearch.toLowerCase());
+                      })
+                      .filter(it => !(sel.options||[]).some(o => o.name === (it.menuName || it.name)))
                       .slice(0,20)
-                      .map(it => (
-                        <button key={it.id} onClick={()=>{
-                          const opt = { id:`opt-${Date.now()}-${it.id}`, name:it.name, price: it.price || 0 };
-                          upd({ options:[...(sel.options||[]),opt] });
-                          setItemSearch('');
-                        }} style={{
-                          display:'flex', alignItems:'center', justifyContent:'space-between',
-                          padding:'6px 10px', borderRadius:7, cursor:'pointer', fontFamily:'inherit',
-                          background:'var(--bg2)', border:'1px solid var(--bdr)',
-                          fontSize:12, color:'var(--t1)', textAlign:'left',
-                        }}
-                        onMouseEnter={e=>e.currentTarget.style.borderColor='var(--acc)'}
-                        onMouseLeave={e=>e.currentTarget.style.borderColor='var(--bdr)'}
-                        >
-                          <span style={{ fontWeight:600 }}>{it.name}</span>
-                          <span style={{ color:'var(--acc)', fontFamily:'var(--font-mono)', fontSize:11 }}>£{(it.price||0).toFixed(2)}</span>
-                        </button>
-                      ))
+                      .map(it => {
+                        const displayName = it.menuName || it.name || 'Unnamed';
+                        return (
+                          <button key={it.id} onClick={()=>{
+                            const opt = { id:`opt-${Date.now()}-${it.id}`, name:displayName, price: it.price || 0 };
+                            upd({ options:[...(sel.options||[]),opt] });
+                            setItemSearch('');
+                          }} style={{
+                            display:'flex', alignItems:'center', justifyContent:'space-between',
+                            padding:'6px 10px', borderRadius:7, cursor:'pointer', fontFamily:'inherit',
+                            background:'var(--bg2)', border:'1px solid var(--bdr)',
+                            fontSize:12, color:'var(--t1)', textAlign:'left',
+                          }}
+                          onMouseEnter={e=>e.currentTarget.style.borderColor='var(--acc)'}
+                          onMouseLeave={e=>e.currentTarget.style.borderColor='var(--bdr)'}
+                          >
+                            <span style={{ fontWeight:600 }}>{displayName}</span>
+                            <span style={{ color:'var(--acc)', fontFamily:'var(--font-mono)', fontSize:11 }}>£{(it.price||0).toFixed(2)}</span>
+                          </button>
+                        );
+                      })
                     }
-                    {(menuItems||[]).filter(it=>it.name?.toLowerCase().includes(itemSearch.toLowerCase())).length===0 && (
-                      <div style={{ fontSize:11, color:'var(--t4)', textAlign:'center', padding:'8px 0' }}>No items match "{itemSearch}"</div>
+                    {(menuItems||[]).filter(it => it.type === 'subitem').length === 0 && (
+                      <div style={{ fontSize:11, color:'var(--t4)', textAlign:'center', padding:'8px 0' }}>
+                        No sub-items found. Create items with type "Sub item" in the Items tab first.
+                      </div>
+                    )}
+                    {(menuItems||[]).filter(it => it.type === 'subitem').length > 0 &&
+                     (menuItems||[]).filter(it => it.type === 'subitem' && (it.menuName||it.name||'').toLowerCase().includes(itemSearch.toLowerCase())).length === 0 && (
+                      <div style={{ fontSize:11, color:'var(--t4)', textAlign:'center', padding:'8px 0' }}>No sub-items match "{itemSearch}"</div>
                     )}
                   </div>
                 </div>

@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.38', date: 'Apr 2026', label: 'Modifier groups: sub-items only search',
+    changes: [
+      'Search existing items now only shows items with type Sub item — no regular menu items',
+      'Item names now use menuName field correctly — no more showing default New item text',
+      'Clear message shown when no sub-items exist yet, with instructions to create them',
+    ],
+  },
+  {
     version: '3.5.37', date: 'Apr 2026', label: 'Profile saves fixed + modifier item search',
     changes: [
       'Profile saves now use direct fetch — proven reliable, no more silent failures',
