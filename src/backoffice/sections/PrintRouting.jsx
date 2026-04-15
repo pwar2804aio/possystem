@@ -307,7 +307,7 @@ export default function PrintRouting() {
       {/* ── Left: center list ── */}
       <div style={S.left}>
         <div style={{ padding:'16px 14px 8px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
-          <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)', marginBottom:2 }}>Print routing</div>
+          <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)', marginBottom:2 }}>Production printing</div>
           <div style={{ fontSize:12, color:'var(--t3)' }}>Route categories to production centers</div>
         </div>
 
@@ -425,7 +425,7 @@ export default function PrintRouting() {
         {!activeCentre && !showAdd && !editCentre && (
           <div style={{ textAlign:'center', padding:'80px 40px', color:'var(--t3)' }}>
             <div style={{ fontSize:48, marginBottom:16 }}>🖨</div>
-            <div style={{ fontSize:18, fontWeight:700, color:'var(--t2)', marginBottom:8 }}>Print routing</div>
+            <div style={{ fontSize:18, fontWeight:700, color:'var(--t2)', marginBottom:8 }}>Production printing</div>
             <div style={{ fontSize:14, lineHeight:1.6, marginBottom:24 }}>
               Create production centers for your kitchen, bar and expo stations.<br/>
               Assign printers, KDS screens and menu categories to each.

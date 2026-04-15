@@ -596,7 +596,7 @@ export function BackOfficeSurface() {
     { id:'reports',   label:'Reports',        icon:'📊' },
     { id:'ai',        label:'AI Assistant',   icon:'✦'  },
     { id:'menu',      label:'Menu',           icon:'🍽' },
-    { id:'printers',  label:'Printers',       icon:'🖨' },
+    { id:'printers',  label:'Printer setup',       icon:'🖨' },
     { id:'shift',     label:'Shift',          icon:'🕐' },
     { id:'staff',     label:'Staff',          icon:'👥' },
   ];

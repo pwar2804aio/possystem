@@ -20,9 +20,16 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.27';
+const VERSION = '3.5.28';
 
 const CHANGELOG = [
+  {
+    version: '3.5.28', date: 'Apr 2026', label: 'Production printing rename',
+    changes: [
+      '"Print routing" renamed to "Production printing" throughout back office',
+      'Sidebar nav, quick-action tiles, and section headers all updated',
+    ],
+  },
   {
     version: '3.5.27', date: 'Apr 2026', label: 'Sunmi NT311 printer integration',
     changes: [

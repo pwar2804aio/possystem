@@ -25,7 +25,7 @@ const NAV = [
   { id:'profiles',   label:'Device profiles', icon:'📋',  group:'Devices' },
   { id:'devices',    label:'Devices',         icon:'📱',  group:'Devices' },
   { id:'staff',      label:'Staff & access',  icon:'👥',  group:'Configuration' },
-  { id:'printing',   label:'Print routing',   icon:'🖨',  group:'Configuration' },
+  { id:'printing',   label:'Production printing',   icon:'🖨',  group:'Configuration' },
   { id:'reports',    label:'Reports',         icon:'📊',  group:'Analytics' },
   { id:'eod',        label:'End of day',      icon:'🔒',  group:'Analytics' },
 ];
@@ -415,7 +415,7 @@ function BOOverview({ setSection, orgCtx }) {
     { icon:'📋', label:'Device profiles',  sub:'Configure terminal behaviour',    target:'profiles' },
     { icon:'📱', label:'Add terminal',     sub:'Pair a new Sunmi device',         target:'devices' },
     { icon:'👥', label:'Manage staff',     sub:'Add servers, change PINs',        target:'staff' },
-    { icon:'🖨', label:'Print routing',    sub:'Route stations to printers',      target:'printing' },
+    { icon:'🖨', label:'Production printing',    sub:'Route orders to kitchen & receipt printers',      target:'printing' },
   ];
 
   return (
