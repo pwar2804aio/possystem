@@ -20,16 +20,30 @@ import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import DevSwitcher from './components/DevSwitcher';
 
-const VERSION = '3.5.26';
+const VERSION = '3.5.27';
 
 const CHANGELOG = [
   {
+    version: '3.5.27', date: 'Apr 2026', label: 'Sunmi NT311 printer integration',
+    changes: [
+      'Full ESC/POS print service — works on any device including iOS Safari',
+      'WiFi bridge transport: HTTP POST to local Node server → TCP 9100 to printer (universal)',
+      'Web Bluetooth transport: direct connection on Chrome/Android',
+      'Sunmi native transport: AIDL bridge on Sunmi D3 Pro and other Sunmi devices',
+      'Browser window.print() fallback — always available as last resort',
+      'print-bridge.js: zero-dependency Node server, runs on Pi, Mac, or Sunmi device',
+      'Printer settings panel in back office: transport selector, bridge URL, test connection',
+      'ESC/POS builder: bold, center, double-height, two-column, auto-cut, cash drawer trigger',
+      'Customer receipt template: itemised bill with mods, discounts, totals, footer',
+      'Kitchen ticket template: large table number, double-width items, seat and mod callouts',
+      'NT311 setup guide built into the printer settings panel',
+    ],
+  },
+  {
     version: '3.5.26', date: 'Apr 2026', label: 'Live device profile sync',
     changes: [
-      'Device profile changes now apply instantly — no reload required',
-      'Realtime subscription on device_profiles table detects any edit to order types, features, sections, or defaults',
-      'Front end updates immediately when profile settings are changed in back office or Supabase',
-      'Toast confirms when a profile update has been received',
+      'Realtime subscription on device_profiles — profile changes apply instantly without reload',
+      'Front end updates immediately when order types, features or defaults change in back office',
     ],
   },
   {

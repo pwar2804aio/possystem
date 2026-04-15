@@ -1,13 +1,27 @@
 import { useState } from 'react';
 import { PRODUCTION_CENTRES } from '../data/seed';
+import { printService } from '../lib/printer';
+import { useStore } from '../store';
 
 // ── Receipt display & print ───────────────────────────────────────────────────
-export function ReceiptModal({ items, subtotal, service, total, checkDiscount, orderType, tableLabel, server, covers, customer, onClose }) {
+export function ReceiptModal({ items, subtotal, service, total, checkDiscount, orderType, tableLabel, server, covers, customer, ref: checkRef, method, tip, onClose }) {
+  const { location } = useStore();
   const now = new Date();
   const nonVoided = items.filter(i => !i.voided);
+  const [printing, setPrinting] = useState(false);
 
-  const handlePrint = () => {
-    const win = window.open('', '_blank', 'width=380,height=700');
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+      await printService.printReceipt({
+        location,
+        check: { ref: checkRef, server, tableLabel, orderType, covers, method },
+        items: nonVoided,
+        totals: { subtotal, service, tip: tip || 0, grand: total + (tip || 0) },
+      });
+    } catch (err) {
+      // Fallback to browser print on failure
+      const win = window.open('', '_blank', 'width=380,height=700');
     win.document.write(`
       <html><head><title>Receipt</title>
       <style>
@@ -56,9 +70,11 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
       <div class="center muted" style="margin-top:8px">Thank you for dining with us</div>
       </body></html>
     `);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); }, 300);
+      win.document.close();
+      win.focus();
+      setTimeout(() => { win.print(); }, 300);
+    }
+    setPrinting(false);
   };
 
   return (
@@ -69,7 +85,7 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
         <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--bdr)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div style={{fontSize:15,fontWeight:700,color:'var(--t1)'}}>Check</div>
           <div style={{display:'flex',gap:8}}>
-            <button onClick={handlePrint} style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0e0f14',fontSize:12,fontWeight:700}}>🖨 Print</button>
+            <button onClick={handlePrint} disabled={printing} style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0e0f14',fontSize:12,fontWeight:700}}>{printing ? '…' : '🖨 Print'}</button>
             <button onClick={onClose} style={{background:'none',border:'none',color:'var(--t3)',cursor:'pointer',fontSize:22}}>×</button>
           </div>
         </div>
