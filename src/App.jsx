@@ -31,6 +31,7 @@ const CHANGELOG = [
       'Status polls bridge every 30s, green glow when online, red when bridge unreachable',
     ],
   },
+  {
     version: '3.5.31', date: 'Apr 2026', label: 'Supabase print queue',
     changes: [
       'Print jobs now go via Supabase — no HTTP bridge server, no port forwarding, no CORS',
