@@ -352,6 +352,20 @@ export function KDSSurface() {
   const locationId = pairedDevice?.locationId || null;
   const centreId = localDeviceConfig?.centreId || pairedDevice?.centreId || null;
 
+  // Heartbeat — update last_seen every 60s so Status drawer shows correct KDS online state
+  useEffect(() => {
+    if (!pairedDevice?.id || isMock) return;
+    const beat = async () => {
+      try {
+        const { updateDeviceHeartbeat } = await import('../lib/db.js');
+        updateDeviceHeartbeat(pairedDevice.id);
+      } catch {}
+    };
+    beat();
+    const id = setInterval(beat, 60000);
+    return () => clearInterval(id);
+  }, [pairedDevice?.id]);
+
   // Local tickets state — loaded from Supabase + synced via realtime
   const [liveTickets, setLiveTickets] = useState(null); // null = loading
   const [, setTick] = useState(0);

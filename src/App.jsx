@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.42', date: 'Apr 2026', label: 'Status drawer: KDS status + test all hardware',
+    changes: [
+      'KDS screens now shown in Status drawer with online/offline status based on last_seen heartbeat',
+      'Test button on each printer — waits for agent confirmation, shows real outcome',
+      'Test button on each KDS — sends a test ticket visible on the KDS screen',
+      'KDS heartbeat: device updates last_seen every 60s while KDS surface is open',
+      'Print queue shows issue count in section label when there are problems',
+    ],
+  },
+  {
     version: '3.5.41', date: 'Apr 2026', label: 'Print queue: hide completed jobs',
     changes: ['Print queue in Status drawer only shows pending and failed jobs — completed prints are hidden'],
   },
