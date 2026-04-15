@@ -23,6 +23,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.46', date: 'Apr 2026', label: 'Production routing: subcategory inheritance fixed',
+    changes: [
+      'Root cause found: order line items did not carry cat or parentId — routing looked at empty fields',
+      'Items now look up their category from menuItems store using itemId when routing to production centres',
+      'Variant items (e.g. Small Latte) inherit routing from parent item category chain: Coffee → Hot Drinks → KDS Bar',
+      'cat and parentId now stamped onto order line items at creation time',
+    ],
+  },
+  {
     version: '3.5.46', date: 'Apr 2026', label: 'Production routing: variant sizes route via parent category',
     changes: [
       'Variant sizes (Small/Medium/Large) now route using their parent item category if their own category does not match',

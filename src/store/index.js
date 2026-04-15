@@ -871,6 +871,8 @@ export const useStore = create((set, get) => ({
       price, qty, mods: mods||[], notes: opts.notes||'',
       pizzaConfig, allergens: item.allergens||[],
       centreId: item.centreId,
+      cat: item.cat || null,           // carry category so routing works
+      parentId: item.parentId || null,  // carry parentId so variant routing works
       seat: 'shared',
       course: CAT_COURSE[item.cat] ?? 1,
       fired: CAT_COURSE[item.cat] === 0,
@@ -1041,23 +1043,28 @@ export const useStore = create((set, get) => ({
     // Determine which production center(s) an item routes to based on its category
     const getCentresForItem = (item, config) => {
       const { centres, routing } = config;
-      // No routing configured at all — no KDS/production centres
       if (!centres?.length || !routing) return [];
 
-      // For variant items, also consider the parent item's category
-      const itemCat = item.cat || item.cats?.[0] || null;
+      // Order line items only carry itemId — look up the full menu item to get cat/parentId
       const allItems = useStore.getState().menuItems || [];
-      const parentItem = item.parentId ? allItems.find(i => i.id === item.parentId) : null;
-      const parentCat = parentItem?.cat || parentItem?.cats?.[0] || null;
+      const menuItem = allItems.find(i => i.id === (item.itemId || item.id));
+
+      // Direct category from the item (or looked-up menu item)
+      let itemCat = item.cat || item.cats?.[0] || menuItem?.cat || menuItem?.cats?.[0] || null;
+
+      // For variant items (e.g. Small Latte), also check the parent item's category
+      // (variants often inherit their routing from the parent: Latte → Coffee → Hot Drinks → KDS Bar)
+      const parentId = item.parentId || menuItem?.parentId || null;
+      const parentMenuItem = parentId ? allItems.find(i => i.id === parentId) : null;
+      const parentCat = parentMenuItem?.cat || parentMenuItem?.cats?.[0] || null;
 
       const parentMap = buildCatParentMap();
       const matched = [];
       centres.forEach(centre => {
         const r = routing[centre.id];
         if (!r?.assignedCategories?.length) return;
-        if (r.excludedItems?.includes(item.id)) return; // item individually excluded
+        if (r.excludedItems?.includes(item.id) || r.excludedItems?.includes(item.itemId)) return;
         const assignedSet = new Set(r.assignedCategories);
-        // Match if item's category OR parent item's category (for variants) or any ancestor matches
         const catMatches = (itemCat && catOrAncestorMatches(itemCat, assignedSet, parentMap)) ||
                            (parentCat && catOrAncestorMatches(parentCat, assignedSet, parentMap));
         if (catMatches) matched.push(centre.id);
@@ -1167,12 +1174,8 @@ export const useStore = create((set, get) => ({
       const getCentresForItem = (item) => {
         const { centres, routing } = routingConfig;
         if (!centres?.length) return [];
-        const itemCat = item.cat || item.cats?.[0] || null;
         const snap = (() => { try { return JSON.parse(localStorage.getItem('rpos-config-snapshot')||'{}'); } catch { return {}; } })();
         const cats = snap.menuCategories || [];
-        const allItems = useStore.getState().menuItems || [];
-        const parentItem = item.parentId ? allItems.find(i => i.id === item.parentId) : null;
-        const parentCat = parentItem?.cat || parentItem?.cats?.[0] || null;
         const parentMap = {};
         cats.forEach(c => { parentMap[c.id] = c.parentId || null; });
         const catOrAncestorMatches = (catId, assignedSet, depth = 0) => {
@@ -1181,11 +1184,20 @@ export const useStore = create((set, get) => ({
           const pid = parentMap[catId];
           return pid ? catOrAncestorMatches(pid, assignedSet, depth + 1) : false;
         };
+
+        // Look up the full menu item to get cat (order line items only carry itemId)
+        const allItems = useStore.getState().menuItems || [];
+        const menuItem = allItems.find(i => i.id === (item.itemId || item.id));
+        const itemCat = item.cat || item.cats?.[0] || menuItem?.cat || menuItem?.cats?.[0] || null;
+        const parentId = item.parentId || menuItem?.parentId || null;
+        const parentMenuItem = parentId ? allItems.find(i => i.id === parentId) : null;
+        const parentCat = parentMenuItem?.cat || parentMenuItem?.cats?.[0] || null;
+
         const matched = [];
         centres.forEach(centre => {
           const r = routing[centre.id];
           if (!r?.assignedCategories?.length) return;
-          if (r.excludedItems?.includes(item.id)) return;
+          if (r.excludedItems?.includes(item.id) || r.excludedItems?.includes(item.itemId)) return;
           const assignedSet = new Set(r.assignedCategories);
           const catMatches = (itemCat && catOrAncestorMatches(itemCat, assignedSet)) ||
                              (parentCat && catOrAncestorMatches(parentCat, assignedSet));
