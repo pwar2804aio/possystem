@@ -209,6 +209,9 @@ export const useStore = create((set, get) => ({
       ...(snap.menus ? { menus: snap.menus } : {}),
       // Menu categories — full replace
       ...(snap.menuCategories ? { menuCategories: snap.menuCategories } : {}),
+      // Modifier + instruction groups — full replace
+      ...(snap.modifierGroupDefs ? { modifierGroupDefs: snap.modifierGroupDefs } : {}),
+      ...(snap.instructionGroupDefs ? { instructionGroupDefs: snap.instructionGroupDefs } : {}),
 
       // Print routing config from back office
       ...(snap.printRouting ? { printRouting: snap.printRouting } : {}),
@@ -448,20 +451,57 @@ export const useStore = create((set, get) => ({
         {id:'sub-soy',     name:'Soy milk',            price:0.5},
       ]},
   ] : [],
-  addModifierGroupDef: g => set(s => ({ modifierGroupDefs:[...s.modifierGroupDefs,{id:`mgd-${Date.now()}`,...g}] })),
-  updateModifierGroupDef: (id,patch) => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.map(g=>g.id===id?{...g,...patch}:g) })),
-  updateModifierGroupOption: (groupId, optId, patch) => set(s => ({
-    modifierGroupDefs: s.modifierGroupDefs.map(g =>
-      g.id === groupId
-        ? { ...g, options: (g.options||[]).map(o => o.id===optId ? { ...o, ...patch } : o) }
-        : g
-    )
-  })),
-  removeModifierGroupDef: id => set(s => ({ modifierGroupDefs:s.modifierGroupDefs.filter(g=>g.id!==id) })),
+  // Helper: persist a modifier group to Supabase (upsert by id)
+  _saveModGroup: async (group) => {
+    if (isMock) return;
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const locId = await getLocationId();
+      await fetch(`${SUPABASE_URL}/rest/v1/modifier_groups?on_conflict=id`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ id: group.id, location_id: locId, name: group.name, min: group.min ?? 0, max: group.max ?? 1, selection_type: group.selectionType || 'single', options: group.options || [], sort_order: group.sortOrder || 0 }]),
+      });
+    } catch (e) { console.warn('modifier group save failed', e); }
+  },
+
+  addModifierGroupDef: g => {
+    const newGroup = { id: `mgd-${Date.now()}`, ...g };
+    set(s => ({ modifierGroupDefs: [...s.modifierGroupDefs, newGroup] }));
+    useStore.getState()._saveModGroup(newGroup);
+  },
+  updateModifierGroupDef: (id, patch) => set(s => {
+    const updated = s.modifierGroupDefs.map(g => g.id === id ? { ...g, ...patch } : g);
+    const group = updated.find(g => g.id === id);
+    if (group) useStore.getState()._saveModGroup(group);
+    return { modifierGroupDefs: updated };
+  }),
+  updateModifierGroupOption: (groupId, optId, patch) => set(s => {
+    const updated = s.modifierGroupDefs.map(g =>
+      g.id === groupId ? { ...g, options: (g.options||[]).map(o => o.id===optId ? { ...o, ...patch } : o) } : g
+    );
+    const group = updated.find(g => g.id === groupId);
+    if (group) useStore.getState()._saveModGroup(group);
+    return { modifierGroupDefs: updated };
+  }),
+  removeModifierGroupDef: id => {
+    set(s => ({ modifierGroupDefs: s.modifierGroupDefs.filter(g => g.id !== id) }));
+    if (!isMock) {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      fetch(`${SUPABASE_URL}/rest/v1/modifier_groups?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      }).catch(() => {});
+    }
+  },
   reorderModifierGroupDefs: (fromIdx, toIdx) => set(s => {
     const arr = [...s.modifierGroupDefs];
     const [moved] = arr.splice(fromIdx, 1);
     arr.splice(toIdx, 0, moved);
+    // Save all with updated sort_order
+    arr.forEach((g, i) => useStore.getState()._saveModGroup({ ...g, sortOrder: i }));
     return { modifierGroupDefs: arr };
   }),
 

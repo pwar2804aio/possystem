@@ -82,11 +82,13 @@ export default function BackOfficeApp() {
   const loadLocationData = async (locationId) => {
     if (!locationId) return;
     const { fetchMenus, fetchMenuCategories, fetchMenuItems, fetchFloorPlan } = await import('../lib/db.js');
-    const [menusRes, catsRes, itemsRes, floorRes] = await Promise.all([
+    const [menusRes, catsRes, itemsRes, floorRes, modGroupsRes] = await Promise.all([
       fetchMenus(locationId),
       fetchMenuCategories(locationId),
       fetchMenuItems(locationId),
       fetchFloorPlan(locationId),
+      // Load modifier group definitions from Supabase
+      supabase ? supabase.from('modifier_groups').select('*').eq('location_id', locationId).order('sort_order') : { data: null },
     ]);
     const { useStore } = await import('../store/index.js');
     const patch = {};
@@ -100,7 +102,6 @@ export default function BackOfficeApp() {
     }));
     if (itemsRes.data?.length)   patch.menuItems       = itemsRes.data.map(item => ({
       ...item,
-      // Map snake_case Supabase columns to camelCase store format
       menuName:    item.menu_name    ?? item.menuName    ?? item.name ?? 'Item',
       receiptName: item.receipt_name ?? item.receiptName ?? item.name ?? 'Item',
       kitchenName: item.kitchen_name ?? item.kitchenName ?? item.name ?? 'Item',
@@ -110,7 +111,14 @@ export default function BackOfficeApp() {
       parentId:    item.parent_id    ?? item.parentId,
       assignedModifierGroups: item.assigned_modifier_groups ?? item.assignedModifierGroups ?? [],
     }));
-    if (floorRes.data?.tables?.length)   patch.tables  = floorRes.data.tables;
+    if (floorRes.data?.tables?.length) patch.tables = floorRes.data.tables;
+    // Map modifier groups from snake_case DB columns to camelCase store format
+    if (modGroupsRes.data?.length) patch.modifierGroupDefs = modGroupsRes.data.map(g => ({
+      id: g.id, name: g.name, min: g.min ?? 0, max: g.max ?? 1,
+      selectionType: g.selection_type ?? 'single',
+      options: g.options ?? [],
+      sortOrder: g.sort_order ?? 0,
+    }));
     if (Object.keys(patch).length) useStore.setState(patch);
   };
 
@@ -337,6 +345,8 @@ function PushToPOSButton() {
       menuCategories,
       changeCount: pendingBOChanges,
       profiles: deviceProfiles,
+      modifierGroupDefs: useStore.getState().modifierGroupDefs || [],
+      instructionGroupDefs: useStore.getState().instructionGroupDefs || [],
     };
 
     // Persist snapshot so POS tabs that open later can still receive it

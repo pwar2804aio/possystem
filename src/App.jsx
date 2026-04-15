@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.39', date: 'Apr 2026', label: 'Modifier groups: full backend wired',
+    changes: [
+      'Modifier groups now persist to Supabase — survive page refreshes and work across devices',
+      'Back office loads modifier groups from Supabase on boot alongside menu items',
+      'Push to POS includes modifier group definitions — POS now receives options, names, prices',
+      'Creating, editing, reordering, deleting modifier groups all write to Supabase instantly',
+      'Modifiers tab on parent items with variants shows a warning — assign to sizes only',
+    ],
+  },
+  {
     version: '3.5.38', date: 'Apr 2026', label: 'Modifier groups: sub-items only search',
     changes: [
       'Search existing items now only shows items with type Sub item — no regular menu items',

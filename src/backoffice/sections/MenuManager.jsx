@@ -1352,8 +1352,16 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
         {sec==='modifiers' && !isSub && (
           <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
-            {/* Modifier groups */}
-            <div>
+            {/* Block modifiers on parent items that have variants */}
+            {isParent ? (
+              <div style={{ padding:'16px 18px', background:'var(--acc-d)', border:'1.5px solid var(--acc-b)', borderRadius:12 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--acc)', marginBottom:6 }}>⚠ Assign modifiers to sizes, not the parent</div>
+                <div style={{ fontSize:12, color:'var(--t2)', lineHeight:1.6 }}>
+                  This item has {variants.length} size{variants.length!==1?'s':''} (variants). Modifiers must be assigned to each size individually — not to the parent product. Click a size in the Flow tab to edit its modifiers.
+                </div>
+              </div>
+            ) : (<>
+              <div>
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
                 <span style={{ ...lbl, margin:0 }}>Modifier groups</span>
                 <span style={{ fontSize:9, color:'var(--t4)', fontWeight:400 }}>paid options — drag to reorder</span>
@@ -1460,6 +1468,8 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
                 </div>
               )}
             </div>
+
+          </>)}
 
           </div>
         )}
