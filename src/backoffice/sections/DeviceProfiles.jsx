@@ -52,35 +52,34 @@ const DEFAULT_PROFILES = [
 
 export default function DeviceProfiles() {
   const { showToast, devices, setDeviceConfig, markBOChange } = useStore();
-  const lsStored = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null'); } catch { return null; } })();
-  const [profiles, setProfiles] = useState(lsStored || (isMock ? DEFAULT_PROFILES : []));
+  const [profiles, setProfiles] = useState([]);
   const [editing, setEditing] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [locationId, setLocationId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Load profiles from Supabase on mount
+  // Load profiles from Supabase on mount — Supabase is single source of truth
   useEffect(() => {
-    if (isMock) return;
+    if (isMock) { setProfiles(DEFAULT_PROFILES); setLoading(false); return; }
     const loadFromDB = async () => {
       const { getLocationId } = await import('../../lib/supabase.js');
       const locId = await getLocationId().catch(() => null);
-      if (!locId) return;
+      if (!locId) { setLoading(false); return; }
       setLocationId(locId);
       const { data } = await supabase.from('device_profiles').select('*').eq('location_id', locId).order('sort_order');
-      if (data?.length) {
-        const mapped = data.map(p => ({
-          id: p.id, name: p.name, color: p.color || '#3b82f6',
-          defaultSurface: p.default_surface || 'tables',
-          enabledOrderTypes: p.enabled_order_types || ['dine-in'],
-          assignedSection: p.assigned_section, hiddenFeatures: p.hidden_features || [],
-          tableServiceEnabled: p.table_service_enabled !== false,
-          quickScreenEnabled: p.quick_screen_enabled !== false,
-          menuId: p.menu_id, deviceCount: 0,
-        }));
-        setProfiles(mapped);
-        // Also keep localStorage in sync as backup
-        try { localStorage.setItem('rpos-device-profiles', JSON.stringify(mapped)); } catch {}
-      }
+      const mapped = (data || []).map(p => ({
+        id: p.id, name: p.name, color: p.color || '#3b82f6',
+        defaultSurface: p.default_surface || 'tables',
+        enabledOrderTypes: p.enabled_order_types || ['dine-in'],
+        assignedSection: p.assigned_section, hiddenFeatures: p.hidden_features || [],
+        tableServiceEnabled: p.table_service_enabled !== false,
+        quickScreenEnabled: p.quick_screen_enabled !== false,
+        menuId: p.menu_id, deviceCount: 0,
+      }));
+      setProfiles(mapped);
+      // Sync localStorage — only what's in Supabase, nothing extra
+      try { localStorage.setItem('rpos-device-profiles', JSON.stringify(mapped)); } catch {}
+      setLoading(false);
     };
     loadFromDB();
   }, []);

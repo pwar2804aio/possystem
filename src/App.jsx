@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.34', date: 'Apr 2026', label: 'Device profiles: permanently fixed',
+    changes: [
+      'Deleted profiles now stay deleted — Supabase is the only source of truth, no localStorage or hardcoded fallbacks',
+      'prof-1/2/3 ghost profiles permanently removed from database',
+      'receipt_printer_id column added to devices table',
+      'DeviceProfiles loads fresh from Supabase on every open, never from stale cache',
+      'Back office localStorage cleared of stale profile data on next load',
+    ],
+  },
+  {
     version: '3.5.33', date: 'Apr 2026', label: 'Device profiles fixed + printer status moved',
     changes: [
       'Hidden features now correctly hide floor plan, bar, orders nav items',
