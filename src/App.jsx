@@ -23,6 +23,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.44', date: 'Apr 2026', label: 'KDS test fix: routes to correct centre',
+    changes: [
+      'KDS test now sends ticket to the correct production centre — BAR KDS receives its own test ticket',
+      'Fixed: test tickets had centre_id null so KDS filtered them out',
+    ],
+  },
+  {
     version: '3.5.43', date: 'Apr 2026', label: 'KDS status: use ticket activity as online signal',
     changes: [
       'KDS online detection: 15min last_seen threshold (was 3min)',

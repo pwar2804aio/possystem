@@ -45,7 +45,7 @@ export default function StatusDrawer({ onClose }) {
       const locId = await getLocationId();
       if (!locId) return;
       const [devicesRes, ticketsRes] = await Promise.all([
-        supabase.from('devices').select('id,name,type,last_seen,status').eq('location_id', locId).eq('type', 'kds'),
+        supabase.from('devices').select('id,name,type,last_seen,status,centre_id').eq('location_id', locId).eq('type', 'kds'),
         // Recent bumped tickets = KDS was actively used
         supabase.from('kds_tickets').select('bumped_at').eq('location_id', locId).not('bumped_at', 'is', null).order('bumped_at', { ascending: false }).limit(1),
       ]);
@@ -157,28 +157,34 @@ export default function StatusDrawer({ onClose }) {
     }
   };
 
-  // Test KDS — send a test ticket
+  // Test KDS — send a test ticket to the device's specific centre
   const testKDS = async (device) => {
     setTestState(s => ({ ...s, [device.id]: 'testing' }));
     setTestMsg(m => ({ ...m, [device.id]: 'Sending test ticket…' }));
     try {
       const { insertKDSTicket } = await import('../lib/db.js');
       const locId = await getLocationId();
+      // Get the device's centre_id so the KDS actually receives it
+      let centreId = device.centre_id || null;
+      if (!centreId && supabase) {
+        const { data } = await supabase.from('devices').select('centre_id').eq('id', device.id).single();
+        centreId = data?.centre_id || null;
+      }
       const testTicket = {
         id: `kds-test-${Date.now()}`,
-        location_id: locId,
-        centre_id: null, // null = all KDS screens
-        table_label: 'TEST',
-        order_type: 'dine-in',
-        server: 'System',
-        items: [{ name: 'KDS Test Ticket', qty: 1, mods: [], notes: 'This is a test — can be dismissed' }],
-        sent_at: new Date().toISOString(),
-        status: 'pending',
+        tableLabel: 'TEST',
+        tableId: null,
+        server: 'System test',
         covers: 1,
+        centreId,         // camelCase — insertKDSTicket maps this to centre_id
+        items: [{ name: 'KDS Test Ticket', qty: 1, mods: [], notes: 'Test — dismiss when done', course: 1 }],
+        sentAt: Date.now(),
+        status: 'pending',
       };
-      await insertKDSTicket(testTicket, locId);
+      const { error } = await insertKDSTicket(testTicket, locId);
+      if (error) throw new Error(error.message);
       setTestState(s => ({ ...s, [device.id]: 'ok' }));
-      setTestMsg(m => ({ ...m, [device.id]: '✓ Test ticket sent — check KDS screen' }));
+      setTestMsg(m => ({ ...m, [device.id]: `✓ Test ticket sent to ${device.name}` }));
     } catch (err) {
       setTestState(s => ({ ...s, [device.id]: 'failed' }));
       setTestMsg(m => ({ ...m, [device.id]: `✗ ${err.message}` }));
