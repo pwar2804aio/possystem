@@ -598,7 +598,7 @@ export function KDSSurface() {
                         </div>
                       ))}
 
-                      {/* Pending courses — dimmed */}
+                      {/* Pending courses — shown clearly, not fired yet */}
                       {pending.length > 0 && (() => {
                         const pendingByCourse = {};
                         pending.forEach(i => {
@@ -607,20 +607,21 @@ export function KDSSurface() {
                           pendingByCourse[c].push(i);
                         });
                         return (
-                          <div style={{ marginTop:4, paddingTop:10, borderTop:`1px dashed ${u.border}`, opacity:0.6 }}>
+                          <div style={{ marginTop:4, paddingTop:10, borderTop:`1px solid ${u.border}` }}>
                             {Object.entries(pendingByCourse).sort(([a],[b])=>a-b).map(([course, cItems]) => (
                               <div key={course}>
-                                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                                  <span style={{ fontSize:10, fontWeight:800, color:'var(--t4)' }}>⏳ {COURSE_LABEL[course] || `Course ${course}`} — pending fire from POS</span>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
+                                  <span style={{ fontSize:11, fontWeight:800, color:'var(--t3)' }}>⏳ {COURSE_LABEL[course] || `Course ${course}`}</span>
+                                  <span style={{ fontSize:9, color:'var(--t4)', fontWeight:600 }}>PENDING — fire from POS</span>
                                 </div>
                                 {cItems.map((item,i) => (
-                                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, paddingBottom:6, marginBottom:6 }}>
-                                    <div style={{ width:22, height:22, borderRadius:6, background:'var(--bg4)', border:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'var(--t4)', flexShrink:0, fontFamily:'var(--font-mono)' }}>
+                                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, paddingBottom:8, marginBottom:i<cItems.length-1?8:12 }}>
+                                    <div style={{ width:26, height:26, borderRadius:7, background:'var(--bg4)', border:`1.5px solid var(--bdr)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'var(--t3)', flexShrink:0, fontFamily:'var(--font-mono)' }}>
                                       {item.qty}
                                     </div>
                                     <div style={{ flex:1 }}>
-                                      <div style={{ fontSize:12, fontWeight:600, color:'var(--t3)', lineHeight:1.3 }}>{item.name}</div>
-                                      {item.mods && <div style={{ fontSize:10, color:'var(--t4)', marginTop:2 }}>{item.mods}</div>}
+                                      <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', lineHeight:1.3 }}>{item.name}</div>
+                                      {item.mods && <div style={{ fontSize:11, color:'var(--t4)', marginTop:2, lineHeight:1.4 }}>{item.mods}</div>}
                                     </div>
                                   </div>
                                 ))}

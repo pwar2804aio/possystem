@@ -23,6 +23,10 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.56', date: 'Apr 2026', label: 'KDS pending courses no longer greyed out',
+    changes: ['KDS pending courses shown clearly with ⏳ header, same text weight as fired courses'],
+  },
+  {
     version: '3.5.55', date: 'Apr 2026', label: 'KDS: live fire course updates via realtime',
     changes: [
       'KDS now reacts to fire course in real time - ticket re-renders when POS fires next course',
