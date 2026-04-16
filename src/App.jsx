@@ -23,6 +23,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.48', date: 'Apr 2026', label: 'Sub-items: proper category manager',
+    changes: [
+      'Sub-items view rebuilt as a two-panel category manager',
+      'Left panel: create and select sub-item categories (Milks, Sauces, Proteins…)',
+      'Right panel: shows items in selected category with individual POS visibility toggles',
+      'Assign existing sub-items to any category using the ← Assign existing search picker',
+      'POS visibility toggle on category header toggles soldAlone for all items in the group at once',
+      'Rename categories inline via the ✎ pencil button',
+      'Move items back to ungrouped via the ↩ button',
+    ],
+  },
+  {
     version: '3.5.47', date: 'Apr 2026', label: 'Sub-items view + required modifier errors',
     changes: [
       'Items tab: new ⊕ Sub items filter shows dedicated grouped view for all sub-items',

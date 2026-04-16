@@ -20,7 +20,7 @@
  *  Instruction groups tab
  *  └── Same — options are plain strings
  */
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
 
@@ -757,8 +757,274 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
 // Search, filter by type or category, click to edit, add new items.
 // Sub-items (variants) always shown indented under their parent.
 // ═══════════════════════════════════════════════════════════════════════════
-// ── AddSubGroupRow — creates a new named group in sub-items view ──────────────
-function AddSubGroupRow({ onAdd, existingGroups }) {
+// ═══════════════════════════════════════════════════════════════════════════
+// SUB-ITEMS MANAGER — two-panel: left = categories, right = items in category
+// Categories are stored as subGroup strings on the items.
+// POS visibility = soldAlone (all items in group visible on POS or not)
+// ═══════════════════════════════════════════════════════════════════════════
+function SubItemsManager({ menuItems, addMenuItem, updateMenuItem, markBOChange, showToast, selItemId, setSelItemId }) {
+  const allSubItems = menuItems.filter(i => !i.archived && i.type === 'subitem');
+  const groups = [...new Set(allSubItems.map(i => i.subGroup || ''))].sort((a,b) => {
+    if (!a) return 1; if (!b) return -1; return a.localeCompare(b);
+  });
+
+  const [selGroup, setSelGroup] = useState(groups[0] ?? null);
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [assignSearch, setAssignSearch] = useState('');
+  const [showAssign, setShowAssign] = useState(false);
+
+  const groupItems = allSubItems.filter(i => (i.subGroup || '') === (selGroup ?? ''));
+  const groupPosOn = groupItems.length > 0 && groupItems.every(i => i.soldAlone);
+  const groupPosPartial = groupItems.some(i => i.soldAlone) && !groupPosOn;
+  const unassigned = allSubItems.filter(i => i.subGroup !== selGroup && !(selGroup === '' || selGroup === null ? false : false));
+
+  // Items not in selected group — for assignment picker
+  const assignable = allSubItems.filter(i =>
+    (i.subGroup || '') !== (selGroup ?? '') &&
+    (assignSearch === '' || (i.menuName || i.name || '').toLowerCase().includes(assignSearch.toLowerCase()))
+  );
+
+  const createGroup = () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    // Create a new sub-item in this group so it exists
+    addMenuItem({ name:'New item', menuName:'New item', receiptName:'New item', kitchenName:'New item',
+      type:'subitem', cat:'', allergens:[], pricing:{base:0}, subGroup:name,
+      assignedModifierGroups:[], assignedInstructionGroups:[], cats:[], sortOrder:999 });
+    markBOChange();
+    setSelGroup(name);
+    setAddingGroup(false);
+    setNewGroupName('');
+    setTimeout(()=>{ const last=useStore.getState().menuItems.slice(-1)[0]; if(last) setSelItemId(last.id); }, 40);
+  };
+
+  const addNewToGroup = () => {
+    addMenuItem({ name:'New item', menuName:'New item', receiptName:'New item', kitchenName:'New item',
+      type:'subitem', cat:'', allergens:[], pricing:{base:0}, subGroup:selGroup ?? '',
+      assignedModifierGroups:[], assignedInstructionGroups:[], cats:[], sortOrder:groupItems.length });
+    markBOChange();
+    setTimeout(()=>{ const last=useStore.getState().menuItems.slice(-1)[0]; if(last) setSelItemId(last.id); }, 40);
+  };
+
+  const assignToGroup = (item) => {
+    updateMenuItem(item.id, { subGroup: selGroup ?? '' });
+    markBOChange();
+    setAssignSearch('');
+    showToast(`${item.menuName||item.name} moved to ${selGroup || 'Ungrouped'}`, 'success');
+  };
+
+  const removeFromGroup = (item) => {
+    updateMenuItem(item.id, { subGroup: '' });
+    markBOChange();
+  };
+
+  const toggleGroupPOS = () => {
+    const newVal = !groupPosOn;
+    groupItems.forEach(i => updateMenuItem(i.id, { soldAlone: newVal, cat: newVal ? i.cat||'' : i.cat }));
+    markBOChange();
+    showToast(newVal ? `${selGroup || 'Group'} — visible on POS` : `${selGroup || 'Group'} — hidden from POS`, newVal ? 'success' : 'info');
+  };
+
+  const renameGroup = (oldName, newName) => {
+    if (!newName.trim() || newName === oldName) return;
+    allSubItems.filter(i => (i.subGroup||'') === oldName).forEach(i => updateMenuItem(i.id, { subGroup: newName.trim() }));
+    markBOChange();
+    setSelGroup(newName.trim());
+  };
+
+  return (
+    <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
+
+      {/* ── Left: group list ─────────────────────── */}
+      <div style={{ width:200, borderRight:'1px solid var(--bdr)', display:'flex', flexDirection:'column', overflow:'hidden', flexShrink:0 }}>
+        <div style={{ padding:'8px 10px', borderBottom:'1px solid var(--bdr)', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'var(--t2)', flex:1 }}>Categories</span>
+          <button onClick={()=>setAddingGroup(v=>!v)} style={{ width:22, height:22, borderRadius:5, cursor:'pointer', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+        </div>
+
+        {addingGroup && (
+          <div style={{ padding:'8px', borderBottom:'1px solid var(--bdr)', background:'var(--bg2)', flexShrink:0 }}>
+            <input style={{ ...inp, fontSize:12, marginBottom:6 }} value={newGroupName} onChange={e=>setNewGroupName(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter')createGroup();if(e.key==='Escape')setAddingGroup(false);}}
+              placeholder="Category name…" autoFocus/>
+            <div style={{ display:'flex', gap:4 }}>
+              <button onClick={()=>setAddingGroup(false)} style={{ flex:1,padding:'4px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11 }}>Cancel</button>
+              <button onClick={createGroup} disabled={!newGroupName.trim()} style={{ flex:2,padding:'4px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0b0c10',fontSize:11,fontWeight:700,opacity:newGroupName.trim()?1:.4 }}>Add</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ flex:1, overflowY:'auto', padding:'4px 6px' }}>
+          {groups.map(g => {
+            const gItems = allSubItems.filter(i => (i.subGroup||'') === g);
+            const posOn = gItems.length > 0 && gItems.every(i => i.soldAlone);
+            const active = selGroup === g;
+            return (
+              <div key={g||'__none'} onClick={()=>{setSelGroup(g);setShowAssign(false);setAssignSearch('');}}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 8px', borderRadius:8, marginBottom:2, cursor:'pointer',
+                  background:active?'var(--acc-d)':'transparent', border:`1.5px solid ${active?'var(--acc)':'transparent'}`, transition:'all .1s' }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:11, fontWeight:active?700:500, color:active?'var(--acc)':'var(--t2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {g || '— Ungrouped'}
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--t4)', marginTop:1, display:'flex', alignItems:'center', gap:4 }}>
+                    {gItems.length} items
+                    {posOn && <span style={{ color:'var(--grn)', fontWeight:700 }}>· POS ✓</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {groups.length === 0 && (
+            <div style={{ textAlign:'center', padding:'20px 6px', color:'var(--t4)', fontSize:10 }}>No categories yet.<br/>Click + to create one.</div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Right: items in selected group ─────── */}
+      {selGroup !== null ? (
+        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+          {/* Group header */}
+          <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+            <GroupNameEditor
+              name={selGroup}
+              onRename={newName => renameGroup(selGroup, newName)}
+            />
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8, flexWrap:'wrap' }}>
+              {/* POS visibility toggle */}
+              <button onClick={toggleGroupPOS} disabled={groupItems.length === 0}
+                style={{ display:'flex', alignItems:'center', gap:7, padding:'5px 10px', borderRadius:9, cursor:'pointer', fontFamily:'inherit',
+                  background:groupPosOn?'var(--grn-d)':groupPosPartial?'var(--acc-d)':'var(--bg3)',
+                  border:`1.5px solid ${groupPosOn?'var(--grn-b)':groupPosPartial?'var(--acc-b)':'var(--bdr)'}` }}>
+                <div style={{ width:28, height:16, borderRadius:8, background:groupPosOn?'var(--grn)':groupPosPartial?'var(--acc)':'var(--bg5)', position:'relative', flexShrink:0, transition:'all .2s' }}>
+                  <div style={{ width:12, height:12, borderRadius:'50%', background:'#fff', position:'absolute', top:2, left:groupPosOn?14:2, transition:'left .2s', boxShadow:'0 1px 3px #0003' }}/>
+                </div>
+                <span style={{ fontSize:11, fontWeight:700, color:groupPosOn?'var(--grn)':groupPosPartial?'var(--acc)':'var(--t4)' }}>
+                  {groupPosOn ? 'Visible on POS' : groupPosPartial ? 'Some visible on POS' : 'Hidden from POS'}
+                </span>
+              </button>
+              <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
+                <button onClick={()=>{setShowAssign(v=>!v);setAssignSearch('');}} style={{ padding:'5px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t2)', fontSize:11, fontWeight:600 }}>
+                  {showAssign ? '✕ Close' : '← Assign existing'}
+                </button>
+                <button onClick={addNewToGroup} style={{ padding:'5px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:11, fontWeight:700 }}>+ New item</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Assign existing items picker */}
+          {showAssign && (
+            <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--bdr)', background:'var(--bg2)', flexShrink:0 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--t3)', marginBottom:7 }}>Assign existing sub-items to {selGroup || 'this category'}</div>
+              <div style={{ position:'relative', marginBottom:7 }}>
+                <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)' }}>🔍</span>
+                <input style={{ ...inp, paddingLeft:26, fontSize:12 }} value={assignSearch} onChange={e=>setAssignSearch(e.target.value)} placeholder="Search sub-items…" autoFocus/>
+              </div>
+              <div style={{ maxHeight:160, overflowY:'auto', display:'flex', flexDirection:'column', gap:3 }}>
+                {assignable.length === 0 && (
+                  <div style={{ fontSize:11, color:'var(--t4)', textAlign:'center', padding:'10px 0' }}>
+                    {assignSearch ? `No match for "${assignSearch}"` : 'All sub-items already in this category'}
+                  </div>
+                )}
+                {assignable.map(item => (
+                  <button key={item.id} onClick={()=>assignToGroup(item)}
+                    style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', fontSize:12, color:'var(--t1)', textAlign:'left' }}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor='var(--acc)'}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor='var(--bdr)'}>
+                    <div>
+                      <div style={{ fontWeight:600 }}>{item.menuName||item.name}</div>
+                      <div style={{ fontSize:9, color:'var(--t4)', marginTop:1 }}>{item.subGroup ? `From: ${item.subGroup}` : 'Ungrouped'}</div>
+                    </div>
+                    <span style={{ color:'var(--acc)', fontFamily:'var(--font-mono)', fontSize:11, flexShrink:0 }}>
+                      {(item.pricing?.base||item.price||0) > 0 ? `£${(item.pricing?.base||item.price||0).toFixed(2)}` : 'Free'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Items list */}
+          <div style={{ flex:1, overflowY:'auto' }}>
+            {groupItems.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--t4)' }}>
+                <div style={{ fontSize:28, opacity:.15, marginBottom:10 }}>⊕</div>
+                <div style={{ fontSize:12, fontWeight:600, color:'var(--t3)', marginBottom:12 }}>No items in {selGroup || 'this category'}</div>
+                <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
+                  <button onClick={addNewToGroup} style={{ padding:'7px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700 }}>+ New item</button>
+                  <button onClick={()=>setShowAssign(true)} style={{ padding:'7px 14px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t2)', fontSize:12, fontWeight:600 }}>← Assign existing</button>
+                </div>
+              </div>
+            ) : (
+              groupItems.map(item => {
+                const isSel = selItemId === item.id;
+                const price = item.pricing?.base ?? item.price ?? 0;
+                return (
+                  <div key={item.id} onClick={()=>setSelItemId(isSel?null:item.id)}
+                    style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px', cursor:'pointer',
+                      background:isSel?'var(--acc-d)':'transparent', borderBottom:'1px solid var(--bdr)', transition:'background .1s' }}>
+                    {/* POS toggle per item */}
+                    <div onClick={e=>{e.stopPropagation();updateMenuItem(item.id,{soldAlone:!item.soldAlone});markBOChange();}}
+                      title={item.soldAlone ? 'Visible on POS — click to hide' : 'Hidden from POS — click to show'}
+                      style={{ width:28, height:16, borderRadius:8, background:item.soldAlone?'var(--grn)':'var(--bg5)', border:`1.5px solid ${item.soldAlone?'var(--grn)':'var(--bdr2)'}`, position:'relative', flexShrink:0, cursor:'pointer', transition:'all .2s' }}>
+                      <div style={{ width:11, height:11, borderRadius:'50%', background:'#fff', position:'absolute', top:2, left:item.soldAlone?14:2, transition:'left .2s', boxShadow:'0 1px 3px #0003' }}/>
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:isSel?'var(--acc)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {item.menuName||item.name}
+                      </div>
+                      <div style={{ fontSize:9, color: item.soldAlone ? 'var(--grn)' : 'var(--t4)', marginTop:1 }}>
+                        {item.soldAlone ? '✓ Visible on POS' : 'Modifier option only'}
+                      </div>
+                    </div>
+                    <span style={{ fontSize:12, fontWeight:700, color:'var(--acc)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
+                      {price > 0 ? `£${price.toFixed(2)}` : 'Free'}
+                    </span>
+                    <button onClick={e=>{e.stopPropagation();removeFromGroup(item);}} title="Remove from category"
+                      style={{ width:20, height:20, borderRadius:5, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t4)', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>↩</button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : (
+        <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8, color:'var(--t4)' }}>
+          <div style={{ fontSize:40, opacity:.12 }}>⊕</div>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--t3)' }}>Select or create a category</div>
+          <div style={{ fontSize:11, color:'var(--t4)' }}>Organise sub-items into groups like Milks, Sauces, Proteins…</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Inline rename for group name
+function GroupNameEditor({ name, onRename }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(name);
+  useEffect(() => setVal(name), [name]);
+  if (!editing) return (
+    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+      <span style={{ fontSize:15, fontWeight:800, color:'var(--t1)' }}>{name || '— Ungrouped'}</span>
+      {name && <button onClick={()=>setEditing(true)} style={{ background:'none', border:'none', color:'var(--t4)', cursor:'pointer', fontSize:12 }}>✎</button>}
+    </div>
+  );
+  return (
+    <div style={{ display:'flex', gap:6 }}>
+      <input style={{ ...inp, fontSize:14, fontWeight:700, flex:1 }} value={val} onChange={e=>setVal(e.target.value)}
+        onKeyDown={e=>{ if(e.key==='Enter'){onRename(val);setEditing(false);} if(e.key==='Escape')setEditing(false); }}
+        autoFocus/>
+      <button onClick={()=>{onRename(val);setEditing(false);}} style={{ padding:'4px 12px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700 }}>Save</button>
+      <button onClick={()=>setEditing(false)} style={{ padding:'4px 8px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t3)', fontSize:12 }}>✕</button>
+    </div>
+  );
+}
+
+// ── AddSubGroupRow (kept for compatibility) ───────────────────────────────────
+function AddSubGroupRow({ onAdd }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   if (!adding) return (
@@ -891,72 +1157,17 @@ function ItemsLibrary() {
         <div style={{ flex:1, overflowY:'auto' }}>
 
           {/* ── Sub-items grouped view ── */}
-          {typeFilter === 'subitem' && (() => {
-            const addSubItem = (subGroup='') => {
-              addMenuItem({ name:'New sub item', menuName:'New sub item', receiptName:'New sub item', kitchenName:'New sub item',
-                type:'subitem', cat:'', allergens:[], pricing:{base:0}, subGroup,
-                assignedModifierGroups:[], assignedInstructionGroups:[], cats:[], sortOrder:999 });
-              markBOChange();
-              setTimeout(()=>{ const last=useStore.getState().menuItems.slice(-1)[0]; if(last) setSelItemId(last.id); }, 30);
-            };
-
-            const groups = [...new Set(parents.map(i=>i.subGroup||'').filter(Boolean))].sort();
-            const ungrouped = parents.filter(i=>!i.subGroup);
-            const allGroups = [...groups.map(g => ({ label:g, items: parents.filter(i=>i.subGroup===g) })), ...(ungrouped.length ? [{ label:'', items:ungrouped }] : [])];
-
-            if (parents.length === 0 && !search) return (
-              <div style={{ textAlign:'center', padding:'48px', color:'var(--t4)', fontSize:13 }}>
-                <div style={{ fontSize:36, opacity:.12, marginBottom:12 }}>⊕</div>
-                <div style={{ fontWeight:600, color:'var(--t3)', marginBottom:8 }}>No sub-items yet</div>
-                <div style={{ fontSize:12, color:'var(--t4)', marginBottom:16, lineHeight:1.6 }}>Sub-items are modifier options — Whole Milk, Oat Milk, Chips, etc.<br/>Create them here, then add to modifier groups.</div>
-                <button onClick={()=>addSubItem()} style={{ padding:'8px 18px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700 }}>+ Add first sub-item</button>
-              </div>
-            );
-
-            return (
-              <>
-                {allGroups.map(({ label, items: gItems }) => (
-                  <div key={label||'__ungrouped'}>
-                    {/* Group header */}
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px 4px', position:'sticky', top:0, background:'var(--bg1)', zIndex:1, borderBottom:'1px solid var(--bdr)' }}>
-                      <span style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', flex:1 }}>
-                        {label || '— Ungrouped'}
-                      </span>
-                      <span style={{ fontSize:9, color:'var(--t4)' }}>{gItems.length} items</span>
-                      <button onClick={()=>addSubItem(label)} style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:6, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10' }}>+ Add</button>
-                    </div>
-                    {gItems.map(item => {
-                      const isSel = selItemId === item.id;
-                      const price = item.pricing?.base ?? item.price ?? 0;
-                      return (
-                        <div key={item.id} onClick={()=>setSelItemId(isSel?null:item.id)}
-                          style={{ display:'grid', gridTemplateColumns:'1fr 80px 44px', gap:0, padding:'8px 12px', cursor:'pointer', alignItems:'center',
-                            background:isSel?'var(--acc-d)':'transparent', borderBottom:'1px solid var(--bdr)', transition:'background .1s' }}>
-                          <div style={{ minWidth:0 }}>
-                            <div style={{ fontSize:12, fontWeight:600, color:isSel?'var(--acc)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                              {item.menuName||item.name}
-                            </div>
-                            {item.soldAlone && <span style={{ fontSize:9, color:'var(--grn)', fontWeight:700 }}>✓ Also sold standalone</span>}
-                          </div>
-                          <span style={{ fontSize:12, fontWeight:700, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>
-                            {price > 0 ? `£${price.toFixed(2)}` : 'Free'}
-                          </span>
-                          <span style={{ fontSize:10, color:(item.allergens||[]).length>0?'var(--red)':'var(--t4)' }}>
-                            {(item.allergens||[]).length > 0 ? `⚠${(item.allergens||[]).length}` : ''}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-
-                {/* Add group button */}
-                <div style={{ padding:'12px', borderTop:'1px solid var(--bdr)' }}>
-                  <AddSubGroupRow onAdd={name => addSubItem(name)} existingGroups={groups}/>
-                </div>
-              </>
-            );
-          })()}
+          {typeFilter === 'subitem' && (
+            <SubItemsManager
+              menuItems={menuItems}
+              addMenuItem={addMenuItem}
+              updateMenuItem={updateMenuItem}
+              markBOChange={markBOChange}
+              showToast={showToast}
+              selItemId={selItemId}
+              setSelItemId={setSelItemId}
+            />
+          )}
 
           {typeFilter !== 'subitem' && parents.length === 0 && (
             <div style={{ textAlign:'center', padding:'48px', color:'var(--t4)', fontSize:13 }}>
