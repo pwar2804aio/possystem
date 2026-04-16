@@ -86,7 +86,31 @@ export function startRealtime(store, locationId = LOCATION_ID) {
     })
     .subscribe();
 
-  channels = [kdsChannel, e86Channel, configChannel];
+  // ── Tax rates — live sync when names/rates change ──────────────────────────
+  const taxChannel = supabase
+    .channel(`tax:${locationId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'tax_rates',
+      filter: `location_id=eq.${locationId}`,
+    }, async () => {
+      // Re-fetch all rates for this location when any change happens
+      const { data } = await supabase
+        .from('tax_rates').select('*')
+        .eq('location_id', locationId)
+        .eq('active', true)
+        .order('rate', { ascending: false });
+      if (data) store.setState({ taxRates: data.map(r => ({
+        id: r.id, name: r.name, code: r.code,
+        rate: parseFloat(r.rate), type: r.type,
+        appliesTo: r.applies_to || ['all'],
+        isDefault: r.is_default, active: r.active,
+      })) });
+    })
+    .subscribe();
+
+  channels = [kdsChannel, e86Channel, configChannel, taxChannel];
 
   return () => {
     channels.forEach(ch => supabase.removeChannel(ch));

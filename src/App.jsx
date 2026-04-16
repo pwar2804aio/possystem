@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.86', date: 'Apr 2026', label: 'Tax name changes propagate live everywhere',
+    changes: [
+      'TaxManager now syncs updated tax rates to Zustand store immediately after save — name/rate changes show live in item editor and order panel',
+      'Realtime subscription for tax_rates table — POS receives name and rate changes automatically without page refresh',
+    ],
+  },
+  {
     version: '3.5.85', date: 'Apr 2026', label: 'Data integrity: Supabase as source of truth',
     changes: [
       'updateMenuItem now saves the FULL item to Supabase on every edit — not just the changed patch',

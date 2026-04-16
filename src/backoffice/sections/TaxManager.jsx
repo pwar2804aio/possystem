@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
 import { UK_DEFAULT_RATES, US_DEFAULT_RATES } from '../../lib/tax';
+import { useStore } from '../../store';
 
 const ORDER_TYPES = ['dine-in', 'takeaway', 'delivery', 'bar', 'counter'];
 
@@ -137,7 +138,15 @@ export default function TaxManager() {
     if (isMock) { setLoading(false); return; }
     const locId = await getLocationId();
     const { data } = await supabase.from('tax_rates').select('*').eq('location_id', locId).order('rate', { ascending:false });
-    setRates(data || []);
+    const fetched = data || [];
+    setRates(fetched);
+    // Sync to Zustand store so POS/checkout/order panel pick up name changes immediately
+    useStore.setState({ taxRates: fetched.map(r => ({
+      id: r.id, name: r.name, code: r.code,
+      rate: parseFloat(r.rate), type: r.type,
+      appliesTo: r.applies_to || ['all'],
+      isDefault: r.is_default, active: r.active,
+    })) });
     setLoading(false);
   };
 
