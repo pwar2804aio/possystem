@@ -57,6 +57,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.5.91', date: 'Apr 2026', label: 'Fix: service charge config now reaches deviceConfig', changes: ['serviceCharge was not being written to rpos-device-config or rpos-terminal-config — fixed in all 3 write locations', 'Store init now backfills serviceCharge from rpos-device-profiles if missing from cached device config', 'Service charge on min covers threshold now works correctly on the POS'] },
   { version: '3.5.90', date: 'Apr 2026', label: 'Save & Send combined into one button', changes: ['Table mode: Save and Send merged into single context-aware button — shows Save (no items), Save & Send (unsent items), or Save (all already sent)'] },
   { version: '3.5.89', date: 'Apr 2026', label: 'Remove Dev Switch device button from POS', changes: ['Dev: Switch device floating button removed from bottom left of POS — was covering the UI'] },
   { version: '3.5.88', date: 'Apr 2026', label: 'Remove Switch device mode button', changes: ['Removed Switch device mode button from back office sidebar — was covering UI'] },
@@ -1594,6 +1595,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
               hiddenFeatures: profile.hiddenFeatures || [],
               tableServiceEnabled: profile.tableServiceEnabled !== false,
               quickScreenEnabled: profile.quickScreenEnabled !== false,
+              serviceCharge: profile.serviceCharge || null,
             };
             localStorage.setItem('rpos-device-config', JSON.stringify(config));
             useStore.getState().setDeviceConfig(config);
@@ -1688,6 +1690,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             hiddenFeatures: p.hidden_features || [],
             tableServiceEnabled: p.table_service_enabled !== false,
             quickScreenEnabled: p.quick_screen_enabled !== false,
+            serviceCharge: p.service_charge || null,
             terminalName: useStore.getState().deviceConfig?.terminalName,
           };
           localStorage.setItem('rpos-device-config', JSON.stringify(config));

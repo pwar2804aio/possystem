@@ -300,10 +300,28 @@ export const useStore = create((set, get) => ({
       }
       // Then check sessionStorage (tab-specific — each tab is a separate terminal)
       const saved = sessionStorage.getItem('rpos-terminal-config');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const cfg = JSON.parse(saved);
+        // Backfill serviceCharge from stored profiles if missing
+        if (!cfg.serviceCharge && cfg.profileId) {
+          const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+          const match = profiles.find(p => p.id === cfg.profileId);
+          if (match?.serviceCharge) cfg.serviceCharge = match.serviceCharge;
+        }
+        return cfg;
+      }
       // Fall back to localStorage device config (set when device was paired/profiled)
       const localConfig = localStorage.getItem('rpos-device-config');
-      if (localConfig) return JSON.parse(localConfig);
+      if (localConfig) {
+        const cfg = JSON.parse(localConfig);
+        // Backfill serviceCharge from stored profiles if missing
+        if (!cfg.serviceCharge && cfg.profileId) {
+          const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+          const match = profiles.find(p => p.id === cfg.profileId);
+          if (match?.serviceCharge) cfg.serviceCharge = match.serviceCharge;
+        }
+        return cfg;
+      }
       return null;
     } catch { return null; }
   })(),
