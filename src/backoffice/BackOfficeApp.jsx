@@ -363,6 +363,7 @@ function PushToPOSButton() {
       menus,
       menuItems,
       menuCategories,
+      quickScreenIds: useStore.getState().quickScreenIds || [],
       changeCount: pendingBOChanges,
       profiles: deviceProfiles,
       modifierGroupDefs: useStore.getState().modifierGroupDefs || [],

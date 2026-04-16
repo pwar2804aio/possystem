@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.70', date: 'Apr 2026', label: 'Quick screen fix: items now push to POS correctly',
+    changes: [
+      'quickScreenIds now included in Push to POS snapshot',
+      'SyncBridge no longer strips quickScreenIds when applying snapshot on POS',
+      'Item grid rows expand to fit content instead of overlapping',
+    ],
+  },
+  {
     version: '3.5.69', date: 'Apr 2026', label: 'Item grid fix + quick screen fix',
     changes: [
       'Item grid: rows now use minmax so long names expand the row instead of overlapping',

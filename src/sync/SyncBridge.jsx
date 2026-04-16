@@ -47,14 +47,13 @@ export default function SyncBridge({ onSyncPulse }) {
           delete parsed.modifierGroups;
           delete parsed.modifierOptions;
           delete parsed.itemVariants;
-          delete parsed.quickScreenIds;
           delete parsed.staff;
           delete parsed.tables;
           delete parsed.sections;
           delete parsed.eightySix;
           delete parsed.tabs;          // bar tabs are session-only in real mode
+          // NOTE: quickScreenIds is kept — it's config pushed from back office
           // NOTE: closedChecks are kept from localStorage as fast fallback
-          // They get confirmed/refreshed from Supabase below
         }
         useStore.setState(parsed);
         isApplyingRef.current = false;
