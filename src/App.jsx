@@ -23,6 +23,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.62', date: 'Apr 2026', label: 'Platform DB: separate user/company management',
+    changes: [
+      'New RPOS Platform DB (yhzjgyrkyjabvhblqxzu) manages companies, locations, and user access',
+      'Ops DB remains clean — only POS operational data',
+      'getLocationId now queries Platform DB first, falls back to ops DB for existing installs',
+      'Both pwar2804@gmail.com and peter@posup.co.uk seeded in Platform DB with admin access',
+    ],
+  },
+  {
     version: '3.5.61', date: 'Apr 2026', label: 'Auto-fire to kitchen on payment',
     changes: [
       'Walk-in orders paid without sending first now auto-fire to production printing at point of payment',
