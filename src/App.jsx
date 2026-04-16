@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.50', date: 'Apr 2026', label: 'Required modifier fix: group min overrides item min',
+    changes: [
+      'Required modifier validation now uses the higher of group-level min vs item-level min',
+      'Previously: item stored min:0 (optional) which silently overrode group min:1 (required)',
+      'Now: if a group is marked Required in Modifier groups tab, it stays required on all items',
+    ],
+  },
+  {
     version: '3.5.49', date: 'Apr 2026', label: 'Archived items + sub-items simplified + required modifier error',
     changes: [
       'Items tab: Archived button shows all archived items with Unarchive button per item',

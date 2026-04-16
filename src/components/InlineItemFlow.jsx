@@ -25,8 +25,11 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
     if (targetItem?.assignedModifierGroups?.length) {
       targetItem.assignedModifierGroups.forEach(ag => {
         const def = modifierGroupDefs?.find(d => d.id === ag.groupId);
-        if (def) all.push({ ...def, min: ag.min ?? def.min ?? 0, max: ag.max ?? def.max ?? 1,
-          required: (ag.min ?? def.min ?? 0) > 0 });
+        if (def) {
+          const effectiveMin = Math.max(ag.min ?? 0, def.min ?? 0);
+          all.push({ ...def, min: effectiveMin, max: ag.max ?? def.max ?? 1,
+            required: effectiveMin > 0 });
+        }
       });
     }
     if (targetItem?.modifierGroups?.length) {
