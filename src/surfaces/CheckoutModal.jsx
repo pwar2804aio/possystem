@@ -435,14 +435,14 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                 })}
                 {service > 0 ? (
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:5 }}>
-                    <span>Service (12.5%)</span>
+                    <span>Service charge</span>
                     <span style={{ fontFamily:'var(--font-mono)' }}>£{service.toFixed(2)}</span>
                   </div>
-                ) : (
-                  <div style={{ fontSize:12, color:'var(--grn)', fontWeight:600, marginBottom:5 }}>
-                    ✓ No service charge · {isBarTab?'bar tab':orderType}
+                ) : orderType === 'dine-in' ? (
+                  <div style={{ fontSize:12, color:'var(--t4)', marginBottom:5 }}>
+                    No service charge
                   </div>
-                )}
+                ) : null}
                 <div style={{ height:1, background:'var(--bdr)', margin:'8px 0' }}/>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
                   <span style={{ fontSize:15, fontWeight:600, color:'var(--t2)' }}>Total due</span>

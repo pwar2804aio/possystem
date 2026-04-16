@@ -1,6 +1,7 @@
 import { useCompact } from '../lib/useCompact';
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import { resolveServiceCharge } from '../lib/serviceCharge';
 import CheckSelectorModal from '../components/CheckSelectorModal';
 
 const STATUS = {
@@ -609,13 +610,35 @@ export default function TablesSurface() {
                           <span style={{ color:'var(--t3)' }}>Order sent</span><span style={{ color:'var(--t1)', fontWeight:600 }}>{fmt(session.sentAt)} ago</span>
                         </div>}
                         <div style={{ height:1, background:'var(--bdr)', margin:'8px 0' }}/>
-                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, fontWeight:700 }}>
-                          <span style={{ color:'var(--t2)' }}>Running total</span>
-                          <span style={{ color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>£{(session.subtotal||0).toFixed(2)}</span>
-                        </div>
-                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', marginTop:3 }}>
-                          <span>inc. service</span><span style={{ fontFamily:'DM Mono,monospace' }}>£{(session.total||0).toFixed(2)}</span>
-                        </div>
+                        {(() => {
+                          // Compute service charge using device profile config
+                          const sub = session.subtotal || 0;
+                          let scRate = 0;
+                          try {
+                            scRate = resolveServiceCharge({
+                              deviceConfig,
+                              orderType: 'dine-in',
+                              covers: session.covers || 1,
+                              waived: session.serviceChargeWaived || false,
+                            });
+                          } catch {}
+                          const scAmt = sub * scRate;
+                          const totalWithSC = sub + scAmt;
+                          return (
+                            <>
+                              <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, fontWeight:700 }}>
+                                <span style={{ color:'var(--t2)' }}>Running total</span>
+                                <span style={{ color:'var(--acc)', fontFamily:'DM Mono,monospace' }}>£{sub.toFixed(2)}</span>
+                              </div>
+                              {scAmt > 0 && (
+                                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t3)', marginTop:3 }}>
+                                  <span>inc. service ({deviceConfig?.serviceCharge?.rate ?? 12.5}%)</span>
+                                  <span style={{ fontFamily:'DM Mono,monospace' }}>£{totalWithSC.toFixed(2)}</span>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
 

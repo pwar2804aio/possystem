@@ -57,6 +57,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.5.93', date: 'Apr 2026', label: 'Service charge: floor plan panel + checkout fixed', changes: ['Floor plan table panel now computes service charge using resolveServiceCharge — respects minCovers threshold and waived flag', 'Checkout modal shows service charge correctly from getPOSTotals', 'Service charge label no longer hardcoded to 12.5%'] },
   { version: '3.5.92', date: 'Apr 2026', label: 'Fix: serviceCharge guaranteed in deviceConfig', changes: ['setDeviceConfig now auto-merges serviceCharge from rpos-device-profiles if missing — no code path can strip it', 'minConfig path also carries serviceCharge forward from existingConfig', 'Service charge on min covers now works on first load without needing re-pair'] },
   { version: '3.5.91', date: 'Apr 2026', label: 'Fix: service charge config now reaches deviceConfig', changes: ['serviceCharge was not being written to rpos-device-config or rpos-terminal-config — fixed in all 3 write locations', 'Store init now backfills serviceCharge from rpos-device-profiles if missing from cached device config', 'Service charge on min covers threshold now works correctly on the POS'] },
   { version: '3.5.90', date: 'Apr 2026', label: 'Save & Send combined into one button', changes: ['Table mode: Save and Send merged into single context-aware button — shows Save (no items), Save & Send (unsent items), or Save (all already sent)'] },
