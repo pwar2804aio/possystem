@@ -240,36 +240,37 @@ export default function PrinterRegistry() {
     setTestResult(r => ({ ...r, [printer.id]: null }));
     try {
       const result = await printService.printTestPage(printer);
-      // Job queued — now watch it for up to 20s to see if agent picks it up
       const jobId = result?.jobId;
       if (jobId && printService.watchJob) {
         setTestResult(r => ({ ...r, [printer.id]: 'queued' }));
         await new Promise((resolve) => {
-          const unsub = printService.watchJob(jobId, (updated) => {
+          const unsub = printService.watchJob(jobId, async (updated) => {
             if (updated.status === 'done') {
-              persist(printers.map(p => p.id === printer.id ? { ...p, status: 'online', lastSeen: Date.now() } : p));
+              await printService.recordPrinterHealth(printer.id, 'online');
+              persist(printers.map(p => p.id === printer.id ? { ...p, status:'online', lastSeen:Date.now() } : p));
               setTestResult(r => ({ ...r, [printer.id]: 'online' }));
               unsub(); resolve();
             } else if (updated.status === 'failed') {
-              persist(printers.map(p => p.id === printer.id ? { ...p, status: 'offline' } : p));
-              setTestResult(r => ({ ...r, [printer.id]: 'agent-failed', error: updated.error || 'Agent reported failure' }));
+              const err = updated.error_message || 'Agent reported failure';
+              await printService.recordPrinterHealth(printer.id, 'error', err);
+              persist(printers.map(p => p.id === printer.id ? { ...p, status:'offline' } : p));
+              setTestResult(r => ({ ...r, [printer.id]: 'agent-failed', error: err }));
               unsub(); resolve();
             }
           });
-          // Timeout after 20s — agent probably not running
           setTimeout(() => {
             unsub();
-            persist(printers.map(p => p.id === printer.id ? { ...p, status: 'offline' } : p));
-            setTestResult(r => ({ ...r, [printer.id]: 'timeout', error: 'Print agent not responding — is it running?' }));
+            // Timeout — agent not responding. Don't mark offline yet — job may still be in queue
+            setTestResult(r => ({ ...r, [printer.id]: 'timeout' }));
             resolve();
           }, 20000);
         });
       } else {
-        // No watchJob support — mark as queued only
         setTestResult(r => ({ ...r, [printer.id]: 'queued' }));
       }
     } catch (err) {
-      persist(printers.map(p => p.id === printer.id ? { ...p, status: 'offline' } : p));
+      await printService.recordPrinterHealth(printer.id, 'error', err.message);
+      persist(printers.map(p => p.id === printer.id ? { ...p, status:'offline' } : p));
       setTestResult(r => ({ ...r, [printer.id]: 'error', error: err.message }));
     }
     setTesting(t => ({ ...t, [printer.id]: false }));
@@ -334,12 +335,12 @@ export default function PrinterRegistry() {
                   )}
                   {result && (
                     <div style={{ fontSize:11, marginTop:5, fontWeight:600,
-                      color: result === 'online' ? 'var(--grn)' : result === 'queued' ? 'var(--acc)' : 'var(--red)' }}>
-                      {result === 'online'       && '✓ Printed successfully'}
-                      {result === 'queued'       && '⏳ Job sent — waiting for agent (up to 20s)…'}
-                      {result === 'timeout'      && `✗ Agent not responding — is the print agent running?\n${testResult[printer.id]?.error || ''}`}
-                      {result === 'agent-failed' && `✗ Agent failed to print — ${testResult[printer.id]?.error || 'check printer connection'}`}
-                      {result === 'error'        && `✗ Failed to queue job — ${testResult[printer.id]?.error || 'Supabase error'}`}
+                      color: result === 'online' ? 'var(--grn)' : result === 'queued' ? 'var(--acc)' : result === 'timeout' ? 'var(--acc)' : 'var(--red)' }}>
+                      {result === 'online'       && '✓ Printed successfully — printer is online'}
+                      {result === 'queued'       && '⏳ Job queued — waiting for print agent…'}
+                      {result === 'timeout'      && '⚠ Job queued but no response yet — check the print agent is running on your LAN machine'}
+                      {result === 'agent-failed' && `✗ Agent reached printer but failed — ${testResult[printer.id]?.error || 'check printer cable, paper, and power'}`}
+                      {result === 'error'        && `✗ Could not queue job — ${testResult[printer.id]?.error || 'check Supabase connection'}`}
                     </div>
                   )}
                   {testing[printer.id] && result === 'queued' && (

@@ -295,6 +295,59 @@ class PrintService {
       .subscribe();
     return () => supabase.removeChannel(channel);
   }
+
+  // Update printer_health table after a job completes — called by PrinterRegistry after test
+  async recordPrinterHealth(printerId, status, error = null) {
+    if (!supabase) return;
+    try {
+      const locationId = await getLocationId();
+      if (!locationId) return;
+      const now = new Date().toISOString();
+      await supabase.from('printer_health').upsert({
+        printer_id: printerId,
+        location_id: locationId,
+        status,
+        last_job_at: now,
+        ...(status === 'online'  ? { last_success_at: now, consecutive_failures: 0 } : {}),
+        ...(status === 'offline' || status === 'error' ? {
+          last_error_at: now,
+          last_error: error || 'Unknown error',
+        } : {}),
+        updated_at: now,
+      }, { onConflict: 'printer_id' });
+    } catch(e) { console.warn('printer_health update failed', e); }
+  }
+
+  // Load printer health from Supabase
+  async getPrinterHealth(locationId) {
+    if (!supabase || !locationId) return {};
+    try {
+      const { data } = await supabase.from('printer_health').select('*').eq('location_id', locationId);
+      return Object.fromEntries((data || []).map(r => [r.printer_id, r]));
+    } catch { return {}; }
+  }
+
+  // Watch all printer health changes in realtime
+  watchPrinterHealth(locationId, onUpdate) {
+    if (!supabase) return () => {};
+    const channel = supabase
+      .channel(`printer-health-${locationId}`)
+      .on('postgres_changes', { event:'*', schema:'public', table:'printer_health', filter:`location_id=eq.${locationId}` },
+        payload => onUpdate(payload.new || payload.old))
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }
+
+  // Watch print agent heartbeats
+  watchAgents(locationId, onUpdate) {
+    if (!supabase) return () => {};
+    const channel = supabase
+      .channel(`printer-agents-${locationId}`)
+      .on('postgres_changes', { event:'*', schema:'public', table:'printer_agents', filter:`location_id=eq.${locationId}` },
+        payload => onUpdate(payload.new))
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }
 }
 
 export const printService = new PrintService();

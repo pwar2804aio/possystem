@@ -62,10 +62,36 @@ export default function StatusDrawer({ onClose }) {
     } catch {}
   }, []);
 
-  // Check printer statuses from recent print_jobs
+  // Load printer health from printer_health table — persistent, realtime
   const checkPrinterStatuses = useCallback(async () => {
     if (!supabase || !printers.length) return;
     try {
+      const locId = await getLocationId();
+      if (!locId) return;
+
+      // First try printer_health table (persistent, updated by agent)
+      const { data: health } = await supabase
+        .from('printer_health')
+        .select('printer_id, status, last_success_at, last_error_at, last_error, consecutive_failures')
+        .eq('location_id', locId);
+
+      if (health?.length) {
+        const s = {};
+        printers.forEach(printer => {
+          const h = health.find(r => r.printer_id === printer.id);
+          if (!h) { s[printer.id] = 'unknown'; return; }
+          // If last success was within 10min and no failures since, show online
+          const successAge = h.last_success_at ? Date.now() - new Date(h.last_success_at).getTime() : Infinity;
+          if (h.status === 'online' && successAge < 10 * 60000) s[printer.id] = 'online';
+          else if (h.consecutive_failures >= 2) s[printer.id] = 'offline';
+          else if (h.status === 'error') s[printer.id] = 'offline';
+          else s[printer.id] = h.status || 'unknown';
+        });
+        setStatuses(prev => ({ ...prev, ...s }));
+        return;
+      }
+
+      // Fallback: infer from recent print_jobs
       const { data } = await supabase
         .from('print_jobs')
         .select('printer_id, status, created_at')
@@ -78,9 +104,9 @@ export default function StatusDrawer({ onClose }) {
         if (!jobs.length) { s[printer.id] = 'unknown'; return; }
         const latest = jobs[0];
         const age = Date.now() - new Date(latest.created_at).getTime();
-        if (latest.status === 'done' && age < 5 * 60000) s[printer.id] = 'online';
+        if (latest.status === 'done' && age < 10 * 60000) s[printer.id] = 'online';
         else if (latest.status === 'failed') s[printer.id] = 'offline';
-        else if (latest.status === 'pending' && age > 30000) s[printer.id] = 'offline';
+        else if (latest.status === 'pending' && age > 60000) s[printer.id] = 'unknown';
         else s[printer.id] = 'unknown';
       });
       setStatuses(prev => ({ ...prev, ...s }));

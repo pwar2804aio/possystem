@@ -23,6 +23,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.67', date: 'Apr 2026', label: 'Printer monitoring: proper health tracking',
+    changes: [
+      'print_jobs added to Supabase realtime — watchJob now fires correctly on job completion',
+      'New printer_health table: persistent per-printer status updated on every job outcome',
+      'New printer_agents table: ready for LAN print agent heartbeat (90s timeout detection)',
+      'Status Drawer reads from printer_health first — accurate and persistent across sessions',
+      'Test button: timeout no longer falsely marks printer offline, shows correct agent-vs-printer distinction',
+      'agent-failed vs timeout vs error are now three distinct failure states with clear messages',
+    ],
+  },
+  {
     version: '3.5.66', date: 'Apr 2026', label: 'Location switcher fix',
     changes: [
       'Regular users now correctly see their location in the switcher',
