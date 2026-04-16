@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { ALLERGENS, INITIAL_TABLES, MENU_ITEMS, PRINTERS, PRODUCTION_CENTRES, STAFF } from '../data/seed';
 import { VERSION } from '../lib/version';
 import { supabase, isMock } from '../lib/supabase';
+import AIChat from '../components/AIChat';
 // ══════════════════════════════════════════════════════════════════════════════
 // Payment Screen
 // ══════════════════════════════════════════════════════════════════════════════
@@ -758,103 +759,14 @@ export function BackOfficeSurface() {
 
 // ── AI Shift Assistant ────────────────────────────────────────────────────────
 function BOAIAssistant({ closedChecks, shift, staff }) {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: `Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}${staff?.name ? `, ${staff.name}` : ''}. I'm your shift assistant. I can help you analyse today's service, spot trends, suggest upsells, flag concerns, or just answer questions about the shift. What would you like to know?`,
-    }
-  ]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const bottomRef = useState(null);
-  const inputRef = useState(null);
-
-  const QUICK_PROMPTS = [
-    'How is the shift going?',
-    'Which tables are performing best?',
-    'What should I 86 soon?',
-    'Suggest upsells for tonight',
-    'Any concerns I should know about?',
-    'What are our top selling items?',
-  ];
-
-  // Build a concise shift context for Claude
-  const buildContext = () => {
-    const now = new Date();
-    const revenue = closedChecks.reduce((s,c)=>s+c.total,0);
-    const covers  = closedChecks.reduce((s,c)=>s+(c.covers||1),0);
-    const avg     = closedChecks.length > 0 ? revenue/closedChecks.length : 0;
-    const tips    = closedChecks.reduce((s,c)=>s+(c.tip||0),0);
-    const refunds = closedChecks.reduce((s,c)=>s+c.refunds.reduce((r,rf)=>r+rf.amount,0),0);
-
-    // Top items
-    const itemMap = {};
-    closedChecks.forEach(c=>c.items.forEach(i=>{
-      itemMap[i.name] = (itemMap[i.name]||0) + i.qty;
-    }));
-    const topItems = Object.entries(itemMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,q])=>`${n} (×${q})`).join(', ');
-
-    // By server
-    const serverMap = {};
-    closedChecks.forEach(c=>{ const s=c.server||'Unknown'; serverMap[s]=(serverMap[s]||0)+c.total; });
-    const byServer = Object.entries(serverMap).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}: £${v.toFixed(0)}`).join(', ');
-
-    return `You are a restaurant shift assistant AI for RestaurantOS. Be concise, practical, and direct. Use £ for currency.
-
-CURRENT TIME: ${now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} — ${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}
-SHIFT: ${shift.name} (open since ${shift.opened})
-STAFF: ${staff?.name || 'Unknown'} (${staff?.role || 'Server'})
-
-SHIFT PERFORMANCE (from ${closedChecks.length} closed checks):
-- Revenue: £${revenue.toFixed(2)} | Covers: ${covers} | Avg check: £${avg.toFixed(2)}
-- Tips collected: £${tips.toFixed(2)} | Refunds issued: £${refunds.toFixed(2)}
-- Card: £${closedChecks.filter(c=>c.method==='card').reduce((s,c)=>s+c.total,0).toFixed(2)} | Cash: £${closedChecks.filter(c=>c.method==='cash').reduce((s,c)=>s+c.total,0).toFixed(2)}
-- Top items: ${topItems || 'No data yet'}
-- By server: ${byServer || 'No data yet'}
-
-Respond helpfully and briefly. If there's no data yet, acknowledge it and still give useful advice.`;
-  };
-
-  const send = async (text) => {
-    const msg = text || input.trim();
-    if (!msg || loading) return;
-    setInput('');
-
-    const userMsg = { role:'user', content: msg };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setLoading(true);
-
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: buildContext(),
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-        }),
-      });
-      const data = await res.json();
-      const reply = data.content?.[0]?.text || 'Sorry, I couldn\'t get a response.';
-      setMessages(m => [...m, { role:'assistant', content: reply }]);
-    } catch (err) {
-      setMessages(m => [...m, { role:'assistant', content: 'Connection error — check your network and try again.' }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
-      {/* Header */}
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
       <div style={{ padding:'16px 24px 12px', borderBottom:'1px solid var(--bdr)', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:'var(--acc-d)', border:'1px solid var(--acc-b)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>✦</div>
           <div>
             <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)' }}>AI Shift Assistant</div>
-            <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>Powered by Claude · Has full context of today's shift</div>
+            <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>Powered by Claude · Live shift context</div>
           </div>
           <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6, padding:'4px 10px', borderRadius:20, background:'var(--grn-d)', border:'1px solid var(--grn-b)' }}>
             <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--grn)' }}/>
@@ -862,89 +774,8 @@ Respond helpfully and briefly. If there's no data yet, acknowledge it and still 
           </div>
         </div>
       </div>
-
-      {/* Messages */}
-      <div style={{ flex:1, overflowY:'auto', padding:'16px 24px' }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{
-            display:'flex', gap:10, marginBottom:16,
-            justifyContent: m.role==='user' ? 'flex-end' : 'flex-start',
-          }}>
-            {m.role==='assistant' && (
-              <div style={{ width:28, height:28, borderRadius:8, background:'var(--acc-d)', border:'1px solid var(--acc-b)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, flexShrink:0, marginTop:2 }}>✦</div>
-            )}
-            <div style={{
-              maxWidth:'78%',
-              padding:'10px 14px',
-              borderRadius: m.role==='user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
-              background: m.role==='user' ? 'var(--acc)' : 'var(--bg3)',
-              border: m.role==='user' ? 'none' : '1px solid var(--bdr)',
-              color: m.role==='user' ? '#0b0c10' : 'var(--t1)',
-              fontSize: 13,
-              lineHeight: 1.6,
-              fontWeight: m.role==='user' ? 600 : 400,
-              whiteSpace: 'pre-wrap',
-            }}>
-              {m.content}
-            </div>
-            {m.role==='user' && (
-              <div style={{ width:28, height:28, borderRadius:'50%', background:staff?.color+'22', border:`2px solid ${staff?.color||'var(--acc)'}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:staff?.color||'var(--acc)', flexShrink:0, marginTop:2 }}>
-                {staff?.initials || '?'}
-              </div>
-            )}
-          </div>
-        ))}
-        {loading && (
-          <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-            <div style={{ width:28, height:28, borderRadius:8, background:'var(--acc-d)', border:'1px solid var(--acc-b)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13 }}>✦</div>
-            <div style={{ padding:'12px 16px', borderRadius:'4px 16px 16px 16px', background:'var(--bg3)', border:'1px solid var(--bdr)', display:'flex', gap:5, alignItems:'center' }}>
-              {[0,1,2].map(i=>(
-                <div key={i} style={{ width:6, height:6, borderRadius:'50%', background:'var(--acc)', animation:`pulse 1.2s ease-in-out ${i*0.2}s infinite` }}/>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Quick prompts */}
-      <div style={{ padding:'0 24px 10px', flexShrink:0 }}>
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          {QUICK_PROMPTS.map(p=>(
-            <button key={p} onClick={()=>send(p)} disabled={loading} style={{
-              padding:'5px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
-              background:'var(--bg3)', border:'1px solid var(--bdr)',
-              color:'var(--t3)', fontSize:11, fontWeight:600, transition:'all .12s',
-              opacity: loading ? .4 : 1,
-            }}
-            onMouseEnter={e=>{if(!loading){e.currentTarget.style.borderColor='var(--acc-b)';e.currentTarget.style.color='var(--acc)';}}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr)';e.currentTarget.style.color='var(--t3)';}}>
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Input */}
-      <div style={{ padding:'0 24px 18px', flexShrink:0 }}>
-        <div style={{ display:'flex', gap:8, background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:14, padding:'6px 6px 6px 14px', transition:'border-color .15s' }}
-          onFocusCapture={e=>e.currentTarget.style.borderColor='var(--acc-b)'}
-          onBlurCapture={e=>e.currentTarget.style.borderColor='var(--bdr2)'}>
-          <input
-            value={input}
-            onChange={e=>setInput(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send()}
-            placeholder="Ask anything about the shift…"
-            disabled={loading}
-            style={{ flex:1, background:'transparent', border:'none', outline:'none', color:'var(--t1)', fontSize:13, fontFamily:'inherit' }}
-          />
-          <button onClick={()=>send()} disabled={!input.trim()||loading} style={{
-            width:36, height:36, borderRadius:10, cursor:'pointer', fontFamily:'inherit',
-            background: input.trim()&&!loading ? 'var(--acc)' : 'var(--bg4)',
-            border: 'none', color: input.trim()&&!loading ? '#0b0c10' : 'var(--t4)',
-            fontSize:16, display:'flex', alignItems:'center', justifyContent:'center',
-            transition:'all .12s', flexShrink:0,
-          }}>↑</button>
-        </div>
+      <div style={{ flex:1, overflow:'hidden' }}>
+        <AIChat mode="foh" staff={staff} placeholder="Ask about today's shift, allergens, printer status…"/>
       </div>
     </div>
   );

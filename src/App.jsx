@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.71', date: 'Apr 2026', label: 'AI Assistant: FoH + BoH with tool use',
+    changes: [
+      'New BoH AI Assistant section — sales reporting, menu lookup, printer status, add items, update prices',
+      'FoH Shift Assistant upgraded with full tool use — allergens, printer checks, 86 items',
+      'Secure API proxy at /api/ai — Anthropic API key stays server-side, never exposed',
+      'Hard constraint system: read tools execute immediately, write tools require explicit confirmation',
+      'Tool-call visualization shows what the AI is doing in real time',
+    ],
+  },
+  {
     version: '3.5.70', date: 'Apr 2026', label: 'Quick screen fix: items now push to POS correctly',
     changes: [
       'quickScreenIds now included in Push to POS snapshot',

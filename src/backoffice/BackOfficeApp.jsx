@@ -17,6 +17,7 @@ import EODClose from './sections/EODClose';
 import Inventory from './sections/Inventory';
 import SupabaseSetup from '../lib/SupabaseSetup';
 import CompanyAdmin from './sections/CompanyAdmin';
+import AIAssistantSection from './sections/AIAssistantSection';
 
 const NAV = [
   { id:'overview',   label:'Overview',        icon:'◈',  group:'Dashboard' },
@@ -30,6 +31,7 @@ const NAV = [
   { id:'printing',   label:'Production printing',   icon:'🖨',  group:'Configuration' },
   { id:'reports',    label:'Reports',         icon:'📊',  group:'Analytics' },
   { id:'eod',        label:'End of day',      icon:'🔒',  group:'Analytics' },
+  { id:'ai',         label:'AI Assistant',    icon:'✦',  group:'Analytics' },
 ];
 
 export default function BackOfficeApp() {
@@ -308,6 +310,7 @@ export default function BackOfficeApp() {
           {section === 'reports'    && <BOReports />}
           {section === 'eod'        && <EODClose />}
           {section === 'admin'       && <CompanyAdmin />}
+          {section === 'ai'         && <AIAssistantSection />}
         </div>
       </div>
       {showLocationSwitcher && <LocationSwitcher onClose={() => setShowLocationSwitcher(false)} />}
