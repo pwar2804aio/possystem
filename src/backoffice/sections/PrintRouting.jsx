@@ -18,7 +18,32 @@ const load = () => {
   try { return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres:[], routing:{} }; }
   catch { return { centres:[], routing:{} }; }
 };
-const save = (data) => localStorage.setItem('rpos-print-routing', JSON.stringify(data));
+const save = (data) => localStorage.setItem('rpos-print-routing', JSON.stringify(data)); // local cache for POS
+
+async function loadRoutingFromDB() {
+  if (isMock || !supabase) return load();
+  try {
+    const locationId = await getLocationId();
+    if (!locationId) return load();
+    const { data } = await supabase.from('print_routing').select('*').eq('location_id', locationId).single();
+    if (data) {
+      const config = { centres: data.centres || [], routing: data.routing || {} };
+      localStorage.setItem('rpos-print-routing', JSON.stringify(config));
+      return config;
+    }
+  } catch(e) { /* no row yet */ }
+  return load();
+}
+
+async function saveRoutingToDB(data) {
+  if (isMock || !supabase) return;
+  save(data); // update local cache immediately
+  try {
+    const locationId = await getLocationId();
+    if (!locationId) return;
+    await supabase.from('print_routing').upsert({ location_id:locationId, centres:data.centres, routing:data.routing, updated_at:new Date().toISOString() }, { onConflict:'location_id' });
+  } catch(e) { console.warn('routing save failed', e); }
+}
 
 // Default routing entry for a centre
 const emptyRouting = () => ({ assignedCategories:[], excludedItems:[] });
@@ -165,16 +190,26 @@ function CategoryRouter({ centreId, routing, setRouting, menuCategories, menuIte
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function PrintRouting() {
   const { menuCategories, menuItems, markBOChange } = useStore();
-  const [data, setData] = useState(load);
-  const [routing, setRouting] = useState(load().routing || {});
-  const [selected, setSelected] = useState(null); // selected centre id
+  const [data, setData] = useState(() => ({ centres:[], routing:{} }));
+  const [routing, setRouting] = useState({});
+  const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [editCentre, setEditCentre] = useState(null); // centre being edited
+  const [editCentre, setEditCentre] = useState(null);
   const [kdsDevices, setKdsDevices] = useState([]);
   const [form, setForm] = useState({ name:'', icon:'🔥', type:'kitchen', printerId:'', kdsDeviceId:'' });
   const [printers, setPrinters] = useState(() => { try { return JSON.parse(localStorage.getItem('rpos-printers')||'[]'); } catch { return []; } });
+  const [_loaded, setLoaded] = useState(false);
 
-  // Keep printer list live if user adds a printer in another tab
+  // Load routing from Supabase on mount
+  useEffect(() => {
+    loadRoutingFromDB().then(config => {
+      setData(config);
+      setRouting(config.routing || {});
+      setLoaded(true);
+    });
+  }, []);
+
+  // Keep printer list live
   useEffect(() => {
     const h = () => { try { setPrinters(JSON.parse(localStorage.getItem('rpos-printers')||'[]')); } catch {} };
     window.addEventListener('rpos-printers-updated', h);
@@ -193,10 +228,11 @@ export default function PrintRouting() {
     })();
   }, []);
 
-  // Persist changes
+  // Persist changes to Supabase (and localStorage cache)
   useEffect(() => {
+    if (!_loaded) return; // don't save on initial load
     const saved = { centres: data.centres, routing };
-    save(saved);
+    saveRoutingToDB(saved);
     markBOChange?.();
   }, [data.centres, routing]);
 

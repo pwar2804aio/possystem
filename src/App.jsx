@@ -23,6 +23,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.63', date: 'Apr 2026', label: 'Back office fully cloud-based',
+    changes: [
+      'Printers: read/write Supabase printers table — survives across machines and incognito',
+      'Print routing: read/write Supabase print_routing table — fully cloud-persisted',
+      'Push to POS: reads routing and printers from Supabase as source of truth',
+      'localStorage only used as POS cache — back office is 100% Supabase',
+    ],
+  },
+  {
     version: '3.5.62', date: 'Apr 2026', label: 'Platform DB: separate user/company management',
     changes: [
       'New RPOS Platform DB (yhzjgyrkyjabvhblqxzu) manages companies, locations, and user access',

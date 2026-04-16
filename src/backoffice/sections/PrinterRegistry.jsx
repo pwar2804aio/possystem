@@ -35,9 +35,34 @@ const EMPTY = { name:'', model:'sunmi-nt311', connectionType:'network', address:
 function loadPrinters() {
   try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; }
 }
+async function loadPrintersFromDB() {
+  if (isMock || !supabase) return loadPrinters();
+  try {
+    const locationId = await getLocationId();
+    if (!locationId) return loadPrinters();
+    const { data } = await supabase.from('printers').select('*').eq('location_id', locationId).order('created_at');
+    if (data) {
+      const list = data.map(r => ({ id:r.id, name:r.name, model:r.meta?.model||'generic', connectionType:r.connection, address:r.ip, port:r.port||9100, paperWidth:r.paper_width||80, roles:r.meta?.roles||['receipt'], location:r.meta?.location||'', status:r.meta?.status||'unknown', addedAt:r.meta?.addedAt||Date.now() }));
+      localStorage.setItem('rpos-printers', JSON.stringify(list)); // keep local cache for POS
+      return list;
+    }
+  } catch(e) { console.warn('printers load failed', e); }
+  return loadPrinters();
+}
+async function savePrinterToDB(printer) {
+  if (isMock || !supabase) return;
+  try {
+    const locationId = await getLocationId();
+    if (!locationId) return;
+    await supabase.from('printers').upsert({ id:printer.id, location_id:locationId, name:printer.name, type:'escpos', connection:printer.connectionType, ip:printer.address||null, port:printer.port||9100, paper_width:printer.paperWidth||80, meta:{ model:printer.model, roles:printer.roles, location:printer.location, status:printer.status, addedAt:printer.addedAt }, updated_at:new Date().toISOString() });
+  } catch(e) { console.warn('printer save failed', e); }
+}
+async function deletePrinterFromDB(id) {
+  if (isMock || !supabase) return;
+  try { await supabase.from('printers').delete().eq('id', id); } catch(e) { console.warn('printer delete failed', e); }
+}
 function savePrinters(list) {
   localStorage.setItem('rpos-printers', JSON.stringify(list));
-  // Fire a storage event so other components (PrintRouting, DeviceRegistry) pick it up
   window.dispatchEvent(new Event('rpos-printers-updated'));
 }
 
@@ -173,26 +198,40 @@ function PrinterForm({ initial, onSave, onCancel }) {
 }
 
 export default function PrinterRegistry() {
-  const [printers, setPrinters] = useState(loadPrinters);
+  const [printers, setPrinters] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [testing, setTesting] = useState({});
   const [testResult, setTestResult] = useState({});
 
-  const persist = (list) => { setPrinters(list); savePrinters(list); };
+  useEffect(() => {
+    loadPrintersFromDB().then(list => { setPrinters(list); setLoading(false); });
+  }, []);
 
-  const handleSave = (form) => {
+  const persist = (list) => {
+    setPrinters(list);
+    savePrinters(list); // keep local cache
+  };
+
+  const handleSave = async (form) => {
+    let updated;
     if (form.id) {
-      persist(printers.map(p => p.id === form.id ? { ...form, port: 9100 } : p));
+      updated = printers.map(p => p.id === form.id ? { ...form, port:9100 } : p);
     } else {
-      persist([...printers, { ...form, port: 9100, id: `prn-${Date.now()}`, status: 'unknown', addedAt: Date.now() }]);
+      const newPrinter = { ...form, port:9100, id:`prn-${Date.now()}`, status:'unknown', addedAt:Date.now() };
+      updated = [...printers, newPrinter];
+      await savePrinterToDB(newPrinter);
     }
+    if (form.id) await savePrinterToDB({ ...form, port:9100 });
+    persist(updated);
     setShowForm(false);
     setEditId(null);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!confirm('Remove this printer?')) return;
+    await deletePrinterFromDB(id);
     persist(printers.filter(p => p.id !== id));
   };
 
@@ -242,6 +281,7 @@ export default function PrinterRegistry() {
     <div style={S.page}>
       <div style={S.h1}>Printers</div>
       <div style={S.sub}>Add and manage physical printers — then assign them to production centres and devices</div>
+      {loading && <div style={{ color:'var(--t4)', fontSize:13, padding:'20px 0' }}>Loading printers…</div>}
 
       {/* Printer list */}
       {printers.length === 0 && !showForm && (

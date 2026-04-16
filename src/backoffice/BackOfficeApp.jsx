@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { broadcastConfigPush } from '../sync/SyncBridge';
-import { supabase, isMock, setResolvedLocationId, clearResolvedLocationId } from '../lib/supabase';
+import { supabase, isMock, getLocationId, setResolvedLocationId, clearResolvedLocationId } from '../lib/supabase';
 import BOLogin from './BOLogin';
 import LocationSwitcher from './LocationSwitcher';
 import { VERSION } from '../lib/version';
@@ -321,13 +321,32 @@ function PushToPOSButton() {
   const [pushing, setPushing] = useState(false);
   const [justPushed, setJustPushed] = useState(false);
 
-  const handlePush = () => {
+  const handlePush = async () => {
     setPushing(true);
 
     // Build config snapshot — layout + menu config (not operational/session state)
     // Include print routing config in snapshot
-    const printRouting = (() => { try { return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null'); } catch { return null; } })();
-    const printers = (() => { try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; } })();
+    // Load routing from Supabase (source of truth), fall back to localStorage
+    let printRouting = { centres:[], routing:{} };
+    let printers = [];
+    try {
+      const locId = await getLocationId();
+      if (locId && supabase) {
+        const [rtRes, prnRes] = await Promise.all([
+          supabase.from('print_routing').select('centres,routing').eq('location_id', locId).single(),
+          supabase.from('printers').select('*').eq('location_id', locId),
+        ]);
+        if (rtRes.data) printRouting = { centres: rtRes.data.centres||[], routing: rtRes.data.routing||{} };
+        if (prnRes.data) printers = prnRes.data.map(r => ({ id:r.id, name:r.name, model:r.meta?.model, connectionType:r.connection, address:r.ip, port:r.port||9100, paperWidth:r.paper_width||80, roles:r.meta?.roles||[], location:r.meta?.location||'' }));
+      }
+    } catch {}
+    // Fallback to localStorage if Supabase failed
+    if (!printRouting.centres.length) {
+      try { printRouting = JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres:[], routing:{} }; } catch {}
+    }
+    if (!printers.length) {
+      try { printers = JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch {}
+    }
     const deviceProfiles = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null') || []; } catch { return []; } })();
 
     const snapshot = {
