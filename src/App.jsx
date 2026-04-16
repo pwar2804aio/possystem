@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.75', date: 'Apr 2026', label: 'Location settings + reports crash fix',
+    changes: [
+      'Reports crash fixed: locations variable reference error resolved',
+      'New Location Settings section in back office: set timezone, business day start, and named shifts',
+      'Timezone dropdown with 15 IANA zones — shows live current time in selected zone',
+      'Business day start: choose what time the new reporting day begins (default 06:00)',
+      'Shifts editor: add/edit/remove Breakfast/Lunch/Dinner style periods with start/end times',
+      'Saving clears the location config cache so changes take effect immediately',
+    ],
+  },
+  {
     version: '3.5.74', date: 'Apr 2026', label: 'Save/Send + timezone + shift architecture',
     changes: [
       'Save button: open a table and save it with no items — seats the table and holds it on the floor plan',

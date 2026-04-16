@@ -27,10 +27,12 @@ function StatCard({ label, value, sub, color, icon }) {
 
 export default function BOReports() {
   const { closedChecks: todayChecks, activeSessions, tables, menuItems } = useStore();
-  const [period, setPeriod]         = useState('today');
-  const [view, setView]             = useState('overview');
-  const [rangeChecks, setRangeChecks] = useState(null); // null = use todayChecks
+  const [period, setPeriod]           = useState('today');
+  const [view, setView]               = useState('overview');
+  const [rangeChecks, setRangeChecks] = useState(null);
   const [loadingRange, setLoadingRange] = useState(false);
+  const [locationFilter, setLocationFilter] = useState('all');
+  const locations = []; // Multi-location filter reserved for future
 
   // When period changes to non-today, fetch from Supabase
   useEffect(() => {
