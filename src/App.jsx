@@ -54,10 +54,10 @@ import ConfigSyncBanner from './components/ConfigSyncBanner';
 import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
-import DevSwitcher from './components/DevSwitcher';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.5.89', date: 'Apr 2026', label: 'Remove Dev Switch device button from POS', changes: ['Dev: Switch device floating button removed from bottom left of POS — was covering the UI'] },
   { version: '3.5.88', date: 'Apr 2026', label: 'Remove Switch device mode button', changes: ['Removed Switch device mode button from back office sidebar — was covering UI'] },
   {
     version: '3.5.87', date: 'Apr 2026', label: 'Service charge per device profile',
@@ -1751,7 +1751,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
       <SyncBridge onSyncPulse={handleSyncPulse}/>
-      {!isMock && <DevSwitcher />}
+      
       <ShiftBar version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} syncPulse={syncPulse}/>
       <ConfigSyncBanner />
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
