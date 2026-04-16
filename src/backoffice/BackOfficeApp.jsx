@@ -404,11 +404,30 @@ function PushToPOSButton() {
     } catch {}
 
     // Write to Supabase so physical devices on other machines receive it
-    // Write to Supabase scoped to this location so POS devices on other machines receive it
-    import('../lib/db.js').then(async ({ insertConfigPush }) => {
+    import('../lib/db.js').then(async ({ insertConfigPush, upsertMenuItem, upsertMenuCategory }) => {
       const { getLocationId } = await import('../lib/supabase.js');
       const locationId = await getLocationId();
+
+      // Write config push (for realtime notification to POS devices)
       insertConfigPush({ pushed_by: staff?.name || 'Manager', snapshot, change_count: pendingBOChanges }, locationId);
+
+      // Also write ALL menu items and categories to Supabase so they're queryable
+      // This makes Supabase the source of truth, not just the snapshot
+      if (locationId && menuItems?.length) {
+        for (const item of menuItems.filter(i => !i.archived)) {
+          upsertMenuItem({
+            ...item,
+            location_id: locationId,
+            tax_rate_id: item.taxRateId ?? item.tax_rate_id ?? null,
+            tax_overrides: item.taxOverrides ?? item.tax_overrides ?? {},
+          }, locationId).catch(() => {});
+        }
+      }
+      if (locationId && menuCategories?.length) {
+        for (const cat of menuCategories) {
+          upsertMenuCategory({ ...cat, location_id: locationId }, locationId).catch(() => {});
+        }
+      }
     });
 
     // Broadcast to all open POS terminals in this browser session

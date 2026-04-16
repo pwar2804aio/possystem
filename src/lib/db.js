@@ -26,6 +26,22 @@ export const fetchMenuCategories = async (locationId = null) => {
   return supabase.from('menu_categories').select('*').eq('location_id', locationId).order('sort_order');
 };
 
+export const upsertMenuCategory = async (cat, locationId = LOCATION_ID) => {
+  if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId();
+  if (!locationId) return { data: null, error: new Error('No location') };
+  const result = await supabase.from('menu_categories').upsert({
+    ...cat,
+    location_id: locationId,
+    parent_id: cat.parentId ?? cat.parent_id ?? null,
+    menu_id: cat.menuId ?? cat.menu_id ?? null,
+    sort_order: cat.sortOrder ?? cat.sort_order ?? 0,
+    updated_at: new Date().toISOString(),
+  });
+  if (result.error) console.error('[DB] menu_categories upsert failed:', result.error.message);
+  return result;
+};
+
 
 export const fetchMenuItems = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
@@ -44,11 +60,29 @@ export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
   if (!locationId) locationId = await getLocationId();
   if (!locationId) return { data: null, error: new Error('No location') };
   const dbItem = {
-    ...item,
+    id: item.id,
     location_id: locationId,
-    updated_at: new Date().toISOString(),
+    name: item.name,
+    price: item.price ?? 0,
+    cat: item.cat ?? null,
+    type: item.type ?? 'simple',
+    archived: item.archived ?? false,
+    allergens: item.allergens ?? [],
+    description: item.description ?? '',
+    menu_name: item.menuName ?? item.menu_name ?? item.name,
+    receipt_name: item.receiptName ?? item.receipt_name ?? item.name,
+    kitchen_name: item.kitchenName ?? item.kitchen_name ?? item.name,
+    sort_order: item.sortOrder ?? item.sort_order ?? 0,
+    parent_id: item.parentId ?? item.parent_id ?? null,
+    sold_alone: item.soldAlone ?? item.sold_alone ?? true,
+    pricing: item.pricing ?? null,
+    visibility: item.visibility ?? null,
+    assigned_modifier_groups: item.assignedModifierGroups ?? item.assigned_modifier_groups ?? [],
+    assigned_instruction_groups: item.assignedInstructionGroups ?? item.assigned_instruction_groups ?? [],
+    centre_id: item.centreId ?? item.centre_id ?? null,
     tax_rate_id: item.taxRateId ?? item.tax_rate_id ?? null,
     tax_overrides: item.taxOverrides ?? item.tax_overrides ?? {},
+    updated_at: new Date().toISOString(),
   };
   const result = await supabase.from('menu_items').upsert(dbItem);
   if (result.error) console.error('[DB] menu_items upsert failed:', result.error.message, 'item:', item.id, 'location:', locationId);

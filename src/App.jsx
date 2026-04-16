@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.81', date: 'Apr 2026', label: 'Push to POS now writes menu to Supabase',
+    changes: [
+      'Root cause: Push to POS only saved a config_pushes snapshot, never wrote menu items to the menu_items table — Supabase DB was always empty',
+      'Push to POS now upserts ALL menu items and categories to Supabase on every push',
+      'upsertMenuItem rewritten to map every field cleanly (not spread full camelCase objects with wrong keys)',
+      'upsertMenuCategory added to db.js',
+      'After pushing: tax assignments, pricing, allergens — all saved properly to Supabase and queryable',
+    ],
+  },
+  {
     version: '3.5.80', date: 'Apr 2026', label: 'Fix: tax fields now travel from menu item to order item',
     changes: [
       'Root cause found: addItem() never copied taxRateId/taxOverrides onto the order item — so calculateOrderTax had nothing to work with on every item',
