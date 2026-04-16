@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.80', date: 'Apr 2026', label: 'Fix: tax fields now travel from menu item to order item',
+    changes: [
+      'Root cause found: addItem() never copied taxRateId/taxOverrides onto the order item — so calculateOrderTax had nothing to work with on every item',
+      'addItem now carries taxRateId and taxOverrides from menu item into the live order item',
+      'recordClosedCheck now computes and stores taxBreakdown at point of payment',
+      'tax.js imported properly into store (was using require() which does not work in ES modules)',
+    ],
+  },
+  {
     version: '3.5.79', date: 'Apr 2026', label: 'Fix: tax rates actually load in POS now',
     changes: [
       'Critical fix: supabase client was not imported in useSupabaseInit — tax rates fetch was silently skipped every boot',

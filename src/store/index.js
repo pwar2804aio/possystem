@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase, isMock, getLocationId } from '../lib/supabase';
+import { calculateOrderTax } from '../lib/tax';
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 const sbUpsertMenu = async (menu) => {
@@ -894,8 +895,10 @@ export const useStore = create((set, get) => ({
       price, qty, mods: mods||[], notes: opts.notes||'',
       pizzaConfig, allergens: item.allergens||[],
       centreId: item.centreId,
-      cat: item.cat || null,           // carry category so routing works
-      parentId: item.parentId || null,  // carry parentId so variant routing works
+      cat: item.cat || null,
+      parentId: item.parentId || null,
+      taxRateId: item.taxRateId || item.tax_rate_id || null,
+      taxOverrides: item.taxOverrides || item.tax_overrides || {},
       seat: 'shared',
       course: (() => {
         const cats = useStore.getState().menuCategories || [];
@@ -1435,10 +1438,16 @@ export const useStore = create((set, get) => ({
   ] : [],
 
   recordClosedCheck: (tableId, paymentInfo = {}) => {
-    const { tables, staff } = get();
+    const { tables, staff, taxRates } = get();
     const table = tables.find(t => t.id === tableId);
     const session = table?.session;
     if (!session) return;
+
+    // Calculate tax breakdown at point of close
+    let taxBreakdown = null;
+    if (taxRates?.length) {
+      try { taxBreakdown = calculateOrderTax(session.items.filter(i=>!i.voided), taxRates, 'dine-in'); } catch {}
+    }
 
     const ref = `#${Math.floor(1000 + Math.random() * 9000)}`;
     const record = {
@@ -1457,8 +1466,9 @@ export const useStore = create((set, get) => ({
       total:      paymentInfo.grand || session.total || 0,
       method:     paymentInfo.method || 'card',
       closedAt:   Date.now(),
-      status:     'paid',   // paid | partial_refund | refunded
+      status:     'paid',
       refunds:    [],
+      taxBreakdown,
     };
     set(s => ({ closedChecks: [record, ...s.closedChecks] }));
     import('../lib/db.js').then(({ insertClosedCheck }) => insertClosedCheck(record));
