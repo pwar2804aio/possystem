@@ -43,7 +43,14 @@ export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
   if (!locationId) locationId = await getLocationId();
   if (!locationId) return { data: null, error: new Error('No location') };
-  const result = await supabase.from('menu_items').upsert({ ...item, location_id: locationId, updated_at: new Date().toISOString() });
+  const dbItem = {
+    ...item,
+    location_id: locationId,
+    updated_at: new Date().toISOString(),
+    tax_rate_id: item.taxRateId ?? item.tax_rate_id ?? null,
+    tax_overrides: item.taxOverrides ?? item.tax_overrides ?? {},
+  };
+  const result = await supabase.from('menu_items').upsert(dbItem);
   if (result.error) console.error('[DB] menu_items upsert failed:', result.error.message, 'item:', item.id, 'location:', locationId);
   return result;
 };

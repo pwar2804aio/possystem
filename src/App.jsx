@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.76', date: 'Apr 2026', label: 'Tax system: UK VAT + US Sales Tax',
+    changes: [
+      'Tax rates table in Supabase — UK seeded: Standard 20%, Reduced 5%, Zero 0%',
+      'Back office: Tax & VAT section to create, edit, and delete rates for any location',
+      'Menu Manager: Tax tab per item with per-order-type overrides (e.g. takeaway = Zero Rate)',
+      'Checkout: shows tax breakdown — inclusive shows VAT extracted, exclusive adds tax on top',
+      'Reports: Tax tab with net/tax/gross per rate, period filter, CSV export for accountant',
+      'Tax engine handles UK (price includes tax) and US (tax added on top) correctly',
+    ],
+  },
+  {
     version: '3.5.75', date: 'Apr 2026', label: 'Location settings + reports crash fix',
     changes: [
       'Reports crash fixed: locations variable reference error resolved',

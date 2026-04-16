@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
 import { fetchClosedChecksRange } from '../../lib/db';
+import { calculateOrderTax } from '../../lib/tax';
 
 const PERIODS = [
   { id:'today',  label:'Today'      },
@@ -26,7 +27,7 @@ function StatCard({ label, value, sub, color, icon }) {
 }
 
 export default function BOReports() {
-  const { closedChecks: todayChecks, activeSessions, tables, menuItems } = useStore();
+  const { closedChecks: todayChecks, activeSessions, tables, menuItems, taxRates } = useStore();
   const [period, setPeriod]           = useState('today');
   const [view, setView]               = useState('overview');
   const [rangeChecks, setRangeChecks] = useState(null);
@@ -126,6 +127,7 @@ export default function BOReports() {
   const tabs = [
     { id:'overview',    label:'Overview' },
     { id:'open',        label:`Open orders${openOrders.length ? ` (${openOrders.length})` : ''}` },
+    { id:'tax',         label:'Tax' },
     { id:'items',       label:'Product mix' },
     { id:'servers',     label:'By server' },
     { id:'hourly',      label:'Hourly' },
@@ -405,6 +407,111 @@ export default function BOReports() {
           )}
         </div>
       )}
+
+      {/* ── Tax report ── */}
+      {view === 'tax' && (() => {
+        if (!taxRates?.length) return (
+          <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>
+            <div style={{ fontSize:36, marginBottom:10 }}>%</div>
+            No tax rates configured. Go to <strong style={{ color:'var(--t2)' }}>Tax & VAT</strong> to set up rates.
+          </div>
+        );
+
+        // Build tax summary across all filtered checks
+        const taxSummary = {};
+        let totalGross = 0, totalTax = 0, totalNet = 0;
+
+        filtered.forEach(check => {
+          const orderType = check.orderType || 'dine-in';
+          const breakdown = calculateOrderTax(check.items || [], taxRates, orderType);
+          totalGross += breakdown.total;
+          totalTax   += breakdown.totalTax;
+          totalNet   += breakdown.subtotal;
+          breakdown.breakdown.forEach(b => {
+            const key = b.rate.id;
+            if (!taxSummary[key]) taxSummary[key] = { rate: b.rate, tax: 0, net: 0, gross: 0, checks: 0 };
+            taxSummary[key].tax   += b.tax;
+            taxSummary[key].net   += b.net;
+            taxSummary[key].gross += b.gross;
+            taxSummary[key].checks++;
+          });
+        });
+
+        const rows = Object.values(taxSummary).sort((a,b) => b.rate.rate - a.rate.rate);
+        const hasExclusive = rows.some(r => r.rate.type === 'exclusive');
+
+        const exportCSV = () => {
+          const lines = ['Rate,Code,Type,Net Sales,Tax,Gross Sales'];
+          rows.forEach(r => {
+            const pct = (r.rate.rate*100).toFixed(1).replace('.0','');
+            lines.push(`"${r.rate.name} (${pct}%)","${r.rate.code||''}","${r.rate.type}","£${r.net.toFixed(2)}","£${r.tax.toFixed(2)}","£${r.gross.toFixed(2)}"`);
+          });
+          lines.push(`"Total","","","£${totalNet.toFixed(2)}","£${totalTax.toFixed(2)}","£${totalGross.toFixed(2)}"`);
+          const blob = new Blob([lines.join('\n')], { type:'text/csv' });
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+          a.download = `tax-report-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+        };
+
+        return (
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+              <div style={{ fontSize:13, color:'var(--t4)' }}>
+                {hasExclusive ? 'Tax added on top of prices (exclusive)' : 'Tax included in prices (inclusive / VAT)'}
+                {' · '}{filtered.length} checks
+              </div>
+              <button onClick={exportCSV} style={{ padding:'6px 14px', borderRadius:8, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                Export CSV
+              </button>
+            </div>
+
+            {/* Summary cards */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
+              <StatCard label="Gross sales"      value={fmt(totalGross)} sub="inc. tax"   color="var(--acc)" icon="💰"/>
+              <StatCard label="Net sales"         value={fmt(totalNet)}  sub="ex. tax"    color="var(--t1)"  icon="📋"/>
+              <StatCard label="Total tax"         value={fmt(totalTax)}  sub={`${filtered.length} checks`} color="var(--red)" icon="%"/>
+            </div>
+
+            {/* Breakdown table */}
+            {rows.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'32px 0', color:'var(--t4)', fontSize:13 }}>
+                No tax data for this period — check that tax rates are assigned to menu items.
+              </div>
+            ) : (
+              <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, overflow:'hidden' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', padding:'10px 16px', background:'var(--bg3)', borderBottom:'1px solid var(--bdr)', fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.06em' }}>
+                  <span>Rate</span><span style={{ textAlign:'right' }}>Net sales</span><span style={{ textAlign:'right' }}>Tax</span><span style={{ textAlign:'right' }}>Gross</span>
+                </div>
+                {rows.map(r => {
+                  const pct = (r.rate.rate*100).toFixed(1).replace('.0','');
+                  return (
+                    <div key={r.rate.id} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', padding:'12px 16px', borderBottom:'1px solid var(--bdr)', alignItems:'center' }}>
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>{r.rate.name}</div>
+                        <div style={{ fontSize:11, color:'var(--t4)' }}>{pct}% · {r.rate.code} · {r.rate.type}</div>
+                      </div>
+                      <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', color:'var(--t2)' }}>{fmt(r.net)}</div>
+                      <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', color:'var(--red)', fontWeight:600 }}>{fmt(r.tax)}</div>
+                      <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', color:'var(--t1)', fontWeight:700 }}>{fmt(r.gross)}</div>
+                    </div>
+                  );
+                })}
+                <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', padding:'12px 16px', background:'var(--bg3)' }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)' }}>Total</div>
+                  <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--t1)' }}>{fmt(totalNet)}</div>
+                  <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--red)' }}>{fmt(totalTax)}</div>
+                  <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--acc)' }}>{fmt(totalGross)}</div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop:16, padding:'12px 16px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--bdr)', fontSize:11, color:'var(--t4)', lineHeight:1.8 }}>
+              <strong style={{ color:'var(--t2)' }}>For VAT returns:</strong> Net sales = taxable turnover. 
+              Switch periods above to see weekly/monthly figures for filing.
+              Use Export CSV to send to your accountant.
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Loading overlay for range queries */}
       {loadingRange && (

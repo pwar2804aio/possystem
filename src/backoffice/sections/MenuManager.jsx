@@ -24,6 +24,73 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
 
+// ── Tax section for item editor ───────────────────────────────────────────────
+const ORDER_TYPES_TAX = ['dine-in', 'takeaway', 'delivery', 'bar', 'counter'];
+
+function TaxSection({ item, onUpdate, markBOChange }) {
+  const { taxRates } = useStore();
+
+  const setTaxRate = (id) => {
+    onUpdate({ taxRateId: id || null, tax_rate_id: id || null });
+    markBOChange();
+  };
+  const setOverride = (orderType, rateId) => {
+    const overrides = { ...(item.taxOverrides || {}), [orderType]: rateId || null };
+    // Clean null overrides
+    Object.keys(overrides).forEach(k => { if (!overrides[k]) delete overrides[k]; });
+    onUpdate({ taxOverrides: overrides, tax_overrides: overrides });
+    markBOChange();
+  };
+
+  if (!taxRates?.length) return (
+    <div style={{ padding:'20px 0', color:'var(--t4)', fontSize:12, textAlign:'center' }}>
+      No tax rates configured.<br/>
+      Go to <strong style={{ color:'var(--t2)' }}>Tax & VAT</strong> to set up rates first.
+    </div>
+  );
+
+  const noneOption = <option value="">No tax</option>;
+  const rateOptions = taxRates.map(r => {
+    const pct = (parseFloat(r.rate) * 100).toFixed(1).replace('.0','');
+    return <option key={r.id} value={r.id}>{r.name} ({pct}% {r.type === 'inclusive' ? 'incl.' : 'excl.'})</option>;
+  });
+
+  return (
+    <div>
+      <div style={{ marginBottom:16 }}>
+        <span style={{ fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', display:'block', marginBottom:5 }}>Default tax rate</span>
+        <select value={item.taxRateId || ''} onChange={e => setTaxRate(e.target.value)}
+          style={{ width:'100%', padding:'8px 11px', borderRadius:9, border:'1.5px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none' }}>
+          {noneOption}{rateOptions}
+        </select>
+        <div style={{ fontSize:11, color:'var(--t4)', marginTop:5, lineHeight:1.6 }}>
+          Applied to all order types unless overridden below.
+        </div>
+      </div>
+
+      <div style={{ marginBottom:8 }}>
+        <span style={{ fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.07em', display:'block', marginBottom:8 }}>
+          Per-order-type overrides
+        </span>
+        <div style={{ fontSize:11, color:'var(--t4)', marginBottom:10, lineHeight:1.6 }}>
+          Override the tax rate for specific order types. Common UK use: set takeaway to Zero Rate for food items.
+        </div>
+        {ORDER_TYPES_TAX.map(ot => (
+          <div key={ot} style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, alignItems:'center', marginBottom:6 }}>
+            <span style={{ fontSize:12, color:'var(--t2)', fontWeight:600, textTransform:'capitalize' }}>{ot}</span>
+            <select value={item.taxOverrides?.[ot] || ''}
+              onChange={e => setOverride(ot, e.target.value)}
+              style={{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--bdr)', background:'var(--bg)', color:'var(--t1)', fontSize:12, fontFamily:'inherit', outline:'none' }}>
+              <option value="">Use default</option>
+              {rateOptions}
+            </select>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Shared ───────────────────────────────────────────────────────────────────
 const inp = { background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:9, padding:'8px 11px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', width:'100%', boxSizing:'border-box' };
 const lbl = { fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:5, display:'block' };
@@ -1161,6 +1228,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
     !isSub && { id:'variants',  label:`Sizes${isParent?` (${variants.length})`:''}` },
     !isSub && { id:'modifiers', label:`Modifiers${assignedMods.length>0?` (${assignedMods.length})`:''}` },
     { id:'pricing',   label:'Pricing' },
+    { id:'tax',       label:`Tax${item.taxRateId ? ' ✓' : ''}` },
     { id:'allergens', label:`Allergens${(item.allergens||[]).length>0?` (${item.allergens.length})`:''}` },
     isPizza && { id:'pizza', label:'Pizza' },
   ].filter(Boolean);
@@ -1604,6 +1672,11 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
               </div>
             ))}
           </div>
+        )}
+
+        {/* ════ TAX ════════════════════════════════════════════════════════ */}
+        {sec==='tax' && (
+          <TaxSection item={item} onUpdate={onUpdate} markBOChange={markBOChange}/>
         )}
 
         {/* ════ ALLERGENS ══════════════════════════════════════════════════ */}

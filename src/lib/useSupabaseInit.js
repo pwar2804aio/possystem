@@ -74,6 +74,22 @@ export default function useSupabaseInit() {
         useStore.setState({ closedChecks: checks });
       }
 
+      // Tax rates for this location
+      if (locId) {
+        const { data: rates } = await supabase
+          .from('tax_rates')
+          .select('*')
+          .eq('location_id', locId)
+          .eq('active', true)
+          .order('rate', { ascending: false });
+        if (rates) useStore.setState({ taxRates: rates.map(r => ({
+          id: r.id, name: r.name, code: r.code,
+          rate: parseFloat(r.rate), type: r.type,
+          appliesTo: r.applies_to || ['all'],
+          isDefault: r.is_default, active: r.active,
+        })) });
+      }
+
       // Latest config push
       const locId = await getLocationId().catch(() => null);
       const { data: push } = await fetchLatestConfigPush(locId);

@@ -19,6 +19,7 @@ import SupabaseSetup from '../lib/SupabaseSetup';
 import CompanyAdmin from './sections/CompanyAdmin';
 import AIAssistantSection from './sections/AIAssistantSection';
 import LocationSettings from './sections/LocationSettings';
+import TaxManager from './sections/TaxManager';
 
 const NAV = [
   { id:'overview',   label:'Overview',        icon:'◈',  group:'Dashboard' },
@@ -30,10 +31,11 @@ const NAV = [
   { id:'printers',   label:'Printers',        icon:'🖨',  group:'Devices' },
   { id:'staff',      label:'Staff & access',  icon:'👥',  group:'Configuration' },
   { id:'printing',   label:'Production printing',   icon:'🖨',  group:'Configuration' },
-  { id:'reports',    label:'Reports',         icon:'📊',  group:'Analytics' },
-  { id:'eod',        label:'End of day',      icon:'🔒',  group:'Analytics' },
-  { id:'ai',         label:'AI Assistant',    icon:'✦',  group:'Analytics' },
-  { id:'location',   label:'Location settings', icon:'⚙️', group:'Analytics' },
+  { id:'reports',    label:'Reports',           icon:'📊',  group:'Analytics' },
+  { id:'eod',        label:'End of day',        icon:'🔒',  group:'Analytics' },
+  { id:'tax',        label:'Tax & VAT',          icon:'%',   group:'Analytics' },
+  { id:'ai',         label:'AI Assistant',      icon:'✦',   group:'Analytics' },
+  { id:'location',   label:'Location settings', icon:'⚙️',  group:'Analytics' },
 ];
 
 export default function BackOfficeApp() {
@@ -314,6 +316,7 @@ export default function BackOfficeApp() {
           {section === 'admin'       && <CompanyAdmin />}
           {section === 'ai'         && <AIAssistantSection />}
           {section === 'location'   && <LocationSettings />}
+          {section === 'tax'        && <TaxManager />}
         </div>
       </div>
       {showLocationSwitcher && <LocationSwitcher onClose={() => setShowLocationSwitcher(false)} />}

@@ -541,6 +541,7 @@ export const useStore = create((set, get) => ({
   // Quick Screen — list of item IDs shown on the ⚡ Quick tab, ordered
   quickScreenIds: isMock ? QUICK_IDS : [],
   locationConfig: { timezone: 'Europe/London', businessDayStart: '06:00', shifts: [] },
+  taxRates: [],
   setQuickScreenIds: (ids) => set({ quickScreenIds: ids }),
 
   menuItems: (isMock ? MENU_ITEMS : []).map((item, idx) => ({
@@ -1665,15 +1666,7 @@ export const useStore = create((set, get) => ({
     const seed = SHIFT;
 
     // Use business day start from location config, fallback to midnight
-    let sod;
-    try {
-      const { getBusinessDayStart } = require('./locationTime') || {};
-      sod = getBusinessDayStart ? getBusinessDayStart(config) : new Date();
-      if (!getBusinessDayStart) { sod = new Date(); sod.setHours(0,0,0,0); }
-    } catch {
-      sod = new Date(); sod.setHours(0,0,0,0);
-    }
-
+    const sod = new Date(); sod.setHours(0, 0, 0, 0);
     const checks = allChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
 
     if (!checks.length) return isMock ? seed : {

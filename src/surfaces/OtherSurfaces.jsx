@@ -7,7 +7,7 @@ import AIChat from '../components/AIChat';
 // ══════════════════════════════════════════════════════════════════════════════
 // Payment Screen
 // ══════════════════════════════════════════════════════════════════════════════
-export function PaymentScreen({ subtotal, service, total, items, onClose, onComplete }) {
+export function PaymentScreen({ subtotal, service, total, items, taxBreakdown, onClose, onComplete }) {
   const [step, setStep] = useState('tip');
   const [tipPct, setTipPct] = useState(12.5);
   const [customTip, setCustomTip] = useState('');
@@ -18,6 +18,10 @@ export function PaymentScreen({ subtotal, service, total, items, onClose, onComp
   const tipAmt  = customTip !== '' ? parseFloat(customTip)||0 : subtotal * tipPct/100;
   const grand   = total + tipAmt;
   const change  = cash ? Math.max(0, parseFloat(cash) - grand) : 0;
+
+  // Tax display — use breakdown if provided, otherwise skip
+  const hasTax = taxBreakdown?.breakdown?.length > 0 || taxBreakdown?.totalTax > 0;
+  const hasExclusive = taxBreakdown?.hasExclusiveTax;
 
   const S = (s) => (
     <div style={{
@@ -52,7 +56,27 @@ export function PaymentScreen({ subtotal, service, total, items, onClose, onComp
             </div>
           ))}
           <div className="divider"/>
-          <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--t3)' }}><span>Subtotal</span><span>£{subtotal.toFixed(2)}</span></div>
+          {hasTax && hasExclusive ? (
+            // US exclusive: show net subtotal, then tax, then total
+            <>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--t3)' }}><span>Subtotal (ex. tax)</span><span>£{taxBreakdown.subtotal.toFixed(2)}</span></div>
+              {taxBreakdown.breakdown.map(b => {
+                const pct = (b.rate.rate*100).toFixed(3).replace(/\.?0+$/,'');
+                return <div key={b.rate.id} style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--t3)', marginTop:2 }}><span>{b.rate.name} ({pct}%)</span><span>£{b.tax.toFixed(2)}</span></div>;
+              })}
+            </>
+          ) : hasTax ? (
+            // UK inclusive: show gross subtotal, then VAT breakdown
+            <>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--t3)' }}><span>Subtotal (incl. VAT)</span><span>£{subtotal.toFixed(2)}</span></div>
+              {taxBreakdown.breakdown.map(b => {
+                const pct = (b.rate.rate*100).toFixed(1).replace('.0','');
+                return <div key={b.rate.id} style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t4)', marginTop:1 }}><span>  of which {b.rate.name} ({pct}%)</span><span>£{b.tax.toFixed(2)}</span></div>;
+              })}
+            </>
+          ) : (
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--t3)' }}><span>Subtotal</span><span>£{subtotal.toFixed(2)}</span></div>
+          )}
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--t3)', marginTop:2 }}><span>Service 12.5%</span><span>£{service.toFixed(2)}</span></div>
         </div>
 

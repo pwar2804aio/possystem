@@ -140,6 +140,8 @@ export default function SyncBridge({ onSyncPulse }) {
             sortOrder: item.sort_order ?? item.sortOrder ?? 0,
             parentId: item.parent_id ?? item.parentId ?? null,
             soldAlone: item.sold_alone ?? item.soldAlone,
+            taxRateId: item.tax_rate_id ?? item.taxRateId ?? null,
+            taxOverrides: item.tax_overrides ?? item.taxOverrides ?? {},
           }));
           if (catsRes.data?.length) patch.menuCategories = catsRes.data.map(cat => ({
             ...cat,

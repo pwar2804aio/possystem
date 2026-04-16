@@ -1,7 +1,9 @@
 import { useCompact } from '../lib/useCompact';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ALLERGENS } from '../data/seed';
 import SplitModal from '../components/SplitModal';
+import { useStore } from '../store';
+import { calculateOrderTax } from '../lib/tax';
 
 // ─── Tip picker ───────────────────────────────────────────────────────────────
 function TipPicker({ total, onSelect }) {
@@ -268,6 +270,7 @@ function CashTransaction({ grand, onComplete, onBack }) {
 // ─── Main checkout modal ──────────────────────────────────────────────────────
 export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
   const compact = useCompact();
+  const { taxRates } = useStore();
   const [screen, setScreen] = useState('review');
   const [namesOnly, setNamesOnly] = useState(false);
   const [tipAmt, setTipAmt] = useState(0);
@@ -276,6 +279,14 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
   const isBarTab = orderType==='bar-tab';
   const skipTip  = isBarTab || orderType==='takeaway' || orderType==='collection';
   const grand    = total + tipAmt;
+
+  // Calculate tax breakdown
+  const taxBreakdown = useMemo(() => {
+    if (!taxRates?.length) return null;
+    try { return calculateOrderTax(items?.filter(i=>!i.voided)||[], taxRates, orderType); } catch { return null; }
+  }, [items, taxRates, orderType]);
+  const hasTax = taxBreakdown?.breakdown?.length > 0;
+  const hasExclusive = taxBreakdown?.hasExclusiveTax;
 
   const complete = (method, tip=tipAmt, tendered=null) => {
     onComplete({ method: method, tip, grand: total+tip, tendered });
@@ -394,10 +405,34 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
 
               {/* Totals */}
               <div style={{ background:'var(--bg3)', borderRadius:compact?10:14, padding:compact?'10px 12px':'14px 16px', marginBottom:compact?12:20, border:'1px solid var(--bdr)' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:5 }}>
-                  <span>Subtotal</span>
-                  <span style={{ fontFamily:'var(--font-mono)' }}>£{subtotal.toFixed(2)}</span>
-                </div>
+                {hasTax && hasExclusive ? (
+                  // US exclusive — show net, then tax lines, then total
+                  <>
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:4 }}>
+                      <span>Subtotal (ex. tax)</span>
+                      <span style={{ fontFamily:'var(--font-mono)' }}>£{taxBreakdown.subtotal.toFixed(2)}</span>
+                    </div>
+                    {taxBreakdown.breakdown.map(b => {
+                      const pct = (b.rate.rate*100).toFixed(3).replace(/\.?0+$/,'');
+                      return <div key={b.rate.id} style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--t3)', marginBottom:4 }}>
+                        <span>{b.rate.name} ({pct}%)</span>
+                        <span style={{ fontFamily:'var(--font-mono)' }}>£{b.tax.toFixed(2)}</span>
+                      </div>;
+                    })}
+                  </>
+                ) : (
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom: hasTax ? 2 : 5 }}>
+                    <span>Subtotal{hasTax ? ' (incl. VAT)' : ''}</span>
+                    <span style={{ fontFamily:'var(--font-mono)' }}>£{subtotal.toFixed(2)}</span>
+                  </div>
+                )}
+                {hasTax && !hasExclusive && taxBreakdown.breakdown.map(b => {
+                  const pct = (b.rate.rate*100).toFixed(1).replace('.0','');
+                  return <div key={b.rate.id} style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--t4)', marginBottom:4 }}>
+                    <span>  of which {b.rate.name} ({pct}%)</span>
+                    <span style={{ fontFamily:'var(--font-mono)' }}>£{b.tax.toFixed(2)}</span>
+                  </div>;
+                })}
                 {service > 0 ? (
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--t3)', marginBottom:5 }}>
                     <span>Service (12.5%)</span>
