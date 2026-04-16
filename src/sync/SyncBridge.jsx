@@ -91,13 +91,14 @@ export default function SyncBridge({ onSyncPulse }) {
 
           // Load floor plan + active sessions atomically — never set session:null then restore
           const { supabase: sb, getLocationId } = await import('../lib/supabase.js');
-          const [floorRes, itemsRes, catsRes, menusRes, sessionsRes, profilesRes] = await Promise.all([
+          const [floorRes, itemsRes, catsRes, menusRes, sessionsRes, profilesRes, modGroupsRes] = await Promise.all([
             fetchFloorPlan(locationId),
             fetchMenuItems(locationId),
             fetchMenuCategories(locationId),
             fetchMenus(locationId),
             sb ? sb.from('active_sessions').select('table_id,session').eq('location_id', locationId) : Promise.resolve({ data: [] }),
             sb2 ? sb2.from('device_profiles').select('*').eq('location_id', locationId) : Promise.resolve({ data: [] }),
+            sb ? sb.from('modifier_groups').select('*').eq('location_id', locationId).order('sort_order') : Promise.resolve({ data: [] }),
           ]);
           // Cache profiles to localStorage so they survive offline
           if (profilesRes?.data?.length) {
@@ -170,6 +171,13 @@ export default function SyncBridge({ onSyncPulse }) {
             color: cat.color ?? '#3b82f6',
           }));
           if (menusRes.data?.length) patch.menus = menusRes.data;
+          if (modGroupsRes.data?.length) patch.modifierGroupDefs = modGroupsRes.data.map(g => ({
+            id: g.id, name: g.name, type: g.type,
+            min: g.min ?? 0, max: g.max ?? 1,
+            required: g.required ?? false,
+            options: g.options || [],
+            sortOrder: g.sort_order ?? 0,
+          }));
 
           // Load today's closed checks from Supabase — CRITICAL for sales history
           try {
