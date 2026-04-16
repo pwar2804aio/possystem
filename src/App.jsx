@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.60', date: 'Apr 2026', label: 'KDS: recall, hold, and per-item bump',
+    changes: [
+      'History button: tap to see all bumped tickets — tap Recall on any to bring it back to the queue',
+      'Hold button (⏸): parks a ticket in an On hold section without bumping it',
+      'Held tickets show purple with On Hold badge — tap Back to queue or Bump from held',
+      'Per-item bump: small checkbox on each item row — tap to mark individual items done',
+      'When all items on a ticket are individually bumped, the whole ticket auto-bumps',
+    ],
+  },
+  {
     version: '3.5.59', date: 'Apr 2026', label: 'Modifiers and instructions on separate lines everywhere',
     changes: [
       'POS order panel: each modifier on its own line, instructions italic, notes with pencil icon',

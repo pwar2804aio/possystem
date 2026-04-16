@@ -367,64 +367,13 @@ export function KDSSurface() {
   }, [pairedDevice?.id]);
 
   // Local tickets state — loaded from Supabase + synced via realtime
-  const [liveTickets, setLiveTickets] = useState(null); // null = loading
+  const [liveTickets, setLiveTickets] = useState(null);
+  const [heldTickets, setHeldTickets] = useState([]);
+  const [historyTickets, setHistoryTickets] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [, setTick] = useState(0);
-
-  // Filter: default to this device's assigned centre
   const [filter, setFilter] = useState(centreId || 'all');
 
-  // Load tickets from Supabase and subscribe to realtime
-  useEffect(() => {
-    if (isMock || !locationId) {
-      setLiveTickets(null); // fall back to store tickets
-      return;
-    }
-
-    // Initial fetch
-    const load = async () => {
-      try {
-        let q = supabase.from('kds_tickets').select('*').eq('location_id', locationId).eq('status', 'pending').order('sent_at', { ascending: true });
-        // Filter by centre_id if this KDS is assigned to a specific center
-        if (centreId) q = q.eq('centre_id', centreId);
-        const { data } = await q;
-        if (data) setLiveTickets(data.map(mapRow));
-      } catch(e) { setLiveTickets(null); }
-    };
-    load();
-
-    // Realtime subscription — picks up new tickets from any POS terminal
-    const channel = supabase
-      .channel(`kds-tickets-${locationId}${centreId ? `-${centreId}` : ''}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'kds_tickets',
-        filter: `location_id=eq.${locationId}`,
-      }, (payload) => {
-        const ticket = mapRow(payload.new);
-        // Filter by centre if this KDS is assigned to one
-        if (centreId && ticket.centreId !== centreId) return;
-        setLiveTickets(prev => prev ? [...prev, ticket] : [ticket]);
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'kds_tickets',
-        filter: `location_id=eq.${locationId}`,
-      }, (payload) => {
-        if (payload.new.status === 'bumped') {
-          setLiveTickets(prev => prev ? prev.filter(t => t.id !== payload.new.id) : prev);
-        } else {
-          // fired_courses updated — re-render ticket with new fired state
-          setLiveTickets(prev => prev ? prev.map(t => t.id === payload.new.id ? mapRow(payload.new) : t) : prev);
-        }
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [locationId, centreId]);
-
-  // Map Supabase snake_case row to display format
   const mapRow = (row) => ({
     id: row.id,
     table: row.table_label || row.table || '',
@@ -432,29 +381,113 @@ export function KDSSurface() {
     covers: row.covers || 1,
     centreId: row.centre_id || row.centreId || null,
     sentAt: row.sent_at ? new Date(row.sent_at).getTime() : Date.now(),
+    bumpedAt: row.bumped_at ? new Date(row.bumped_at).getTime() : null,
     minutes: 0,
     firedCourses: row.fired_courses || row.firedCourses || [0, 1],
     allCourses: row.all_courses || row.allCourses || [],
-    items: typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []),
+    items: (typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || [])).map(i => ({ ...i, _bumped: i._bumped || false })),
   });
 
-  // Bump a ticket — update Supabase + remove from local state
+  useEffect(() => {
+    if (isMock || !locationId) { setLiveTickets(null); return; }
+    const load = async () => {
+      try {
+        let q = supabase.from('kds_tickets').select('*').eq('location_id', locationId).in('status', ['pending','held']).order('sent_at', { ascending: true });
+        if (centreId) q = q.eq('centre_id', centreId);
+        const { data } = await q;
+        if (data) {
+          setLiveTickets(data.filter(r=>r.status==='pending').map(mapRow));
+          setHeldTickets(data.filter(r=>r.status==='held').map(mapRow));
+        }
+      } catch(e) { setLiveTickets(null); }
+    };
+    load();
+    const channel = supabase
+      .channel(`kds-tickets-${locationId}${centreId ? `-${centreId}` : ''}`)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'kds_tickets', filter:`location_id=eq.${locationId}` }, (payload) => {
+        const ticket = mapRow(payload.new);
+        if (centreId && ticket.centreId !== centreId) return;
+        setLiveTickets(prev => prev ? [...prev, ticket] : [ticket]);
+      })
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'kds_tickets', filter:`location_id=eq.${locationId}` }, (payload) => {
+        const updated = mapRow(payload.new);
+        if (payload.new.status === 'bumped') {
+          setLiveTickets(prev => prev ? prev.filter(t => t.id !== payload.new.id) : prev);
+          setHeldTickets(prev => prev.filter(t => t.id !== payload.new.id));
+        } else if (payload.new.status === 'held') {
+          setLiveTickets(prev => prev ? prev.filter(t => t.id !== payload.new.id) : prev);
+          setHeldTickets(prev => { const ex=prev.some(t=>t.id===updated.id); return ex?prev.map(t=>t.id===updated.id?updated:t):[...prev,updated]; });
+        } else if (payload.new.status === 'pending') {
+          setHeldTickets(prev => prev.filter(t => t.id !== payload.new.id));
+          setLiveTickets(prev => prev ? (prev.some(t=>t.id===updated.id)?prev.map(t=>t.id===updated.id?updated:t):[...prev,updated]) : [updated]);
+        } else {
+          setLiveTickets(prev => prev ? prev.map(t => t.id === payload.new.id ? updated : t) : prev);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [locationId, centreId]);
+
   const handleBump = async (ticketId) => {
     if (liveTickets !== null) {
       setLiveTickets(prev => prev.filter(t => t.id !== ticketId));
-      if (!isMock) {
-        await supabase.from('kds_tickets').update({ status: 'bumped', bumped_at: new Date().toISOString() }).eq('id', ticketId);
-      }
-    } else {
-      bumpTicket(ticketId);
-    }
+      if (!isMock) await supabase.from('kds_tickets').update({ status:'bumped', bumped_at:new Date().toISOString() }).eq('id', ticketId);
+    } else { bumpTicket(ticketId); }
     showToast('Ticket bumped', 'success');
   };
 
-  // Use live Supabase tickets if available, fall back to store
+  const handleHold = async (ticketId) => {
+    const ticket = (liveTickets||[]).find(t=>t.id===ticketId);
+    if (!ticket) return;
+    setLiveTickets(prev => prev ? prev.filter(t => t.id !== ticketId) : prev);
+    setHeldTickets(prev => [...prev, ticket]);
+    if (!isMock) await supabase.from('kds_tickets').update({ status:'held' }).eq('id', ticketId);
+    showToast('Ticket held', 'info');
+  };
+
+  const handleUnhold = async (ticketId) => {
+    const ticket = heldTickets.find(t=>t.id===ticketId);
+    if (!ticket) return;
+    setHeldTickets(prev => prev.filter(t => t.id !== ticketId));
+    setLiveTickets(prev => prev ? [...prev, {...ticket, sentAt:Date.now()}] : [{...ticket, sentAt:Date.now()}]);
+    if (!isMock) await supabase.from('kds_tickets').update({ status:'pending' }).eq('id', ticketId);
+    showToast('Ticket back in queue', 'success');
+  };
+
+  const loadHistory = async () => {
+    setShowHistory(true);
+    if (isMock) return;
+    try {
+      let q = supabase.from('kds_tickets').select('*').eq('location_id', locationId).eq('status','bumped').order('bumped_at', { ascending:false }).limit(30);
+      if (centreId) q = q.eq('centre_id', centreId);
+      const { data } = await q;
+      if (data) setHistoryTickets(data.map(mapRow));
+    } catch(e) { console.warn('history load failed', e); }
+  };
+
+  const handleRecall = async (ticketId) => {
+    const ticket = historyTickets.find(t=>t.id===ticketId);
+    if (!ticket) return;
+    const recalled = { ...ticket, sentAt: Date.now() };
+    setHistoryTickets(prev => prev.filter(t => t.id !== ticketId));
+    setLiveTickets(prev => prev ? [...prev, recalled] : [recalled]);
+    if (!isMock) await supabase.from('kds_tickets').update({ status:'pending', bumped_at:null, sent_at:new Date().toISOString() }).eq('id', ticketId);
+    setShowHistory(false);
+    showToast('Ticket recalled', 'success');
+  };
+
+  const handleBumpItem = async (ticketId, itemIndex) => {
+    const ticket = (liveTickets||[]).find(t=>t.id===ticketId);
+    if (!ticket) return;
+    const updatedItems = ticket.items.map((it, i) => i === itemIndex ? { ...it, _bumped: true } : it);
+    const allBumped = updatedItems.every(i => i._bumped);
+    if (allBumped) { handleBump(ticketId); return; }
+    setLiveTickets(prev => prev ? prev.map(t => t.id === ticketId ? { ...t, items: updatedItems } : t) : prev);
+    if (!isMock) await supabase.from('kds_tickets').update({ items: updatedItems }).eq('id', ticketId);
+  };
+
   const tickets = liveTickets !== null ? liveTickets : storeTickets;
 
-  // Tick every 30s to update live timers
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30000);
     return () => clearInterval(id);
@@ -463,15 +496,21 @@ export function KDSSurface() {
   const urgency = (m) => m>=25?'urgent':m>=12?'warning':'ok';
   const fmt = (m) => m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
   const URG = {
-    urgent:  { color:'var(--red)',  bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  pulse:true },
-    warning: { color:'var(--acc)',  bg:'rgba(232,160,32,.08)', border:'rgba(232,160,32,.25)', pulse:false },
-    ok:      { color:'var(--grn)',  bg:'transparent',          border:'var(--bdr)',            pulse:false },
+    urgent:  { color:'var(--red)',  bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)' },
+    warning: { color:'var(--acc)',  bg:'rgba(232,160,32,.08)', border:'rgba(232,160,32,.25)' },
+    ok:      { color:'var(--grn)',  bg:'transparent',          border:'var(--bdr)' },
   };
+  const HELD_STYLE = { color:'#a78bfa', bg:'rgba(167,139,250,.08)', border:'rgba(167,139,250,.25)' };
+  const COURSE_LABEL = { 0:'Immediate', 1:'Course 1', 2:'Course 2', 3:'Course 3' };
 
   function getLiveMinutes(ticket) {
-    if (!ticket.sentAt) return ticket.minutes||0;
     const ts = ticket.sentAt instanceof Date ? ticket.sentAt.getTime() : typeof ticket.sentAt === 'string' ? new Date(ticket.sentAt).getTime() : Number(ticket.sentAt);
     return Math.max(0, Math.floor((Date.now() - ts) / 60000));
+  }
+
+  function getStationLabel(ticket) {
+    try { const r = JSON.parse(localStorage.getItem('rpos-print-routing')||'null'); return r?.centres?.find(c=>c.id===(ticket.centreId||ticket.station))?.name; } catch{}
+    return ticket.station || 'Kitchen';
   }
 
   const stations = ['all', ...new Set(tickets.map(t=>t.centreId||t.station||'pc1').filter(Boolean))];
@@ -482,182 +521,179 @@ export function KDSSurface() {
     ok:      displayed.filter(t=>urgency(getLiveMinutes(t))==='ok').length,
   };
 
+  const TicketCard = ({ ticket, isHeld=false, isHistory=false }) => {
+    const liveMin = isHeld||isHistory ? 0 : getLiveMinutes(ticket);
+    const urg = isHeld ? 'held' : urgency(liveMin);
+    const u = urg==='held' ? HELD_STYLE : URG[urg];
+    const firedCourses = ticket.firedCourses || [0,1];
+    const allItems = ticket.items || [];
+    const firedItems = allItems.filter(i => firedCourses.includes(i.course??1));
+    const pendingItems = allItems.filter(i => !firedCourses.includes(i.course??1));
+    const firedByCourse = {};
+    firedItems.forEach(i => { const c=i.course??1; if(!firedByCourse[c])firedByCourse[c]=[]; firedByCourse[c].push({...i,_origIdx:allItems.indexOf(i)}); });
+    const pendingByCourse = {};
+    pendingItems.forEach(i => { const c=i.course??1; if(!pendingByCourse[c])pendingByCourse[c]=[]; pendingByCourse[c].push({...i,_origIdx:allItems.indexOf(i)}); });
+
+    const ItemRow = ({ item }) => (
+      <div style={{ display:'flex', alignItems:'flex-start', gap:8, paddingBottom:8, marginBottom:4, opacity:item._bumped?0.3:1, transition:'opacity .2s' }}>
+        {!isHeld && !isHistory && (
+          <button onClick={()=>handleBumpItem(ticket.id, item._origIdx)}
+            title="Bump this item"
+            style={{ width:22, height:22, borderRadius:6, border:`1.5px solid ${item._bumped?'var(--grn)':'var(--bdr2)'}`,
+              background:item._bumped?'var(--grn-d)':'transparent', cursor:'pointer', flexShrink:0, marginTop:2,
+              display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:item._bumped?'var(--grn)':'var(--t4)', fontWeight:900 }}>
+            {item._bumped ? '✓' : ''}
+          </button>
+        )}
+        <div style={{ width:24, height:24, borderRadius:6, background:u.color+'22', border:`1.5px solid ${u.color}44`,
+          display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:item._bumped?'var(--t4)':u.color,
+          flexShrink:0, fontFamily:'var(--font-mono)', textDecoration:item._bumped?'line-through':'' }}>
+          {item.qty}
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:item._bumped?'var(--t4)':'var(--t1)', lineHeight:1.3, textDecoration:item._bumped?'line-through':'' }}>{item.name}</div>
+          {(Array.isArray(item.mods)?item.mods:(item.mods?[item.mods]:[])).map((mod,mi)=>(
+            <div key={mi} style={{ fontSize:11, color:'var(--red)', fontWeight:600, marginTop:2, lineHeight:1.4 }}>{mod}</div>
+          ))}
+        </div>
+      </div>
+    );
+
+    return (
+      <div style={{ background:u.bg, border:`1.5px solid ${u.border}`, borderRadius:16, overflow:'hidden',
+        boxShadow:urg==='urgent'?`0 0 20px ${u.color}22`:'none', opacity:isHeld?0.9:1 }}>
+        <div style={{ padding:'10px 14px 8px', borderBottom:`1px solid ${u.border}` }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+            <div style={{ fontSize:16, fontWeight:900, color:u.color, flex:1 }}>
+              {isHeld&&'⏸ '}{isHistory&&'📋 '}{ticket.table||'Walk-in'}
+            </div>
+            {!isHeld&&!isHistory&&(
+              <div style={{ padding:'5px 12px', borderRadius:20, background:urg==='urgent'?'var(--red-d)':urg==='warning'?'var(--acc-d)':'var(--grn-d)', border:`1px solid ${u.color}55`, display:'flex', alignItems:'center', gap:5 }}>
+                {urg==='urgent'&&<div style={{ width:6,height:6,borderRadius:'50%',background:'var(--red)',animation:'pulse 1s ease-in-out infinite' }}/>}
+                <span style={{ fontSize:13, fontWeight:800, color:u.color, fontFamily:'var(--font-mono)' }}>{fmt(liveMin)}</span>
+              </div>
+            )}
+            {isHeld&&<span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, border:`1px solid ${HELD_STYLE.border}`, color:HELD_STYLE.color }}>ON HOLD</span>}
+            {isHistory&&ticket.bumpedAt&&<span style={{ fontSize:10, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>{new Date(ticket.bumpedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>}
+          </div>
+          <div style={{ fontSize:10, color:'var(--t4)', display:'flex', gap:10 }}>
+            {ticket.server&&<span>👤 {ticket.server}</span>}
+            {ticket.covers>1&&<span>👥 {ticket.covers}</span>}
+            <span style={{ fontSize:9 }}>{getStationLabel(ticket)}</span>
+          </div>
+        </div>
+
+        <div style={{ padding:'10px 14px' }}>
+          {Object.entries(firedByCourse).sort(([a],[b])=>a-b).map(([course,cItems])=>(
+            <div key={course} style={{ marginBottom:4 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
+                <span style={{ fontSize:11, fontWeight:800, color:u.color }}>🔥 {COURSE_LABEL[course]||`Course ${course}`}</span>
+              </div>
+              {cItems.map(item=><ItemRow key={item._origIdx} item={item}/>)}
+            </div>
+          ))}
+          {pendingItems.length>0&&(
+            <div style={{ marginTop:4, paddingTop:8, borderTop:`1px solid ${u.border}` }}>
+              {Object.entries(pendingByCourse).sort(([a],[b])=>a-b).map(([course,cItems])=>(
+                <div key={course} style={{ marginBottom:4 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
+                    <span style={{ fontSize:11, fontWeight:800, color:'var(--t3)' }}>⏳ {COURSE_LABEL[course]||`Course ${course}`}</span>
+                    <span style={{ fontSize:9, color:'var(--t4)', fontWeight:600 }}>PENDING FIRE</span>
+                  </div>
+                  {cItems.map(item=><ItemRow key={item._origIdx} item={item}/>)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding:'10px 14px', borderTop:`1px solid ${u.border}`, display:'flex', gap:6 }}>
+          {isHistory?(
+            <button onClick={()=>handleRecall(ticket.id)} style={{ flex:1, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:800 }}>↩ Recall to queue</button>
+          ):isHeld?(
+            <>
+              <button onClick={()=>handleUnhold(ticket.id)} style={{ flex:2, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:HELD_STYLE.color, border:'none', color:'#fff', fontSize:13, fontWeight:800 }}>↩ Back to queue</button>
+              <button onClick={()=>handleBump(ticket.id)} style={{ flex:1, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t3)', fontSize:12, fontWeight:700 }}>Bump ✓</button>
+            </>
+          ):(
+            <>
+              <button onClick={()=>handleBump(ticket.id)} style={{ flex:2, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--grn)', border:'none', color:'#fff', fontSize:13, fontWeight:800 }}
+                onMouseEnter={e=>e.currentTarget.style.background='#16a34a'} onMouseLeave={e=>e.currentTarget.style.background='var(--grn)'}>
+                Bump ✓
+              </button>
+              <button onClick={()=>handleHold(ticket.id)} title="Hold" style={{ width:38, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:HELD_STYLE.color, fontSize:17, fontWeight:700 }}>⏸</button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display:'flex', flex:1, flexDirection:'column', overflow:'hidden', background:'var(--bg)' }}>
-
-      {/* Header */}
       <div style={{ height:52, display:'flex', alignItems:'center', gap:14, padding:'0 18px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
         <div>
           <div style={{ fontSize:14, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>{kdsName}</div>
           <div style={{ fontSize:10, color:'var(--t3)', fontWeight:600 }}>
-            {centreName && <span style={{ marginRight:6 }}>{centreName} ·</span>}
-            {displayed.length} ticket{displayed.length!==1?'s':''} · live · <span style={{ fontFamily:'monospace' }}>v{VERSION}</span>
+            {centreName&&<span style={{ marginRight:6 }}>{centreName} ·</span>}
+            {displayed.length} ticket{displayed.length!==1?'s':''}{heldTickets.length>0?` · ${heldTickets.length} held`:''} · <span style={{ fontFamily:'monospace' }}>v{VERSION}</span>
           </div>
         </div>
-
-        {/* Urgency badges */}
         <div style={{ display:'flex', gap:6 }}>
           {counts.urgent>0&&<span style={{ padding:'3px 10px', borderRadius:10, fontSize:11, fontWeight:700, background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)' }}>{counts.urgent} urgent</span>}
           {counts.warning>0&&<span style={{ padding:'3px 10px', borderRadius:10, fontSize:11, fontWeight:700, background:'var(--acc-d)', border:'1px solid var(--acc-b)', color:'var(--acc)' }}>{counts.warning} warn</span>}
           {counts.ok>0&&<span style={{ padding:'3px 10px', borderRadius:10, fontSize:11, fontWeight:700, background:'var(--grn-d)', border:'1px solid var(--grn-b)', color:'var(--grn)' }}>{counts.ok} ok</span>}
         </div>
-
-        {/* Station filter */}
-        {stations.length>1&&(
-          <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
-            {stations.map(s=>(
-              <button key={s} onClick={()=>setFilter(s)} style={{
-                padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
-                background:filter===s?'var(--acc-d)':'transparent',
-                border:`1px solid ${filter===s?'var(--acc-b)':'var(--bdr)'}`,
-                color:filter===s?'var(--acc)':'var(--t3)',
-                fontSize:11, fontWeight:700,
-              }}>{s==='all' ? 'All stations' : ((() => { try { const r = JSON.parse(localStorage.getItem('rpos-print-routing')||'null'); return r?.centres?.find(c=>c.id===s)?.name; } catch{} })() || s)}</button>
-            ))}
-          </div>
-        )}
+        <div style={{ marginLeft:'auto', display:'flex', gap:6, alignItems:'center' }}>
+          <button onClick={showHistory?()=>setShowHistory(false):loadHistory}
+            style={{ padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:700,
+              background:showHistory?'var(--acc-d)':'transparent', border:`1px solid ${showHistory?'var(--acc-b)':'var(--bdr)'}`, color:showHistory?'var(--acc)':'var(--t3)' }}>
+            📋 History
+          </button>
+          {stations.length>1&&stations.map(s=>(
+            <button key={s} onClick={()=>setFilter(s)} style={{ padding:'4px 12px', borderRadius:20, cursor:'pointer', fontFamily:'inherit',
+              background:filter===s?'var(--acc-d)':'transparent', border:`1px solid ${filter===s?'var(--acc-b)':'var(--bdr)'}`,
+              color:filter===s?'var(--acc)':'var(--t3)', fontSize:11, fontWeight:700 }}>
+              {s==='all'?'All stations':(getStationLabel({centreId:s,station:s})||s)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Tickets grid */}
-      <div style={{ flex:1, overflowY:'auto', padding:14, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12, alignContent:'start' }}>
-        {displayed.length===0&&(
-          <div style={{ gridColumn:'1/-1', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'80px 0', color:'var(--t3)' }}>
-            <div style={{ width:64, height:64, borderRadius:18, background:'var(--grn-d)', border:'2px solid var(--grn-b)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, marginBottom:16 }}>✓</div>
-            <div style={{ fontSize:16, fontWeight:800, color:'var(--t2)', marginBottom:4 }}>Kitchen clear</div>
-            <div style={{ fontSize:12 }}>All orders bumped</div>
-          </div>
-        )}
-        {displayed.map(ticket=>{
-          const liveMin = ticket.sentAt ? Math.floor((Date.now()-(ticket.sentAt instanceof Date ? ticket.sentAt.getTime() : Number(ticket.sentAt)))/60000) : (ticket.minutes||0);
-          const urg = urgency(liveMin);
-          const u   = URG[urg];
-          const stationLabel = (() => { try { const r = JSON.parse(localStorage.getItem('rpos-print-routing')||'null'); return r?.centres?.find(c=>c.id===(ticket.centreId||ticket.station))?.name; } catch{} })() || ticket.station || 'Kitchen';
-          return (
-            <div key={ticket.id} style={{
-              background:u.bg, border:`1.5px solid ${u.border}`,
-              borderRadius:16, overflow:'hidden',
-              boxShadow: urg==='urgent'?`0 0 20px ${u.color}22`:'none',
-            }}>
-              {/* Ticket header */}
-              <div style={{ padding:'11px 14px', borderBottom:`1px solid ${u.border}`, display:'flex', alignItems:'center', gap:10 }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:15, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em' }}>{ticket.table}</div>
-                  <div style={{ fontSize:10, color:'var(--t3)', marginTop:1, fontWeight:600 }}>
-                    {ticket.server}{ticket.covers?` · ${ticket.covers} covers`:''} · <span style={{color:u.color}}>{stationLabel}</span>
-                  </div>
-                </div>
-                {/* Live timer */}
-                <div style={{
-                  padding:'5px 12px', borderRadius:20,
-                  background:urg==='urgent'?'var(--red-d)':urg==='warning'?'var(--acc-d)':'var(--grn-d)',
-                  border:`1px solid ${u.color}55`,
-                  display:'flex', alignItems:'center', gap:5,
-                }}>
-                  {urg==='urgent'&&<div style={{ width:6,height:6,borderRadius:'50%',background:'var(--red)',animation:'pulse 1s ease-in-out infinite' }}/>}
-                  <span style={{ fontSize:13, fontWeight:800, color:u.color, fontFamily:'var(--font-mono)' }}>{fmt(liveMin)}</span>
-                </div>
-              </div>
-
-              {/* Items — grouped by course */}
-              <div style={{ padding:'10px 14px' }}>
-                {(() => {
-                  const firedCourses = ticket.firedCourses || [0, 1];
-                  const items = ticket.items || [];
-                  const fired = items.filter(i => firedCourses.includes(i.course ?? 1));
-                  const pending = items.filter(i => !firedCourses.includes(i.course ?? 1));
-
-                  // Group fired items by course
-                  const firedByCourse = {};
-                  fired.forEach(i => {
-                    const c = i.course ?? 1;
-                    if (!firedByCourse[c]) firedByCourse[c] = [];
-                    firedByCourse[c].push(i);
-                  });
-
-                  const COURSE_LABEL = { 0:'Immediate', 1:'Course 1', 2:'Course 2', 3:'Course 3' };
-
-                  return (
-                    <>
-                      {/* Fired courses — active */}
-                      {Object.entries(firedByCourse).sort(([a],[b])=>a-b).map(([course, cItems]) => (
-                        <div key={course}>
-                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
-                            <span style={{ fontSize:11, fontWeight:800, color:u.color }}>🔥 {COURSE_LABEL[course] || `Course ${course}`}</span>
-                          </div>
-                          {cItems.map((item,i) => (
-                            <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, paddingBottom:8, marginBottom:i<cItems.length-1?8:12 }}>
-                              <div style={{ width:26, height:26, borderRadius:7, background:u.color+'22', border:`1.5px solid ${u.color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:u.color, flexShrink:0, fontFamily:'var(--font-mono)' }}>
-                                {item.qty}
-                              </div>
-                              <div style={{ flex:1 }}>
-                                <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)', lineHeight:1.3 }}>{item.name}</div>
-                                {(Array.isArray(item.mods) ? item.mods : (item.mods ? [item.mods] : [])).map((mod, mi) => (
-                                  <div key={mi} style={{ fontSize:11, color:'var(--red)', fontWeight:600, marginTop:2, lineHeight:1.4 }}>{mod}</div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-
-                      {/* Pending courses — shown clearly, not fired yet */}
-                      {pending.length > 0 && (() => {
-                        const pendingByCourse = {};
-                        pending.forEach(i => {
-                          const c = i.course ?? 1;
-                          if (!pendingByCourse[c]) pendingByCourse[c] = [];
-                          pendingByCourse[c].push(i);
-                        });
-                        return (
-                          <div style={{ marginTop:4, paddingTop:10, borderTop:`1px solid ${u.border}` }}>
-                            {Object.entries(pendingByCourse).sort(([a],[b])=>a-b).map(([course, cItems]) => (
-                              <div key={course}>
-                                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
-                                  <span style={{ fontSize:11, fontWeight:800, color:'var(--t3)' }}>⏳ {COURSE_LABEL[course] || `Course ${course}`}</span>
-                                  <span style={{ fontSize:9, color:'var(--t4)', fontWeight:600 }}>PENDING — fire from POS</span>
-                                </div>
-                                {cItems.map((item,i) => (
-                                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, paddingBottom:8, marginBottom:i<cItems.length-1?8:12 }}>
-                                    <div style={{ width:26, height:26, borderRadius:7, background:'var(--bg4)', border:`1.5px solid var(--bdr)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:'var(--t3)', flexShrink:0, fontFamily:'var(--font-mono)' }}>
-                                      {item.qty}
-                                    </div>
-                                    <div style={{ flex:1 }}>
-                                      <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', lineHeight:1.3 }}>{item.name}</div>
-                                      {(Array.isArray(item.mods) ? item.mods : (item.mods ? [item.mods] : [])).map((mod, mi) => (
-                                        <div key={mi} style={{ fontSize:11, color:'var(--red)', fontWeight:600, marginTop:2, lineHeight:1.4 }}>{mod}</div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </>
-                  );
-                })()}
-              </div>
-
-              {/* Actions */}
-              <div style={{ padding:'10px 14px', borderTop:`1px solid ${u.border}`, display:'flex', gap:6 }}>
-                <button style={{
-                  flex:1, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit',
-                  background:'var(--grn)', border:'none', color:'#fff', fontSize:13, fontWeight:800,
-                  transition:'all .12s',
-                }}
-                onClick={()=>handleBump(ticket.id)}
-                onMouseEnter={e=>e.currentTarget.style.background='#16a34a'}
-                onMouseLeave={e=>e.currentTarget.style.background='var(--grn)'}>
-                  Bump ✓
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>showToast('Recalled to queue','info')}>Recall</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>showToast('Reprinted to kitchen printer','info')}>🖨</button>
-              </div>
+      {showHistory?(
+        <div style={{ flex:1, overflowY:'auto', padding:14 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'var(--t3)', marginBottom:12 }}>Bumped tickets — tap Recall to bring back</div>
+          {historyTickets.length===0?(
+            <div style={{ textAlign:'center', padding:'60px', color:'var(--t4)', fontSize:13 }}>No history yet</div>
+          ):(
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12 }}>
+              {historyTickets.map(t=><TicketCard key={t.id} ticket={t} isHistory/>)}
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      ):(
+        <div style={{ flex:1, overflowY:'auto', padding:14 }}>
+          {heldTickets.length>0&&(
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 }}>⏸ On hold</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12, marginBottom:12 }}>
+                {heldTickets.map(t=><TicketCard key={t.id} ticket={t} isHeld/>)}
+              </div>
+              <div style={{ height:1, background:'var(--bdr)', margin:'4px 0 16px' }}/>
+            </div>
+          )}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12, alignContent:'start' }}>
+            {displayed.length===0&&(
+              <div style={{ gridColumn:'1/-1', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'80px 0', color:'var(--t3)' }}>
+                <div style={{ width:64, height:64, borderRadius:18, background:'var(--grn-d)', border:'2px solid var(--grn-b)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, marginBottom:16 }}>✓</div>
+                <div style={{ fontSize:16, fontWeight:800, color:'var(--t2)', marginBottom:4 }}>Kitchen clear</div>
+                <div style={{ fontSize:12 }}>All orders bumped</div>
+              </div>
+            )}
+            {displayed.map(t=><TicketCard key={t.id} ticket={t}/>)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
