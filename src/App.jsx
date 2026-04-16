@@ -59,6 +59,10 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.77', date: 'Apr 2026', label: 'Fix: tax rates now load in back office',
+    changes: ['Tax rates now load in back office context (were only loading in POS context)', 'Item mapper in back office now includes taxRateId and taxOverrides'],
+  },
+  {
     version: '3.5.76', date: 'Apr 2026', label: 'Tax system: UK VAT + US Sales Tax',
     changes: [
       'Tax rates table in Supabase — UK seeded: Standard 20%, Reduced 5%, Zero 0%',

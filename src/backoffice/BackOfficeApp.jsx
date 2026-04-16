@@ -117,6 +117,8 @@ export default function BackOfficeApp() {
       soldAlone:   item.sold_alone   ?? item.soldAlone,
       parentId:    item.parent_id    ?? item.parentId,
       assignedModifierGroups: item.assigned_modifier_groups ?? item.assignedModifierGroups ?? [],
+      taxRateId:   item.tax_rate_id  ?? item.taxRateId  ?? null,
+      taxOverrides: item.tax_overrides ?? item.taxOverrides ?? {},
     }));
     if (floorRes.data?.tables?.length) patch.tables = floorRes.data.tables;
     // Map modifier groups from snake_case DB columns to camelCase store format
@@ -126,6 +128,23 @@ export default function BackOfficeApp() {
       options: g.options ?? [],
       sortOrder: g.sort_order ?? 0,
     }));
+
+    // Load tax rates for this location
+    if (supabase) {
+      const { data: taxRates } = await supabase
+        .from('tax_rates')
+        .select('*')
+        .eq('location_id', locationId)
+        .eq('active', true)
+        .order('rate', { ascending: false });
+      if (taxRates?.length) patch.taxRates = taxRates.map(r => ({
+        id: r.id, name: r.name, code: r.code,
+        rate: parseFloat(r.rate), type: r.type,
+        appliesTo: r.applies_to || ['all'],
+        isDefault: r.is_default, active: r.active,
+      }));
+    }
+
     if (Object.keys(patch).length) useStore.setState(patch);
   };
 
