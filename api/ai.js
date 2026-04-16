@@ -12,6 +12,9 @@ const ALLOWED_TOOLS_FOH = [
   'get_printer_status',
   'get_allergen_info',
   'get_floor_status',
+  'get_current_order',
+  'add_to_order',
+  'apply_order_discount',
   'eighty_six_item',
 ];
 
@@ -117,6 +120,37 @@ const TOOL_DEFINITIONS = {
       required: ['item_id', 'item_name'],
     },
   },
+  get_current_order: {
+    name: 'get_current_order',
+    description: 'Get the items currently in the active order / checkout. Use this before adding items to understand what is already on the order.',
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  add_to_order: {
+    name: 'add_to_order',
+    description: 'Propose adding a menu item to the current active order. Always call get_current_order first to confirm what table/order is active. Requires confirmation before adding.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        item_name: { type: 'string', description: 'The name of the item to add (will be matched against the menu)' },
+        qty:       { type: 'number', description: 'Quantity to add (default 1)' },
+        notes:     { type: 'string', description: 'Special instructions or notes for this item (optional)' },
+      },
+      required: ['item_name'],
+    },
+  },
+  apply_order_discount: {
+    name: 'apply_order_discount',
+    description: 'Propose applying a discount to the current order. Requires confirmation. Only use when explicitly asked by staff.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type:   { type: 'string', enum: ['percent', 'fixed'], description: 'Discount type: percent (e.g. 10%) or fixed amount (e.g. £5 off)' },
+        value:  { type: 'number', description: 'Discount value — percentage (0-100) or fixed GBP amount' },
+        reason: { type: 'string', description: 'Reason for the discount (e.g. "staff discount", "manager comp")' },
+      },
+      required: ['type', 'value', 'reason'],
+    },
+  },
 };
 
 const SYSTEM_FOH = `You are an AI shift assistant for front-of-house restaurant staff. You help during live service.
@@ -128,18 +162,25 @@ WHAT YOU CAN DO:
 - Look up allergen information for menu items
 - Check if printers are online
 - Check table and floor status
-- Help mark items as sold out (86) — always confirm before doing this
+- View the current order (always call get_current_order first before adding anything)
+- Add items to the current active order — always confirm before doing this
+- Apply discounts to the current order — always confirm, always capture a reason
+- Mark items as sold out (86) — always confirm before doing this
+
+CHECKOUT RULES:
+- Always call get_current_order first to confirm a table is open before adding items
+- If no order is active, tell staff to open a table on the POS first
+- Never add more than 5 items in one go
+- Flag discounts over 50% as unusual and ask for manager confirmation
 
 HARD LIMITS — you MUST NOT:
-- Delete anything at all
+- Delete anything
 - Change menu prices
-- Add or remove menu items
-- Access historical data beyond today's shift
-- Make any bulk changes
+- Modify the menu (add/remove items)
+- Access data beyond today's shift
 - Discuss anything unrelated to the restaurant
 
-If asked to do something outside these limits, politely decline and explain why.
-Always use £ for currency. Keep responses to 2-3 sentences where possible.`;
+Always use £ for currency. Keep responses brief — staff are busy.`;
 
 const SYSTEM_BOH = `You are an AI assistant for restaurant managers using the back office system. You help with reporting, menu management, and operational questions.
 

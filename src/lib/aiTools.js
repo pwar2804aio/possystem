@@ -201,6 +201,80 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
       };
     }
 
+    case 'get_current_order': {
+      const { tables = [], activeTableId, activeSessions = {} } = storeState;
+      const activeTable = tables.find(t => t.id === activeTableId);
+      const session = activeTableId ? (activeSessions[activeTableId] || activeTable?.session) : null;
+      const items = session?.items || [];
+      if (!activeTableId || !items.length) {
+        return { result: { active: false, message: 'No active order open. Open a table or start a new order on the POS first.' } };
+      }
+      const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+      return {
+        result: {
+          active: true,
+          table: activeTable?.label || activeTableId,
+          item_count: items.length,
+          items: items.map(i => ({ name: i.name, qty: i.qty, price: `£${i.price.toFixed(2)}`, notes: i.notes || null })),
+          subtotal: `£${subtotal.toFixed(2)}`,
+        },
+      };
+    }
+
+    case 'add_to_order': {
+      const { menuItems = [], tables = [], activeTableId } = storeState;
+      const activeTable = tables.find(t => t.id === activeTableId);
+      if (!activeTableId) {
+        return { result: { error: 'No active order — staff must open a table or start an order on the POS first.' } };
+      }
+      const query = toolInput.item_name?.toLowerCase() || '';
+      const item = menuItems.find(i => i.name?.toLowerCase() === query)
+                || menuItems.find(i => i.name?.toLowerCase().includes(query));
+      if (!item) {
+        return { result: { error: `No menu item found matching "${toolInput.item_name}". Check the menu and try again.` } };
+      }
+      const qty = toolInput.qty || 1;
+      return {
+        result: {
+          preview: true,
+          message: 'Proposed order addition — awaiting confirmation',
+          item: { name: item.name, price: `£${item.price.toFixed(2)}`, qty, notes: toolInput.notes || null },
+          table: activeTable?.label || activeTableId,
+          total: `£${(item.price * qty).toFixed(2)}`,
+        },
+        pendingAction: {
+          type:  'add_to_order',
+          label: `Add ${qty}× ${item.name} (£${item.price.toFixed(2)}) to ${activeTable?.label || 'current order'}${toolInput.notes ? ` — note: "${toolInput.notes}"` : ''}`,
+          payload: { item, qty, notes: toolInput.notes || '' },
+        },
+      };
+    }
+
+    case 'apply_order_discount': {
+      const { tables = [], activeTableId } = storeState;
+      const activeTable = tables.find(t => t.id === activeTableId);
+      if (!activeTableId) {
+        return { result: { error: 'No active order open.' } };
+      }
+      const display = toolInput.type === 'percent'
+        ? `${toolInput.value}% off`
+        : `£${Number(toolInput.value).toFixed(2)} off`;
+      return {
+        result: {
+          preview: true,
+          message: 'Proposed discount — awaiting confirmation',
+          discount: display,
+          reason: toolInput.reason,
+          table: activeTable?.label || activeTableId,
+        },
+        pendingAction: {
+          type:  'apply_order_discount',
+          label: `Apply ${display} to ${activeTable?.label || 'current order'} — reason: ${toolInput.reason}`,
+          payload: { ...toolInput, tableId: activeTableId },
+        },
+      };
+    }
+
     default:
       return { result: { error: `Unknown tool: ${toolName}` } };
   }
@@ -242,6 +316,21 @@ export async function executeConfirmedAction(action, storeActions = {}) {
       if (!toggle86) return { ok: false, error: 'Not available' };
       toggle86(payload.item_id);
       return { ok: true, message: `"${payload.item_name}" has been 86'd` };
+    }
+
+    case 'add_to_order': {
+      const { addItem } = storeActions;
+      if (!addItem) return { ok: false, error: 'Not available' };
+      addItem(payload.item, [], null, { qty: payload.qty || 1, notes: payload.notes || '' });
+      return { ok: true, message: `${payload.qty || 1}× ${payload.item.name} added to the order` };
+    }
+
+    case 'apply_order_discount': {
+      const { applyDiscount } = storeActions;
+      if (!applyDiscount) return { ok: false, error: 'Discount not available' };
+      applyDiscount({ type: payload.type, value: payload.value, reason: payload.reason, tableId: payload.tableId });
+      const display = payload.type === 'percent' ? `${payload.value}%` : `£${Number(payload.value).toFixed(2)}`;
+      return { ok: true, message: `${display} discount applied — ${payload.reason}` };
     }
 
     default:

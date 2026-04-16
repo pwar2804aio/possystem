@@ -63,18 +63,21 @@ export default function AIChat({ mode = 'foh', initialContext = '', placeholder 
   }, [messages, loading, pendingAction]);
 
   const getStoreState = useCallback(() => ({
-    menuItems:     store.menuItems || [],
+    menuItems:      store.menuItems || [],
     menuCategories: store.menuCategories || [],
-    closedChecks:  store.closedChecks || [],
-    tables:        store.tables || [],
+    closedChecks:   store.closedChecks || [],
+    tables:         store.tables || [],
     activeSessions: store.activeSessions || {},
-    eightySixIds:  store.eightySixIds || [],
+    activeTableId:  store.activeTableId || null,
+    eightySixIds:   store.eightySixIds || [],
   }), [store]);
 
   const getStoreActions = useCallback(() => ({
     addMenuItem:    store.addMenuItem,
     updateMenuItem: store.updateMenuItem,
     toggle86:       store.toggle86,
+    addItem:        store.addItem,
+    applyDiscount:  store.applyDiscount || store.setOrderDiscount,
   }), [store]);
 
   // Build messages array for the API (full conversation history with tool results)
@@ -241,6 +244,13 @@ export default function AIChat({ mode = 'foh', initialContext = '', placeholder 
             {mode === 'boh' && (
               <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:16, justifyContent:'center' }}>
                 {["What's our revenue today?", "Top selling items?", "Are printers online?", "Add a new dessert"].map(q => (
+                  <button key={q} onClick={() => send(q)} style={{ padding:'6px 12px', borderRadius:20, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>{q}</button>
+                ))}
+              </div>
+            )}
+            {mode === 'foh' && (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:16, justifyContent:'center' }}>
+                {["What's our revenue today?", "Add a side of chips", "Allergens in the risotto?", "Is the kitchen printer online?"].map(q => (
                   <button key={q} onClick={() => send(q)} style={{ padding:'6px 12px', borderRadius:20, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>{q}</button>
                 ))}
               </div>

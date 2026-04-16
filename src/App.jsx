@@ -26,7 +26,7 @@ function AIAssistantSurface() {
           </div>
         </div>
         <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:12 }}>
-          {['📊 Shift summary', '⚠️ Allergen lookup', '🖨 Printer status', '🚫 86 an item'].map(c => (
+          {['📊 Shift summary', '⚠️ Allergen lookup', '🖨 Printer status', '🛒 Add to order', '🚫 86 an item'].map(c => (
             <span key={c} style={{ fontSize:11, padding:'3px 8px', borderRadius:20, background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t3)', fontWeight:600 }}>{c}</span>
           ))}
         </div>
@@ -58,6 +58,15 @@ import DevSwitcher from './components/DevSwitcher';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.5.73', date: 'Apr 2026', label: 'AI: add to order + discounts',
+    changes: [
+      'AI can now view the current order (get_current_order)',
+      'AI can add menu items to the active checkout — requires confirmation',
+      'AI can apply order discounts — requires confirmation and reason',
+      'AI always checks which table is open before adding items',
+    ],
+  },
   {
     version: '3.5.72', date: 'Apr 2026', label: 'AI tab added to POS nav',
     changes: ['AI Shift Assistant now accessible from the ✦ AI tab in the POS sidebar'],
