@@ -326,9 +326,18 @@ export const useStore = create((set, get) => ({
     } catch { return null; }
   })(),
   setDeviceConfig: (config) => {
-    try { sessionStorage.setItem('rpos-terminal-config', JSON.stringify(config)); } catch {}
-    set({ deviceConfig: config });
-    if (config?.defaultSurface) set({ surface: config.defaultSurface });
+    // Always backfill serviceCharge from stored profiles if the config is missing it
+    let finalConfig = config;
+    if (config && !config.serviceCharge && config.profileId) {
+      try {
+        const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+        const match = profiles.find(p => p.id === config.profileId);
+        if (match?.serviceCharge) finalConfig = { ...config, serviceCharge: match.serviceCharge };
+      } catch {}
+    }
+    try { sessionStorage.setItem('rpos-terminal-config', JSON.stringify(finalConfig)); } catch {}
+    set({ deviceConfig: finalConfig });
+    if (finalConfig?.defaultSurface) set({ surface: finalConfig.defaultSurface });
   },
   clearDeviceConfig: () => {
     try { sessionStorage.removeItem('rpos-terminal-config'); } catch {}
