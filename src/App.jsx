@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.65', date: 'Apr 2026', label: 'Location switcher: super admin sees all orgs',
+    changes: [
+      'Super admins now see all companies and all locations in the location switcher',
+      'Each company shown as a section header with location count and plan badge',
+      'Switching to any location updates the active context for the whole back office session',
+    ],
+  },
+  {
     version: '3.5.64', date: 'Apr 2026', label: 'Fix auth: revert getLocationId to user_profiles',
     changes: ['Reverted getLocationId to direct user_profiles lookup — Platform DB query was breaking auth flow'],
   },
