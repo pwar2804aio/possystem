@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.66', date: 'Apr 2026', label: 'Location switcher fix',
+    changes: [
+      'Regular users now correctly see their location in the switcher',
+      'No longer does a failing DB lookup — reads directly from user_profiles',
+      'Super admins still see all companies and locations from Platform DB',
+    ],
+  },
+  {
     version: '3.5.65', date: 'Apr 2026', label: 'Location switcher: super admin sees all orgs',
     changes: [
       'Super admins now see all companies and all locations in the location switcher',
