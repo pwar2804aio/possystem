@@ -6,6 +6,7 @@ import CheckSelectorModal from '../components/CheckSelectorModal';
 const STATUS = {
   available: { color:'#22c55e', bg:'rgba(34,197,94,.12)',  border:'rgba(34,197,94,.35)', label:'Available' },
   open:      { color:'#3b82f6', bg:'rgba(59,130,246,.12)', border:'rgba(59,130,246,.35)', label:'Open'      },
+  seated:    { color:'#60a5fa', bg:'rgba(96,165,250,.10)', border:'rgba(96,165,250,.3)',  label:'Seated'    },
   occupied:  { color:'#e8a020', bg:'rgba(232,160,32,.14)', border:'rgba(232,160,32,.4)',  label:'Occupied'  },
   reserved:  { color:'#a855f7', bg:'rgba(168,85,247,.12)', border:'rgba(168,85,247,.35)', label:'Reserved'  },
 };
@@ -172,8 +173,12 @@ function ReservationModal({ table, existing, onConfirm, onCancel }) {
 // ─── Table Node ───────────────────────────────────────────────────────────────
 function TableNode({ table, onClick }) {
   const { tables } = useStore();
-  const sm = STATUS[table.status] || STATUS.available;
   const session = table.session;
+  // Derive display status: seated = session exists but no items yet
+  const displayStatus = (table.status === 'occupied' && session && session.items?.filter(i=>!i.voided).length === 0)
+    ? 'seated'
+    : table.status;
+  const sm = STATUS[displayStatus] || STATUS.available;
   const timeSeated = session?.seatedAt ? fmt(session.seatedAt) : null;
   const isRound = table.shape === 'rd';
   const childCount = tables.filter(t => t.parentId === table.id).length;
@@ -203,7 +208,13 @@ function TableNode({ table, onClick }) {
         </div>
       )}
 
-      {(table.status === 'open' || table.status === 'occupied') && session && (
+      {displayStatus === 'seated' && session && (
+        <div style={{ fontSize:9, color:sm.color, marginTop:2, fontWeight:600 }}>
+          {session.covers} cvr · seated
+        </div>
+      )}
+
+      {(table.status === 'open' || (table.status === 'occupied' && displayStatus !== 'seated')) && session && (
         <>
           <div style={{ fontSize:9, color:'var(--t2)', marginTop:2, lineHeight:1.3 }}>
             {session.covers} cvr · {session.server?.split(' ')[0]}

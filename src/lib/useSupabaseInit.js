@@ -14,6 +14,7 @@ import {
   fetchMenuItems, fetchFloorPlan, fetch86List,
   fetchKDSTickets, fetchClosedChecks, fetchLatestConfigPush,
 } from './db';
+import { getLocationConfig, getBusinessDayStart } from './locationTime';
 
 export default function useSupabaseInit() {
   const { menuItems, setMenuItems } = useStore.getState?.() || {};
@@ -24,6 +25,13 @@ export default function useSupabaseInit() {
     async function init() {
       const store = useStore.getState();
 
+      // Load location config first — needed for timezone-correct reporting
+      const locConfig = await getLocationConfig();
+      const todayStart = getBusinessDayStart(locConfig);
+
+      // Store config in Zustand so components can access it
+      useStore.setState({ locationConfig: locConfig });
+
       // Menu items
       const { data: items } = await fetchMenuItems();
       if (items?.length) {
@@ -33,7 +41,6 @@ export default function useSupabaseInit() {
       // Floor plan + sections
       const { data: fp } = await fetchFloorPlan();
       if (fp?.tables?.length) {
-        // Merge DB layout into store tables (preserve session/order state)
         const current = useStore.getState().tables;
         const merged = fp.tables.map(dbT => {
           const live = current.find(t => t.id === dbT.id);
@@ -61,13 +68,13 @@ export default function useSupabaseInit() {
         useStore.setState({ kdsTickets: tickets });
       }
 
-      // Recent closed checks (last 200)
-      const { data: checks } = await fetchClosedChecks();
+      // Today's closed checks — scoped to business day start in location timezone
+      const { data: checks } = await fetchClosedChecks(undefined, 500, todayStart);
       if (checks) {
         useStore.setState({ closedChecks: checks });
       }
 
-      // Latest config push — check if this terminal is behind
+      // Latest config push
       const locId = await getLocationId().catch(() => null);
       const { data: push } = await fetchLatestConfigPush(locId);
       if (push?.snapshot) {

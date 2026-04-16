@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.74', date: 'Apr 2026', label: 'Save/Send + timezone + shift architecture',
+    changes: [
+      'Save button: open a table and save it with no items — seats the table and holds it on the floor plan',
+      'Seated state: tables with a session but no orders show in blue (seated) vs amber (occupied with orders)',
+      'Table mode: Save (always) + Send (only when items exist) — walk-in keeps Send as before',
+      'Timezone per location: Platform DB locations table now has timezone, business_day_start, and shifts columns',
+      'locationTime.js: business day start utility — reports use location timezone, not device local time',
+      'Shift config seeded: Breakfast 07:00-11:30, Lunch 11:30-17:00, Dinner 17:00-23:00 as defaults',
+    ],
+  },
+  {
     version: '3.5.73', date: 'Apr 2026', label: 'Reporting: today only, open orders',
     changes: [
       'Overview cards and shift getter now filter to today (since midnight) — no more historical data polluting revenue',

@@ -29,7 +29,7 @@ export default function POSSurface() {
     staff, allergens, toggleAllergen, clearAllergens,
     addItem, addCustomItem, removeItem, updateItemQty, updateItemNote,
     updateItemSeat, updateItemCourse, setOrderNote,
-    sendToKitchen, fireCourse,
+    sendToKitchen, fireCourse, saveTableSession,
     getPOSItems, getPOSTotals, getPOSOrderNote,
     activeTableId, tables, clearTable, clearWalkIn, setActiveTableId, recordWalkInClosed,
     orderType, setOrderType, customer, setCustomer, clearCustomer,
@@ -212,23 +212,29 @@ export default function POSSurface() {
     setModalItem(item);
   };
 
-  const handleSend = () => {
-    if (!items.length) { showToast('No items on order', 'error'); return; }
+  const handleSave = () => {
+    // Save the session (seat the table) with or without items — no kitchen send
+    if (!activeTableId) return;
+    const label = activeTable?.label || activeTableId;
+    saveTableSession(activeTableId, covers);
+    setActiveTableId(null);
+    showToast(`Table ${label} — saved`, 'success');
+  };
 
-    if (activeTableId) {
-      // Send to kitchen, then clear POS so it's ready for the next order
-      const label = activeTable?.label || activeTableId;
-      setShowCheckout(false);
-      sendToKitchen();
-      // Deselect the table — it stays occupied in the floor plan
-      // POS resets to walk-in mode, ready for the next order
-      setActiveTableId(null);
-      showToast(`${label} — sent to kitchen`, 'success');
+  const handleSend = () => {
+    // Walk-in with no table — open the send modal to choose order type
+    if (!activeTableId) {
+      if (!items.length) { showToast('No items on order', 'error'); return; }
+      setShowSendModal(true);
       return;
     }
-
-    // No table → ask what type this order is
-    setShowSendModal(true);
+    // Table order — send unsent items to kitchen then save
+    if (!items.length) { showToast('Add items before sending to kitchen', 'error'); return; }
+    const label = activeTable?.label || activeTableId;
+    setShowCheckout(false);
+    sendToKitchen();
+    setActiveTableId(null);
+    showToast(`${label} — sent to kitchen`, 'success');
   };
 
   const handlePayComplete = (paymentInfo = {}) => {
@@ -453,12 +459,29 @@ export default function POSSurface() {
             </>
           )}
 
-          {/* Send / Pay */}
+          {/* Save / Send / Pay */}
           <div style={{padding:'6px 10px 12px',display:'flex',gap:6}}>
             <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:40,height:40,borderRadius:11,border:'1px solid var(--bdr2)',background:'var(--bg3)',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:20,flexShrink:0,transition:'all .14s'}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--bdr3)';e.currentTarget.style.color='var(--t2)';}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr2)';e.currentTarget.style.color='var(--t3)';}}>+</button>
-            <button className="btn btn-ghost" style={{flex:1,height:compact?34:40,opacity:items.length===0?.3:1,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01}} onClick={handleSend}>Send →</button>
+            {activeTableId ? (
+              // Table mode: Save (always) + Save & Send (only if items)
+              <>
+                <button className="btn btn-ghost" style={{flex:1,height:compact?34:40,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01}} onClick={handleSave}>
+                  Save
+                </button>
+                {items.length > 0 && (
+                  <button className="btn btn-ghost" style={{flex:1.2,height:compact?34:40,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01,borderColor:'var(--acc-b)',color:'var(--acc)'}} onClick={handleSend}>
+                    Send →
+                  </button>
+                )}
+              </>
+            ) : (
+              // Walk-in mode: Send only (requires items)
+              <button className="btn btn-ghost" style={{flex:1,height:compact?34:40,opacity:items.length===0?.3:1,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01}} onClick={handleSend}>
+                Send →
+              </button>
+            )}
             <button className="btn btn-acc" style={{flex:1.4,height:compact?34:40,opacity:items.length===0?.3:1,fontSize:compact?12:14,fontWeight:800,letterSpacing:.01}} onClick={()=>{
               if (!items.length) return;
               const hasAllergens = items.some(i=>!i.voided&&i.allergens?.length);

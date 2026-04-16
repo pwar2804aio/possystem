@@ -9,6 +9,7 @@
  */
 
 import { supabase, isMock, getLocationId } from './supabase';
+import { getTodayStartFallback } from './locationTime';
 
 // ── Menu ──────────────────────────────────────────────────────────────────────
 export const fetchMenus = async (locationId = null) => {
@@ -161,8 +162,8 @@ export const insertClosedCheck = async (check, locationId = LOCATION_ID) => {
 
 export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 500, sinceDate = null) => {
   if (isMock) return { data: null, error: null };
-  // Default: load today's checks only (since midnight local time)
-  const since = sinceDate || (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+  // Use provided date or fall back to today's start (will be refined by locationTime once config loads)
+  const since = sinceDate || getTodayStartFallback();
   const result = await supabase
     .from('closed_checks')
     .select('*')

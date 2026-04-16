@@ -540,6 +540,7 @@ export const useStore = create((set, get) => ({
   //
   // Quick Screen — list of item IDs shown on the ⚡ Quick tab, ordered
   quickScreenIds: isMock ? QUICK_IDS : [],
+  locationConfig: { timezone: 'Europe/London', businessDayStart: '06:00', shifts: [] },
   setQuickScreenIds: (ids) => set({ quickScreenIds: ids }),
 
   menuItems: (isMock ? MENU_ITEMS : []).map((item, idx) => ({
@@ -785,6 +786,26 @@ export const useStore = create((set, get) => ({
   // Open an already-seated table (go to its POS)
   openTableInPOS: (tableId) => {
     set({ activeTableId:tableId, surface:'pos', orderType:'dine-in' });
+  },
+
+  // Save a table session without sending to kitchen — creates session if needed (seats the table)
+  saveTableSession: (tableId, covers) => {
+    set(s => ({
+      tables: s.tables.map(t => {
+        if (t.id !== tableId) return t;
+        const session = t.session || {
+          id: `ORD-${++_orderNum}`,
+          items: [], firedCourses: [], sentAt: null,
+          covers: covers || 2,
+          server: s.staff?.name || 'Staff',
+          seatedAt: Date.now(),
+          note: '', orderNote: '', subtotal: 0, total: 0,
+        };
+        // Update covers if changed
+        const updatedSession = { ...session, covers: covers || session.covers };
+        return { ...t, status: 'occupied', session: updatedSession };
+      }),
+    }));
   },
 
   // Close / clear a table after payment
@@ -1640,9 +1661,19 @@ export const useStore = create((set, get) => ({
   // Shift stats — computed live from closed checks
   get shift() {
     const allChecks = useStore.getState().closedChecks;
+    const config    = useStore.getState().locationConfig;
     const seed = SHIFT;
-    // Today = since midnight local time
-    const sod = new Date(); sod.setHours(0, 0, 0, 0);
+
+    // Use business day start from location config, fallback to midnight
+    let sod;
+    try {
+      const { getBusinessDayStart } = require('./locationTime') || {};
+      sod = getBusinessDayStart ? getBusinessDayStart(config) : new Date();
+      if (!getBusinessDayStart) { sod = new Date(); sod.setHours(0,0,0,0); }
+    } catch {
+      sod = new Date(); sod.setHours(0,0,0,0);
+    }
+
     const checks = allChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
 
     if (!checks.length) return isMock ? seed : {
