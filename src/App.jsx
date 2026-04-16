@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.78', date: 'Apr 2026', label: 'Tax: fix loading + order panel + receipt',
+    changes: [
+      'Fix: tax rates now actually load in POS (locId was declared after it was used)',
+      'Order panel: shows live tax summary below total (incl. VAT 20% £X.XX for UK, + Sales Tax for US)',
+      'ESC/POS receipt: UK shows of which VAT lines under total, US shows tax-exclusive breakdown',
+      'Browser/HTML receipt: same tax lines added',
+      'Receipt modal: passes taxBreakdown into printReceipt call',
+    ],
+  },
+  {
     version: '3.5.77', date: 'Apr 2026', label: 'Fix: tax rates now load in back office',
     changes: ['Tax rates now load in back office context (were only loading in POS context)', 'Item mapper in back office now includes taxRateId and taxOverrides'],
   },

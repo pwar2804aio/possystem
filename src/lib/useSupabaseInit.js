@@ -74,15 +74,18 @@ export default function useSupabaseInit() {
         useStore.setState({ closedChecks: checks });
       }
 
+      // Resolve location ID (needed for tax rates + config push)
+      const locId = await getLocationId().catch(() => null);
+
       // Tax rates for this location
-      if (locId) {
+      if (locId && supabase) {
         const { data: rates } = await supabase
           .from('tax_rates')
           .select('*')
           .eq('location_id', locId)
           .eq('active', true)
           .order('rate', { ascending: false });
-        if (rates) useStore.setState({ taxRates: rates.map(r => ({
+        if (rates?.length) useStore.setState({ taxRates: rates.map(r => ({
           id: r.id, name: r.name, code: r.code,
           rate: parseFloat(r.rate), type: r.type,
           appliesTo: r.applies_to || ['all'],
@@ -91,7 +94,6 @@ export default function useSupabaseInit() {
       }
 
       // Latest config push
-      const locId = await getLocationId().catch(() => null);
       const { data: push } = await fetchLatestConfigPush(locId);
       if (push?.snapshot) {
         const currentVersion = parseInt(sessionStorage.getItem('rpos-config-version') || '0');

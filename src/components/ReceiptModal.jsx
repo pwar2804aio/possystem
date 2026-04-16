@@ -2,13 +2,21 @@ import { useState } from 'react';
 import { PRODUCTION_CENTRES } from '../data/seed';
 import { printService } from '../lib/printer';
 import { useStore } from '../store';
+import { calculateOrderTax } from '../lib/tax';
 
 // ── Receipt display & print ───────────────────────────────────────────────────
 export function ReceiptModal({ items, subtotal, service, total, checkDiscount, orderType, tableLabel, server, covers, customer, ref: checkRef, method, tip, onClose }) {
-  const { location } = useStore();
+  const { location, taxRates } = useStore();
   const now = new Date();
   const nonVoided = items.filter(i => !i.voided);
   const [printing, setPrinting] = useState(false);
+
+  // Calculate tax breakdown for receipt
+  const taxBreakdown = (() => {
+    if (!taxRates?.length) return null;
+    try { return calculateOrderTax(nonVoided, taxRates, orderType || 'dine-in'); }
+    catch { return null; }
+  })();
 
   const handlePrint = async () => {
     setPrinting(true);
@@ -17,7 +25,7 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
         location,
         check: { ref: checkRef, server, tableLabel, orderType, covers, method },
         items: nonVoided,
-        totals: { subtotal, service, tip: tip || 0, grand: total + (tip || 0) },
+        totals: { subtotal, service, tip: tip || 0, grand: total + (tip || 0), taxBreakdown },
       });
     } catch (err) {
       // Fallback to browser print on failure

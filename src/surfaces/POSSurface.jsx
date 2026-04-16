@@ -2,6 +2,7 @@ import { useCompact } from '../lib/useCompact';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
+import { calculateOrderTax } from '../lib/tax';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
 import InlineItemFlow from '../components/InlineItemFlow';
 import CheckoutModal from './CheckoutModal';
@@ -47,6 +48,7 @@ export default function POSSurface() {
     menuCategories,
     quickScreenIds,
     menus,
+    taxRates,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
@@ -416,6 +418,21 @@ export default function POSSurface() {
                     </div>
                   : <div style={{fontSize:11,color:'var(--grn)',marginBottom:3,fontWeight:600}}>No service charge</div>
                 }
+                {/* Tax summary line */}
+                {taxRates?.length > 0 && items.length > 0 && (() => {
+                  try {
+                    const tb = calculateOrderTax(items.filter(i=>!i.voided), taxRates, orderType || 'dine-in');
+                    if (!tb.totalTax && tb.totalTax !== 0) return null;
+                    const hasExcl = tb.hasExclusiveTax;
+                    return tb.breakdown.map(b => {
+                      const pct = (b.rate.rate*100).toFixed(1).replace('.0','');
+                      return <div key={b.rate.id} style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--t4)',marginBottom:2}}>
+                        <span>{hasExcl ? `+ ${b.rate.name} (${pct}%)` : `incl. ${b.rate.name} (${pct}%)`}</span>
+                        <span style={{fontFamily:'var(--font-mono)'}}>£{b.tax.toFixed(2)}</span>
+                      </div>;
+                    });
+                  } catch { return null; }
+                })()}
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:22,fontWeight:800,marginTop:8,paddingTop:8,borderTop:'1px solid var(--bdr)'}}>
                   <span>Total</span>
                   <span style={{color:'var(--acc)',fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>£{total.toFixed(2)}</span>

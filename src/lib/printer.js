@@ -96,6 +96,27 @@ export function buildCustomerReceipt({ location, check, items, totals }) {
   if(totals.service>0) b.twoCol('Service (12.5%)',`\xA3${totals.service.toFixed(2)}`);
   if(totals.tip>0) b.twoCol('Tip',`\xA3${totals.tip.toFixed(2)}`);
 
+  // Tax breakdown
+  if(totals.taxBreakdown?.breakdown?.length) {
+    const hasExcl = totals.taxBreakdown.hasExclusiveTax;
+    if(hasExcl) {
+      // US: show net + tax lines
+      b.twoCol('Subtotal (ex. tax)',`\xA3${totals.taxBreakdown.subtotal.toFixed(2)}`);
+      totals.taxBreakdown.breakdown.forEach(br => {
+        const pct = (br.rate.rate*100).toFixed(1).replace('.0','');
+        b.twoCol(`${br.rate.name} (${pct}%)`,`\xA3${br.tax.toFixed(2)}`);
+      });
+    } else {
+      // UK: show 'of which VAT' lines under total
+      totals.taxBreakdown.breakdown.forEach(br => {
+        if(br.tax > 0) {
+          const pct = (br.rate.rate*100).toFixed(1).replace('.0','');
+          b.fontB().twoCol(`  of which ${br.rate.name} (${pct}%)`,`\xA3${br.tax.toFixed(2)}`).fontA();
+        }
+      });
+    }
+  }
+
   b.bold(true).doubleBoth()
    .twoCol('TOTAL',`\xA3${totals.grand.toFixed(2)}`)
    .normal();
@@ -189,6 +210,11 @@ function buildReceiptHtml({ location, check, items, totals }) {
     ${totals.service>0?`<div class="row"><span>Service</span><span>\xA3${totals.service?.toFixed(2)}</span></div>`:''}
     ${totals.tip>0?`<div class="row"><span>Tip</span><span>\xA3${totals.tip?.toFixed(2)}</span></div>`:''}
     <div class="row bold big"><span>TOTAL</span><span>\xA3${totals.grand?.toFixed(2)}</span></div>
+    ${totals.taxBreakdown?.breakdown?.filter(b=>b.tax>0).map(b => {
+      const pct = (b.rate.rate*100).toFixed(1).replace('.0','');
+      const label = b.rate.type==='exclusive' ? `${b.rate.name} (${pct}%)` : `of which ${b.rate.name} (${pct}%)`;
+      return `<div class="row" style="font-size:10px;color:#666"><span>${label}</span><span>\xA3${b.tax.toFixed(2)}</span></div>`;
+    }).join('') || ''}
     <div class="divider"></div>
     <div class="center">${location?.receiptFooter||'Thank you for dining with us!'}</div>
   `;
