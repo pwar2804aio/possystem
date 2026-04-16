@@ -211,6 +211,8 @@ export const useStore = create((set, get) => ({
       ...(snap.menus ? { menus: snap.menus } : {}),
       // Menu categories — full replace
       ...(snap.menuCategories ? { menuCategories: snap.menuCategories } : {}),
+      // Tax rates — full replace
+      ...(snap.taxRates?.length ? { taxRates: snap.taxRates } : {}),
       // Modifier + instruction groups — full replace
       ...(snap.modifierGroupDefs ? { modifierGroupDefs: snap.modifierGroupDefs } : {}),
       ...(snap.instructionGroupDefs ? { instructionGroupDefs: snap.instructionGroupDefs } : {}),

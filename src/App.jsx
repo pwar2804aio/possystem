@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.84', date: 'Apr 2026', label: 'Fix: taxRates now travel with Push to POS',
+    changes: [
+      'taxRates added to Push to POS snapshot — they were never included before so POS always had empty tax rates',
+      'applyConfigUpdate now applies taxRates from snapshot to the store',
+    ],
+  },
+  {
     version: '3.5.83', date: 'Apr 2026', label: 'Tax: order panel + receipt display fixed',
     changes: [
       'Order panel: tax breakdown now shows clearly below service charge, above total',

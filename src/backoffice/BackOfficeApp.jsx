@@ -391,6 +391,7 @@ function PushToPOSButton() {
       menus,
       menuItems,
       menuCategories,
+      taxRates: useStore.getState().taxRates || [],
       quickScreenIds: useStore.getState().quickScreenIds || [],
       changeCount: pendingBOChanges,
       profiles: deviceProfiles,
