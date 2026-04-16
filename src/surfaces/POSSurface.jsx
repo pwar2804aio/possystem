@@ -418,18 +418,21 @@ export default function POSSurface() {
                     </div>
                   : <div style={{fontSize:11,color:'var(--grn)',marginBottom:3,fontWeight:600}}>No service charge</div>
                 }
-                {/* Tax summary line */}
+                {/* Tax breakdown — shown below service charge */}
                 {taxRates?.length > 0 && items.length > 0 && (() => {
                   try {
                     const tb = calculateOrderTax(items.filter(i=>!i.voided), taxRates, orderType || 'dine-in');
-                    if (!tb.totalTax && tb.totalTax !== 0) return null;
+                    if (!tb?.breakdown?.length) return null;
                     const hasExcl = tb.hasExclusiveTax;
-                    return tb.breakdown.map(b => {
+                    return tb.breakdown.filter(b => b.tax >= 0).map(b => {
                       const pct = (b.rate.rate*100).toFixed(1).replace('.0','');
-                      return <div key={b.rate.id} style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--t4)',marginBottom:2}}>
-                        <span>{hasExcl ? `+ ${b.rate.name} (${pct}%)` : `incl. ${b.rate.name} (${pct}%)`}</span>
-                        <span style={{fontFamily:'var(--font-mono)'}}>£{b.tax.toFixed(2)}</span>
-                      </div>;
+                      const label = hasExcl ? `+ ${b.rate.name} (${pct}%)` : `incl. ${b.rate.name} (${pct}%)`;
+                      return (
+                        <div key={b.rate.id} style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--t4)',marginBottom:2}}>
+                          <span>{label}</span>
+                          <span style={{fontFamily:'var(--font-mono)'}}>£{b.tax.toFixed(2)}</span>
+                        </div>
+                      );
                     });
                   } catch { return null; }
                 })()}

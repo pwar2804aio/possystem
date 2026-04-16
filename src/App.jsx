@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.83', date: 'Apr 2026', label: 'Tax: order panel + receipt display fixed',
+    changes: [
+      'Order panel: tax breakdown now shows clearly below service charge, above total',
+      'Receipt modal: on-screen preview now shows tax lines (of which VAT or + Sales Tax)',
+      'Receipt print (HTML): tax lines now appear after total in printed receipt',
+    ],
+  },
+  {
     version: '3.5.82', date: 'Apr 2026', label: 'Fix: Push to POS now writes menu to Supabase',
     changes: [
       'upsertMenuItem schema fixed — was sending price column which does not exist (schema uses pricing jsonb)',

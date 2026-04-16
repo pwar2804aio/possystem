@@ -56,6 +56,9 @@ create table if not exists menu_items (
   visibility jsonb default '{"pos": true, "kiosk": true, "online": true}',
   sold_alone boolean default false,
   archived boolean default false,
+  centre_id text,
+  tax_rate_id uuid,
+  tax_overrides jsonb default '{}',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

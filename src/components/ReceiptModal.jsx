@@ -74,6 +74,11 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
       ${checkDiscount > 0 ? `<div class="row" style="color:#1a7a3a"><span>Discount</span><span>−£${checkDiscount.toFixed(2)}</span></div>` : ''}
       ${service > 0 ? `<div class="row muted"><span>Service charge (12.5%)</span><span>£${service.toFixed(2)}</span></div>` : ''}
       <div class="row total-row"><span>TOTAL</span><span>£${total.toFixed(2)}</span></div>
+      ${(taxBreakdown?.breakdown||[]).filter(b=>b.tax>0).map(b => {
+        const pct = (b.rate.rate*100).toFixed(1).replace('.0','');
+        const label = b.rate.type==='exclusive' ? `${b.rate.name} (${pct}%)` : `of which ${b.rate.name} (${pct}%)`;
+        return `<div class="row muted" style="font-size:10px"><span>${label}</span><span>£${b.tax.toFixed(2)}</span></div>`;
+      }).join('')}
       <div class="line"></div>
       <div class="center muted" style="margin-top:8px">Thank you for dining with us</div>
       </body></html>
@@ -134,6 +139,13 @@ export function ReceiptModal({ items, subtotal, service, total, checkDiscount, o
           <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--t3)',marginBottom:3}}><span>Subtotal</span><span>£{subtotal.toFixed(2)}</span></div>
           {checkDiscount>0&&<div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--grn)',marginBottom:3}}><span>Discount</span><span>−£{checkDiscount.toFixed(2)}</span></div>}
           {service>0&&<div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--t3)',marginBottom:3}}><span>Service (12.5%)</span><span>£{service.toFixed(2)}</span></div>}
+
+          {/* Tax breakdown */}
+          {taxBreakdown?.breakdown?.filter(b=>b.tax>0).map(b => {
+            const pct = (b.rate.rate*100).toFixed(1).replace('.0','');
+            const label = b.rate.type==='exclusive' ? `${b.rate.name} (${pct}%)` : `of which ${b.rate.name} (${pct}%)`;
+            return <div key={b.rate.id} style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'var(--t4)',marginBottom:2}}><span>{label}</span><span>£{b.tax.toFixed(2)}</span></div>;
+          })}
 
           <div style={{display:'flex',justifyContent:'space-between',fontSize:16,fontWeight:700,borderTop:'1px solid var(--bdr3)',paddingTop:8,marginTop:6}}>
             <span style={{color:'var(--t1)'}}>Total</span>
