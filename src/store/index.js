@@ -576,21 +576,17 @@ export const useStore = create((set, get) => ({
       let items = s.menuItems.map(item => {
         if (item.id !== id) return item;
         const updated = { ...item, ...patch };
-        // Auto simple↔modifiable based on modifier groups
         if (patch.modifierGroups !== undefined && !['subitem','variants','combo','pizza'].includes(updated.type)) {
           updated.type = patch.modifierGroups?.length > 0 ? 'modifiable' : 'simple';
         }
         return updated;
       });
-
-      // When setting parentId: auto-mark that parent as 'variants'
       if (patch.parentId) {
         items = items.map(item => {
           if (item.id !== patch.parentId || item.type === 'subitem') return item;
           return { ...item, type: 'variants' };
         });
       }
-      // When clearing parentId: revert parent to 'simple' if it has no remaining children
       if ('parentId' in patch && !patch.parentId) {
         const oldParentId = s.menuItems.find(i => i.id === id)?.parentId;
         if (oldParentId) {
@@ -600,10 +596,13 @@ export const useStore = create((set, get) => ({
           }
         }
       }
-
+      // Write the FULL updated item to Supabase (not just the patch)
+      const fullItem = items.find(i => i.id === id);
+      if (fullItem) {
+        import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem(fullItem));
+      }
       return { menuItems: items };
     });
-    import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem({ id, ...patch }));
   },
   addMenuItem: item => {
     const base = item.price || item.basePrice || 0;

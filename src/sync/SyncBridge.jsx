@@ -134,15 +134,30 @@ export default function SyncBridge({ onSyncPulse }) {
           }
           if (itemsRes.data?.length) patch.menuItems = itemsRes.data.map(item => ({
             ...item,
+            price: item.pricing?.base ?? item.price ?? 0,
             menuName: item.menu_name ?? item.menuName ?? item.name ?? 'Item',
             receiptName: item.receipt_name ?? item.receiptName ?? item.name,
             kitchenName: item.kitchen_name ?? item.kitchenName ?? item.name,
             sortOrder: item.sort_order ?? item.sortOrder ?? 0,
             parentId: item.parent_id ?? item.parentId ?? null,
             soldAlone: item.sold_alone ?? item.soldAlone,
+            centreId: item.centre_id ?? item.centreId ?? null,
             taxRateId: item.tax_rate_id ?? item.taxRateId ?? null,
             taxOverrides: item.tax_overrides ?? item.taxOverrides ?? {},
           }));
+
+          // Load tax rates directly from Supabase (source of truth)
+          if (sb && locationId) {
+            try {
+              const { data: taxData } = await sb.from('tax_rates').select('*').eq('location_id', locationId).eq('active', true).order('rate', { ascending: false });
+              if (taxData?.length) patch.taxRates = taxData.map(r => ({
+                id: r.id, name: r.name, code: r.code,
+                rate: parseFloat(r.rate), type: r.type,
+                appliesTo: r.applies_to || ['all'],
+                isDefault: r.is_default, active: r.active,
+              }));
+            } catch {}
+          }
           if (catsRes.data?.length) patch.menuCategories = catsRes.data.map(cat => ({
             ...cat,
             parentId: cat.parent_id ?? cat.parentId ?? null,

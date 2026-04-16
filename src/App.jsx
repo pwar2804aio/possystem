@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.85', date: 'Apr 2026', label: 'Data integrity: Supabase as source of truth',
+    changes: [
+      'updateMenuItem now saves the FULL item to Supabase on every edit — not just the changed patch',
+      'SyncBridge now loads taxRates directly from Supabase on boot (not just from snapshot)',
+      'SyncBridge maps price from pricing.base when loading items from Supabase',
+      'Items edited in back office immediately persist all fields to Supabase correctly',
+    ],
+  },
+  {
     version: '3.5.84', date: 'Apr 2026', label: 'Fix: taxRates now travel with Push to POS',
     changes: [
       'taxRates added to Push to POS snapshot — they were never included before so POS always had empty tax rates',
