@@ -467,7 +467,9 @@ function PushToPOSButton() {
   );
 }
 function BOOverview({ setSection, orgCtx }) {
-  const { closedChecks, tables, devices, activeSessions, staff: currentStaff } = useStore();
+  const { closedChecks, tables, devices, staff: currentStaff } = useStore();
+  // activeSessions derived from tables
+  const activeSessions = Object.fromEntries(tables.filter(t => t.session).map(t => [t.id, t.session]));
 
   // Today = since midnight local time
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);

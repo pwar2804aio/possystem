@@ -57,6 +57,15 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.5.95', date: 'Apr 2026', label: 'Data sync: consistent checks and open orders across all devices',
+    changes: [
+      'Open orders report fixed: activeSessions now derived from tables[] — was always undefined so report showed zero',
+      'BOReports: today tab now fetches closed checks fresh from Supabase on mount — no longer device-local',
+      'AI assistant get_sales_summary and get_top_items now query Supabase directly — correct totals on any device including Sunmi',
+      'Realtime subscription added for closed_checks — all devices receive new check immediately when any device takes payment',
+    ],
+  },
   { version: '3.5.94', date: 'Apr 2026', label: 'Fix: modifier groups load from Supabase on boot', changes: ['SyncBridge now fetches modifier_groups from Supabase on POS boot — no longer requires a Push to POS for modifiers to work after a reload'] },
   { version: '3.5.93', date: 'Apr 2026', label: 'Service charge: floor plan panel + checkout fixed', changes: ['Floor plan table panel now computes service charge using resolveServiceCharge — respects minCovers threshold and waived flag', 'Checkout modal shows service charge correctly from getPOSTotals', 'Service charge label no longer hardcoded to 12.5%'] },
   { version: '3.5.92', date: 'Apr 2026', label: 'Fix: serviceCharge guaranteed in deviceConfig', changes: ['setDeviceConfig now auto-merges serviceCharge from rpos-device-profiles if missing — no code path can strip it', 'minConfig path also carries serviceCharge forward from existingConfig', 'Service charge on min covers now works on first load without needing re-pair'] },

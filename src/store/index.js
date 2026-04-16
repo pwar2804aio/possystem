@@ -1304,6 +1304,15 @@ export const useStore = create((set, get) => ({
   walkInOrder: null,
   clearWalkIn: () => set({ walkInOrder:null, customer:null, orderType:'dine-in' }),
 
+  // activeSessions — map of tableId → session for all tables that have a session
+  // Used by Reports, AI assistant, and back office dashboard
+  getActiveSessions: () => {
+    const tables = get().tables;
+    return Object.fromEntries(
+      tables.filter(t => t.session).map(t => [t.id, t.session])
+    );
+  },
+
   // Get current items/totals for POS (works for both table and walk-in)
   getPOSItems: () => {
     const { activeTableId, tables, walkInOrder } = get();

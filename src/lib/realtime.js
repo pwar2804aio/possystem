@@ -110,7 +110,35 @@ export function startRealtime(store, locationId = LOCATION_ID) {
     })
     .subscribe();
 
-  channels = [kdsChannel, e86Channel, configChannel, taxChannel];
+  // ── Closed checks — live sync across all devices ──────────────────────────
+  const checksChannel = supabase
+    .channel(`checks:${locationId}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'closed_checks',
+      filter: `location_id=eq.${locationId}`,
+    }, ({ new: check }) => {
+      if (!check) return;
+      // Normalise and prepend to store so all devices see it immediately
+      const normalised = {
+        id: check.id, ref: check.ref, server: check.server, covers: check.covers,
+        orderType: check.order_type, customer: check.customer,
+        items: check.items || [], discounts: check.discounts || [],
+        subtotal: check.subtotal, service: check.service, tip: check.tip, total: check.total,
+        method: check.method,
+        closedAt: check.closed_at ? new Date(check.closed_at).getTime() : null,
+        status: check.status, refunds: check.refunds || [],
+        tableId: check.table_id, tableLabel: check.table_label,
+      };
+      const current = store.getState().closedChecks || [];
+      if (!current.find(c => c.id === normalised.id)) {
+        store.setState({ closedChecks: [normalised, ...current] });
+      }
+    })
+    .subscribe();
+
+  channels = [kdsChannel, e86Channel, configChannel, taxChannel, checksChannel];
 
   return () => {
     channels.forEach(ch => supabase.removeChannel(ch));

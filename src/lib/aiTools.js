@@ -20,20 +20,30 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
   switch (toolName) {
 
     case 'get_sales_summary': {
-      const { closedChecks = [] } = storeState;
-      // Only today's checks — since midnight local time
+      // Always fetch live from Supabase so data is consistent across all devices
       const sod = new Date(); sod.setHours(0, 0, 0, 0);
-      const checks = closedChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
-      const revenue = checks.reduce((s, c) => s + (c.total || 0), 0);
-      const covers  = checks.reduce((s, c) => s + (c.covers || 1), 0);
-      const tips    = checks.reduce((s, c) => s + (c.tip || 0), 0);
-      const card    = checks.filter(c => c.method === 'card').reduce((s, c) => s + c.total, 0);
-      const cash    = checks.filter(c => c.method === 'cash').reduce((s, c) => s + c.total, 0);
-      const avg     = checks.length ? revenue / checks.length : 0;
+      let checks = [];
+      if (locationId && supabase) {
+        const { data } = await supabase.from('closed_checks')
+          .select('*').eq('location_id', locationId)
+          .gte('closed_at', sod.toISOString()).order('closed_at', { ascending: false });
+        checks = data || [];
+      } else {
+        const { closedChecks = [] } = storeState;
+        checks = closedChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      }
+      // Normalise field names (DB uses snake_case, store uses camelCase)
+      const norm = checks.map(c => ({ total: c.total, covers: c.covers || c.covers || 1, tip: c.tip || 0, method: c.payment_method || c.method, items: c.items || [], closedAt: c.closed_at || c.closedAt }));
+      const revenue = norm.reduce((s, c) => s + (c.total || 0), 0);
+      const covers  = norm.reduce((s, c) => s + c.covers, 0);
+      const tips    = norm.reduce((s, c) => s + c.tip, 0);
+      const card    = norm.filter(c => c.method === 'card').reduce((s, c) => s + c.total, 0);
+      const cash    = norm.filter(c => c.method === 'cash').reduce((s, c) => s + c.total, 0);
+      const avg     = norm.length ? revenue / norm.length : 0;
       return {
         result: {
           period: 'today',
-          checks: checks.length,
+          checks: norm.length,
           revenue: `£${revenue.toFixed(2)}`,
           covers,
           average_check: `£${avg.toFixed(2)}`,
@@ -45,10 +55,18 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
     }
 
     case 'get_top_items': {
-      const { closedChecks = [] } = storeState;
       const limit = Math.min(toolInput.limit || 5, 10);
       const sod = new Date(); sod.setHours(0, 0, 0, 0);
-      const checks = closedChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      let checks = [];
+      if (locationId && supabase) {
+        const { data } = await supabase.from('closed_checks')
+          .select('items').eq('location_id', locationId)
+          .gte('closed_at', sod.toISOString());
+        checks = data || [];
+      } else {
+        const { closedChecks = [] } = storeState;
+        checks = closedChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      }
       const itemMap = {};
       checks.forEach(c => (c.items || []).forEach(i => {
         itemMap[i.name] = (itemMap[i.name] || { qty: 0, revenue: 0 });

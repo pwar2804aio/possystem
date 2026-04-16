@@ -27,13 +27,43 @@ function StatCard({ label, value, sub, color, icon }) {
 }
 
 export default function BOReports() {
-  const { closedChecks: todayChecks, activeSessions, tables, menuItems, taxRates } = useStore();
+  const { tables, menuItems, taxRates } = useStore();
+  // activeSessions derived from tables — all tables that have a session
+  const activeSessions = useMemo(() =>
+    Object.fromEntries(tables.filter(t => t.session).map(t => [t.id, t.session]))
+  , [tables]);
   const [period, setPeriod]           = useState('today');
   const [view, setView]               = useState('overview');
   const [rangeChecks, setRangeChecks] = useState(null);
+  const [todayLive, setTodayLive]     = useState(null); // fresh from Supabase
   const [loadingRange, setLoadingRange] = useState(false);
   const [locationFilter, setLocationFilter] = useState('all');
   const locations = []; // Multi-location filter reserved for future
+
+  // Always fetch today's checks fresh from Supabase on mount — ensures cross-device consistency
+  useEffect(() => {
+    if (isMock) return;
+    (async () => {
+      try {
+        const locId = await getLocationId();
+        if (!locId || !supabase) return;
+        const sod = new Date(); sod.setHours(0, 0, 0, 0);
+        const { data } = await supabase.from('closed_checks')
+          .select('*').eq('location_id', locId)
+          .gte('closed_at', sod.toISOString())
+          .order('closed_at', { ascending: false });
+        if (data) {
+          // Normalise snake_case from DB
+          setTodayLive(data.map(c => ({
+            ...c,
+            closedAt: c.closed_at || c.closedAt,
+            method: c.payment_method || c.method,
+            tableLabel: c.table_label || c.tableLabel,
+          })));
+        }
+      } catch {}
+    })();
+  }, []);
 
   // When period changes to non-today, fetch from Supabase
   useEffect(() => {
@@ -54,10 +84,11 @@ export default function BOReports() {
 
   // Open orders are computed above from activeSessions
 
-  // Use today's store data for "today", fetched range data for other periods
+  // Use fresh Supabase data for "today", fetched range data for other periods
   const filtered = useMemo(() => {
-    return period === 'today' ? todayChecks : (rangeChecks || []);
-  }, [period, todayChecks, rangeChecks]);
+    if (period === 'today') return todayLive || [];
+    return rangeChecks || [];
+  }, [period, todayLive, rangeChecks]);
 
   // Open orders — active sessions with items, not yet paid
   const openOrders = useMemo(() => {
