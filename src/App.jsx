@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.87', date: 'Apr 2026', label: 'Service charge per device profile',
+    changes: [
+      'Service charge now configured per device profile — bar/counter can have it disabled, table service terminals can have different rates',
+      'Device Profile editor: enable/disable toggle, rate %, apply to all or min covers threshold',
+      'Order panel: service charge only shows for dine-in table orders — never walk-in, takeaway, bar, delivery',
+      'Order panel: tap service charge line to remove it for this order, tap Restore to reinstate',
+      'resolveServiceCharge() utility: clean logic for all conditions — profile config, order type, covers, waived flag',
+    ],
+  },
+  {
     version: '3.5.86', date: 'Apr 2026', label: 'Tax name changes propagate live everywhere',
     changes: [
       'TaxManager now syncs updated tax rates to Zustand store immediately after save — name/rate changes show live in item editor and order panel',

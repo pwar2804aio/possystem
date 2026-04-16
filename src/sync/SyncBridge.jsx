@@ -108,6 +108,7 @@ export default function SyncBridge({ onSyncPulse }) {
               tableServiceEnabled: p.table_service_enabled !== false,
               quickScreenEnabled: p.quick_screen_enabled !== false,
               menuId: p.menu_id,
+              serviceCharge: p.service_charge || null,
             }));
             try { localStorage.setItem('rpos-device-profiles', JSON.stringify(mapped)); } catch {}
           }

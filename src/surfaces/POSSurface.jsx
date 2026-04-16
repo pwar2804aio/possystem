@@ -30,7 +30,7 @@ export default function POSSurface() {
     staff, allergens, toggleAllergen, clearAllergens,
     addItem, addCustomItem, removeItem, updateItemQty, updateItemNote,
     updateItemSeat, updateItemCourse, setOrderNote,
-    sendToKitchen, fireCourse, saveTableSession,
+    sendToKitchen, fireCourse, saveTableSession, toggleServiceCharge,
     getPOSItems, getPOSTotals, getPOSOrderNote,
     activeTableId, tables, clearTable, clearWalkIn, setActiveTableId, recordWalkInClosed,
     orderType, setOrderType, customer, setCustomer, clearCustomer,
@@ -103,7 +103,7 @@ export default function POSSurface() {
   const activeTable = activeTableId ? tables.find(t=>t.id===activeTableId) : null;
   const session = activeTable?.session;
   const items = getPOSItems();
-  const { subtotal, service, total, itemCount, checkDiscount, discountedSub } = getPOSTotals();
+  const { subtotal, service, total, itemCount, checkDiscount, discountedSub, serviceChargeWaived, serviceChargeApplicable } = getPOSTotals();
   const orderNote = getPOSOrderNote();
   const firedCourses = session?.firedCourses || [];
   const covers = session?.covers || 2;
@@ -412,12 +412,27 @@ export default function POSSurface() {
                 {checkDiscount>0&&<div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--grn)',marginBottom:3}}>
                   <span>Discount</span><span style={{fontFamily:'var(--font-mono)'}}>−£{checkDiscount.toFixed(2)}</span>
                 </div>}
-                {service>0
-                  ? <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--t3)',marginBottom:3}}>
-                      <span>Service ({useStore.getState().locations?.find(l=>l.id===useStore.getState().currentLocationId)?.serviceCharge??12.5}%)</span><span style={{fontFamily:'var(--font-mono)'}}>£{service.toFixed(2)}</span>
+                {/* Service charge — only dine-in, from device profile, tap to remove/restore */}
+                {serviceChargeApplicable && (
+                  serviceChargeWaived ? (
+                    // Waived — show restore option
+                    <div onClick={toggleServiceCharge} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:11,color:'var(--t4)',marginBottom:3,cursor:'pointer',padding:'2px 0'}}>
+                      <span style={{display:'flex',alignItems:'center',gap:4}}>
+                        <span style={{fontSize:10,color:'var(--grn)',fontWeight:700,border:'1px solid var(--grn-b)',background:'var(--grn-d)',borderRadius:4,padding:'1px 5px'}}>+</span>
+                        <span style={{textDecoration:'line-through',color:'var(--t4)'}}>Service charge removed</span>
+                      </span>
+                      <span style={{color:'var(--grn)',fontSize:10,fontWeight:600}}>Restore</span>
                     </div>
-                  : <div style={{fontSize:11,color:'var(--grn)',marginBottom:3,fontWeight:600}}>No service charge</div>
-                }
+                  ) : service > 0 ? (
+                    // Active — show with remove button
+                    <div onClick={toggleServiceCharge} style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,color:'var(--t3)',marginBottom:3,cursor:'pointer',padding:'2px 0',borderRadius:6}}
+                      onMouseEnter={e=>{e.currentTarget.style.background='var(--bg3)';e.currentTarget.style.padding='2px 4px';}}
+                      onMouseLeave={e=>{e.currentTarget.style.background='';e.currentTarget.style.padding='2px 0';}}>
+                      <span>{(() => { const sc = deviceConfig?.serviceCharge; const pct = sc?.rate ?? 12.5; return sc?.applyTo==='minCovers' ? `Service (${pct}%, ${sc.minCovers}+ cvr)` : `Service (${pct}%)`; })()} <span style={{fontSize:10,color:'var(--t4)',marginLeft:4}}>tap to remove</span></span>
+                      <span style={{fontFamily:'var(--font-mono)'}}>£{service.toFixed(2)}</span>
+                    </div>
+                  ) : null
+                )}
                 {/* Tax breakdown — shown below service charge */}
                 {taxRates?.length > 0 && items.length > 0 && (() => {
                   try {

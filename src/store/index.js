@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase, isMock, getLocationId } from '../lib/supabase';
 import { calculateOrderTax } from '../lib/tax';
+import { resolveServiceCharge } from '../lib/serviceCharge';
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 const sbUpsertMenu = async (menu) => {
@@ -1017,6 +1018,19 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  // Toggle service charge waiver for the current order
+  toggleServiceCharge: () => {
+    const { activeTableId } = get();
+    if (activeTableId) {
+      set(s=>({ tables:s.tables.map(t=>{
+        if(t.id!==activeTableId||!t.session)return t;
+        return {...t,session:{...t.session,serviceChargeWaived:!t.session.serviceChargeWaived}};
+      })}));
+    } else {
+      set(s=>({ walkInOrder:{...s.walkInOrder,serviceChargeWaived:!s.walkInOrder?.serviceChargeWaived} }));
+    }
+  },
+
   updateItemSeat: (itemUid, seat) => {
     const { activeTableId } = get();
     if (activeTableId) {
@@ -1273,15 +1287,19 @@ export const useStore = create((set, get) => ({
   },
 
   getPOSTotals: () => {
-    const { activeTableId, tables, walkInOrder, orderType } = get();
-    let items, checkDiscounts;
+    const { activeTableId, tables, walkInOrder, orderType, deviceConfig } = get();
+    let items, checkDiscounts, covers, serviceChargeWaived;
     if (activeTableId) {
       const session = tables.find(t=>t.id===activeTableId)?.session;
       items = session?.items || [];
       checkDiscounts = session?.discounts || [];
+      covers = session?.covers || 1;
+      serviceChargeWaived = session?.serviceChargeWaived || false;
     } else {
       items = walkInOrder?.items || [];
       checkDiscounts = walkInOrder?.discounts || [];
+      covers = 1;
+      serviceChargeWaived = walkInOrder?.serviceChargeWaived || false;
     }
     // Subtotal — voided items excluded, item discounts applied
     const subtotal = items.filter(i=>!i.voided).reduce((s,i)=>{
@@ -1292,12 +1310,16 @@ export const useStore = create((set, get) => ({
     // Check-level discounts
     const checkDiscount = checkDiscounts.reduce((s,d) => s + (d.type==='percent'?subtotal*d.value/100:d.value), 0);
     const discountedSub = Math.max(0, subtotal - checkDiscount);
-    const loc = get().locations?.find(l => l.id === get().currentLocationId);
-    const serviceRate = (loc?.serviceCharge ?? 12.5) / 100;
-    const service = orderType==='dine-in' ? discountedSub * serviceRate : 0;
+
+    // Service charge — from device profile config, dine-in only, respects waived flag
+    const serviceRate = resolveServiceCharge({ deviceConfig, orderType, covers, waived: serviceChargeWaived });
+    const service = discountedSub * serviceRate;
+
     return {
       subtotal, checkDiscount, discountedSub, service,
-      total: discountedSub+service,
+      serviceChargeWaived,
+      serviceChargeApplicable: orderType === 'dine-in' && (deviceConfig?.serviceCharge?.enabled !== false),
+      total: discountedSub + service,
       itemCount: items.filter(i=>!i.voided).reduce((s,i)=>s+i.qty,0),
     };
   },

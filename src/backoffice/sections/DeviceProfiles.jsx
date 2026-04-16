@@ -118,6 +118,7 @@ export default function DeviceProfiles() {
           quick_screen_enabled: updated.quickScreenEnabled !== false,
           menu_id: updated.menuId || null,
           sort_order: updated.sortOrder || 0,
+          service_charge: updated.serviceCharge || null,
         };
         const res = await fetch(`${SUPABASE_URL}/rest/v1/device_profiles?on_conflict=id`, {
           method: 'POST',
@@ -391,6 +392,67 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
               <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff', position:'absolute', top:3, left: form.tableServiceEnabled ? 22 : 3, transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.3)' }}/>
             </button>
           </div>
+
+          {/* Service charge */}
+          {(() => {
+            const sc = form.serviceCharge || { enabled: false, rate: 12.5, applyTo: 'all', minCovers: 8 };
+            const updSC = (k, v) => upd('serviceCharge', { ...sc, [k]: v });
+            return (
+              <div style={{ marginBottom:18, padding:'14px', background:'var(--bg3)', borderRadius:10, border:'1px solid var(--bdr)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: sc.enabled ? 14 : 0 }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>Service charge</div>
+                    <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>Applies to dine-in table orders only</div>
+                  </div>
+                  <button onClick={() => updSC('enabled', !sc.enabled)} style={{
+                    width:44, height:24, borderRadius:12, border:'none', cursor:'pointer',
+                    background: sc.enabled ? 'var(--grn)' : 'var(--bg4)', transition:'all .2s', flexShrink:0, position:'relative',
+                  }}>
+                    <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff', position:'absolute', top:3, left: sc.enabled ? 22 : 3, transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.3)' }}/>
+                  </button>
+                </div>
+                {sc.enabled && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <label style={{ fontSize:12, color:'var(--t3)', flexShrink:0 }}>Rate</label>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg)', border:'1px solid var(--bdr)', borderRadius:8, padding:'6px 10px' }}>
+                        <input type="number" min="0" max="100" step="0.5" value={sc.rate} onChange={e => updSC('rate', parseFloat(e.target.value)||0)}
+                          style={{ width:50, border:'none', background:'transparent', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', textAlign:'right' }}/>
+                        <span style={{ fontSize:12, color:'var(--t3)' }}>%</span>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      <label style={{ fontSize:12, color:'var(--t3)' }}>Apply to</label>
+                      {[
+                        { id:'all',       label:'All dine-in orders', desc:'Every table order' },
+                        { id:'minCovers', label:'Minimum covers',     desc:`Only when covers ≥ threshold` },
+                      ].map(opt => (
+                        <button key={opt.id} onClick={() => updSC('applyTo', opt.id)} style={{
+                          padding:'8px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                          background: sc.applyTo === opt.id ? 'var(--acc-d)' : 'var(--bg)',
+                          border:`1.5px solid ${sc.applyTo === opt.id ? 'var(--acc)' : 'var(--bdr)'}`,
+                        }}>
+                          <div style={{ fontSize:12, fontWeight:600, color:sc.applyTo===opt.id?'var(--acc)':'var(--t1)' }}>{opt.label}</div>
+                          <div style={{ fontSize:10, color:'var(--t4)', marginTop:1 }}>{opt.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                    {sc.applyTo === 'minCovers' && (
+                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                        <label style={{ fontSize:12, color:'var(--t3)', flexShrink:0 }}>Minimum covers</label>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg)', border:'1px solid var(--bdr)', borderRadius:8, padding:'6px 10px' }}>
+                          <input type="number" min="1" max="50" step="1" value={sc.minCovers} onChange={e => updSC('minCovers', parseInt(e.target.value)||1)}
+                            style={{ width:40, border:'none', background:'transparent', color:'var(--t1)', fontSize:13, fontFamily:'inherit', outline:'none', textAlign:'right' }}/>
+                          <span style={{ fontSize:12, color:'var(--t3)' }}>+</span>
+                        </div>
+                        <span style={{ fontSize:11, color:'var(--t4)' }}>covers to trigger service charge</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Menu assignment */}
           <div style={{ marginBottom:18 }}>
