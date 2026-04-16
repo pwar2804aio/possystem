@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.51', date: 'Apr 2026', label: 'Required nested modifier validation',
+    changes: [
+      'Required validation now checks nested sub-groups (e.g. Coffee Temp shown after picking a milk)',
+      'Nested required sub-groups show red border + Required badge when not selected',
+      'Error message names the nested group: Please choose: Coffee Temp',
+    ],
+  },
+  {
     version: '3.5.50', date: 'Apr 2026', label: 'Required modifier fix: group min overrides item min',
     changes: [
       'Required modifier validation now uses the higher of group-level min vs item-level min',

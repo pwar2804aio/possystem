@@ -99,12 +99,32 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
     return buildInstGroups(item);
   }, [activeItem, item, instructionGroupDefs]);
 
-  const missingRequired = modGroups.filter(g => {
-    if (!(g.required || (g.min || 0) > 0)) return false;
-    const sel = selections[g.id];
-    if (Array.isArray(sel)) return sel.length < (g.min || 1);
-    return !sel;
-  });
+  const missingRequired = useMemo(() => {
+    const missing = [];
+    modGroups.forEach(g => {
+      const isRequired = g.required || (g.min || 0) > 0;
+      const sel = selections[g.id];
+      // Check top-level group
+      if (isRequired) {
+        if (Array.isArray(sel) ? sel.length < (g.min || 1) : !sel) {
+          missing.push(g);
+          return; // if top-level not filled, don't check its sub-group
+        }
+      }
+      // Check required nested sub-group: if the selected option has a subGroupId
+      const selOpt = !Array.isArray(sel) ? sel : null;
+      if (selOpt?.subGroupId) {
+        const subDef = modifierGroupDefs?.find(d => d.id === selOpt.subGroupId);
+        if (subDef && ((subDef.min || 0) > 0)) {
+          const subSel = selections[subDef.id];
+          const subFilled = Array.isArray(subSel) ? subSel.length >= (subDef.min || 1) : !!subSel;
+          if (!subFilled) missing.push({ ...subDef, required: true, _isNested: true });
+        }
+      }
+    });
+    return missing;
+  }, [modGroups, selections, modifierGroupDefs]);
+
   const canAdd = step === 'variant' ? false : missingRequired.length === 0;
 
   const extraCost = Object.values(selections).flat().filter(Boolean)
@@ -406,8 +426,10 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
               if (!selOpt?.subGroupId) return null;
               const subDef = allModDefs?.find(d => d.id === selOpt.subGroupId);
               if (!subDef) return null;
+              const subMissing = missingRequired.some(m => m.id === subDef.id);
               return (
                 <SubModifierGroup key={subDef.id} group={subDef}
+                  isMissing={subMissing}
                   selections={selections} onToggleSingle={onToggleSingle}
                   onAddMulti={onAddMulti} onRemoveMulti={onRemoveMulti}/>
               );
@@ -452,15 +474,20 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
 }
 
 // ── SubModifierGroup: nested modifier group shown inline ─────────────────────
-function SubModifierGroup({ group, selections, onToggleSingle, onAddMulti, onRemoveMulti }) {
+function SubModifierGroup({ group, selections, onToggleSingle, onAddMulti, onRemoveMulti, isMissing = false }) {
   const cur = selections[group.id];
   const max = group.max >= 99 || !group.max ? 999 : group.max;
   const isMulti = max > 1;
   return (
-    <div style={{ marginTop:8, padding:'10px 12px', background:'var(--bg3)', borderRadius:10,
-      border:'1px solid var(--bdr)', borderLeft:'3px solid var(--acc)' }}>
-      <div style={{ fontSize:10, fontWeight:700, color:'var(--acc)', textTransform:'uppercase',
-        letterSpacing:'.07em', marginBottom:8 }}>↳ {group.name || group.label}</div>
+    <div style={{ marginTop:8, padding:'10px 12px', background: isMissing ? 'var(--red-d)' : 'var(--bg3)', borderRadius:10,
+      border: isMissing ? '2px solid var(--red-b)' : '1px solid var(--bdr)',
+      borderLeft: isMissing ? '3px solid var(--red)' : '3px solid var(--acc)' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+        <div style={{ fontSize:10, fontWeight:700, color: isMissing ? 'var(--red)' : 'var(--acc)', textTransform:'uppercase', letterSpacing:'.07em' }}>
+          ↳ {group.name || group.label}
+        </div>
+        {(group.min || 0) > 0 && <span style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:5, background: isMissing ? 'var(--red)' : 'var(--acc)', color:'#fff' }}>Required</span>}
+      </div>
       <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
         {(group.options||[]).map(opt => {
           const id = opt.id || opt.name;
