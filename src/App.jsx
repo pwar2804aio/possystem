@@ -23,6 +23,10 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.52', date: 'Apr 2026', label: 'Modifier groups: options entered manually only',
+    changes: ['Removed Search existing items from modifier group editor — options are entered manually (name + price)'],
+  },
+  {
     version: '3.5.51', date: 'Apr 2026', label: 'Required nested modifier validation',
     changes: [
       'Required validation now checks nested sub-groups (e.g. Coffee Temp shown after picking a milk)',
