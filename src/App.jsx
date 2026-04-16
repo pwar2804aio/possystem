@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.57', date: 'Apr 2026', label: 'Course badge always visible on order items',
+    changes: [
+      'Course badge now always shows on unsent order items (Course 1, Course 2 etc) — tap to change',
+      'Fire button appears automatically once order has course 2+ items and course 1 has been sent',
+      'Set default course per category in Menu Manager → Menus → edit category',
+    ],
+  },
+  {
     version: '3.5.56', date: 'Apr 2026', label: 'KDS pending courses no longer greyed out',
     changes: ['KDS pending courses shown clearly with ⏳ header, same text weight as fired courses'],
   },

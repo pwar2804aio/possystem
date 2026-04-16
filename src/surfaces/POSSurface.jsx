@@ -1040,9 +1040,9 @@ function OrderItem({
                     {item.seat==='shared'?'Shared':`Seat ${item.seat}`}
                   </button>
                 )}
-                {item.course>0&&(
+                {!isCommitted && (
                   <button onClick={()=>setShowMenu(s=>!s)} style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:5,background:COURSE_COLORS[item.course]?.bg||'var(--bg3)',border:`1px solid ${(COURSE_COLORS[item.course]?.color||'var(--t3)')+'44'}`,color:COURSE_COLORS[item.course]?.color||'var(--t3)',cursor:'pointer',fontFamily:'inherit'}}>
-                    {COURSE_COLORS[item.course]?.label}
+                    {COURSE_COLORS[item.course]?.label || 'Course 1'}
                   </button>
                 )}
                 {isCommitted&&<span style={{fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:5,background:'var(--grn-d)',border:'1px solid var(--grn-b)',color:'var(--grn)'}}>✓ Sent</span>}
