@@ -414,6 +414,9 @@ export function KDSSurface() {
       }, (payload) => {
         if (payload.new.status === 'bumped') {
           setLiveTickets(prev => prev ? prev.filter(t => t.id !== payload.new.id) : prev);
+        } else {
+          // fired_courses updated — re-render ticket with new fired state
+          setLiveTickets(prev => prev ? prev.map(t => t.id === payload.new.id ? mapRow(payload.new) : t) : prev);
         }
       })
       .subscribe();

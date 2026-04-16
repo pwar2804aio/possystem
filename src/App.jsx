@@ -23,6 +23,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.55', date: 'Apr 2026', label: 'KDS: live fire course updates via realtime',
+    changes: [
+      'KDS now reacts to fire course in real time - ticket re-renders when POS fires next course',
+      'Fired courses move from dimmed pending section to active flame section instantly',
+    ],
+  },
+  {
     version: '3.5.54', date: 'Apr 2026', label: 'Courses: category assignment + KDS display',
     changes: [
       'Categories now have a Default course picker in the edit modal',
