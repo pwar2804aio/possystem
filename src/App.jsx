@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.69', date: 'Apr 2026', label: 'Item grid fix + quick screen fix',
+    changes: [
+      'Item grid: rows now use minmax so long names expand the row instead of overlapping',
+      'Quick screen: only shows items explicitly configured in Back Office — no more padding with random products',
+      'Quick screen: shows a clear setup message when not yet configured',
+    ],
+  },
+  {
     version: '3.5.68', date: 'Apr 2026', label: 'Print agent v2: heartbeat + health tracking',
     changes: [
       'Print agent now writes a heartbeat to Supabase every 30s — dashboard knows agent is alive',

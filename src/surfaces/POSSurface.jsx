@@ -114,13 +114,15 @@ export default function POSSurface() {
   // For bar terminal (assignedSection='bar'), show bar/drinks items first
   const assignedSection = deviceConfig?.assignedSection;
   const quickItems = useMemo(() => {
-    const ids = quickScreenIds && quickScreenIds.length ? quickScreenIds : QUICK_IDS;
-    const activeIds = quickScreenIds || [];
-    const available = MENU_ITEMS.filter(i => !i.archived && !i.parentId);
-    const fromIds = activeIds.map(id => MENU_ITEMS.find(i => i.id === id)).filter(i => i && !eightySixIds.includes(i.id) && !i.archived);
-    if (fromIds.length >= 12) return fromIds.slice(0, 16);
-    const pad = available.filter(i => !ids.includes(i.id) && !eightySixIds.includes(i.id)).slice(0, 16 - fromIds.length);
-    return [...fromIds, ...pad];
+    // If quick screen has been explicitly configured in back office, show ONLY those items
+    if (quickScreenIds && quickScreenIds.length > 0) {
+      return quickScreenIds
+        .map(id => MENU_ITEMS.find(i => i.id === id))
+        .filter(i => i && !eightySixIds.includes(i.id) && !i.archived)
+        .slice(0, 16);
+    }
+    // Not configured yet — show nothing (empty quick screen prompts setup)
+    return [];
   }, [quickScreenIds, MENU_ITEMS, eightySixIds]);
 
   // When the main category changes, reset the subcategory selection
@@ -611,7 +613,7 @@ export default function POSSurface() {
                 })}
               </div>
             )}
-            <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?115:155}px,1fr))`,gridAutoRows:compact?'80px':'110px',gap:compact?4:8}}>
+            <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?115:155}px,1fr))`,gridAutoRows:`minmax(${compact?80:110}px,auto)`,gap:compact?4:8}}>
                 {displayItems.map(item=>{
                   // Resolve category colour/icon from store (Menu Manager categories)
                   const storeCat = menuCategories.find(c => c.id === item.cat);
@@ -706,9 +708,19 @@ export default function POSSurface() {
               </div>
               {displayItems.length===0&&(
                 <div style={{textAlign:'center',padding:'80px 0',color:'var(--t3)'}}>
-                  <div style={{fontSize:40,marginBottom:12,opacity:.4}}>🔍</div>
-                  <div style={{fontSize:15,fontWeight:700,color:'var(--t2)',marginBottom:6}}>No items found</div>
-                  <button onClick={()=>setSearch('')} style={{fontSize:13,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>Clear search →</button>
+                  {cat === 'quick' && (!quickScreenIds || quickScreenIds.length === 0) ? (
+                    <>
+                      <div style={{fontSize:40,marginBottom:12,opacity:.4}}>⚡</div>
+                      <div style={{fontSize:15,fontWeight:700,color:'var(--t2)',marginBottom:6}}>Quick screen not configured</div>
+                      <div style={{fontSize:12,color:'var(--t4)',marginBottom:4}}>Go to Back Office → Menu Manager → Quick Screen to add items</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{fontSize:40,marginBottom:12,opacity:.4}}>🔍</div>
+                      <div style={{fontSize:15,fontWeight:700,color:'var(--t2)',marginBottom:6}}>No items found</div>
+                      <button onClick={()=>setSearch('')} style={{fontSize:13,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>Clear search →</button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
