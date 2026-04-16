@@ -23,6 +23,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.68', date: 'Apr 2026', label: 'Print agent v2: heartbeat + health tracking',
+    changes: [
+      'Print agent now writes a heartbeat to Supabase every 30s — dashboard knows agent is alive',
+      'Agent ID and hostname visible per location — know exactly which machine the agent is on',
+      'printer_health updated after every job: online on success, error with message on failure',
+      'Consecutive failure counter increments — after 2+ failures printer marked offline',
+      'Agent marks itself offline on clean shutdown (SIGTERM/SIGINT)',
+      'Drains stale printing jobs on startup in case agent crashed mid-job',
+    ],
+  },
+  {
     version: '3.5.67', date: 'Apr 2026', label: 'Printer monitoring: proper health tracking',
     changes: [
       'print_jobs added to Supabase realtime — watchJob now fires correctly on job completion',
