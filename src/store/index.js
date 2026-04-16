@@ -36,6 +36,7 @@ const sbUpsertCategory = async (cat) => {
     color: cat.color || '#3b82f6',
     accounting_group: cat.accountingGroup || '',
     sort_order: cat.sortOrder || 0,
+    default_course: cat.defaultCourse ?? 1,
     updated_at: new Date().toISOString(),
   });
   if (error) console.error('[Supabase] menu_categories upsert error:', error);
@@ -874,8 +875,18 @@ export const useStore = create((set, get) => ({
       cat: item.cat || null,           // carry category so routing works
       parentId: item.parentId || null,  // carry parentId so variant routing works
       seat: 'shared',
-      course: CAT_COURSE[item.cat] ?? 1,
-      fired: CAT_COURSE[item.cat] === 0,
+      course: (() => {
+        const cats = useStore.getState().menuCategories || [];
+        const cat = cats.find(c => c.id === item.cat) ||
+                    cats.find(c => c.id === item.cats?.[0]) ||
+                    (item.parentId ? cats.find(c => c.id === (useStore.getState().menuItems||[]).find(m=>m.id===item.parentId)?.cat) : null);
+        return cat?.defaultCourse ?? 1;
+      })(),
+      fired: (() => {
+        const cats = useStore.getState().menuCategories || [];
+        const cat = cats.find(c => c.id === item.cat);
+        return (cat?.defaultCourse ?? 1) === 0;
+      })(),
       status: 'pending',
     };
 
@@ -1075,27 +1086,36 @@ export const useStore = create((set, get) => ({
     const createKdsTickets = (items, tableLabel, serverName, covers) => {
       const routingConfig = getRoutingConfig();
       const byCenter = {};
-      items.filter(i => [0,1].includes(i.course) && !i.voided && i.status==='pending').forEach(item => {
+      const FIRED_ON_SEND = [0, 1];
+      // Send ALL non-voided pending items — not just courses 0+1
+      items.filter(i => !i.voided && i.status === 'pending').forEach(item => {
         const centres = getCentresForItem(item, routingConfig);
         centres.forEach(cid => {
           if (!byCenter[cid]) byCenter[cid] = [];
           byCenter[cid].push(item);
         });
       });
-      return Object.entries(byCenter).map(([centreId, centreItems]) => ({
-        id: `kds-${Date.now()}-${centreId}-${Math.random().toString(36).slice(2,6)}`,
-        table: tableLabel, server: serverName, covers, centreId,
-        sentAt: Date.now(), minutes: 0,
-        items: centreItems.map(i => ({
-          qty: i.qty, name: i.kitchenName || i.menu_name || i.menuName || i.name,
-          mods: [
-            ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
-            ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
-            ...(i.notes ? [`📝 ${i.notes}`] : []),
-          ].join(' · '),
-          course: i.course, centreId, uid: i.uid,
-        })),
-      }));
+      return Object.entries(byCenter).map(([centreId, centreItems]) => {
+        const allCourses = [...new Set(centreItems.map(i => i.course ?? 1))].sort((a,b)=>a-b);
+        return {
+          id: `kds-${Date.now()}-${centreId}-${Math.random().toString(36).slice(2,6)}`,
+          table: tableLabel, server: serverName, covers, centreId,
+          sentAt: Date.now(), minutes: 0,
+          firedCourses: FIRED_ON_SEND,
+          allCourses,
+          items: centreItems.map(i => ({
+            qty: i.qty, name: i.kitchenName || i.menu_name || i.menuName || i.name,
+            mods: [
+              ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
+              ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
+              ...(i.notes ? [`📝 ${i.notes}`] : []),
+            ].join(' · '),
+            course: i.course ?? 1,
+            fired: FIRED_ON_SEND.includes(i.course ?? 1),
+            centreId, uid: i.uid,
+          })),
+        };
+      });
     };
 
     if (activeTableId) {
@@ -1157,90 +1177,57 @@ export const useStore = create((set, get) => ({
   },
 
   fireCourse: (courseNum) => {
-    const { activeTableId, tables, staff } = get();
-    if (activeTableId) {
-      const table = tables.find(t => t.id === activeTableId);
-      const session = table?.session;
-      const courseItems = session?.items?.filter(i => i.course === courseNum && i.status === 'pending' && !i.voided) || [];
+    const { activeTableId, tables } = get();
+    if (!activeTableId) return;
+    const table = tables.find(t => t.id === activeTableId);
+    const session = table?.session;
+    if (!session) return;
 
-      // Use routing config to determine centres
-      const routingConfig = (() => {
-        try {
-          const stored = useStore.getState().printRouting;
-          if (stored?.centres?.length) return stored;
-          return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres:[], routing:{} };
-        } catch { return { centres:[], routing:{} }; }
-      })();
-      const getCentresForItem = (item) => {
-        const { centres, routing } = routingConfig;
-        if (!centres?.length) return [];
-        const snap = (() => { try { return JSON.parse(localStorage.getItem('rpos-config-snapshot')||'{}'); } catch { return {}; } })();
-        const cats = snap.menuCategories || [];
-        const parentMap = {};
-        cats.forEach(c => { parentMap[c.id] = c.parentId || null; });
-        const catOrAncestorMatches = (catId, assignedSet, depth = 0) => {
-          if (!catId || depth > 5) return false;
-          if (assignedSet.has(catId)) return true;
-          const pid = parentMap[catId];
-          return pid ? catOrAncestorMatches(pid, assignedSet, depth + 1) : false;
-        };
+    // Mark course as fired in POS session
+    set(s => ({
+      tables: s.tables.map(t => {
+        if (t.id !== activeTableId || !t.session) return t;
+        const firedCourses = [...new Set([...(t.session.firedCourses||[]), courseNum])];
+        const items = t.session.items.map(i => i.course === courseNum ? { ...i, fired:true, status:'sent' } : i);
+        return { ...t, session: { ...t.session, items, firedCourses } };
+      }),
+      // Update in-store kds tickets: mark course items as fired
+      kdsTickets: s.kdsTickets.map(ticket => {
+        if (ticket.table !== (table?.label || activeTableId)) return ticket;
+        if ((ticket.firedCourses||[]).includes(courseNum)) return ticket;
+        const firedCourses = [...new Set([...(ticket.firedCourses||[0,1]), courseNum])];
+        const items = (ticket.items||[]).map(i => i.course === courseNum ? { ...i, fired:true } : i);
+        return { ...ticket, firedCourses, items };
+      }),
+    }));
 
-        // Look up the full menu item to get cat (order line items only carry itemId)
-        const allItems = useStore.getState().menuItems || [];
-        const menuItem = allItems.find(i => i.id === (item.itemId || item.id));
-        const itemCat = item.cat || item.cats?.[0] || menuItem?.cat || menuItem?.cats?.[0] || null;
-        const parentId = item.parentId || menuItem?.parentId || null;
-        const parentMenuItem = parentId ? allItems.find(i => i.id === parentId) : null;
-        const parentCat = parentMenuItem?.cat || parentMenuItem?.cats?.[0] || null;
+    // Update kds_tickets in Supabase so KDS screen reacts via realtime
+    import('../lib/supabase.js').then(async ({ supabase, getLocationId }) => {
+      try {
+        if (!supabase) return;
+        const locId = await getLocationId();
+        if (!locId) return;
+        const { data: tickets } = await supabase
+          .from('kds_tickets')
+          .select('id, fired_courses, items')
+          .eq('location_id', locId)
+          .eq('table_label', table?.label || activeTableId)
+          .eq('status', 'pending')
+          .order('sent_at', { ascending: false })
+          .limit(3);
+        if (!tickets?.length) return;
+        for (const ticket of tickets) {
+          if ((ticket.fired_courses||[]).includes(courseNum)) continue;
+          const firedCourses = [...new Set([...(ticket.fired_courses||[0,1]), courseNum])];
+          const updatedItems = (ticket.items||[]).map(i => i.course === courseNum ? { ...i, fired:true } : i);
+          await supabase.from('kds_tickets')
+            .update({ fired_courses: firedCourses, items: updatedItems })
+            .eq('id', ticket.id);
+        }
+      } catch (e) { console.warn('fireCourse Supabase update failed', e); }
+    });
 
-        const matched = [];
-        centres.forEach(centre => {
-          const r = routing[centre.id];
-          if (!r?.assignedCategories?.length) return;
-          if (r.excludedItems?.includes(item.id) || r.excludedItems?.includes(item.itemId)) return;
-          const assignedSet = new Set(r.assignedCategories);
-          const catMatches = (itemCat && catOrAncestorMatches(itemCat, assignedSet)) ||
-                             (parentCat && catOrAncestorMatches(parentCat, assignedSet));
-          if (catMatches) matched.push(centre.id);
-        });
-        return matched;
-      };
-
-      const byCenter = {};
-      courseItems.forEach(item => {
-        getCentresForItem(item).forEach(cid => {
-          if (!byCenter[cid]) byCenter[cid] = [];
-          byCenter[cid].push(item);
-        });
-      });
-      const newTickets = Object.entries(byCenter).map(([centreId, centreItems]) => ({
-        id: `kds-${Date.now()}-${centreId}-c${courseNum}`,
-        table: table?.label || activeTableId,
-        server: staff?.name || session?.server || 'Server',
-        covers: session?.covers || 2,
-        centreId, sentAt: Date.now(), minutes: 0,
-        items: centreItems.map(i => ({
-          qty: i.qty, name: i.kitchenName || i.menu_name || i.menuName || i.name,
-          mods: [
-            ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
-            ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
-            ...(i.notes ? [`📝 ${i.notes}`] : []),
-          ].join(' · '),
-          course: i.course, centreId, uid: i.uid,
-        })),
-      }));
-
-      set(s=>({
-        tables: s.tables.map(t => {
-          if(t.id!==activeTableId||!t.session) return t;
-          const firedCourses=[...new Set([...(t.session.firedCourses||[]),courseNum])];
-          const items=t.session.items.map(i=>i.course===courseNum?{...i,fired:true,status:'sent'}:i);
-          return {...t,session:{...t.session,items,firedCourses}};
-        }),
-        kdsTickets: [...s.kdsTickets, ...newTickets],
-      }));
-      get().showToast(`Course ${courseNum} fired to kitchen`,'success');
-    }
+    get().showToast('Course ' + courseNum + ' fired to kitchen', 'success');
   },
 
   // ── Walk-in order (non-table) ──────────────

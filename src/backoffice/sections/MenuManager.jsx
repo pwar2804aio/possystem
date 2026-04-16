@@ -2110,11 +2110,12 @@ function InstructionsTab() {
 
 // ── Edit Category Modal ───────────────────────────────────────────────────────
 function CatModal({ cat, roots, onSave, onDelete, onClose }) {
-  const [f, setF] = useState({ label:cat.label, icon:cat.icon||'🍽', color:cat.color||'#3b82f6', parentId:cat.parentId||'', accountingGroup:cat.accountingGroup||'' });
+  const [f, setF] = useState({ label:cat.label, icon:cat.icon||'🍽', color:cat.color||'#3b82f6', parentId:cat.parentId||'', accountingGroup:cat.accountingGroup||'', defaultCourse:cat.defaultCourse??1 });
   const set = (k,v) => setF(p=>({...p,[k]:v}));
+  const COURSES = [{v:0,l:'Immediate',hint:'Drinks, bread — fires instantly with order'},{v:1,l:'Course 1',hint:'Starters / first plates'},{v:2,l:'Course 2',hint:'Mains'},{v:3,l:'Course 3',hint:'Desserts'}];
   return (
     <div className="modal-back" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:18, width:'100%', maxWidth:420, padding:'20px', boxShadow:'var(--sh3)' }}>
+      <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:18, width:'100%', maxWidth:440, padding:'20px', boxShadow:'var(--sh3)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
           <div style={{ fontSize:15, fontWeight:800, color:'var(--t1)' }}>Edit category</div>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--t4)', cursor:'pointer', fontSize:20 }}>×</button>
@@ -2124,6 +2125,17 @@ function CatModal({ cat, roots, onSave, onDelete, onClose }) {
           <div><span style={lbl}>Accounting group</span><input style={inp} value={f.accountingGroup} onChange={e=>set('accountingGroup',e.target.value)} placeholder="e.g. Food, Beverages"/></div>
           <div><span style={lbl}>Icon</span><div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>{ICONS.map(ic=><button key={ic} onClick={()=>set('icon',ic)} style={{ width:28,height:28,borderRadius:7,border:`1.5px solid ${f.icon===ic?'var(--acc)':'var(--bdr)'}`,background:f.icon===ic?'var(--acc-d)':'var(--bg3)',cursor:'pointer',fontSize:14 }}>{ic}</button>)}</div></div>
           <div><span style={lbl}>Colour</span><div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>{COLOURS.map(c=><button key={c} onClick={()=>set('color',c)} style={{ width:20,height:20,borderRadius:'50%',background:c,border:'none',cursor:'pointer',outline:f.color===c?'3px solid var(--t1)':'none',outlineOffset:2 }}/>)}</div></div>
+          <div>
+            <span style={lbl}>Default course</span>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
+              {COURSES.map(({v,l,hint})=>(
+                <button key={v} onClick={()=>set('defaultCourse',v)} style={{ padding:'7px 10px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`2px solid ${f.defaultCourse===v?'var(--acc)':'var(--bdr)'}`, background:f.defaultCourse===v?'var(--acc-d)':'var(--bg3)' }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:f.defaultCourse===v?'var(--acc)':'var(--t2)' }}>{v===0?'⚡':v===1?'1️⃣':v===2?'2️⃣':'3️⃣'} {l}</div>
+                  <div style={{ fontSize:9, color:'var(--t4)', marginTop:2 }}>{hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
           <div><span style={lbl}>Parent</span>
             <select value={f.parentId} onChange={e=>set('parentId',e.target.value)} style={{ ...inp, cursor:'pointer' }}>
               <option value="">Root category</option>

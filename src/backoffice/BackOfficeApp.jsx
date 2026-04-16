@@ -99,6 +99,7 @@ export default function BackOfficeApp() {
       parentId: c.parent_id ?? c.parentId,
       accountingGroup: c.accounting_group ?? c.accountingGroup,
       sortOrder: c.sort_order ?? c.sortOrder,
+      defaultCourse: c.default_course ?? c.defaultCourse ?? 1,
     }));
     if (itemsRes.data?.length)   patch.menuItems       = itemsRes.data.map(item => ({
       ...item,

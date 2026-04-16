@@ -23,6 +23,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.54', date: 'Apr 2026', label: 'Courses: category assignment + KDS display',
+    changes: [
+      'Categories now have a Default course picker in the edit modal',
+      'Items auto-get the right course when added from a category',
+      'Send to kitchen sends all courses in one ticket',
+      'KDS groups items by course with flame headers for fired, dimmed for pending',
+      'Fire course updates existing KDS ticket via Supabase realtime',
+    ],
+  },
+  {
     version: '3.5.53', date: 'Apr 2026', label: 'Modifier groups: options must come from Items list',
     changes: [
       'Modifier group options can only be added by searching existing sub-items from the Items tab',

@@ -118,6 +118,8 @@ export const insertKDSTicket = async (ticket, locationId = null) => {
     centre_id: ticket.centreId || null,
     items: ticket.items || [],
     status: 'pending',
+    fired_courses: ticket.firedCourses || [0, 1],
+    all_courses: ticket.allCourses || [],
     sent_at: ticket.sentAt ? new Date(ticket.sentAt).toISOString() : new Date().toISOString(),
   };
   return supabase.from('kds_tickets').insert(row);

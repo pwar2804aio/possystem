@@ -430,6 +430,8 @@ export function KDSSurface() {
     centreId: row.centre_id || row.centreId || null,
     sentAt: row.sent_at ? new Date(row.sent_at).getTime() : Date.now(),
     minutes: 0,
+    firedCourses: row.fired_courses || row.firedCourses || [0, 1],
+    allCourses: row.all_courses || row.allCourses || [],
     items: typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []),
   });
 
@@ -553,24 +555,80 @@ export function KDSSurface() {
                 </div>
               </div>
 
-              {/* Items */}
+              {/* Items — grouped by course */}
               <div style={{ padding:'10px 14px' }}>
-                {ticket.items.map((item,i)=>(
-                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, paddingBottom:8, marginBottom:i<ticket.items.length-1?8:0, borderBottom:i<ticket.items.length-1?`1px solid ${u.border}`:'none' }}>
-                    <div style={{ width:26, height:26, borderRadius:7, background:u.color+'22', border:`1.5px solid ${u.color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:u.color, flexShrink:0, fontFamily:'var(--font-mono)' }}>
-                      {item.qty}
-                    </div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)', lineHeight:1.3 }}>{item.name}</div>
-                      {item.mods&&<div style={{ fontSize:11, color:item.mods.includes('⚠')?'var(--red)':'var(--t4)', marginTop:2, lineHeight:1.4 }}>{item.mods}</div>}
-                    </div>
-                    {item.course>0&&(
-                      <span style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'var(--blu-d)', border:'1px solid var(--blu-b)', color:'var(--blu)', fontWeight:800, flexShrink:0, marginTop:2 }}>
-                        C{item.course}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                {(() => {
+                  const firedCourses = ticket.firedCourses || [0, 1];
+                  const items = ticket.items || [];
+                  const fired = items.filter(i => firedCourses.includes(i.course ?? 1));
+                  const pending = items.filter(i => !firedCourses.includes(i.course ?? 1));
+
+                  // Group fired items by course
+                  const firedByCourse = {};
+                  fired.forEach(i => {
+                    const c = i.course ?? 1;
+                    if (!firedByCourse[c]) firedByCourse[c] = [];
+                    firedByCourse[c].push(i);
+                  });
+
+                  const COURSE_LABEL = { 0:'Immediate', 1:'Course 1', 2:'Course 2', 3:'Course 3' };
+
+                  return (
+                    <>
+                      {/* Fired courses — active */}
+                      {Object.entries(firedByCourse).sort(([a],[b])=>a-b).map(([course, cItems]) => (
+                        <div key={course}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
+                            <span style={{ fontSize:11, fontWeight:800, color:u.color }}>🔥 {COURSE_LABEL[course] || `Course ${course}`}</span>
+                          </div>
+                          {cItems.map((item,i) => (
+                            <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, paddingBottom:8, marginBottom:i<cItems.length-1?8:12 }}>
+                              <div style={{ width:26, height:26, borderRadius:7, background:u.color+'22', border:`1.5px solid ${u.color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:u.color, flexShrink:0, fontFamily:'var(--font-mono)' }}>
+                                {item.qty}
+                              </div>
+                              <div style={{ flex:1 }}>
+                                <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)', lineHeight:1.3 }}>{item.name}</div>
+                                {item.mods && <div style={{ fontSize:11, color:item.mods.includes('⚠')?'var(--red)':'var(--t4)', marginTop:2, lineHeight:1.4 }}>{item.mods}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+
+                      {/* Pending courses — dimmed */}
+                      {pending.length > 0 && (() => {
+                        const pendingByCourse = {};
+                        pending.forEach(i => {
+                          const c = i.course ?? 1;
+                          if (!pendingByCourse[c]) pendingByCourse[c] = [];
+                          pendingByCourse[c].push(i);
+                        });
+                        return (
+                          <div style={{ marginTop:4, paddingTop:10, borderTop:`1px dashed ${u.border}`, opacity:0.6 }}>
+                            {Object.entries(pendingByCourse).sort(([a],[b])=>a-b).map(([course, cItems]) => (
+                              <div key={course}>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                                  <span style={{ fontSize:10, fontWeight:800, color:'var(--t4)' }}>⏳ {COURSE_LABEL[course] || `Course ${course}`} — pending fire from POS</span>
+                                </div>
+                                {cItems.map((item,i) => (
+                                  <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10, paddingBottom:6, marginBottom:6 }}>
+                                    <div style={{ width:22, height:22, borderRadius:6, background:'var(--bg4)', border:'1px solid var(--bdr)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'var(--t4)', flexShrink:0, fontFamily:'var(--font-mono)' }}>
+                                      {item.qty}
+                                    </div>
+                                    <div style={{ flex:1 }}>
+                                      <div style={{ fontSize:12, fontWeight:600, color:'var(--t3)', lineHeight:1.3 }}>{item.name}</div>
+                                      {item.mods && <div style={{ fontSize:10, color:'var(--t4)', marginTop:2 }}>{item.mods}</div>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Actions */}
