@@ -58,6 +58,7 @@ import DevSwitcher from './components/DevSwitcher';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.5.88', date: 'Apr 2026', label: 'Remove Switch device mode button', changes: ['Removed Switch device mode button from back office sidebar — was covering UI'] },
   {
     version: '3.5.87', date: 'Apr 2026', label: 'Service charge per device profile',
     changes: [

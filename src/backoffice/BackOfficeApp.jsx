@@ -274,15 +274,7 @@ export default function BackOfficeApp() {
             </button>
           )}
           {!isMock && (
-            <button onClick={() => { localStorage.removeItem('rpos-device-mode'); window.location.href = '/'; }} style={{
-              width:'100%', padding:'6px 10px', borderRadius:9, marginTop:4,
-              cursor:'pointer', textAlign:'left', fontSize:11,
-              fontWeight:600, border:'none',
-              fontFamily:'inherit', background:'transparent',
-              color:'var(--t4)', display:'flex', alignItems:'center', gap:8,
-            }}>
-              <span>↩</span> Switch device mode
-            </button>
+            <div style={{ height: 4 }} />
           )}
         </div>
       </div>
