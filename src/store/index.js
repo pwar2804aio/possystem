@@ -1106,7 +1106,10 @@ export const useStore = create((set, get) => ({
           items: centreItems.map(i => ({
             qty: i.qty, name: i.kitchenName || i.menu_name || i.menuName || i.name,
             mods: [
-              ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
+              ...(i.mods?.filter(m => !m._instruction).map(m =>
+                m.groupLabel ? `${m.groupLabel}: ${m.name || m.label}` : (m.name || m.label)
+              ).filter(Boolean) || []),
+              ...(i.mods?.filter(m => m._instruction).map(m => m.label).filter(Boolean) || []),
               ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
               ...(i.notes ? [`📝 ${i.notes}`] : []),
             ],

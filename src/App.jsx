@@ -23,6 +23,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.59', date: 'Apr 2026', label: 'Modifiers and instructions on separate lines everywhere',
+    changes: [
+      'POS order panel: each modifier on its own line, instructions italic, notes with pencil icon',
+      'Instructions no longer baked into item name — they live only in the mods list',
+      'KDS: each mod/instruction/allergen on its own red line',
+      'Kitchen printer: each mod on its own red line, no >> prefix',
+    ],
+  },
+  {
     version: '3.5.58', date: 'Apr 2026', label: 'Modifiers on separate red lines on KDS and printer',
     changes: [
       'KDS: each modifier and instruction on its own line in red',

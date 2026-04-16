@@ -130,17 +130,17 @@ export function buildKitchenTicket({ table, server, covers, course, centreName, 
   (items||[]).forEach(item=>{
     b.doubleBoth();
     const qty=item.qty>1?`${item.qty}x `:'';
-    b.text(qty+item.name.toUpperCase().substring(0,18)).lf();
+    b.text(qty+(item.name||'').toUpperCase().substring(0,22)).lf();
     b.normal();
     if(item.seat) b.fontB().line(`  Seat ${item.seat}`).fontA();
-    // Mods + instructions — each on their own line in RED
+    // Each mod/instruction on its own red line
     const modLines = Array.isArray(item.mods) ? item.mods : (item.mods ? item.mods.split(' · ') : []);
     modLines.forEach(m => {
-      const text = typeof m === 'string' ? m : (m.label || '');
+      const text = (typeof m === 'string' ? m : (m.label||'')).trim();
       if (!text) return;
-      b.red().bold(true).line(`  >> ${text}`).bold(false).black();
+      b.red().bold(true).line(`  ${text}`).bold(false).black();
     });
-    if(item.notes) b.red().underline(true).bold(true).line(`  !! ${item.notes}`).bold(false).underline(false).black();
+    if(item.notes) b.red().bold(true).underline(true).line(`  ${item.notes}`).bold(false).underline(false).black();
     b.lf();
   });
 

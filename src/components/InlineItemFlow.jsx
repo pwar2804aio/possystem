@@ -152,12 +152,10 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
         mods.push({ groupLabel: g?.name, label: val, price: 0, _instruction: true });
       }
     });
-    const instParts = Object.values(instSelections).filter(Boolean);
     const variantPart = selectedVariant
       ? ` — ${selectedVariant.menuName || selectedVariant.name || selectedVariant.label}`
       : '';
-    const nameSuffix = instParts.length ? ` · ${instParts.join(', ')}` : '';
-    const displayName = `${item.menuName || item.menu_name || item.name}${variantPart}${nameSuffix}`;
+    const displayName = `${item.menuName || item.menu_name || item.name}${variantPart}`;
     const targetItem = selectedVariant?._childItem || item;
     onConfirm(targetItem, mods, null, { notes: notes.trim(), qty, linePrice: total, displayName });
   };

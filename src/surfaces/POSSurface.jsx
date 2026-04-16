@@ -993,12 +993,20 @@ function OrderItem({
               {item.name}
               {isVoided && <span style={{fontSize:9,fontWeight:800,padding:'1px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)',letterSpacing:.04}}>VOIDED</span>}
             </div>
-            {item.mods?.map((m,i)=>(
-              <div key={i} style={{fontSize:11,color:'var(--t4)',marginTop:1,display:'flex',justifyContent:'space-between'}}>
+            {item.mods?.filter(m => !m._instruction).map((m,i)=>(
+              <div key={i} style={{fontSize:11,color:'var(--t3)',marginTop:1,display:'flex',justifyContent:'space-between'}}>
                 <span>{m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}</span>
                 {m.price>0&&<span style={{color:'var(--acc)',fontFamily:'var(--font-mono)'}}>+£{m.price.toFixed(2)}</span>}
               </div>
             ))}
+            {item.mods?.filter(m => m._instruction).map((m,i)=>(
+              <div key={`inst-${i}`} style={{fontSize:11,color:'var(--t3)',marginTop:1,fontStyle:'italic'}}>
+                {m.label}
+              </div>
+            ))}
+            {item.notes && (
+              <div style={{fontSize:11,color:'var(--t3)',marginTop:1,fontStyle:'italic'}}>📝 {item.notes}</div>
+            )}
 
             {/* Item discount */}
             {item.discount && !isVoided && (
