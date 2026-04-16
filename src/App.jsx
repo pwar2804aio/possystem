@@ -23,6 +23,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.49', date: 'Apr 2026', label: 'Archived items + sub-items simplified + required modifier error',
+    changes: [
+      'Items tab: Archived button shows all archived items with Unarchive button per item',
+      'Sub items filter: simplified flat list with POS visibility toggle on each row',
+      'Required modifier error: Add button turns red with message when required groups not selected',
+      'Missing required groups highlighted with red border',
+    ],
+  },
+  {
     version: '3.5.48', date: 'Apr 2026', label: 'Sub-items: proper category manager',
     changes: [
       'Sub-items view rebuilt as a two-panel category manager',
