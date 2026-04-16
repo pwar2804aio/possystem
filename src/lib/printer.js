@@ -41,6 +41,8 @@ class EscPosBuilder {
   underline(on)      { return this._push([ESC,0x2d,on?1:0]); }
   fontB()            { return this._push([ESC,0x4d,0x01]); }
   fontA()            { return this._push([ESC,0x4d,0x00]); }
+  red()              { return this._push([ESC,0x72,0x01]); }  // ESC r 1 = red ink
+  black()            { return this._push([ESC,0x72,0x00]); }  // ESC r 0 = black ink
 
   text(str) { return this._push((str||'').replace(/[^\x00-\xff]/g,'?')); }
   line(str='') { return this.text(str).lf(); }
@@ -84,7 +86,8 @@ export function buildCustomerReceipt({ location, check, items, totals }) {
     const linePrice=`\xA3${(item.price*item.qty).toFixed(2)}`;
     const nameStr=item.qty>1?`${item.qty}x ${item.name}`:item.name;
     b.twoCol(nameStr.substring(0,42-linePrice.length-1), linePrice);
-    item.mods?.forEach(m=>b.fontB().line(`  ${m.label}`).fontA());
+    const modLines = Array.isArray(item.mods) ? item.mods : (item.mods ? item.mods.split(' · ') : []);
+    modLines.forEach(m => b.fontB().line(`  ${typeof m === 'string' ? m : (m.label||'')}`).fontA());
     if(item.notes) b.fontB().line(`  Note: ${item.notes}`).fontA();
   });
 
@@ -130,8 +133,14 @@ export function buildKitchenTicket({ table, server, covers, course, centreName, 
     b.text(qty+item.name.toUpperCase().substring(0,18)).lf();
     b.normal();
     if(item.seat) b.fontB().line(`  Seat ${item.seat}`).fontA();
-    item.mods?.forEach(m=>b.bold(true).line(`  >> ${m.label}`).bold(false));
-    if(item.notes) b.underline(true).bold(true).line(`  !! ${item.notes}`).bold(false).underline(false);
+    // Mods + instructions — each on their own line in RED
+    const modLines = Array.isArray(item.mods) ? item.mods : (item.mods ? item.mods.split(' · ') : []);
+    modLines.forEach(m => {
+      const text = typeof m === 'string' ? m : (m.label || '');
+      if (!text) return;
+      b.red().bold(true).line(`  >> ${text}`).bold(false).black();
+    });
+    if(item.notes) b.red().underline(true).bold(true).line(`  !! ${item.notes}`).bold(false).underline(false).black();
     b.lf();
   });
 
@@ -162,10 +171,12 @@ export function buildTestPage() {
 // ─── HTML fallback builders ───────────────────────────────────────────────────
 function buildReceiptHtml({ location, check, items, totals }) {
   const now = new Date();
-  const rows = (items||[]).filter(i=>!i.voided).map(item=>`
+  const rows = (items||[]).filter(i=>!i.voided).map(item=>{
+    const modLines = Array.isArray(item.mods) ? item.mods : (item.mods ? item.mods.split(' · ') : []);
+    return `
     <div class="row"><span>${item.qty>1?`${item.qty}\xD7 `:''}${item.name}</span><span>\xA3${(item.price*item.qty).toFixed(2)}</span></div>
-    ${item.mods?.map(m=>`<div style="padding-left:8px;font-size:10px">${m.label}</div>`).join('')||''}
-  `).join('');
+    ${modLines.map(m=>`<div style="padding-left:8px;font-size:10px">${typeof m==='string'?m:(m.label||'')}</div>`).join('')}
+  `;}).join('');
   return `
     <div class="center bold big">${location?.name||'Restaurant'}</div>
     <div class="center">${location?.address||''}</div>

@@ -23,6 +23,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.58', date: 'Apr 2026', label: 'Modifiers on separate red lines on KDS and printer',
+    changes: [
+      'KDS: each modifier and instruction on its own line in red',
+      'Kitchen printer: each modifier on its own line printed in red ink (ESC/POS ESC r)',
+      'Notes printed in red underline bold on kitchen tickets',
+    ],
+  },
+  {
     version: '3.5.57', date: 'Apr 2026', label: 'Course badge always visible on order items',
     changes: [
       'Course badge now always shows on unsent order items (Course 1, Course 2 etc) — tap to change',

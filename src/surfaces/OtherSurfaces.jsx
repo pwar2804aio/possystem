@@ -591,7 +591,9 @@ export function KDSSurface() {
                               </div>
                               <div style={{ flex:1 }}>
                                 <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)', lineHeight:1.3 }}>{item.name}</div>
-                                {item.mods && <div style={{ fontSize:11, color:item.mods.includes('⚠')?'var(--red)':'var(--t4)', marginTop:2, lineHeight:1.4 }}>{item.mods}</div>}
+                                {(Array.isArray(item.mods) ? item.mods : (item.mods ? [item.mods] : [])).map((mod, mi) => (
+                                  <div key={mi} style={{ fontSize:11, color:'var(--red)', fontWeight:600, marginTop:2, lineHeight:1.4 }}>{mod}</div>
+                                ))}
                               </div>
                             </div>
                           ))}
@@ -621,7 +623,9 @@ export function KDSSurface() {
                                     </div>
                                     <div style={{ flex:1 }}>
                                       <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', lineHeight:1.3 }}>{item.name}</div>
-                                      {item.mods && <div style={{ fontSize:11, color:'var(--t4)', marginTop:2, lineHeight:1.4 }}>{item.mods}</div>}
+                                      {(Array.isArray(item.mods) ? item.mods : (item.mods ? [item.mods] : [])).map((mod, mi) => (
+                                        <div key={mi} style={{ fontSize:11, color:'var(--red)', fontWeight:600, marginTop:2, lineHeight:1.4 }}>{mod}</div>
+                                      ))}
                                     </div>
                                   </div>
                                 ))}

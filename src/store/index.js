@@ -1109,7 +1109,7 @@ export const useStore = create((set, get) => ({
               ...(i.mods?.map(m => m.groupLabel ? `${m.groupLabel}: ${m.label}` : m.label).filter(Boolean) || []),
               ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
               ...(i.notes ? [`📝 ${i.notes}`] : []),
-            ].join(' · '),
+            ],
             course: i.course ?? 1,
             fired: FIRED_ON_SEND.includes(i.course ?? 1),
             centreId, uid: i.uid,
