@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.82', date: 'Apr 2026', label: 'Fix: Push to POS now writes menu to Supabase',
+    changes: [
+      'upsertMenuItem schema fixed — was sending price column which does not exist (schema uses pricing jsonb)',
+      'centre_id, tax_rate_id, tax_overrides columns added to menu_items, schema cache reloaded',
+      'Push to POS now writes all menu items and categories to Supabase with correct field mapping',
+    ],
+  },
+  {
     version: '3.5.81', date: 'Apr 2026', label: 'Push to POS now writes menu to Supabase',
     changes: [
       'Root cause: Push to POS only saved a config_pushes snapshot, never wrote menu items to the menu_items table — Supabase DB was always empty',

@@ -59,33 +59,38 @@ export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
   if (!locationId) locationId = await getLocationId();
   if (!locationId) return { data: null, error: new Error('No location') };
+
+  // Build pricing jsonb — preserve existing or derive from scalar price
+  const pricing = item.pricing || { base: item.price || 0 };
+
   const dbItem = {
-    id: item.id,
-    location_id: locationId,
-    name: item.name,
-    price: item.price ?? 0,
-    cat: item.cat ?? null,
-    type: item.type ?? 'simple',
-    archived: item.archived ?? false,
-    allergens: item.allergens ?? [],
-    description: item.description ?? '',
-    menu_name: item.menuName ?? item.menu_name ?? item.name,
-    receipt_name: item.receiptName ?? item.receipt_name ?? item.name,
-    kitchen_name: item.kitchenName ?? item.kitchen_name ?? item.name,
-    sort_order: item.sortOrder ?? item.sort_order ?? 0,
-    parent_id: item.parentId ?? item.parent_id ?? null,
-    sold_alone: item.soldAlone ?? item.sold_alone ?? true,
-    pricing: item.pricing ?? null,
-    visibility: item.visibility ?? null,
-    assigned_modifier_groups: item.assignedModifierGroups ?? item.assigned_modifier_groups ?? [],
-    assigned_instruction_groups: item.assignedInstructionGroups ?? item.assigned_instruction_groups ?? [],
-    centre_id: item.centreId ?? item.centre_id ?? null,
-    tax_rate_id: item.taxRateId ?? item.tax_rate_id ?? null,
-    tax_overrides: item.taxOverrides ?? item.tax_overrides ?? {},
-    updated_at: new Date().toISOString(),
+    id:           item.id,
+    location_id:  locationId,
+    name:         item.name || 'Item',
+    menu_name:    item.menuName    || item.menu_name    || item.name || 'Item',
+    receipt_name: item.receiptName || item.receipt_name || item.name || 'Item',
+    kitchen_name: item.kitchenName || item.kitchen_name || item.name || 'Item',
+    description:  item.description || '',
+    type:         item.type        || 'simple',
+    cat:          item.cat         || null,
+    cats:         item.cats        || [],
+    parent_id:    item.parentId    || item.parent_id    || null,
+    sort_order:   item.sortOrder   ?? item.sort_order   ?? 0,
+    pricing,
+    allergens:    item.allergens   || [],
+    assigned_modifier_groups:    item.assignedModifierGroups    || item.assigned_modifier_groups    || [],
+    assigned_instruction_groups: item.assignedInstructionGroups || item.assigned_instruction_groups || [],
+    visibility:   item.visibility  || { pos: true, kiosk: true, online: true },
+    sold_alone:   item.soldAlone   ?? item.sold_alone   ?? true,
+    archived:     item.archived    ?? false,
+    centre_id:    item.centreId    || item.centre_id    || null,
+    tax_rate_id:  item.taxRateId   || item.tax_rate_id  || null,
+    tax_overrides: item.taxOverrides || item.tax_overrides || {},
+    updated_at:   new Date().toISOString(),
   };
-  const result = await supabase.from('menu_items').upsert(dbItem);
-  if (result.error) console.error('[DB] menu_items upsert failed:', result.error.message, 'item:', item.id, 'location:', locationId);
+
+  const result = await supabase.from('menu_items').upsert(dbItem, { onConflict: 'id' });
+  if (result.error) console.error('[DB] menu_items upsert failed:', result.error.message, 'item:', item.id);
   return result;
 };
 
