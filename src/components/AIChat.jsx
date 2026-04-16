@@ -63,13 +63,14 @@ export default function AIChat({ mode = 'foh', initialContext = '', placeholder 
   }, [messages, loading, pendingAction]);
 
   const getStoreState = useCallback(() => ({
-    menuItems:      store.menuItems || [],
-    menuCategories: store.menuCategories || [],
-    closedChecks:   store.closedChecks || [],
-    tables:         store.tables || [],
-    activeSessions: store.activeSessions || {},
-    activeTableId:  store.activeTableId || null,
-    eightySixIds:   store.eightySixIds || [],
+    menuItems:         store.menuItems || [],
+    menuCategories:    store.menuCategories || [],
+    modifierGroupDefs: store.modifierGroupDefs || [],
+    closedChecks:      store.closedChecks || [],
+    tables:            store.tables || [],
+    activeTableId:     store.activeTableId || null,
+    walkInOrder:       store.walkInOrder || null,
+    eightySixIds:      store.eightySixIds || [],
   }), [store]);
 
   const getStoreActions = useCallback(() => ({
@@ -77,6 +78,8 @@ export default function AIChat({ mode = 'foh', initialContext = '', placeholder 
     updateMenuItem: store.updateMenuItem,
     toggle86:       store.toggle86,
     addItem:        store.addItem,
+    voidItem:       store.voidItem,
+    activeTableId:  store.activeTableId,
     applyDiscount:  store.applyDiscount || store.setOrderDiscount,
   }), [store]);
 

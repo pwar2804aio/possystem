@@ -58,6 +58,22 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.96', date: 'Apr 2026', label: 'AI assistant: massively expanded capabilities',
+    changes: [
+      'New tool: search_item_sales — ask how many lattes, pints, burgers sold today (partial name match)',
+      'New tool: get_hourly_breakdown — busiest hour, revenue per hour, peak time analysis',
+      'New tool: get_payment_breakdown — card vs cash vs split, tips, avg check per method',
+      'New tool: get_server_performance — checks, covers, revenue and avg check per server',
+      'New tool: get_covers_report — covers by hour and by server',
+      'New tool: get_open_tables — all open tables with covers, server, items, subtotal, seated time',
+      'New tool: get_shift_summary — one-call shift overview: revenue, covers, floor status, top item',
+      'New tool: get_item_detail — full item info including modifiers, allergens, price',
+      'New tool: remove_from_order — AI can propose removing items from active order (with confirmation)',
+      'All reporting tools now query Supabase directly — accurate across all devices',
+      'System prompts updated with examples of what the AI can answer',
+    ],
+  },
+  {
     version: '3.5.95', date: 'Apr 2026', label: 'Data sync: consistent checks and open orders across all devices',
     changes: [
       'Open orders report fixed: activeSessions now derived from tables[] — was always undefined so report showed zero',

@@ -7,7 +7,7 @@
 import { supabase, getLocationId } from './supabase';
 
 // Tools that require user confirmation before executing
-export const WRITE_TOOLS = new Set(['add_menu_item', 'update_item_price', 'eighty_six_item']);
+export const WRITE_TOOLS = new Set(['add_menu_item', 'update_item_price', 'eighty_six_item', 'add_to_order', 'remove_from_order', 'apply_order_discount']);
 
 /**
  * Execute a tool call from the AI.
@@ -116,11 +116,246 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
     }
 
     case 'get_floor_status': {
-      const { tables = [], activeSessions = {} } = storeState;
-      const occupied  = tables.filter(t => activeSessions[t.id]?.items?.length > 0).length;
-      const available = tables.length - occupied;
+      const { tables = [] } = storeState;
+      const occupied  = tables.filter(t => t.session?.items?.length > 0).length;
+      const seated    = tables.filter(t => t.session && !t.session.items?.length).length;
+      const available = tables.length - occupied - seated;
       return {
-        result: { total_tables: tables.length, occupied, available },
+        result: { total_tables: tables.length, occupied, seated_no_order: seated, available },
+      };
+    }
+
+    case 'get_open_tables': {
+      const { tables = [] } = storeState;
+      const now = Date.now();
+      const open = tables
+        .filter(t => t.session)
+        .map(t => {
+          const s = t.session;
+          const subtotal = (s.items || []).filter(i => !i.voided).reduce((sum, i) => sum + (i.price || 0) * (i.qty || 1), 0);
+          const seatedMins = s.seatedAt ? Math.round((now - s.seatedAt) / 60000) : null;
+          return {
+            table: t.label,
+            covers: s.covers || 0,
+            server: s.server || 'unassigned',
+            items: (s.items || []).filter(i => !i.voided).length,
+            subtotal: `£${subtotal.toFixed(2)}`,
+            seated_mins: seatedMins,
+            seated_for: seatedMins != null ? `${Math.floor(seatedMins / 60) > 0 ? Math.floor(seatedMins / 60) + 'h ' : ''}${seatedMins % 60}m` : 'unknown',
+          };
+        })
+        .sort((a, b) => (b.seated_mins || 0) - (a.seated_mins || 0));
+      return { result: { open_count: open.length, tables: open } };
+    }
+
+    case 'search_item_sales': {
+      const sod = new Date(); sod.setHours(0, 0, 0, 0);
+      const query = (toolInput.query || '').toLowerCase();
+      let checks = [];
+      if (locationId && supabase) {
+        const { data } = await supabase.from('closed_checks')
+          .select('items').eq('location_id', locationId)
+          .gte('closed_at', sod.toISOString());
+        checks = data || [];
+      } else {
+        checks = (storeState.closedChecks || []).filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      }
+      const matches = {};
+      checks.forEach(c => (c.items || []).forEach(i => {
+        if ((i.name || '').toLowerCase().includes(query)) {
+          const key = i.name;
+          matches[key] = matches[key] || { qty: 0, revenue: 0 };
+          matches[key].qty     += (i.qty || 1);
+          matches[key].revenue += (i.price || 0) * (i.qty || 1);
+        }
+      }));
+      const results = Object.entries(matches)
+        .sort((a, b) => b[1].qty - a[1].qty)
+        .map(([name, d]) => ({ name, qty_sold: d.qty, revenue: `£${d.revenue.toFixed(2)}` }));
+      const totalQty = results.reduce((s, r) => s + r.qty_sold, 0);
+      const totalRev = results.reduce((s, r) => s + parseFloat(r.revenue.slice(1)), 0);
+      if (!results.length) return { result: { found: false, query, message: `No sales found for "${toolInput.query}" today` } };
+      return { result: { query: toolInput.query, found: true, total_sold: totalQty, total_revenue: `£${totalRev.toFixed(2)}`, breakdown: results } };
+    }
+
+    case 'get_hourly_breakdown': {
+      const sod = new Date(); sod.setHours(0, 0, 0, 0);
+      let checks = [];
+      if (locationId && supabase) {
+        const { data } = await supabase.from('closed_checks')
+          .select('total, covers, closed_at').eq('location_id', locationId)
+          .gte('closed_at', sod.toISOString()).order('closed_at');
+        checks = data || [];
+      } else {
+        checks = (storeState.closedChecks || []).filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      }
+      const hourMap = {};
+      checks.forEach(c => {
+        const ts = c.closed_at || (c.closedAt ? new Date(c.closedAt).toISOString() : null);
+        if (!ts) return;
+        const h = new Date(ts).getHours();
+        const label = `${h.toString().padStart(2,'0')}:00`;
+        hourMap[label] = hourMap[label] || { checks: 0, revenue: 0, covers: 0 };
+        hourMap[label].checks++;
+        hourMap[label].revenue += c.total || 0;
+        hourMap[label].covers  += c.covers || 1;
+      });
+      const hours = Object.entries(hourMap)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([hour, d]) => ({ hour, checks: d.checks, covers: d.covers, revenue: `£${d.revenue.toFixed(2)}` }));
+      const peak = hours.length ? hours.reduce((a, b) => parseFloat(b.revenue.slice(1)) > parseFloat(a.revenue.slice(1)) ? b : a) : null;
+      return { result: { hours, peak_hour: peak?.hour || 'n/a', peak_revenue: peak?.revenue || '£0.00' } };
+    }
+
+    case 'get_payment_breakdown': {
+      const sod = new Date(); sod.setHours(0, 0, 0, 0);
+      let checks = [];
+      if (locationId && supabase) {
+        const { data } = await supabase.from('closed_checks')
+          .select('total, method, tip, covers').eq('location_id', locationId)
+          .gte('closed_at', sod.toISOString());
+        checks = data || [];
+      } else {
+        checks = (storeState.closedChecks || []).filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      }
+      const byMethod = {};
+      checks.forEach(c => {
+        const m = c.method || c.payment_method || 'unknown';
+        byMethod[m] = byMethod[m] || { count: 0, total: 0, tips: 0 };
+        byMethod[m].count++;
+        byMethod[m].total += c.total || 0;
+        byMethod[m].tips  += c.tip || 0;
+      });
+      const breakdown = Object.entries(byMethod).map(([method, d]) => ({
+        method, checks: d.count,
+        revenue: `£${d.total.toFixed(2)}`,
+        tips: d.tips > 0 ? `£${d.tips.toFixed(2)}` : null,
+        avg_check: `£${(d.total / d.count).toFixed(2)}`,
+      }));
+      const totalTips = checks.reduce((s, c) => s + (c.tip || 0), 0);
+      return { result: { breakdown, total_tips: `£${totalTips.toFixed(2)}` } };
+    }
+
+    case 'get_server_performance': {
+      const sod = new Date(); sod.setHours(0, 0, 0, 0);
+      let checks = [];
+      if (locationId && supabase) {
+        const { data } = await supabase.from('closed_checks')
+          .select('total, covers, server').eq('location_id', locationId)
+          .gte('closed_at', sod.toISOString());
+        checks = data || [];
+      } else {
+        checks = (storeState.closedChecks || []).filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      }
+      const serverMap = {};
+      checks.forEach(c => {
+        const name = c.server || 'Unknown';
+        serverMap[name] = serverMap[name] || { checks: 0, covers: 0, revenue: 0 };
+        serverMap[name].checks++;
+        serverMap[name].covers  += c.covers || 1;
+        serverMap[name].revenue += c.total  || 0;
+      });
+      const servers = Object.entries(serverMap)
+        .sort((a, b) => b[1].revenue - a[1].revenue)
+        .map(([name, d]) => ({
+          server: name, checks: d.checks, covers: d.covers,
+          revenue: `£${d.revenue.toFixed(2)}`,
+          avg_check: `£${(d.revenue / d.checks).toFixed(2)}`,
+        }));
+      return { result: { servers } };
+    }
+
+    case 'get_covers_report': {
+      const sod = new Date(); sod.setHours(0, 0, 0, 0);
+      let checks = [];
+      if (locationId && supabase) {
+        const { data } = await supabase.from('closed_checks')
+          .select('covers, server, closed_at').eq('location_id', locationId)
+          .gte('closed_at', sod.toISOString());
+        checks = data || [];
+      } else {
+        checks = (storeState.closedChecks || []).filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      }
+      const totalCovers = checks.reduce((s, c) => s + (c.covers || 1), 0);
+      const byServer = {};
+      const byHour = {};
+      checks.forEach(c => {
+        const name = c.server || 'Unknown';
+        byServer[name] = (byServer[name] || 0) + (c.covers || 1);
+        const ts = c.closed_at || (c.closedAt ? new Date(c.closedAt).toISOString() : null);
+        if (ts) {
+          const h = `${new Date(ts).getHours().toString().padStart(2,'0')}:00`;
+          byHour[h] = (byHour[h] || 0) + (c.covers || 1);
+        }
+      });
+      return {
+        result: {
+          total_covers: totalCovers,
+          by_server: Object.entries(byServer).sort((a,b)=>b[1]-a[1]).map(([s,c])=>({ server:s, covers:c })),
+          by_hour: Object.entries(byHour).sort((a,b)=>a[0].localeCompare(b[0])).map(([h,c])=>({ hour:h, covers:c })),
+        },
+      };
+    }
+
+    case 'get_shift_summary': {
+      const { tables = [] } = storeState;
+      const sod = new Date(); sod.setHours(0, 0, 0, 0);
+      let checks = [];
+      if (locationId && supabase) {
+        const { data } = await supabase.from('closed_checks')
+          .select('total, covers, method, items, tip').eq('location_id', locationId)
+          .gte('closed_at', sod.toISOString());
+        checks = data || [];
+      } else {
+        checks = (storeState.closedChecks || []).filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      }
+      const revenue = checks.reduce((s, c) => s + (c.total || 0), 0);
+      const covers  = checks.reduce((s, c) => s + (c.covers || 1), 0);
+      const occupied = tables.filter(t => t.session?.items?.length > 0).length;
+      const onFloor  = tables.filter(t => t.session?.items?.length > 0)
+        .reduce((s, t) => s + (t.session?.items?.filter(i=>!i.voided).reduce((x,i)=>x+(i.price||0)*(i.qty||1),0)||0), 0);
+      const itemMap = {};
+      checks.forEach(c => (c.items || []).forEach(i => {
+        itemMap[i.name] = (itemMap[i.name] || 0) + (i.qty || 1);
+      }));
+      const topItem = Object.entries(itemMap).sort((a,b)=>b[1]-a[1])[0];
+      return {
+        result: {
+          closed_checks: checks.length,
+          revenue: `£${revenue.toFixed(2)}`,
+          covers_done: covers,
+          avg_check: checks.length ? `£${(revenue/checks.length).toFixed(2)}` : '£0.00',
+          open_tables: occupied,
+          revenue_on_floor: `£${onFloor.toFixed(2)}`,
+          top_item_today: topItem ? `${topItem[0]} (${topItem[1]} sold)` : 'none',
+        },
+      };
+    }
+
+    case 'get_item_detail': {
+      const { menuItems = [], menuCategories = [], modifierGroupDefs = [] } = storeState;
+      const query = (toolInput.item_name || '').toLowerCase();
+      const matches = menuItems.filter(i => !i.archived && (i.name || '').toLowerCase().includes(query));
+      if (!matches.length) return { result: { found: false, message: `No item found matching "${toolInput.item_name}"` } };
+      return {
+        result: {
+          found: true,
+          items: matches.slice(0, 3).map(i => {
+            const cat = menuCategories.find(c => c.id === i.cat);
+            const mods = (i.assignedModifierGroups || []).map(mg => {
+              const group = modifierGroupDefs.find(g => g.id === (mg.groupId || mg));
+              return group ? group.name : mg.groupId || mg;
+            });
+            return {
+              name: i.name,
+              price: `£${(i.price || 0).toFixed(2)}`,
+              category: cat?.label || cat?.name || 'Unknown',
+              description: i.description || null,
+              allergens: i.allergens?.length ? i.allergens.join(', ') : 'None declared',
+              modifiers: mods.length ? mods.join(', ') : 'None',
+            };
+          }),
+        },
       };
     }
 
@@ -226,21 +461,45 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
     }
 
     case 'get_current_order': {
-      const { tables = [], activeTableId, activeSessions = {} } = storeState;
+      const { tables = [], activeTableId, walkInOrder } = storeState;
       const activeTable = tables.find(t => t.id === activeTableId);
-      const session = activeTableId ? (activeSessions[activeTableId] || activeTable?.session) : null;
-      const items = session?.items || [];
-      if (!activeTableId || !items.length) {
+      const session = activeTableId ? activeTable?.session : walkInOrder;
+      const items = (session?.items || []).filter(i => !i.voided);
+      if (!items.length) {
         return { result: { active: false, message: 'No active order open. Open a table or start a new order on the POS first.' } };
       }
-      const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+      const subtotal = items.reduce((s, i) => s + (i.price || 0) * i.qty, 0);
       return {
         result: {
           active: true,
-          table: activeTable?.label || activeTableId,
+          table: activeTable?.label || (activeTableId ? activeTableId : 'Walk-in'),
+          covers: session?.covers || 0,
           item_count: items.length,
-          items: items.map(i => ({ name: i.name, qty: i.qty, price: `£${i.price.toFixed(2)}`, notes: i.notes || null })),
+          items: items.map(i => ({ uid: i.uid, name: i.name, qty: i.qty, price: `£${(i.price||0).toFixed(2)}`, notes: i.notes || null })),
           subtotal: `£${subtotal.toFixed(2)}`,
+        },
+      };
+    }
+
+    case 'remove_from_order': {
+      const { menuItems = [], tables = [], activeTableId, walkInOrder } = storeState;
+      const activeTable = tables.find(t => t.id === activeTableId);
+      const session = activeTableId ? activeTable?.session : walkInOrder;
+      const items = (session?.items || []).filter(i => !i.voided);
+      const query = (toolInput.item_name || '').toLowerCase();
+      const match = items.find(i => i.name?.toLowerCase().includes(query));
+      if (!match) return { result: { found: false, message: `"${toolInput.item_name}" not found in the current order.` } };
+      return {
+        result: {
+          preview: true,
+          message: `Proposed removal — awaiting your confirmation`,
+          item: match.name, qty: toolInput.qty || 1,
+          reason: toolInput.reason || null,
+        },
+        pendingAction: {
+          type: 'remove_from_order',
+          label: `Remove ${toolInput.qty || 1}× ${match.name} from order${toolInput.reason ? ` (${toolInput.reason})` : ''}`,
+          payload: { ...toolInput, item_uid: match.uid, item_id: match.id },
         },
       };
     }
@@ -347,6 +606,13 @@ export async function executeConfirmedAction(action, storeActions = {}) {
       if (!addItem) return { ok: false, error: 'Not available' };
       addItem(payload.item, [], null, { qty: payload.qty || 1, notes: payload.notes || '' });
       return { ok: true, message: `${payload.qty || 1}× ${payload.item.name} added to the order` };
+    }
+
+    case 'remove_from_order': {
+      const { voidItem, activeTableId } = storeActions;
+      if (!voidItem) return { ok: false, error: 'Not available' };
+      voidItem(payload.item_uid, activeTableId);
+      return { ok: true, message: `${payload.item_name || 'Item'} removed from the order` };
     }
 
     case 'apply_order_discount': {
