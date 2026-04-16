@@ -23,6 +23,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.61', date: 'Apr 2026', label: 'Auto-fire to kitchen on payment',
+    changes: [
+      'Walk-in orders paid without sending first now auto-fire to production printing at point of payment',
+      'Same applies to table orders — unsent items fire to kitchen when payment is taken',
+    ],
+  },
+  {
     version: '3.5.60', date: 'Apr 2026', label: 'KDS: recall, hold, and per-item bump',
     changes: [
       'History button: tap to see all bumped tickets — tap Recall on any to bring it back to the queue',

@@ -232,10 +232,18 @@ export default function POSSurface() {
   const handlePayComplete = (paymentInfo = {}) => {
     setShowCheckout(false);
     if (activeTableId) {
+      // If table has unsent items, fire them to kitchen before closing
+      const session = useStore.getState().tables.find(t=>t.id===activeTableId)?.session;
+      const hasUnsent = session?.items?.some(i => i.status === 'pending' && !i.voided);
+      if (hasUnsent) sendToKitchen();
       clearTable(activeTableId, paymentInfo);
       showToast('Payment complete — table cleared','success');
       setSurface('tables');
     } else {
+      // Walk-in: if order hasn't been sent to kitchen yet, fire it now
+      const order = useStore.getState().walkInOrder;
+      const hasUnsent = order?.items?.some(i => i.status === 'pending' && !i.voided);
+      if (hasUnsent) sendToKitchen();
       recordWalkInClosed(useStore.getState().walkInOrder, orderType, customer, paymentInfo);
       clearWalkIn();
       showToast('Payment complete','success');
