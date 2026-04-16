@@ -23,6 +23,10 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.64', date: 'Apr 2026', label: 'Fix auth: revert getLocationId to user_profiles',
+    changes: ['Reverted getLocationId to direct user_profiles lookup — Platform DB query was breaking auth flow'],
+  },
+  {
     version: '3.5.63', date: 'Apr 2026', label: 'Back office fully cloud-based',
     changes: [
       'Printers: read/write Supabase printers table — survives across machines and incognito',
