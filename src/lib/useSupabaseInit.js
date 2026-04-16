@@ -9,7 +9,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../store';
-import { isMock, getLocationId } from './supabase';
+import { supabase, isMock, getLocationId } from './supabase';
 import {
   fetchMenuItems, fetchFloorPlan, fetch86List,
   fetchKDSTickets, fetchClosedChecks, fetchLatestConfigPush,
@@ -35,7 +35,11 @@ export default function useSupabaseInit() {
       // Menu items
       const { data: items } = await fetchMenuItems();
       if (items?.length) {
-        useStore.setState({ menuItems: items });
+        useStore.setState({ menuItems: items.map(item => ({
+          ...item,
+          taxRateId:   item.tax_rate_id   ?? item.taxRateId   ?? null,
+          taxOverrides: item.tax_overrides ?? item.taxOverrides ?? {},
+        })) });
       }
 
       // Floor plan + sections

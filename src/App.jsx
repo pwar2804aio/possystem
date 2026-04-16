@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.79', date: 'Apr 2026', label: 'Fix: tax rates actually load in POS now',
+    changes: [
+      'Critical fix: supabase client was not imported in useSupabaseInit — tax rates fetch was silently skipped every boot',
+      'Menu items now have taxRateId and taxOverrides mapped from snake_case on load in POS context',
+    ],
+  },
+  {
     version: '3.5.78', date: 'Apr 2026', label: 'Tax: fix loading + order panel + receipt',
     changes: [
       'Fix: tax rates now actually load in POS (locId was declared after it was used)',
