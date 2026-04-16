@@ -57,6 +57,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.5.90', date: 'Apr 2026', label: 'Save & Send combined into one button', changes: ['Table mode: Save and Send merged into single context-aware button — shows Save (no items), Save & Send (unsent items), or Save (all already sent)'] },
   { version: '3.5.89', date: 'Apr 2026', label: 'Remove Dev Switch device button from POS', changes: ['Dev: Switch device floating button removed from bottom left of POS — was covering the UI'] },
   { version: '3.5.88', date: 'Apr 2026', label: 'Remove Switch device mode button', changes: ['Removed Switch device mode button from back office sidebar — was covering UI'] },
   {

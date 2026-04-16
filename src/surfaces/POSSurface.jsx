@@ -494,25 +494,29 @@ export default function POSSurface() {
             </>
           )}
 
-          {/* Save / Send / Pay */}
+          {/* Send / Pay */}
           <div style={{padding:'6px 10px 12px',display:'flex',gap:6}}>
             <button onClick={()=>setShowCustom(true)} title="Custom item" style={{width:40,height:40,borderRadius:11,border:'1px solid var(--bdr2)',background:'var(--bg3)',color:'var(--t3)',cursor:'pointer',fontFamily:'inherit',fontSize:20,flexShrink:0,transition:'all .14s'}}
               onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--bdr3)';e.currentTarget.style.color='var(--t2)';}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr2)';e.currentTarget.style.color='var(--t3)';}}>+</button>
-            {activeTableId ? (
-              // Table mode: Save (always) + Save & Send (only if items)
-              <>
-                <button className="btn btn-ghost" style={{flex:1,height:compact?34:40,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01}} onClick={handleSave}>
-                  Save
+            {activeTableId ? (() => {
+              // Table mode: one button — label depends on state
+              // No items → Save (hold table)
+              // Items exist, not all sent → Save & Send
+              // All items already sent → Save
+              const hasUnsent = items.some(i => !i.voided && !i.sentAt);
+              const label = items.length === 0 ? 'Save' : hasUnsent ? 'Save & Send →' : 'Save';
+              const isActive = items.length > 0 && hasUnsent;
+              return (
+                <button className="btn btn-ghost"
+                  style={{flex:1,height:compact?34:40,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01,
+                    ...(isActive ? {borderColor:'var(--acc-b)',color:'var(--acc)'} : {})}}
+                  onClick={isActive ? handleSend : handleSave}>
+                  {label}
                 </button>
-                {items.length > 0 && (
-                  <button className="btn btn-ghost" style={{flex:1.2,height:compact?34:40,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01,borderColor:'var(--acc-b)',color:'var(--acc)'}} onClick={handleSend}>
-                    Send →
-                  </button>
-                )}
-              </>
-            ) : (
-              // Walk-in mode: Send only (requires items)
+              );
+            })() : (
+              // Walk-in mode: Send only
               <button className="btn btn-ghost" style={{flex:1,height:compact?34:40,opacity:items.length===0?.3:1,fontSize:compact?12:13,fontWeight:700,letterSpacing:.01}} onClick={handleSend}>
                 Send →
               </button>
