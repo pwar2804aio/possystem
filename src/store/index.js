@@ -1639,9 +1639,12 @@ export const useStore = create((set, get) => ({
   // ── Shift ─────────────────────────────────
   // Shift stats — computed live from closed checks
   get shift() {
-    const checks = useStore.getState().closedChecks;
+    const allChecks = useStore.getState().closedChecks;
     const seed = SHIFT;
-    // Only use seed values in mock mode — real mode starts with a clean shift
+    // Today = since midnight local time
+    const sod = new Date(); sod.setHours(0, 0, 0, 0);
+    const checks = allChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+
     if (!checks.length) return isMock ? seed : {
       name: 'Current shift', opened: new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }),
       covers: 0, sales: 0, avgCheck: 0, cashSales: 0, cardSales: 0, tips: 0, voids: 0, voidValue: 0,

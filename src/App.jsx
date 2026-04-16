@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.73', date: 'Apr 2026', label: 'Reporting: today only, open orders',
+    changes: [
+      'Overview cards and shift getter now filter to today (since midnight) — no more historical data polluting revenue',
+      'fetchClosedChecks loads only today on boot — week/month fetched fresh from Supabase when selected in reports',
+      'AI assistant sales summary now reports today only, not all-time',
+      'Reports: new Open Orders tab shows active tables with subtotals, excluded from revenue',
+      'Open orders show table label, cover count, item count, and current subtotal with clear not-yet-paid label',
+    ],
+  },
+  {
     version: '3.5.73', date: 'Apr 2026', label: 'AI: add to order + discounts',
     changes: [
       'AI can now view the current order (get_current_order)',

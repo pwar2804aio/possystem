@@ -21,15 +21,19 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
 
     case 'get_sales_summary': {
       const { closedChecks = [] } = storeState;
-      const revenue = closedChecks.reduce((s, c) => s + (c.total || 0), 0);
-      const covers  = closedChecks.reduce((s, c) => s + (c.covers || 1), 0);
-      const tips    = closedChecks.reduce((s, c) => s + (c.tip || 0), 0);
-      const card    = closedChecks.filter(c => c.method === 'card').reduce((s, c) => s + c.total, 0);
-      const cash    = closedChecks.filter(c => c.method === 'cash').reduce((s, c) => s + c.total, 0);
-      const avg     = closedChecks.length ? revenue / closedChecks.length : 0;
+      // Only today's checks — since midnight local time
+      const sod = new Date(); sod.setHours(0, 0, 0, 0);
+      const checks = closedChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+      const revenue = checks.reduce((s, c) => s + (c.total || 0), 0);
+      const covers  = checks.reduce((s, c) => s + (c.covers || 1), 0);
+      const tips    = checks.reduce((s, c) => s + (c.tip || 0), 0);
+      const card    = checks.filter(c => c.method === 'card').reduce((s, c) => s + c.total, 0);
+      const cash    = checks.filter(c => c.method === 'cash').reduce((s, c) => s + c.total, 0);
+      const avg     = checks.length ? revenue / checks.length : 0;
       return {
         result: {
-          checks: closedChecks.length,
+          period: 'today',
+          checks: checks.length,
           revenue: `£${revenue.toFixed(2)}`,
           covers,
           average_check: `£${avg.toFixed(2)}`,
@@ -43,8 +47,10 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
     case 'get_top_items': {
       const { closedChecks = [] } = storeState;
       const limit = Math.min(toolInput.limit || 5, 10);
+      const sod = new Date(); sod.setHours(0, 0, 0, 0);
+      const checks = closedChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
       const itemMap = {};
-      closedChecks.forEach(c => (c.items || []).forEach(i => {
+      checks.forEach(c => (c.items || []).forEach(i => {
         itemMap[i.name] = (itemMap[i.name] || { qty: 0, revenue: 0 });
         itemMap[i.name].qty     += (i.qty || 1);
         itemMap[i.name].revenue += (i.price || 0) * (i.qty || 1);
@@ -53,7 +59,7 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
         .sort((a, b) => b[1].qty - a[1].qty)
         .slice(0, limit)
         .map(([name, data]) => ({ name, qty: data.qty, revenue: `£${data.revenue.toFixed(2)}` }));
-      return { result: { items: top } };
+      return { result: { period: 'today', items: top } };
     }
 
     case 'get_printer_status': {

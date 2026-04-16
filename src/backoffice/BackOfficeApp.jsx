@@ -430,16 +430,26 @@ function PushToPOSButton() {
   );
 }
 function BOOverview({ setSection, orgCtx }) {
-  const { closedChecks, tables, devices, staff: currentStaff } = useStore();
+  const { closedChecks, tables, devices, activeSessions, staff: currentStaff } = useStore();
 
-  const revenue     = closedChecks.reduce((s, c) => s + c.total, 0);
-  const covers      = closedChecks.reduce((s, c) => s + (c.covers || 1), 0);
+  // Today = since midnight local time
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayChecks = closedChecks.filter(c => c.closedAt && new Date(c.closedAt) >= todayStart);
+
+  // Open orders = active sessions with items (not yet paid)
+  const openOrdersValue = Object.values(activeSessions || {})
+    .filter(s => s?.items?.length > 0)
+    .reduce((sum, s) => sum + s.items.reduce((t, i) => t + (i.price || 0) * (i.qty || 1), 0), 0);
+  const openOrdersCount = Object.values(activeSessions || {}).filter(s => s?.items?.length > 0).length;
+
+  const revenue     = todayChecks.reduce((s, c) => s + c.total, 0);
+  const covers      = todayChecks.reduce((s, c) => s + (c.covers || 1), 0);
   const onlineDevs  = devices.filter(d => d.status === 'online').length;
   const activeTbls  = tables.filter(t => (t.status === 'open' || t.status === 'occupied') && !t.parentId).length;
 
   const stats = [
-    { label:"Revenue today",   value:`£${revenue.toFixed(2)}`, color:'var(--acc)', sub:`${closedChecks.length} checks` },
-    { label:'Covers',          value:covers,                    color:'var(--blu)', sub:`£${covers > 0 ? (revenue / covers).toFixed(2) : '—'}/head` },
+    { label:"Revenue today",   value:`£${revenue.toFixed(2)}`, color:'var(--acc)', sub:`${todayChecks.length} closed checks` },
+    { label:'Covers today',    value:covers,                    color:'var(--blu)', sub:`£${covers > 0 ? (revenue / covers).toFixed(2) : '0.00'}/head` },
     { label:'Tables active',   value:activeTbls,                color:'var(--grn)', sub:`of ${tables.filter(t => !t.parentId).length} tables` },
     { label:'Terminals online',value:`${onlineDevs}/${devices.length}`, color: onlineDevs === devices.length ? 'var(--grn)' : 'var(--acc)', sub:'this site' },
   ];

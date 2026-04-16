@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store';
-import { supabase, isMock } from '../../lib/supabase';
+import { supabase, isMock, getLocationId } from '../../lib/supabase';
+import { fetchClosedChecksRange } from '../../lib/db';
 
 const PERIODS = [
   { id:'today',  label:'Today'      },
@@ -25,52 +26,54 @@ function StatCard({ label, value, sub, color, icon }) {
 }
 
 export default function BOReports() {
-  const { closedChecks } = useStore();
-  const [period, setPeriod]       = useState('today');
-  const [view, setView]           = useState('overview');
-  const [locationFilter, setLocationFilter] = useState('all');
-  const [locations, setLocations] = useState([]);
+  const { closedChecks: todayChecks, activeSessions, tables, menuItems } = useStore();
+  const [period, setPeriod]         = useState('today');
+  const [view, setView]             = useState('overview');
+  const [rangeChecks, setRangeChecks] = useState(null); // null = use todayChecks
+  const [loadingRange, setLoadingRange] = useState(false);
 
-  // Load accessible locations for the filter dropdown
+  // When period changes to non-today, fetch from Supabase
   useEffect(() => {
-    if (isMock) return;
+    if (isMock || period === 'today') { setRangeChecks(null); return; }
+    setLoadingRange(true);
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data: profile } = await supabase.from('user_profiles').select('org_id, location_id').eq('id', user.id).single();
-        if (!profile) return;
-
-        // Get all locations user has access to
-        const { data: userLocs } = await supabase.from('user_locations').select('location_id').eq('user_id', user.id);
-        const ids = [...new Set([
-          ...(userLocs||[]).map(ul => ul.location_id),
-          profile.location_id,
-        ].filter(Boolean))];
-
-        if (ids.length === 0) return;
-        const { data: locs } = await supabase.from('locations').select('id, name').in('id', ids).order('name');
-        if (locs && locs.length > 1) setLocations(locs); // only show if multiple
-      } catch {}
+        const now = new Date();
+        let fromDate = null;
+        if (period === 'week')  { fromDate = new Date(now); fromDate.setDate(now.getDate() - now.getDay()); fromDate.setHours(0,0,0,0); }
+        if (period === 'month') { fromDate = new Date(now.getFullYear(), now.getMonth(), 1); }
+        const { data } = await fetchClosedChecksRange(await getLocationId(), fromDate, null, 2000);
+        setRangeChecks(data || []);
+      } catch { setRangeChecks([]); }
+      setLoadingRange(false);
     })();
-  }, []);
+  }, [period]);
 
+  // Open orders are computed above from activeSessions
+
+  // Use today's store data for "today", fetched range data for other periods
   const filtered = useMemo(() => {
-    const now = new Date();
-    const sod = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const sow = new Date(sod); sow.setDate(sod.getDate() - sod.getDay());
-    const som = new Date(now.getFullYear(), now.getMonth(), 1);
-    return closedChecks.filter(c => {
-      // Location filter
-      if (locationFilter !== 'all' && c.location_id && c.location_id !== locationFilter) return false;
-      // Period filter
-      const d = new Date(c.closedAt);
-      if (period==='today') return d >= sod;
-      if (period==='week')  return d >= sow;
-      if (period==='month') return d >= som;
-      return true;
-    });
-  }, [closedChecks, period, locationFilter]);
+    return period === 'today' ? todayChecks : (rangeChecks || []);
+  }, [period, todayChecks, rangeChecks]);
+
+  // Open orders — active sessions with items, not yet paid
+  const openOrders = useMemo(() => {
+    return Object.entries(activeSessions || {})
+      .filter(([, s]) => s?.items?.length > 0)
+      .map(([tableId, session]) => {
+        const table = tables.find(t => t.id === tableId);
+        const subtotal = session.items.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0);
+        return {
+          tableId,
+          tableLabel: table?.label || tableId,
+          covers: session.covers || 1,
+          itemCount: session.items.length,
+          subtotal,
+          openedAt: session.openedAt || null,
+        };
+      })
+      .sort((a, b) => (a.openedAt || 0) - (b.openedAt || 0));
+  }, [activeSessions, tables]);
 
   const stats = useMemo(() => {
     const revenue   = filtered.reduce((s,c) => s + c.total, 0);
@@ -119,10 +122,11 @@ export default function BOReports() {
   }, [filtered]);
 
   const tabs = [
-    { id:'overview', label:'Overview' },
-    { id:'items',    label:'Product mix' },
-    { id:'servers',  label:'By server' },
-    { id:'hourly',   label:'Hourly' },
+    { id:'overview',    label:'Overview' },
+    { id:'open',        label:`Open orders${openOrders.length ? ` (${openOrders.length})` : ''}` },
+    { id:'items',       label:'Product mix' },
+    { id:'servers',     label:'By server' },
+    { id:'hourly',      label:'Hourly' },
   ];
 
   const typeIcons = { 'dine-in':'⬚', takeaway:'🥡', collection:'📦', delivery:'🛵', bar:'🍸', counter:'🏷' };
@@ -359,6 +363,51 @@ export default function BOReports() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── Open orders ── */}
+      {view === 'open' && (
+        <div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
+            <StatCard label="Open tables"   value={openOrders.length}                                                     color="var(--acc)" icon="⬚"/>
+            <StatCard label="Open covers"   value={openOrders.reduce((s,o)=>s+o.covers,0)}                                color="var(--t1)"  icon="🧑"/>
+            <StatCard label="Revenue on floor" value={fmt(openOrders.reduce((s,o)=>s+o.subtotal,0))} sub="not yet paid"  color="var(--acc)" icon="💰"/>
+          </div>
+          {openOrders.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>⬚</div>
+              No open orders right now
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {openOrders.map(o => (
+                <div key={o.tableId} style={{ display:'flex', alignItems:'center', gap:16, padding:'12px 16px', background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12 }}>
+                  <div style={{ width:40, height:40, borderRadius:10, background:'var(--acc-d)', border:'1px solid var(--acc-b)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, color:'var(--acc)', flexShrink:0 }}>
+                    {o.tableLabel}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)', marginBottom:2 }}>Table {o.tableLabel}</div>
+                    <div style={{ fontSize:11, color:'var(--t4)' }}>{o.itemCount} item{o.itemCount!==1?'s':''} · {o.covers} cover{o.covers!==1?'s':''}</div>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:15, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>{fmt(o.subtotal)}</div>
+                    <div style={{ fontSize:10, color:'var(--t4)' }}>not yet paid</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{ marginTop:8, padding:'10px 14px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--bdr)', fontSize:12, color:'var(--t4)' }}>
+                ⓘ Open orders are excluded from revenue figures until payment is taken.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Loading overlay for range queries */}
+      {loadingRange && (
+        <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>
+          Loading {period} data…
         </div>
       )}
     </div>

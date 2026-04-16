@@ -159,14 +159,44 @@ export const insertClosedCheck = async (check, locationId = LOCATION_ID) => {
   return result;
 };
 
-export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 500) => {
+export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 500, sinceDate = null) => {
   if (isMock) return { data: null, error: null };
+  // Default: load today's checks only (since midnight local time)
+  const since = sinceDate || (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
   const result = await supabase
+    .from('closed_checks')
+    .select('*')
+    .eq('location_id', locationId)
+    .gte('closed_at', since.toISOString())
+    .order('closed_at', { ascending: false })
+    .limit(limit);
+  if (result.data) {
+    result.data = result.data.map(c => ({
+      id: c.id, ref: c.ref, server: c.server, covers: c.covers,
+      orderType: c.order_type, customer: c.customer,
+      items: c.items || [], discounts: c.discounts || [],
+      subtotal: c.subtotal, service: c.service, tip: c.tip, total: c.total,
+      method: c.method,
+      closedAt: c.closed_at ? new Date(c.closed_at).getTime() : null,
+      status: c.status, refunds: c.refunds || [],
+      tableId: c.table_id, tableLabel: c.table_label,
+    }));
+  }
+  return result;
+};
+
+// For reports — fetch checks across any date range
+export const fetchClosedChecksRange = async (locationId = LOCATION_ID, fromDate, toDate, limit = 1000) => {
+  if (isMock) return { data: null, error: null };
+  let query = supabase
     .from('closed_checks')
     .select('*')
     .eq('location_id', locationId)
     .order('closed_at', { ascending: false })
     .limit(limit);
+  if (fromDate) query = query.gte('closed_at', fromDate.toISOString());
+  if (toDate)   query = query.lte('closed_at', toDate.toISOString());
+  const result = await query;
   if (result.data) {
     result.data = result.data.map(c => ({
       id: c.id, ref: c.ref, server: c.server, covers: c.covers,
