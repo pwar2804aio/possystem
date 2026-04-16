@@ -6,6 +6,42 @@ import POSSurface from './surfaces/POSSurface';
 import BarSurface from './surfaces/BarSurface';
 import TablesSurface from './surfaces/TablesSurface';
 import { KDSSurface } from './surfaces/OtherSurfaces';
+import AIChat from './components/AIChat';
+
+function AIAssistantSurface() {
+  const { staff } = useStore();
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg)' }}>
+      {/* Header */}
+      <div style={{ padding:'16px 24px 14px', borderBottom:'1px solid var(--bdr)', flexShrink:0, background:'var(--bg1)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:'var(--acc-d)', border:'1px solid var(--acc-b)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>✦</div>
+          <div>
+            <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)' }}>AI Shift Assistant</div>
+            <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>Powered by Claude · Ask about your shift</div>
+          </div>
+          <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6, padding:'4px 10px', borderRadius:20, background:'var(--grn-d)', border:'1px solid var(--grn-b)' }}>
+            <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--grn)' }}/>
+            <span style={{ fontSize:11, fontWeight:700, color:'var(--grn)' }}>Live</span>
+          </div>
+        </div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:12 }}>
+          {['📊 Shift summary', '⚠️ Allergen lookup', '🖨 Printer status', '🚫 86 an item'].map(c => (
+            <span key={c} style={{ fontSize:11, padding:'3px 8px', borderRadius:20, background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t3)', fontWeight:600 }}>{c}</span>
+          ))}
+        </div>
+      </div>
+      {/* Chat */}
+      <div style={{ flex:1, overflow:'hidden' }}>
+        <AIChat
+          mode="foh"
+          staff={staff}
+          placeholder="Ask about today's shift, allergens, printer status…"
+        />
+      </div>
+    </div>
+  );
+}
 import BackOfficeApp from './backoffice/BackOfficeApp';
 import { isMock, supabase } from './lib/supabase';
 import PairingScreen from './surfaces/PairingScreen';
@@ -22,6 +58,10 @@ import DevSwitcher from './components/DevSwitcher';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.5.72', date: 'Apr 2026', label: 'AI tab added to POS nav',
+    changes: ['AI Shift Assistant now accessible from the ✦ AI tab in the POS sidebar'],
+  },
   {
     version: '3.5.71', date: 'Apr 2026', label: 'AI Assistant: FoH + BoH with tool use',
     changes: [
@@ -1580,6 +1620,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
           {surface==='bar'        && <BarSurface />}
           {surface==='orders'     && <OrdersHub />}
           {surface==='kds'        && <KDSSurface />}
+          {surface==='ai'         && <AIAssistantSurface />}
         </div>
       </div>
       {toast && <Toast toast={toast} />}
@@ -1593,6 +1634,7 @@ const NAV = [
   { id:'tables',  label:'Floor',  icon:'⬚' },
   { id:'pos',     label:'POS',    icon:'⊞' },
   { id:'orders',  label:'Orders', icon:'📋' },
+  { id:'ai',      label:'AI',     icon:'✦' },
   // KDS is NOT in the nav — KDS devices are separate terminals that boot straight to KDS surface
 ];
 
