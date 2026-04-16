@@ -1804,6 +1804,8 @@ function ModifiersTab() {
   const [selId, setSelId]     = useState(null);
   const [newName, setNewName] = useState('');
   const [newOpt, setNewOpt]   = useState({ name:'', price:'' });
+  const [itemSearch, setItemSearch] = useState('');
+  const { menuItems } = useStore();
   const [dragGIdx, setDragGIdx] = useState(null);
   const [overGIdx, setOverGIdx] = useState(null);
   const [dragOIdx, setDragOIdx] = useState(null);
@@ -1943,17 +1945,53 @@ function ModifiersTab() {
               </div>
             ))}
 
-            {/* Add option */}
-            <div style={{ marginTop:6, padding:'10px', background:'var(--bg3)', borderRadius:10, border:'1.5px dashed var(--bdr2)' }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', marginBottom:7 }}>Add option</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 90px auto', gap:6, alignItems:'center' }}>
-                <input style={{ ...inp, fontSize:12 }} value={newOpt.name} onChange={e=>setNewOpt(o=>({...o,name:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()} placeholder="e.g. Chips, Peppercorn sauce" autoComplete="off"/>
-                <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
-                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft:20, fontSize:12 }} value={newOpt.price} placeholder="0.00" onChange={e=>setNewOpt(o=>({...o,price:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOpt()}/>
-                </div>
-                <button onClick={addOpt} disabled={!newOpt.name.trim()} style={{ width:32,height:36,borderRadius:8,border:'none',background:'var(--acc)',color:'#0b0c10',cursor:'pointer',fontSize:18,display:'flex',alignItems:'center',justifyContent:'center',opacity:newOpt.name.trim()?1:.4 }}>+</button>
+            {/* Add option — must come from Items list */}
+            <div style={{ marginTop:6, padding:'10px 12px', background:'var(--bg3)', borderRadius:10, border:'1.5px dashed var(--bdr2)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', marginBottom:6 }}>Add option from Items list</div>
+              <div style={{ fontSize:10, color:'var(--t4)', marginBottom:8, lineHeight:1.5 }}>
+                Items must be created in the <strong style={{ color:'var(--t2)' }}>Items tab</strong> with type <strong style={{ color:'var(--t2)' }}>Sub item</strong> before being added here.
               </div>
+              <div style={{ position:'relative', marginBottom:6 }}>
+                <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)' }}>🔍</span>
+                <input style={{ ...inp, paddingLeft:26, fontSize:12 }} value={itemSearch} onChange={e=>setItemSearch(e.target.value)} placeholder="Search sub-items by name…" autoComplete="off"/>
+              </div>
+              {itemSearch && (() => {
+                const subItems = (menuItems||[])
+                  .filter(it => it.type === 'subitem' && !it.archived)
+                  .filter(it => (it.menuName||it.name||'').toLowerCase().includes(itemSearch.toLowerCase()))
+                  .filter(it => !(sel.options||[]).some(o => o.name === (it.menuName||it.name)));
+                if (subItems.length === 0) return (
+                  <div style={{ fontSize:11, color:'var(--t4)', textAlign:'center', padding:'8px 0' }}>
+                    No sub-items match — <span style={{ color:'var(--acc)', fontWeight:600 }}>create it in Items tab first</span>
+                  </div>
+                );
+                return (
+                  <div style={{ maxHeight:180, overflowY:'auto', display:'flex', flexDirection:'column', gap:3 }}>
+                    {subItems.slice(0,20).map(it => {
+                      const name = it.menuName || it.name || 'Unnamed';
+                      const price = it.pricing?.base ?? it.price ?? 0;
+                      return (
+                        <button key={it.id} onClick={()=>{
+                          upd({ options:[...(sel.options||[]), { id:`opt-${Date.now()}-${it.id}`, name, price }] });
+                          setItemSearch('');
+                        }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg2)', border:'1px solid var(--bdr)', fontSize:12, color:'var(--t1)', textAlign:'left' }}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor='var(--acc)'}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor='var(--bdr)'}>
+                          <span style={{ fontWeight:600 }}>{name}</span>
+                          <span style={{ color:'var(--acc)', fontFamily:'var(--font-mono)', fontSize:11, flexShrink:0 }}>
+                            {price > 0 ? `£${price.toFixed(2)}` : 'Free'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+              {!itemSearch && (menuItems||[]).filter(it=>it.type==='subitem'&&!it.archived).length === 0 && (
+                <div style={{ fontSize:11, color:'var(--t4)', textAlign:'center', padding:'4px 0' }}>
+                  No sub-items yet — create them in the <strong>Items tab</strong> with type Sub item
+                </div>
+              )}
             </div>
           </div>
         </div>
