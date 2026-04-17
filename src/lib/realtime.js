@@ -122,25 +122,15 @@ export function startRealtime(store, locationId = LOCATION_ID) {
       filter: `location_id=eq.${locationId}`,
     }, ({ new: row }) => {
       if (!row?.table_id) return;
-      store.setState(s => ({
-        tables: s.tables.map(t =>
-          t.id === row.table_id
-            ? { ...t, session: row.session, status: 'occupied' }
-            : t
-        ),
-      }));
-    })
-    .on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'active_sessions',
-      filter: `location_id=eq.${locationId}`,
-    }, ({ new: row }) => {
-      if (!row?.table_id) return;
-      // Skip if this is the table currently being edited on this device
-      // to prevent Supabase echo-back from overwriting local state mid-edit
-      const activeTableId = store.getState().activeTableId;
-      if (row.table_id === activeTableId) return;
+      const state = store.getState();
+      // Skip echo-back: when we open a table, flushSessions writes to Supabase.
+      // The INSERT echo arrives AFTER we've added the first item, overwriting it.
+      // Guard 1: never overwrite the currently active table
+      if (row.table_id === state.activeTableId) return;
+      // Guard 2: skip if local session is already newer (we originated this write)
+      const existing = (state.tables || []).find(t => t.id === row.table_id);
+      if (existing?.session?.seatedAt && row.session?.seatedAt &&
+          existing.session.seatedAt >= row.session.seatedAt) return;
       store.setState(s => ({
         tables: s.tables.map(t =>
           t.id === row.table_id

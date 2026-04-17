@@ -58,6 +58,13 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.7.8', date: 'Apr 2026', label: 'Fix: first item no longer vanishes. History syncing.',
+    changes: [
+      'First item vanish: sessionsChannel INSERT echo-back guard added. When a table is opened, flushSessions writes to Supabase — the INSERT echo was arriving after items were added and overwriting them. Guard 1: skip INSERT events for the currently active table. Guard 2: skip if local session is newer than incoming echo.',
+      'History sync: closed_checks added to supabase_realtime publication — INSERT events now broadcast to all devices instantly when any terminal takes payment.',
+    ],
+  },
   { version: '3.7.7', date: 'Apr 2026', label: 'Session reconciler: grace period + architecture review', changes: ['SessionReconciler: 30s grace period for newly opened tables before Supabase is trusted — prevents premature clearing of sessions not yet flushed', 'History and reports confirmed cross-device: closed_checks realtime broadcasts to all devices, BOReports queries Supabase directly. Scales to 20+ terminals.'] },
   {
     version: '3.7.6', date: 'Apr 2026', label: 'Session sync: polling replaces unreliable DELETE events',
