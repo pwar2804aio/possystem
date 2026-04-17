@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.9.9', date: 'Apr 2026', label: 'Fix: table items now sync across devices in real-time',
+    changes: [
+      'SessionReconciler now updates session contents when a table is open on both devices — previously it only handled open/close, not item changes',
+      'SyncBridge now flushes to Supabase on item add/remove, not just on kitchen send — other devices see items immediately',
+      'Reconciler compares item count every 10s and applies if Supabase has more items than local store',
+      'Active table (being edited) never overwritten by reconciler to avoid clobbering current work',
+    ],
+  },
+  {
     version: '3.9.8', date: 'Apr 2026', label: 'Modifier groups: min picks control',
     changes: [
       'Required toggle now reveals a Min picks row — set exactly how many options the customer must pick (e.g. min 3 of 3 for a Box of 3)',

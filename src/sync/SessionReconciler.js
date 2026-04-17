@@ -61,6 +61,22 @@ export async function startSessionReconciler() {
           return { ...t, session: supabaseOpen.get(t.id), status: 'occupied' };
         }
 
+        if (inStore && inSupabase && !isActive) {
+          // Table is open on BOTH — check if Supabase has newer/more items
+          const supabaseSession = supabaseOpen.get(t.id);
+          const supabaseItemCount = (supabaseSession?.items || []).length;
+          const localItemCount = (t.session?.items || []).length;
+          const supabaseUpdated = new Date(supabaseSession?.updatedAt || supabaseSession?.sentAt || 0).getTime();
+          const localSeated = t.session?.seatedAt || 0;
+
+          // Apply if Supabase has more items, or has items that are sent (kitchen confirmed)
+          // Only overwrite non-active tables to avoid clobbering the operator's current work
+          if (supabaseItemCount > localItemCount) {
+            changed = true;
+            return { ...t, session: supabaseSession, status: 'occupied' };
+          }
+        }
+
         return t;
       });
 
