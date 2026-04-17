@@ -146,6 +146,9 @@ export default function SyncBridge({ onSyncPulse }) {
             centreId: item.centre_id ?? item.centreId ?? null,
             taxRateId: item.tax_rate_id ?? item.taxRateId ?? null,
             taxOverrides: item.tax_overrides ?? item.taxOverrides ?? {},
+            // Must map snake_case → camelCase for modifier and instruction groups
+            assignedModifierGroups: item.assigned_modifier_groups ?? item.assignedModifierGroups ?? [],
+            assignedInstructionGroups: item.assigned_instruction_groups ?? item.assignedInstructionGroups ?? [],
           }));
 
           // Load tax rates directly from Supabase (source of truth)
