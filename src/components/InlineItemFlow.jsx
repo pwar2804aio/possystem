@@ -26,9 +26,9 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
       targetItem.assignedModifierGroups.forEach(ag => {
         const def = modifierGroupDefs?.find(d => d.id === ag.groupId);
         if (def) {
-          const effectiveMin = Math.max(ag.min ?? 0, def.min ?? 0);
-          all.push({ ...def, min: effectiveMin, max: ag.max ?? def.max ?? 1,
-            required: effectiveMin > 0 });
+          // Rule: inherit min/max from group definition only — no per-item override
+          // This keeps one source of truth: the Modifier Groups editor
+          all.push({ ...def, required: (def.min ?? 0) > 0 });
         }
       });
     }
@@ -362,64 +362,90 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:8 }}>
               {(group.options || []).map(opt => {
                 const id = opt.id || opt.label || opt.name;
-                const isSel = isMulti
-                  ? (cur || []).some(o => (o.id || o.label) === id)
-                  : cur?.id === id || cur?.label === id;
+                // How many times this specific option is selected
+                const optQty = isMulti
+                  ? (cur || []).filter(o => (o.id || o.label) === id).length
+                  : (cur?.id === id || cur?.label === id ? 1 : 0);
+                const isSel = optQty > 0;
                 const atMax = isMulti && selectedCount >= max;
 
                 return (
-                  <button key={id}
-                    onClick={() => {
-                      if (isMulti) {
-                        if (isSel) removeMulti(group.id, (cur || []).find(o => (o.id || o.label) === id)?._uid);
-                        else if (!atMax) addMulti(group.id, { ...opt, id: id, label: opt.name || opt.label || id }, max);
-                      } else {
-                        onToggleSingle(group.id, { ...opt, id: id, label: opt.name || opt.label || id });
-                      }
-                    }}
-                    style={{
-                      display:'flex', alignItems:'center', justifyContent:'space-between',
-                      padding: opt.image ? '8px 14px' : '12px 14px',
-                      borderRadius:12, cursor: atMax && !isSel ? 'not-allowed' : 'pointer',
-                      fontFamily:'inherit', textAlign:'left', transition:'all .1s',
-                      border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr)'}`,
-                      background: isSel ? 'var(--acc-d)' : 'var(--bg2)',
-                      opacity: atMax && !isSel ? 0.4 : 1,
-                    }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      {/* Modifier option image */}
-                      {opt.image && (
-                        <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0, border:`1px solid ${isSel?'var(--acc)':'var(--bdr)'}` }}>
-                          <img src={opt.image} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                  <div key={id} style={{ position:'relative' }}>
+                    <button
+                      onClick={() => {
+                        if (isMulti) {
+                          // Always add (up to max) — never deselect on tap
+                          if (!atMax) addMulti(group.id, { ...opt, id, label: opt.name || opt.label || id }, max);
+                        } else {
+                          onToggleSingle(group.id, { ...opt, id, label: opt.name || opt.label || id });
+                        }
+                      }}
+                      style={{
+                        width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+                        padding: opt.image ? '8px 14px' : '12px 14px',
+                        borderRadius:12,
+                        cursor: atMax && !isSel ? 'not-allowed' : 'pointer',
+                        fontFamily:'inherit', textAlign:'left', transition:'all .1s',
+                        border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr)'}`,
+                        background: isSel ? 'var(--acc-d)' : 'var(--bg2)',
+                        opacity: atMax && !isSel ? 0.4 : 1,
+                        paddingRight: isSel && isMulti ? 40 : 14,
+                      }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                        {/* Modifier option image */}
+                        {opt.image && (
+                          <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0, border:`1px solid ${isSel?'var(--acc)':'var(--bdr)'}` }}>
+                            <img src={opt.image} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                          </div>
+                        )}
+                        {/* Checkbox / radio indicator */}
+                        <div style={{ width:18, height:18, borderRadius: isMulti ? 4 : '50%', border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr2)'}`, background: isSel ? 'var(--acc)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          {isSel && <div style={{ width:6, height:6, borderRadius: isMulti ? 2 : '50%', background:'#0b0c10' }}/>}
                         </div>
-                      )}
-                      <div style={{ width:18, height:18, borderRadius: isMulti ? 4 : '50%', border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr2)'}`, background: isSel ? 'var(--acc)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                        {isSel && <div style={{ width:6, height:6, borderRadius: isMulti ? 2 : '50%', background:'#0b0c10' }}/>}
+                        <span style={{ fontSize:13, fontWeight: isSel ? 700 : 400, color: isSel ? 'var(--acc)' : 'var(--t1)' }}>
+                          {opt.name || opt.label}
+                        </span>
                       </div>
-                      <span style={{ fontSize:13, fontWeight: isSel ? 700 : 400, color: isSel ? 'var(--acc)' : 'var(--t1)' }}>
-                        {opt.name || opt.label}
-                      </span>
-                    </div>
-                    {(opt.price || 0) > 0 && (
-                      <span style={{ fontSize:12, fontWeight:700, color: isSel ? 'var(--acc)' : 'var(--t3)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
-                        +£{opt.price.toFixed(2)}
-                      </span>
+                      {(opt.price || 0) > 0 && (
+                        <span style={{ fontSize:12, fontWeight:700, color: isSel ? 'var(--acc)' : 'var(--t3)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
+                          +£{opt.price.toFixed(2)}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Quantity badge + minus button — only for multi-select when selected */}
+                    {isSel && isMulti && (
+                      <div style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center', gap:3 }}>
+                        <button
+                          onClick={e => { e.stopPropagation(); const all=(cur||[]).filter(o=>(o.id||o.label)===id); removeMulti(group.id, all[all.length-1]?._uid); }}
+                          style={{ width:22, height:22, borderRadius:6, border:'1.5px solid var(--acc)', background:'var(--acc-d)', color:'var(--acc)', cursor:'pointer', fontFamily:'inherit', fontSize:15, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>
+                          −
+                        </button>
+                        <span style={{ fontSize:13, fontWeight:900, color:'var(--acc)', minWidth:16, textAlign:'center' }}>
+                          {optQty}
+                        </span>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
 
-            {/* Multi-select removes */}
-            {isMulti && Array.isArray(cur) && cur.length > 0 && (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:8 }}>
-                {cur.map(o => (
-                  <span key={o._uid} onClick={() => removeMulti(group.id, o._uid)} style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:12, background:'var(--acc)', color:'#0b0c10', cursor:'pointer' }}>
-                    {o.name || o.label} ×
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* Running tally chips for multi-select */}
+            {isMulti && Array.isArray(cur) && cur.length > 0 && (() => {
+              // Group by option label for compact display
+              const tally = {};
+              cur.forEach(o => { const k = o.name||o.label; tally[k] = (tally[k]||0)+1; });
+              return (
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:8 }}>
+                  {Object.entries(tally).map(([label, qty]) => (
+                    <span key={label} style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:12, background:'var(--acc)', color:'#0b0c10' }}>
+                      {qty > 1 ? `${label} ×${qty}` : label}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
             {/* Nested modifier: if selected option has subGroupId, show linked group */}
             {(() => {
               const selOpt = !isMulti ? cur : null;

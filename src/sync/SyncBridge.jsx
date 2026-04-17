@@ -151,7 +151,25 @@ export default function SyncBridge({ onSyncPulse }) {
             // Must map snake_case → camelCase for modifier and instruction groups
             assignedModifierGroups: item.assigned_modifier_groups ?? item.assignedModifierGroups ?? [],
             assignedInstructionGroups: item.assigned_instruction_groups ?? item.assignedInstructionGroups ?? [],
+            image: item.image ?? null,
           }));
+
+          // Sync any local-only items that failed to save previously (e.g. before schema was ready)
+          // This ensures items created offline or before column fixes are never lost
+          if (sb && locationId && itemsRes.data?.length) {
+            try {
+              const { upsertMenuItem } = await import('../lib/db.js');
+              const remoteIds = new Set(itemsRes.data.map(i => i.id));
+              const localItems = useStore.getState().menuItems || [];
+              const localOnly = localItems.filter(i =>
+                !remoteIds.has(i.id) && !i.archived && i.id && !i.id.startsWith('demo-')
+              );
+              if (localOnly.length > 0) {
+                console.log(`[SyncBridge] Syncing ${localOnly.length} local-only items to Supabase`);
+                localOnly.forEach(item => upsertMenuItem({ ...item, location_id: locationId }));
+              }
+            } catch (e) { console.warn('[SyncBridge] local-only sync failed', e); }
+          }
 
           // Load tax rates directly from Supabase (source of truth)
           if (sb && locationId) {

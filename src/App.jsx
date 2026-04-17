@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.9.2', date: 'Apr 2026', label: 'Modifier overhaul — quantity select, unified min/max, auto-sync',
+    changes: [
+      'Multi-quantity modifier selection: tap to add (+1 per tap up to max), shows count badge, minus button to remove one. e.g. select Donut 1 x2, Donut 3 x1 in a box of 3',
+      'Unified min/max: POS now inherits min/max from the Modifier Group definition only. Per-item override removed. One source of truth.',
+      'Auto-sync: on boot, back office detects any items that only exist locally (not in Supabase) and writes them automatically. Fixes Box of 3 and prevents data loss permanently.',
+      'Item editor Modifiers tab now shows group max from definition instead of editable override',
+      'image field now mapped when loading items from Supabase',
+    ],
+  },
+  {
     version: '3.9.1', date: 'Apr 2026', label: 'Fix: image buttons fully readable, Box of 3 modifiers',
     changes: [
       'Image button overlay: much stronger gradient (88% at bottom, 55% mid, 25% top), all text uses heavy text-shadow so name and price stay crisp over any image colour',

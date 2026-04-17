@@ -1728,13 +1728,9 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
                         <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⠿</span>
                         <div>
                           <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>{def.name}</div>
-                          <div style={{ fontSize:9, color:'var(--t4)' }}>{(def.options||[]).length} options</div>
+                          <div style={{ fontSize:9, color:'var(--t4)' }}>{(def.options||[]).length} opts · max {def.max&&def.max<99?def.max:'∞'} from group def</div>
                         </div>
                         <button onClick={()=>updateMod(ag.groupId,{min:isReq?0:1})} style={{ padding:'2px 8px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:9, fontWeight:700, border:`1px solid ${isReq?'var(--red-b)':'var(--bdr)'}`, background:isReq?'var(--red-d)':'var(--bg2)', color:isReq?'var(--red)':'var(--t4)', whiteSpace:'nowrap' }}>{isReq?'Required':'Optional'}</button>
-                        <div style={{ display:'flex', alignItems:'center', gap:3 }}>
-                          <span style={{ fontSize:9, color:'var(--t4)' }}>Max</span>
-                          <input type="number" min="1" max="99" style={{ ...inp, width:40, padding:'2px 5px', fontSize:11, textAlign:'center' }} value={ag.max||''} placeholder="∞" onChange={e=>updateMod(ag.groupId,{max:e.target.value===''?null:parseInt(e.target.value)||1})}/>
-                        </div>
                         <button onClick={()=>removeMod(ag.groupId)} style={{ width:24,height:24,borderRadius:6,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
                       </div>
                     );
