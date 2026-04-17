@@ -2559,7 +2559,13 @@ function QuickScreenManager() {
   const catFor = item => menuCategories.find(c => c.id === item?.cat);
 
   const save = (newIds) => {
-    setQuickScreenIds(newIds.filter(Boolean));
+    const filtered = newIds.filter(Boolean);
+    setQuickScreenIds(filtered);
+    // Persist immediately to localStorage so it survives reload without Push to POS
+    try {
+      const cur = JSON.parse(localStorage.getItem('rpos-shared-state') || '{}');
+      localStorage.setItem('rpos-shared-state', JSON.stringify({ ...cur, quickScreenIds: filtered }));
+    } catch {}
     markBOChange();
   };
 

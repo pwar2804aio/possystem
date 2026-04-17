@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.0', date: 'Apr 2026', label: 'Fix: Quick Screen saves persist on reload',
+    changes: [
+      'quickScreenIds added to SHARED_KEYS — now persists to localStorage and broadcasts to all tabs instantly',
+      'Quick Screen save() now writes directly to localStorage immediately — no need to Push to POS for it to survive a reload',
+      'Previously quickScreenIds was not in SHARED_KEYS so it was never written to storage and was lost on every page reload',
+    ],
+  },
+  {
     version: '3.9.9', date: 'Apr 2026', label: 'Fix: table items now sync across devices in real-time',
     changes: [
       'SessionReconciler now updates session contents when a table is open on both devices — previously it only handled open/close, not item changes',
