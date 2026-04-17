@@ -71,7 +71,7 @@ function CountSetter({ itemId, current, onClose }) {
 }
 
 // ── Main item info modal ──────────────────────────────────────────────────────
-export default function ItemInfoModal({ item, onClose, onAddToOrder }) {
+export default function ItemInfoModal({ item, is86, onToggle86, onClose, onAddToOrder }) {
   const { dailyCounts } = useStore();
   const [tab, setTab] = useState('info');   // info | recipe | count
   const m = CAT_META[item.cat] || {};
@@ -305,6 +305,18 @@ export default function ItemInfoModal({ item, onClose, onAddToOrder }) {
 
         {/* ── Footer ── */}
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--bdr)', flexShrink:0, display:'flex', gap:8 }}>
+          {onToggle86 && (
+            <button
+              onClick={onToggle86}
+              style={{ height:46, padding:'0 16px', borderRadius:12, cursor:'pointer', fontFamily:'inherit',
+                border:`1.5px solid ${is86?'var(--red-b)':'var(--bdr2)'}`,
+                background:is86?'var(--red-d)':'var(--bg3)',
+                color:is86?'var(--red)':'var(--t3)',
+                fontSize:12, fontWeight:800, flexShrink:0,
+              }}>
+              {is86 ? '✕ Un-86' : '86 Item'}
+            </button>
+          )}
           <button className="btn btn-ghost" style={{ flex:1, height:46 }} onClick={onClose}>Close</button>
           <button className="btn btn-acc" style={{ flex:2, height:46, fontSize:14, fontWeight:800 }}
             onClick={onAddToOrder}>

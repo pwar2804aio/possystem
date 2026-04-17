@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.2', date: 'Apr 2026', label: 'Quick Screen saves to Supabase; 86 button moved to long-press modal',
+    changes: [
+      'Quick Screen: saveQuickScreenIds now uses static import — dynamic import was silently failing in the bundled output, causing zero Supabase writes',
+      '86 button removed from POS product card — was cluttering every button with a tiny tap target',
+      '86 Item button added to long-press ItemInfoModal footer — clear label, full width, turns red when item is 86d with Un-86 action',
+      'ItemInfoModal now accepts is86 and onToggle86 props from POSSurface',
+    ],
+  },
+  {
     version: '4.0.1', date: 'Apr 2026', label: 'Quick Screen: Supabase-backed, image-aware, matches POS exactly',
     changes: [
       'quickScreenIds moved from localStorage to Supabase locations.quick_screen_ids column — persists across devices and reloads with zero localStorage dependency',

@@ -24,7 +24,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
-import { upsertMenuItem, uploadProductImage, deleteProductImage } from '../../lib/db';
+import { upsertMenuItem, uploadProductImage, deleteProductImage, saveQuickScreenIds } from '../../lib/db';
 
 // ── Clone item helper ─────────────────────────────────────────────────────────
 async function cloneItem(item, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast, setSelItemId) {
@@ -2562,10 +2562,7 @@ function QuickScreenManager() {
     const filtered = newIds.filter(Boolean);
     setQuickScreenIds(filtered);
     markBOChange();
-    // Write directly to Supabase — single source of truth, no localStorage
-    import('../../lib/db.js').then(({ saveQuickScreenIds }) => {
-      saveQuickScreenIds(filtered).catch(e => console.warn('[QuickScreen] save failed:', e.message));
-    });
+    saveQuickScreenIds(filtered).catch(e => console.warn('[QuickScreen] save failed:', e.message));
   };
 
   const clearSlot = idx => {

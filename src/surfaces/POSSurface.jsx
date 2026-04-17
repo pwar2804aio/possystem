@@ -795,14 +795,7 @@ export default function POSSurface() {
                             }}>
                               {item.type==='variants'?'▾ sizes':'⊕ opts'}
                             </span>}
-                            <button
-                              onClick={e=>{e.stopPropagation();toggle86(item.id);showToast(is86?`${item.name} un-86'd`:`${item.name} 86'd`,'warning');}}
-                              style={{width:22,height:22,borderRadius:5,
-                                border:`1px solid ${is86?'var(--red-b)':hasImg?'rgba(255,255,255,.4)':'var(--bdr)'}`,
-                                background:is86?'var(--red-d)':hasImg?'rgba(0,0,0,.4)':'var(--bg4)',
-                                color:is86?'var(--red)':hasImg?'rgba(255,255,255,.8)':'var(--t4)',
-                                cursor:'pointer',fontSize:9,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'inherit',flexShrink:0}}
-                            >{is86?'✕':'86'}</button>
+
                           </div>
                         </div>
                       </div>
@@ -1025,6 +1018,8 @@ export default function POSSurface() {
       {infoItem&&(
         <ItemInfoModal
           item={infoItem}
+          is86={eightySixIds.includes(infoItem.id)}
+          onToggle86={()=>{ toggle86(infoItem.id); showToast(eightySixIds.includes(infoItem.id)?`${infoItem.name} un-86'd`:`${infoItem.name} 86'd`,'warning'); }}
           onClose={()=>setInfoItem(null)}
           onAddToOrder={()=>{ setInfoItem(null); handleItemTap(infoItem); }}
         />
