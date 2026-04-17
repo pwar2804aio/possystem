@@ -149,8 +149,10 @@ export function startRealtime(store, locationId = LOCATION_ID) {
       event: 'DELETE',
       schema: 'public',
       table: 'active_sessions',
-      filter: `location_id=eq.${locationId}`,
+      // Note: Supabase Realtime does not support row-level filters on DELETE events
+      // We receive all deletes and filter by location_id in the handler
     }, ({ old: row }) => {
+      if (row?.location_id && row.location_id !== locationId) return;
       const tid = row?.table_id;
       if (!tid) return;
       store.setState(s => ({

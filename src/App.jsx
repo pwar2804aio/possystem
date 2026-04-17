@@ -57,6 +57,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.6.3', date: 'Apr 2026', label: 'Fix: table-close now syncs across devices', changes: ['Supabase Realtime does not support row-level filters on DELETE events — removed filter from sessionsChannel DELETE handler, now checks location_id in the handler body instead', 'With REPLICA IDENTITY FULL set, the full row including location_id and table_id is available in the DELETE payload'] },
   {
     version: '3.6.2', date: 'Apr 2026', label: 'Fix: modifiers restored, table-close sync fixed',
     changes: [
