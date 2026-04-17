@@ -26,7 +26,7 @@ function AIAssistantSurface() {
           </div>
         </div>
         <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:12 }}>
-          {['📊 Shift summary', '⚠️ Allergen lookup', '🖨 Printer status', '🛒 Add to order', '🚫 86 an item'].map(c => (
+          {['📊 Shift summary', '🍺 Item sales', '⏰ Busiest hour', '🪑 Open tables', '⚠️ Allergen lookup', '👤 Server stats', '🖨 Printers', '🚫 86 an item'].map(c => (
             <span key={c} style={{ fontSize:11, padding:'3px 8px', borderRadius:20, background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t3)', fontWeight:600 }}>{c}</span>
           ))}
         </div>
@@ -57,6 +57,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.5.97', date: 'Apr 2026', label: 'AI: updated UI chips and suggestions', changes: ['FOH shortcut chips updated: Shift summary, Item sales, Busiest hour, Open tables, Server stats, Allergens', 'BOH chips updated: Sales, Item lookup, Hourly, Server performance, Open tables, Payment breakdown, Menu', 'Suggestion pills updated for both modes to showcase new capabilities', 'Tool progress badges added for all 9 new tools'] },
   {
     version: '3.5.96', date: 'Apr 2026', label: 'AI assistant: massively expanded capabilities',
     changes: [

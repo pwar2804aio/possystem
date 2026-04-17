@@ -6,16 +6,28 @@ const API_ENDPOINT = '/api/ai';
 
 function ToolCallBadge({ name }) {
   const labels = {
-    get_sales_summary:  '📊 Looking up sales…',
-    get_top_items:      '🏆 Checking top items…',
-    get_printer_status: '🖨 Checking printers…',
-    get_allergen_info:  '⚠️ Looking up allergens…',
-    get_floor_status:   '🪑 Checking floor status…',
-    get_menu_items:     '📋 Loading menu…',
-    get_order_history:  '🧾 Loading order history…',
-    add_menu_item:      '✨ Preparing new item…',
-    update_item_price:  '💰 Preparing price change…',
-    eighty_six_item:    '🚫 Preparing 86…',
+    get_sales_summary:    '📊 Looking up sales…',
+    get_shift_summary:    '📊 Pulling shift overview…',
+    get_top_items:        '🏆 Checking top sellers…',
+    search_item_sales:    '🔍 Searching item sales…',
+    get_hourly_breakdown: '⏰ Checking hourly data…',
+    get_payment_breakdown:'💳 Checking payment breakdown…',
+    get_server_performance:'👤 Checking server stats…',
+    get_covers_report:    '🧑 Loading covers report…',
+    get_floor_status:     '🪑 Checking floor status…',
+    get_open_tables:      '🪑 Loading open tables…',
+    get_printer_status:   '🖨 Checking printers…',
+    get_allergen_info:    '⚠️ Looking up allergens…',
+    get_item_detail:      '📋 Looking up item…',
+    get_menu_items:       '📋 Loading menu…',
+    get_order_history:    '🧾 Loading order history…',
+    get_current_order:    '🛒 Checking current order…',
+    add_to_order:         '🛒 Preparing to add item…',
+    remove_from_order:    '🗑 Preparing to remove item…',
+    apply_order_discount: '🏷 Preparing discount…',
+    add_menu_item:        '✨ Preparing new item…',
+    update_item_price:    '💰 Preparing price change…',
+    eighty_six_item:      '🚫 Preparing 86…',
   };
   return (
     <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:10, background:'var(--acc-d)', border:'1px solid var(--acc-b)', fontSize:12, color:'var(--acc)', fontWeight:600, marginBottom:8 }}>
@@ -241,19 +253,19 @@ export default function AIChat({ mode = 'foh', initialContext = '', placeholder 
             </div>
             <div style={{ fontSize:12, color:'var(--t4)', lineHeight:1.7 }}>
               {mode === 'boh'
-                ? 'Ask about sales, menu items, printer status, or say "add a new item"'
-                : 'Ask about today\'s shift, allergens, printer status, or mark items as sold out'}
+                ? 'Ask about sales, servers, items sold, open tables, or say "update a price"'
+                : 'Ask about the shift, item sales, open tables, allergens, or add to an order'}
             </div>
             {mode === 'boh' && (
               <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:16, justifyContent:'center' }}>
-                {["What's our revenue today?", "Top selling items?", "Are printers online?", "Add a new dessert"].map(q => (
+                {["How's the shift going?", "How many lattes sold?", "Who's selling the most?", "What's been the busiest hour?", "What tables are still open?", "Show payment breakdown"].map(q => (
                   <button key={q} onClick={() => send(q)} style={{ padding:'6px 12px', borderRadius:20, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>{q}</button>
                 ))}
               </div>
             )}
             {mode === 'foh' && (
               <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:16, justifyContent:'center' }}>
-                {["What's our revenue today?", "Add a side of chips", "Allergens in the risotto?", "Is the kitchen printer online?"].map(q => (
+                {["How's the shift going?", "What tables are open?", "How many pints sold?", "Who's been seated longest?", "Allergens in the risotto?", "Is the kitchen printer online?"].map(q => (
                   <button key={q} onClick={() => send(q)} style={{ padding:'6px 12px', borderRadius:20, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>{q}</button>
                 ))}
               </div>
