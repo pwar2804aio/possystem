@@ -1453,9 +1453,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
               </div>
             )}
 
-            {!isSub && (
-              <ItemImageUpload item={item} onUpdate={onUpdate} markBOChange={markBOChange} showToast={showToast} />
-            )}
+            <ItemImageUpload item={item} onUpdate={onUpdate} markBOChange={markBOChange} showToast={showToast} />
 
             <div>
               <span style={lbl}>Primary category</span>

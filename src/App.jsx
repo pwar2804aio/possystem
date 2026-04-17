@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.9.5', date: 'Apr 2026', label: 'Fix: item image upload now works for sub-items (modifier options)',
+    changes: [
+      'Product image upload was hidden for sub-item type — !isSub guard removed so Donut 1, Donut 2 etc. now show the image uploader in Details tab',
+      'Sub-item images automatically inherit to the modifier picker on POS via resolveOptImage()',
+      'Set image once on the sub-item, it shows on the modifier option card in the POS flow',
+    ],
+  },
+  {
     version: '3.9.4', date: 'Apr 2026', label: 'Fix: modifier images inherit from sub-items automatically',
     changes: [
       'Modifier option images now inherit automatically from the matching sub-item menu item — set the image once on the item, it shows everywhere',
