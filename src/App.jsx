@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.7.9', date: 'Apr 2026', label: 'Fix: deleted variants no longer reappear on refresh', changes: ['upsertMenuItem was using || for parent_id mapping — when parentId was set to null (on variant delete), || treated null as falsy and fell through to the old parent_id from the loaded item, writing the original value back to Supabase. Fixed to use explicit undefined check so null is correctly written as null.'] },
   {
     version: '3.7.8', date: 'Apr 2026', label: 'Fix: first item no longer vanishes. History syncing.',
     changes: [

@@ -74,7 +74,7 @@ export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
     type:         item.type        || 'simple',
     cat:          item.cat         || null,
     cats:         item.cats        || [],
-    parent_id:    item.parentId    || item.parent_id    || null,
+    parent_id:    item.parentId !== undefined ? item.parentId : (item.parent_id !== undefined ? item.parent_id : null),
     sort_order:   item.sortOrder   ?? item.sort_order   ?? 0,
     pricing,
     allergens:    item.allergens   || [],
