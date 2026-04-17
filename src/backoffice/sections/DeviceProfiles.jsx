@@ -63,19 +63,33 @@ export default function DeviceProfiles() {
   useEffect(() => {
     if (isMock) { setProfiles(DEFAULT_PROFILES); return; }
     const loadFromDB = async () => {
-      
       const locId = await getLocationId().catch(() => null);
       if (!locId) return;
       setLocationId(locId);
-      const { data } = await supabase.from('device_profiles').select('*').eq('location_id', locId).order('sort_order');
-      const mapped = (data || []).map(p => ({
+
+      // Fetch profiles AND devices in parallel to get real device counts
+      const [{ data: profileData }, { data: deviceData }] = await Promise.all([
+        supabase.from('device_profiles').select('*').eq('location_id', locId).order('sort_order'),
+        supabase.from('devices').select('id, profile_id').eq('location_id', locId),
+      ]);
+
+      // Count devices per profile
+      const countMap = {};
+      (deviceData || []).forEach(d => {
+        if (d.profile_id) countMap[d.profile_id] = (countMap[d.profile_id] || 0) + 1;
+      });
+
+      const mapped = (profileData || []).map(p => ({
         id: p.id, name: p.name, color: p.color || '#3b82f6',
         defaultSurface: p.default_surface || 'tables',
         enabledOrderTypes: p.enabled_order_types || ['dine-in'],
         assignedSection: p.assigned_section, hiddenFeatures: p.hidden_features || [],
         tableServiceEnabled: p.table_service_enabled !== false,
         quickScreenEnabled: p.quick_screen_enabled !== false,
-        menuId: p.menu_id, deviceCount: 0, serviceCharge: p.service_charge || null, isMaster: p.is_master || false,
+        menuId: p.menu_id,
+        deviceCount: countMap[p.id] || 0,
+        serviceCharge: p.service_charge || null,
+        isMaster: p.is_master || false,
       }));
       setProfiles(mapped);
       try { localStorage.setItem('rpos-device-profiles', JSON.stringify(mapped)); } catch {}

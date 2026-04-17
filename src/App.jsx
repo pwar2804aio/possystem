@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.7.1', date: 'Apr 2026', label: 'Master-child: hard block, fixed false positives, device counts',
+    changes: [
+      'Master offline modal: removed Continue anyway — terminal is now fully locked until master responds. No escape.',
+      'Master device no longer triggers offline modal on itself — isMaster=true devices only run heartbeat, never monitor',
+      'Child monitor delayed 20s on startup — prevents false master-offline on boot before first heartbeat is written',
+      'Device profiles: device count now fetched from Supabase devices table — shows real count of devices assigned to each profile',
+    ],
+  },
+  {
     version: '3.7.0', date: 'Apr 2026', label: 'Fix: device profiles finally save correctly',
     changes: [
       'Root cause: DeviceProfiles.jsx only imported isMock from supabase — supabase client and getLocationId were missing from the top-level import. Dynamic imports inside resolveLocId and loadFromDB did not resolve correctly in the Vite bundle, so supabase.upsert was never called',
@@ -1646,36 +1655,52 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   const [deviceValid, setDeviceValid] = useState(null); // null=checking, true=ok, false=revoked
   const [masterOffline, setMasterOffline] = useState(false);
   const [masterInfo, setMasterInfo] = useState(null);
-  const [masterDismissed, setMasterDismissed] = useState(false);
+  // No "dismissed" state — master offline is a hard block
 
   // Start master/child sync after device is validated
   useEffect(() => {
-    if (!pairedDevice || isMock) return;
-    let started = false;
+    if (!pairedDevice || isMock || deviceValid !== true) return;
+
+    let stopped = false;
     const boot = async () => {
       try {
-        const locId = await import('./lib/supabase.js').then(m => m.getLocationId());
-        if (!locId) return;
-        const { startMasterHeartbeat, startChildMonitor, forceSyncFromSupabase } = await import('./sync/MasterSync.js');
-        // Check if this device's profile is designated master
+        const { getLocationId } = await import('./lib/supabase.js');
+        const locId = await getLocationId().catch(() => null);
+        if (!locId || stopped) return;
+
+        const { startMasterHeartbeat, startChildMonitor } = await import('./sync/MasterSync.js');
+
+        // Read profile from Supabase-populated localStorage — always fresh
         const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
         const cfg = JSON.parse(localStorage.getItem('rpos-device-config') || '{}');
         const profile = profiles.find(p => p.id === cfg.profileId);
-        if (profile?.isMaster) {
-          startMasterHeartbeat({ deviceId: pairedDevice.id, locationId: locId, deviceName: pairedDevice.name, version: '3.6.5' });
+        const isMasterDevice = profile?.isMaster === true;
+
+        if (isMasterDevice) {
+          // Master: write heartbeat immediately, never monitor
+          startMasterHeartbeat({
+            deviceId: pairedDevice.id,
+            locationId: locId,
+            deviceName: pairedDevice.name,
+            version: '3.7.0',
+          });
         } else {
-          startChildMonitor({ locationId: locId });
+          // Child: wait 20s before first check so master has time to write its heartbeat
+          // This prevents false "master offline" on startup
+          await new Promise(r => setTimeout(r, 20_000));
+          if (!stopped) startChildMonitor({ locationId: locId });
         }
-        started = true;
-      } catch {}
+      } catch (e) {
+        console.warn('[MasterSync] boot error:', e.message);
+      }
     };
-    // Run after device is validated
-    if (deviceValid === true) boot();
-    return () => {};
+
+    boot();
+    return () => { stopped = true; };
   }, [deviceValid]);
 
   useEffect(() => {
-    const onOffline = (e) => { setMasterInfo(e.detail); setMasterOffline(true); setMasterDismissed(false); };
+    const onOffline = (e) => { setMasterInfo(e.detail); setMasterOffline(true); };
     const onOnline  = (e) => { setMasterInfo(e.detail); setMasterOffline(false); };
     window.addEventListener('rpos-master-offline', onOffline);
     window.addEventListener('rpos-master-online',  onOnline);
@@ -1937,11 +1962,10 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
       <SyncBridge onSyncPulse={handleSyncPulse}/>
-      {masterOffline && !masterDismissed && (
+      {masterOffline && (
         <MasterOfflineModal
           masterName={masterInfo?.device_name}
           lastSeen={masterInfo}
-          onDismiss={() => setMasterDismissed(true)}
         />
       )}
       
