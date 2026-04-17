@@ -61,8 +61,8 @@ const CHANGELOG = [
   {
     version: '3.9.6', date: 'Apr 2026', label: 'Fix: images and all menu writes now persist correctly to Supabase',
     changes: [
-      'Root cause: LOCATION_ID defaults to 'loc-demo' (the mock sentinel). Every db.js function received loc-demo as locationId — it is truthy so getLocationId() was never called, and all upserts wrote to location_id=loc-demo which matches nothing in Supabase',
-      'Fix: all db.js functions now treat loc-demo the same as null — always resolve the real location ID via getLocationId() before any write',
+      "Root cause: LOCATION_ID defaults to 'loc-demo' (mock sentinel). Every db.js function received loc-demo as locationId — truthy so getLocationId() was never called, and upserts wrote to location_id=loc-demo which matches nothing in Supabase",
+      "Fix: all db.js functions now treat loc-demo the same as null — always resolve the real location ID via getLocationId() before any write",
       'Affects: upsertMenuItem, upsertMenuCategory, upsertFloorTable, toggle86DB, and all other location-scoped writes',
       'This is why item images, modifier group changes, and other edits vanished on reload — they were never written to the database',
     ],
