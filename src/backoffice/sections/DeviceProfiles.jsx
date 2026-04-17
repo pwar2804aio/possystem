@@ -84,43 +84,57 @@ export default function DeviceProfiles() {
   }, []);
 
   const toDbRow = (p, locId) => ({
-    id: p.id, location_id: locId || locationId,
-    name: p.name, color: p.color,
+    id: p.id,
+    location_id: locId || locationId,
+    name: p.name,
+    color: p.color || '#3b82f6',
     default_surface: p.defaultSurface,
     enabled_order_types: p.enabledOrderTypes,
-    assigned_section: p.assignedSection,
-    hidden_features: p.hiddenFeatures,
-    table_service_enabled: p.tableServiceEnabled,
-    quick_screen_enabled: p.quickScreenEnabled,
+    assigned_section: p.assignedSection || null,
+    hidden_features: p.hiddenFeatures || [],
+    table_service_enabled: p.tableServiceEnabled !== false,
+    quick_screen_enabled: p.quickScreenEnabled !== false,
     menu_id: p.menuId || null,
+    sort_order: p.sortOrder || 0,
+    service_charge: p.serviceCharge || null,
+    is_master: p.isMaster || false,
   });
 
+  // Always resolve a real locationId — never save with null
+  const resolveLocId = async () => {
+    if (locationId) return locationId;
+    const { getLocationId } = await import('../../lib/supabase.js');
+    const id = await getLocationId().catch(() => null);
+    if (id) setLocationId(id);
+    return id;
+  };
+
   const save = async (updated) => {
+    // Close panel immediately so it feels instant
+    setEditing(null);
+    setShowNew(false);
+
+    // Update local state and localStorage immediately
     setProfiles(ps => ps.map(p => p.id === updated.id ? updated : p));
+    try {
+      const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+      const exists = cur.find(p => p.id === updated.id);
+      const next = exists
+        ? cur.map(p => p.id === updated.id ? updated : p)
+        : [...cur, updated];
+      localStorage.setItem('rpos-device-profiles', JSON.stringify(next));
+    } catch {}
+
     markBOChange();
+
     if (!isMock) {
       try {
-        const { getLocationId } = await import('../../lib/supabase.js');
-        const locId = locationId || await getLocationId();
-        // Use direct fetch — proven reliable (Supabase JS SDK had silent failures)
+        const locId = await resolveLocId();
+        if (!locId) throw new Error('Could not resolve location ID');
+
+        const row = toDbRow(updated, locId);
         const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
         const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        const row = {
-          id: updated.id,
-          location_id: locId,
-          name: updated.name,
-          color: updated.color || '#3b82f6',
-          default_surface: updated.defaultSurface,
-          enabled_order_types: updated.enabledOrderTypes,
-          assigned_section: updated.assignedSection || null,
-          hidden_features: updated.hiddenFeatures || [],
-          table_service_enabled: updated.tableServiceEnabled !== false,
-          quick_screen_enabled: updated.quickScreenEnabled !== false,
-          menu_id: updated.menuId || null,
-          sort_order: updated.sortOrder || 0,
-          service_charge: updated.serviceCharge || null,
-          is_master: updated.isMaster || false,
-        };
         const res = await fetch(`${SUPABASE_URL}/rest/v1/device_profiles?on_conflict=id`, {
           method: 'POST',
           headers: {
@@ -131,38 +145,46 @@ export default function DeviceProfiles() {
           },
           body: JSON.stringify([row]),
         });
-        if (!res.ok) {
-          const err = await res.text();
-          throw new Error(err);
-        }
-        try {
-          const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
-          localStorage.setItem('rpos-device-profiles', JSON.stringify(cur.map(p => p.id === updated.id ? updated : p)));
-        } catch {}
+        if (!res.ok) throw new Error(await res.text());
+        showToast(`"${updated.name}" saved`, 'success');
       } catch (err) {
         console.error('Profile save failed:', err);
         showToast('Save failed — check connection', 'error');
-        return;
       }
+    } else {
+      showToast(`"${updated.name}" saved`, 'success');
     }
-    showToast(`"${updated.name}" saved — POS updates instantly`, 'success');
-    setEditing(null);
   };
 
   const addProfile = async (profile) => {
-    const nextId = `prof-${Date.now().toString(36).slice(-4)}`;
+    const nextId = `prof-${Date.now()}`;
     const newProfile = { ...profile, id: nextId, deviceCount: 0 };
+
+    // Close panel immediately
+    setShowNew(false);
+
+    // Update local state and localStorage immediately
     setProfiles(ps => [...ps, newProfile]);
-    if (!isMock && locationId) {
-      await supabase.from('device_profiles').insert(toDbRow(newProfile));
-      try {
-        const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
-        localStorage.setItem('rpos-device-profiles', JSON.stringify([...cur, newProfile]));
-      } catch {}
-    }
+    try {
+      const cur = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+      localStorage.setItem('rpos-device-profiles', JSON.stringify([...cur, newProfile]));
+    } catch {}
+
     markBOChange();
     showToast(`"${profile.name}" profile created`, 'success');
-    setShowNew(false);
+
+    if (!isMock) {
+      try {
+        const locId = await resolveLocId();
+        if (!locId) throw new Error('No location ID');
+        const row = toDbRow(newProfile, locId);
+        const { error } = await supabase.from('device_profiles').insert(row);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Profile insert failed:', err);
+        showToast('Could not save to cloud — check connection', 'error');
+      }
+    }
   };
 
   const deleteProfile = async (id) => {
