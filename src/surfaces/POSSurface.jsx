@@ -712,6 +712,8 @@ export default function POSSurface() {
                     clearTimeout(longPressTimer.current);
                   };
 
+                  const hasImg = showItemImages && item.image && !is86;
+
                   return(
                     <button key={item.id}
                       onClick={()=>handleItemTap(item)}
@@ -723,61 +725,83 @@ export default function POSSurface() {
                       className={`prod-card${is86?' prod-card--disabled':''}${lastAddedUid===item.id?' add-pulse':''}`}
                       style={{
                         minHeight:108,
-                        ...(showItemImages && item.image ? {
+                        ...(hasImg ? {
                           backgroundImage: `url(${item.image})`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
                         } : {}),
                       }}>
-                      {/* Dark overlay when image is showing */}
-                      {showItemImages && item.image && !is86 && (
+                      {/* Full overlay when image is showing — dark at bottom for text, subtle at top */}
+                      {hasImg && (
                         <div style={{
                           position:'absolute', inset:0, borderRadius:'inherit',
-                          background:'linear-gradient(to top, rgba(0,0,0,.75) 0%, rgba(0,0,0,.15) 60%, transparent 100%)',
+                          background:'linear-gradient(to top, rgba(0,0,0,.88) 0%, rgba(0,0,0,.55) 45%, rgba(0,0,0,.25) 75%, rgba(0,0,0,.1) 100%)',
+                          zIndex:0,
                         }}/>
                       )}
-                      {/* Left colour bar */}
-                      <div style={{
+                      {/* Left colour bar — hidden when image is showing */}
+                      {!hasImg && <div style={{
                         position:'absolute',left:0,top:0,bottom:0,width:4,
                         background:is86?'var(--bg5)':flagged?'var(--red)':isHot?catColor:`${catColor}60`,
                         borderRadius:'14px 0 0 14px',
-                      }}/>
-                      <div style={{padding:compact?'6px 6px 5px 8px':'12px 12px 11px 16px',flex:1,display:'flex',flexDirection:'column'}}>
-                        {/* Top row: emoji + badges */}
+                      }}/>}
+                      <div style={{padding:compact?'6px 6px 5px 8px':'12px 12px 11px 16px',flex:1,display:'flex',flexDirection:'column',position:'relative',zIndex:1}}>
+                        {/* Top row: emoji/icon + badges — hide emoji when image fills the space */}
                         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
-                          <span style={{fontSize:24,lineHeight:1}}>{is86?'🚫':flagged?'⚠️':catIcon}</span>
+                          {!hasImg && <span style={{fontSize:24,lineHeight:1}}>{is86?'🚫':flagged?'⚠️':catIcon}</span>}
+                          {hasImg && <span/>}
                           <div style={{display:'flex',gap:3,flexDirection:'column',alignItems:'flex-end'}}>
-                            {/* Daily count badge */}
                             {count&&!is86&&(
                               <span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:4,
-                                background:isLow?'rgba(232,160,32,.2)':'rgba(34,197,94,.15)',
-                                color:isLow?'var(--acc)':'var(--grn)',
-                                border:`1px solid ${isLow?'rgba(232,160,32,.4)':'rgba(34,197,94,.3)'}`,
+                                background:hasImg?(isLow?'rgba(232,160,32,.85)':'rgba(34,197,94,.85)'):(isLow?'rgba(232,160,32,.2)':'rgba(34,197,94,.15)'),
+                                color:hasImg?'#fff':(isLow?'var(--acc)':'var(--grn)'),
+                                border:'none',
                               }}>
                                 {count.remaining} left
                               </span>
                             )}
                             {isHot&&!is86&&!flagged&&!count&&(
-                              <span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:`${catColor}25`,color:catColor,letterSpacing:.02}}>#{rank+1}</span>
+                              <span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,
+                                background:hasImg?'rgba(0,0,0,.5)':`${catColor}25`,
+                                color:hasImg?'#fff':catColor,letterSpacing:.02,
+                              }}>#{rank+1}</span>
                             )}
-                            {flagged&&<span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)'}}>⚠ allergen</span>}
+                            {flagged&&<span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:'var(--red)',color:'#fff'}}>⚠ allergen</span>}
                             {is86&&<span style={{fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:4,background:'var(--red-d)',color:'var(--red)',border:'1px solid var(--red-b)'}}>86'd</span>}
                           </div>
                         </div>
                         {/* Name */}
-                        <div style={{fontSize:13,fontWeight:700,color:is86?'var(--t4)':flagged?'var(--red)':(showItemImages&&item.image)?'#fff':'var(--t1)',lineHeight:1.3,flex:1,marginBottom:8,textShadow:(showItemImages&&item.image&&!is86)?'0 1px 3px rgba(0,0,0,.8)':'none'}}>{item.name}</div>
-                        {/* Bottom: price + type + 86 button */}
+                        <div style={{
+                          fontSize:13,fontWeight:700,lineHeight:1.3,flex:1,marginBottom:8,
+                          color:is86?'var(--t4)':flagged?'var(--red)':hasImg?'#fff':'var(--t1)',
+                          textShadow:hasImg?'0 1px 4px rgba(0,0,0,1), 0 2px 8px rgba(0,0,0,.8)':'none',
+                        }}>{item.name}</div>
+                        {/* Bottom: price + type badge + 86 button */}
                         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:4}}>
-                          <div style={{fontSize:compact?13:18,fontWeight:800,color:(showItemImages&&item.image&&!is86)?'#fff':accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em',textShadow:(showItemImages&&item.image&&!is86)?'0 1px 4px rgba(0,0,0,.9)':'none'}}>
+                          <div style={{
+                            fontSize:compact?13:18,fontWeight:800,
+                            color:hasImg?'#fff':accentColor,
+                            fontFamily:'var(--font-mono)',letterSpacing:'-.01em',
+                            textShadow:hasImg?'0 1px 6px rgba(0,0,0,1)':'none',
+                          }}>
                             {item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}
                           </div>
                           <div style={{display:'flex',gap:3,alignItems:'center',flexShrink:0}}>
-                            {item.type!=='simple'&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:5,background:'var(--bg4)',color:'var(--t3)',letterSpacing:.02}}>
-                              {item.type==='variants'?'▾ sizes':item.type==='modifiers'?'⊕ opts':'⊕ opts'}
+                            {item.type!=='simple'&&<span style={{fontSize:9,fontWeight:700,padding:'2px 5px',borderRadius:5,
+                              background:hasImg?'rgba(255,255,255,.2)':'var(--bg4)',
+                              color:hasImg?'#fff':'var(--t3)',
+                              letterSpacing:.02,
+                              border:hasImg?'1px solid rgba(255,255,255,.3)':'none',
+                            }}>
+                              {item.type==='variants'?'▾ sizes':'⊕ opts'}
                             </span>}
                             <button
                               onClick={e=>{e.stopPropagation();toggle86(item.id);showToast(is86?`${item.name} un-86'd`:`${item.name} 86'd`,'warning');}}
-                              style={{width:22,height:22,borderRadius:5,border:`1px solid ${is86?'var(--red-b)':'var(--bdr)'}`,background:is86?'var(--red-d)':'var(--bg4)',color:is86?'var(--red)':'var(--t4)',cursor:'pointer',fontSize:9,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'inherit',flexShrink:0}}
+                              style={{width:22,height:22,borderRadius:5,
+                                border:`1px solid ${is86?'var(--red-b)':hasImg?'rgba(255,255,255,.4)':'var(--bdr)'}`,
+                                background:is86?'var(--red-d)':hasImg?'rgba(0,0,0,.4)':'var(--bg4)',
+                                color:is86?'var(--red)':hasImg?'rgba(255,255,255,.8)':'var(--t4)',
+                                cursor:'pointer',fontSize:9,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'inherit',flexShrink:0}}
                             >{is86?'✕':'86'}</button>
                           </div>
                         </div>

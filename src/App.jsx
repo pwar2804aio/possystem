@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.9.1', date: 'Apr 2026', label: 'Fix: image buttons fully readable, Box of 3 modifiers',
+    changes: [
+      'Image button overlay: much stronger gradient (88% at bottom, 55% mid, 25% top), all text uses heavy text-shadow so name and price stay crisp over any image colour',
+      'Emoji hidden when image shows — no more two things competing for the same space',
+      'Colour bar hidden when image fills the button background',
+      'Badges (86d, allergen, count, rank) adapted for image mode — dark semi-transparent backgrounds with white text',
+      '86 button gets translucent dark background over images so it stays tappable',
+      'Box of 3: menu_items.image column added — future saves now work correctly',
+    ],
+  },
+  {
     version: '3.9.0', date: 'Apr 2026', label: 'Modifier option images',
     changes: [
       'Modifier options now support images — click the image thumbnail (🖼) next to any option in the Modifier Groups editor to upload a photo',
