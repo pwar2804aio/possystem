@@ -178,9 +178,23 @@ export const bumpKDSTicket = async (id) => {
 };
 
 // ── Closed checks ─────────────────────────────────────────────────────────────
-export const insertClosedCheck = async (check, locationId = LOCATION_ID) => {
+export const insertClosedCheck = async (check, locationId = null) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId().catch(() => LOCATION_ID);
+  // Always resolve real location — NEVER fall back to LOCATION_ID ('loc-demo')
+  if (!locationId || locationId === 'loc-demo') {
+    locationId = await getLocationId().catch(() => null);
+  }
+  if (!locationId || locationId === 'loc-demo') {
+    // Last resort: read from paired device in localStorage
+    try {
+      const dev = JSON.parse(localStorage.getItem('rpos-device') || '{}');
+      locationId = dev.locationId || null;
+    } catch {}
+  }
+  if (!locationId) {
+    console.error('[DB] insertClosedCheck: could not resolve locationId — check will be lost');
+    return { data: null, error: new Error('No locationId') };
+  }
 
   const row = {
     id:           check.id,

@@ -58,6 +58,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.6.1', date: 'Apr 2026', label: 'Critical sync fix: closed checks and table clears now sync across all devices',
+    changes: [
+      'ROOT CAUSE: insertClosedCheck was writing location_id = loc-demo instead of the real location UUID — every check was invisible to other devices',
+      'insertClosedCheck now always resolves the real locationId via getLocationId(), never falls back to the mock loc-demo value',
+      'active_sessions now has a dedicated realtime subscription in realtime.js for INSERT/UPDATE/DELETE — DELETE events were silently dropped before because default Postgres replica identity only carries PK columns',
+      'REQUIRED: Run ALTER TABLE active_sessions REPLICA IDENTITY FULL and ALTER TABLE closed_checks REPLICA IDENTITY FULL in Supabase SQL editor for DELETE events to carry table_id',
+    ],
+  },
+  {
     version: '3.6.0', date: 'Apr 2026', label: 'Full system hardening — data integrity milestone',
     changes: [
       'Service charge backfill: deviceConfig always gets serviceCharge from profile on every device validation — no more stale sessions missing SC',

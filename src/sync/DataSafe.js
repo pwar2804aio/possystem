@@ -76,7 +76,7 @@ export async function reconcilePendingChecks() {
   if (!pending.length) return;
 
   const locationId = await getLocationId().catch(() => null);
-  if (!locationId || !supabase) return;
+  if (!locationId || locationId === 'loc-demo' || !supabase) return;
 
   console.log(`[DataSafe] Reconciling ${pending.length} pending check(s)`);
 

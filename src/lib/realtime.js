@@ -110,6 +110,58 @@ export function startRealtime(store, locationId = LOCATION_ID) {
     })
     .subscribe();
 
+  // ── Active sessions — table open/update/close from any device ────────────────
+  // REQUIRES: ALTER TABLE active_sessions REPLICA IDENTITY FULL;
+  // (so DELETE events carry the full row, not just PK)
+  const sessionsChannel = supabase
+    .channel(`sessions:${locationId}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'active_sessions',
+      filter: `location_id=eq.${locationId}`,
+    }, ({ new: row }) => {
+      if (!row?.table_id) return;
+      store.setState(s => ({
+        tables: s.tables.map(t =>
+          t.id === row.table_id
+            ? { ...t, session: row.session, status: 'occupied' }
+            : t
+        ),
+      }));
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'active_sessions',
+      filter: `location_id=eq.${locationId}`,
+    }, ({ new: row }) => {
+      if (!row?.table_id) return;
+      store.setState(s => ({
+        tables: s.tables.map(t =>
+          t.id === row.table_id
+            ? { ...t, session: row.session, status: 'occupied' }
+            : t
+        ),
+      }));
+    })
+    .on('postgres_changes', {
+      event: 'DELETE',
+      schema: 'public',
+      table: 'active_sessions',
+    }, ({ old: row }) => {
+      const tid = row?.table_id;
+      if (!tid) return;
+      store.setState(s => ({
+        tables: s.tables.map(t =>
+          t.id === tid
+            ? { ...t, session: null, status: 'available' }
+            : t
+        ),
+      }));
+    })
+    .subscribe();
+
   // ── Closed checks — live sync across all devices ──────────────────────────
   const checksChannel = supabase
     .channel(`checks:${locationId}`)
@@ -138,7 +190,7 @@ export function startRealtime(store, locationId = LOCATION_ID) {
     })
     .subscribe();
 
-  channels = [kdsChannel, e86Channel, configChannel, taxChannel, checksChannel];
+  channels = [kdsChannel, e86Channel, configChannel, taxChannel, sessionsChannel, checksChannel];
 
   return () => {
     channels.forEach(ch => supabase.removeChannel(ch));
