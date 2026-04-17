@@ -199,10 +199,13 @@ export default function POSSurface() {
       }
     }
 
-    const needsModal = item.assignedModifierGroups?.length > 0
+    // type='simple' always skips modal — even if stale modifier data exists in the record
+    const needsModal = item.type !== 'simple' && (
+      item.assignedModifierGroups?.length > 0
       || item.assignedInstructionGroups?.length > 0
       || item.modifierGroups?.length > 0
-      || ['modifiable','modifiers','pizza'].includes(item.type);
+      || ['modifiable','modifiers','pizza'].includes(item.type)
+    );
 
     if (!needsModal) {
       addItem(item, [], null, { displayName: item.menuName || item.name, qty: 1, linePrice: item.pricing?.base ?? item.price ?? 0 });

@@ -23,6 +23,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
+import { supabase, isMock } from '../../lib/supabase';
+import { upsertMenuItem } from '../../lib/db';
 
 // ── Tax section for item editor ───────────────────────────────────────────────
 const ORDER_TYPES_TAX = ['dine-in', 'takeaway', 'delivery', 'bar', 'counter'];
@@ -792,7 +794,7 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
                       <span style={{ fontSize:10, color:(v.allergens||[]).length>0?'var(--red)':'var(--t4)' }}>
                         {(v.allergens||[]).length>0?(v.allergens||[]).length:''}
                       </span>
-                      <button onClick={e=>{e.stopPropagation();if(confirm('Remove this size?')){updateMenuItem(v.id,{archived:true,parentId:null});markBOChange();showToast('Size removed','info');}}} style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                      <button onClick={e=>{e.stopPropagation();if(confirm('Remove this size?')){updateMenuItem(v.id,{archived:true,parentId:null});if(!isMock){const full={...menuItems.find(i=>i.id===v.id),...{archived:true,parentId:null,parent_id:null}};upsertMenuItem(full);}markBOChange();showToast('Size removed','info');}}} style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
                     </div>
                   );
                 })}
@@ -1188,8 +1190,12 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
   };
   const updVariant   = (id, patch) => { updateMenuItem(id, patch); markBOChange(); };
   const removeVariant = id => {
-    updateMenuItem(id, { archived:true, parentId:null }); markBOChange(); showToast('Variant removed','info');
-    if (variants.filter(v => v.id !== id).length === 0) onUpdate({ type:'simple' });
+    const full = { ...menuItems.find(i => i.id === id), archived: true, parentId: null, parent_id: null };
+    updateMenuItem(id, { archived: true, parentId: null });
+    if (!isMock) upsertMenuItem(full);
+    markBOChange();
+    showToast('Variant removed', 'info');
+    if (variants.filter(v => v.id !== id).length === 0) onUpdate({ type: 'simple' });
   };
   const reorderVariants = (from, to) => {
     const arr = [...variants]; const [moved] = arr.splice(from, 1); arr.splice(to, 0, moved);

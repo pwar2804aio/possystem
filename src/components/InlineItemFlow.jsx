@@ -63,14 +63,12 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
       setSelectedVariant(variant);
       setSelections({});
       setInstSel({});
-      const childItem = variant._childItem || variant;
-      // Modifiers can be on child OR parent — check both
-      const hasMods = buildModGroups(childItem).length > 0 || buildInstGroups(childItem).length > 0
-                   || buildModGroups(item).length > 0      || buildInstGroups(item).length > 0;
+      // variant IS the full child item — check its own mods AND parent mods
+      const hasMods = buildModGroups(variant).length > 0 || buildInstGroups(variant).length > 0
+                   || buildModGroups(item).length > 0    || buildInstGroups(item).length > 0;
       if (!hasMods) {
-        // No modifiers anywhere — confirm directly
         const displayName = `${item.menuName || item.menu_name || item.name} — ${variant.menuName || variant.menu_name || variant.name || variant.label}`;
-        onConfirm(childItem, [], null, {
+        onConfirm(variant, [], null, {
           notes: '', qty, linePrice: (variant.pricing?.base ?? variant.price ?? 0) * qty, displayName
         });
         return;
@@ -80,23 +78,20 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
     }, 180);
   };
 
-  // Active item for modifier resolution:
-  // After picking a variant, prefer child item's mods; fall back to parent item's mods
-  const activeItem = selectedVariant?._childItem || (step === 'modifiers' && !isVariant ? item : null);
+  // After picking a variant, selectedVariant IS the full child menu item.
+  // _childItem is a legacy field that doesn't exist — use selectedVariant directly.
+  const activeItem = selectedVariant || (step === 'modifiers' && !isVariant ? item : null);
   const modGroups = useMemo(() => {
-    if (activeItem) {
-      const childMods = buildModGroups(activeItem);
-      // If child has its own modifier groups use those, otherwise use parent's
-      return childMods.length > 0 ? childMods : buildModGroups(item);
-    }
-    return buildModGroups(item);
+    if (!activeItem) return buildModGroups(item);
+    const childMods = buildModGroups(activeItem);
+    // Child variant has its own modifier groups — use those
+    // Otherwise fall back to parent item's modifier groups
+    return childMods.length > 0 ? childMods : buildModGroups(item);
   }, [activeItem, item, modifierGroupDefs]);
   const instGroups = useMemo(() => {
-    if (activeItem) {
-      const childInst = buildInstGroups(activeItem);
-      return childInst.length > 0 ? childInst : buildInstGroups(item);
-    }
-    return buildInstGroups(item);
+    if (!activeItem) return buildInstGroups(item);
+    const childInst = buildInstGroups(activeItem);
+    return childInst.length > 0 ? childInst : buildInstGroups(item);
   }, [activeItem, item, instructionGroupDefs]);
 
   const missingRequired = useMemo(() => {
@@ -156,7 +151,7 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
       ? ` — ${selectedVariant.menuName || selectedVariant.name || selectedVariant.label}`
       : '';
     const displayName = `${item.menuName || item.menu_name || item.name}${variantPart}`;
-    const targetItem = selectedVariant?._childItem || item;
+    const targetItem = selectedVariant || item;
     onConfirm(targetItem, mods, null, { notes: notes.trim(), qty, linePrice: total, displayName });
   };
 
