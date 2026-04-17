@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.6.7', date: 'Apr 2026', label: 'Fix: device profile dropdown now shows real profiles', changes: ['ProfileSelect in Devices page was calling getProfiles() statically at render time — never updated when Supabase loaded profiles into localStorage', 'Now uses useState + useEffect to fetch profiles from Supabase directly on mount, and listens for localStorage changes', 'The hardcoded DEFAULT_PROFILES fallback (Main counter / Bar terminal / Server handheld) no longer appears once real profiles are loaded'] },
   {
     version: '3.6.6', date: 'Apr 2026', label: 'Critical: realtime fixed, lag fixed',
     changes: [

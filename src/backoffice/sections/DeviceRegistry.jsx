@@ -72,10 +72,46 @@ function PrinterSelect({ value, onChange, placeholder = 'No receipt printer' }) 
 }
 
 function ProfileSelect({ value, onChange }) {
+  const [profiles, setProfiles] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
+      return stored?.length ? stored : DEFAULT_PROFILES;
+    } catch { return DEFAULT_PROFILES; }
+  });
+
+  // Re-read when localStorage is updated (e.g. after DeviceProfiles section saves)
+  useEffect(() => {
+    const refresh = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null');
+        if (stored?.length) setProfiles(stored);
+      } catch {}
+    };
+    window.addEventListener('storage', refresh);
+    // Also fetch fresh from Supabase
+    (async () => {
+      try {
+        const locId = await getLocationId();
+        if (!locId || !supabase) return;
+        const { data } = await supabase
+          .from('device_profiles')
+          .select('id, name')
+          .eq('location_id', locId)
+          .order('sort_order');
+        if (data?.length) {
+          setProfiles(data);
+          localStorage.setItem('rpos-device-profiles',
+            JSON.stringify(data.map(p => ({ ...p }))));
+        }
+      } catch {}
+    })();
+    return () => window.removeEventListener('storage', refresh);
+  }, []);
+
   return (
     <select style={S.input} value={value||''} onChange={e=>onChange(e.target.value)}>
       <option value="">No profile</option>
-      {getProfiles().map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+      {profiles.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
     </select>
   );
 }
