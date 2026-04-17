@@ -86,6 +86,7 @@ export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
     centre_id:    item.centreId    || item.centre_id    || null,
     tax_rate_id:  item.taxRateId   || item.tax_rate_id  || null,
     tax_overrides: item.taxOverrides || item.tax_overrides || {},
+    image:        item.image || null,
     updated_at:   new Date().toISOString(),
   };
 

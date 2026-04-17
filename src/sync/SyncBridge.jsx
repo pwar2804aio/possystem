@@ -19,7 +19,7 @@ const OPERATIONAL_KEYS = [
 // Table status/session sync (operational part only — layout comes via CONFIG_PUSH)
 // We sync the whole tables array but the POS only applies non-layout fields from broadcasts
 // Layout (x,y,w,h,label,section,shape) only changes via CONFIG_PUSH
-const SHARED_KEYS = [...OPERATIONAL_KEYS, 'tables'];
+const SHARED_KEYS = [...OPERATIONAL_KEYS, 'tables', 'showItemImages'];
 
 let channelInstance = null;
 export function getChannel() { return channelInstance; }

@@ -58,6 +58,13 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.8.9', date: 'Apr 2026', label: 'Fix: product images now show on POS',
+    changes: [
+      'image field was missing from upsertMenuItem db row — image URL uploaded to storage but never written to menu_items.image column in Supabase. POS loaded items from Supabase with no image field. Fixed.',
+      'showItemImages missing from SHARED_KEYS — setting was in Zustand store but never persisted to localStorage or synced across tabs. POS always saw false. Fixed.',
+    ],
+  },
   { version: '3.8.8', date: 'Apr 2026', label: 'Fix: image upload getLocationId error', changes: ['getLocationId was missing from the supabase import in MenuManager — added to fix ReferenceError on image upload'] },
   { version: '3.8.7', date: 'Apr 2026', label: 'Fix: image upload uses correct location ID', changes: ['ItemImageUpload now resolves location ID via getLocationId() async instead of hardcoded fallback'] },
   {
