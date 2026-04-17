@@ -278,10 +278,26 @@ export default function SyncBridge({ onSyncPulse }) {
     let pending = {};
 
     // Write table session changes to Supabase for cross-device sync
+    // Only flush on meaningful state changes — not every item qty edit (that causes lag)
     const unsubSessions = !isMock ? useStore.subscribe((state, prev) => {
-      if (state.tables !== prev.tables) {
-        scheduleFlush();
-      }
+      if (state.tables === prev.tables) return;
+      // Detect meaningful changes: table opened/closed, items sent, covers changed
+      const meaningful = state.tables.some((t, i) => {
+        const p = prev.tables[i];
+        if (!p) return true;
+        if ((t.session == null) !== (p.session == null)) return true; // open/close
+        if (t.session?.covers !== p.session?.covers) return true;     // covers
+        // Item sent to kitchen (status pending→sent)
+        const tSent = (t.session?.items || []).filter(i => i.status === 'sent').length;
+        const pSent = (p.session?.items || []).filter(i => i.status === 'sent').length;
+        if (tSent !== pSent) return true;
+        // Item count changed (added/voided, not just qty tweak)
+        const tCount = (t.session?.items || []).filter(i => !i.voided).length;
+        const pCount = (p.session?.items || []).filter(i => !i.voided).length;
+        if (tCount !== pCount) return true;
+        return false;
+      });
+      if (meaningful) scheduleFlush();
     }) : () => {};
 
     const unsub = useStore.subscribe((state, prev) => {

@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.6.6', date: 'Apr 2026', label: 'Critical: realtime fixed, lag fixed',
+    changes: [
+      'ROOT CAUSE FIX: startRealtime was catching errors and falling back to loc-demo — every device subscribed sessions/checks channels to the wrong location UUID, so DELETE events and check INSERTs were invisible to other devices. Now retries up to 5x with 2s gap to get real locationId, final fallback from rpos-device localStorage',
+      'Lag fix: scheduleFlush was firing on EVERY store change including every quantity increment. Now only flushes on meaningful events: table open/close, item sent to kitchen, item added/voided, covers changed. Quantity edits no longer trigger a Supabase write',
+    ],
+  },
+  {
     version: '3.6.5', date: 'Apr 2026', label: 'Master-child architecture: network resilience',
     changes: [
       'Device Profiles: Master POS toggle — designate one terminal as the network master',
@@ -1545,21 +1552,37 @@ export default function App() {
     setTimeout(() => setSyncPulse(false), 600);
   }, []);
 
-  // Start Supabase Realtime on mount (no-op in mock mode)
+  // Start Supabase Realtime on mount — NEVER use loc-demo, retry until real locationId resolves
   useEffect(() => {
     let cleanup;
-    import('./lib/realtime.js').then(({ startRealtime }) => {
-      import('./lib/supabase.js').then(({ getLocationId }) => {
-        getLocationId().then(locationId => {
-          if (locationId) {
+    let retryTimer;
+    const boot = async () => {
+      try {
+        const [{ startRealtime }, { getLocationId }] = await Promise.all([
+          import('./lib/realtime.js'),
+          import('./lib/supabase.js'),
+        ]);
+        // Try up to 5 times with 2s gap to get the real locationId
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const locationId = await getLocationId().catch(() => null);
+          if (locationId && locationId !== 'loc-demo') {
             cleanup = startRealtime(useStore, locationId);
+            return;
           }
-        }).catch(() => {
-          cleanup = startRealtime(useStore);
-        });
-      });
-    }).catch(() => {});
-    return () => cleanup?.();
+          await new Promise(r => { retryTimer = setTimeout(r, 2000); });
+        }
+        // If still no real locationId after retries, try once from paired device localStorage
+        try {
+          const dev = JSON.parse(localStorage.getItem('rpos-device') || '{}');
+          if (dev.locationId && dev.locationId !== 'loc-demo') {
+            const { startRealtime } = await import('./lib/realtime.js');
+            cleanup = startRealtime(useStore, dev.locationId);
+          }
+        } catch {}
+      } catch {}
+    };
+    boot();
+    return () => { cleanup?.(); clearTimeout(retryTimer); };
   }, []);
 
   useEffect(() => {
