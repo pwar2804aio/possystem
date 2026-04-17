@@ -308,6 +308,22 @@ export default function SyncBridge({ onSyncPulse }) {
       }
       if (!Object.keys(changed).length) return;
 
+      // If the only change is tables and it's qty-only (no item count change, no session open/close)
+      // skip localStorage write and BroadcastChannel — it's just a local UI update
+      const onlyTables = Object.keys(changed).length === 1 && changed.tables;
+      if (onlyTables) {
+        const qtyOnly = !state.tables.some((t, i) => {
+          const p = prev.tables[i];
+          if (!p) return true;
+          if ((t.session == null) !== (p.session == null)) return true;
+          const tCount = (t.session?.items || []).filter(i => !i.voided).length;
+          const pCount = (p.session?.items || []).filter(i => !i.voided).length;
+          if (tCount !== pCount) return true;
+          return false;
+        });
+        if (qtyOnly) return; // skip broadcast for qty changes — no cross-device value
+      }
+
       pending = { ...pending, ...changed };
       clearTimeout(timer);
       timer = setTimeout(() => {

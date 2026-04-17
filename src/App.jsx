@@ -58,7 +58,16 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
-  { version: '3.7.3', date: 'Apr 2026', label: 'Fix: master correctly identifies itself every time', changes: ['Device validation already fetches device_profiles from Supabase on every boot — now reads is_master from that and writes it into rpos-device-config', 'Master boot reads cfg.isMaster from rpos-device-config — always set correctly because validation runs before this fires', 'No more Supabase queries or localStorage guessing in boot path'] },
+  {
+    version: '3.7.4', date: 'Apr 2026', label: 'Sync fixed, master works, qty lag gone',
+    changes: [
+      'Table close sync: closed_checks INSERT now ALSO clears the table from the other device floor plan — belt and suspenders alongside the DELETE event. Table will clear on any device the moment payment is taken elsewhere',
+      'Master detection: Main profile set is_master=true directly in Supabase. Profile save now uses update() not upsert() — upsert was not persisting is_master correctly',
+      'VERSION constant used in master heartbeat instead of hardcoded string',
+      'Qty +/- lag: BroadcastChannel and localStorage writes now skipped for qty-only changes — only meaningful changes (adds, voids, sends, opens, closes) trigger cross-tab sync',
+    ],
+  },
+  { version: VERSION, date: 'Apr 2026', label: 'Fix: master correctly identifies itself every time', changes: ['Device validation already fetches device_profiles from Supabase on every boot — now reads is_master from that and writes it into rpos-device-config', 'Master boot reads cfg.isMaster from rpos-device-config — always set correctly because validation runs before this fires', 'No more Supabase queries or localStorage guessing in boot path'] },
   { version: '3.7.2', date: 'Apr 2026', label: 'Fix: master device correctly identifies itself', changes: ['Master detection now queries Supabase devices+device_profiles directly at boot — never relies on stale localStorage cache which was missing isMaster field', 'Fallback to localStorage only if Supabase query fails'] },
   {
     version: '3.7.1', date: 'Apr 2026', label: 'Master-child: hard block, fixed false positives, device counts',
@@ -1683,7 +1692,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             deviceId: pairedDevice.id,
             locationId: locId,
             deviceName: pairedDevice.name,
-            version: '3.7.3',
+            version: VERSION,
           });
         } else {
           // Child: wait 20s before first check so master has time to write heartbeat on startup

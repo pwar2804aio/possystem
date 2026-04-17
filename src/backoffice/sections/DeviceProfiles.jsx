@@ -147,7 +147,17 @@ export default function DeviceProfiles() {
         if (!locId) throw new Error('Could not resolve location ID');
 
         const row = toDbRow(updated, locId);
-        const { error } = await supabase.from('device_profiles').upsert(row, { onConflict: 'id' });
+        // Use update for existing profiles, insert for new ones
+        let error;
+        const existing = await supabase.from('device_profiles').select('id').eq('id', row.id).single();
+        if (existing.data) {
+          // Update all fields explicitly
+          const { error: e } = await supabase.from('device_profiles').update(row).eq('id', row.id);
+          error = e;
+        } else {
+          const { error: e } = await supabase.from('device_profiles').insert(row);
+          error = e;
+        }
         if (error) throw error;
         showToast(`"${updated.name}" saved`, 'success');
       } catch (err) {

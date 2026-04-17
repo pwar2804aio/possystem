@@ -175,7 +175,6 @@ export function startRealtime(store, locationId = LOCATION_ID) {
       filter: `location_id=eq.${locationId}`,
     }, ({ new: check }) => {
       if (!check) return;
-      // Normalise and prepend to store so all devices see it immediately
       const normalised = {
         id: check.id, ref: check.ref, server: check.server, covers: check.covers,
         orderType: check.order_type, customer: check.customer,
@@ -188,7 +187,27 @@ export function startRealtime(store, locationId = LOCATION_ID) {
       };
       const current = store.getState().closedChecks || [];
       if (!current.find(c => c.id === normalised.id)) {
-        store.setState({ closedChecks: [normalised, ...current] });
+        const update = { closedChecks: [normalised, ...current] };
+        // Also clear the table from the floor — this is belt-and-suspenders
+        // in case the active_sessions DELETE event was missed
+        if (normalised.tableId) {
+          const tables = store.getState().tables || [];
+          const table = tables.find(t => t.id === normalised.tableId);
+          if (table?.session) {
+            update.tables = tables.map(t =>
+              t.id === normalised.tableId
+                ? { ...t, session: null, status: 'available' }
+                : t
+            );
+            // Clear from session backup too
+            try {
+              const backup = JSON.parse(localStorage.getItem('rpos-session-backup') || '{}');
+              delete backup[normalised.tableId];
+              localStorage.setItem('rpos-session-backup', JSON.stringify(backup));
+            } catch {}
+          }
+        }
+        store.setState(update);
       }
     })
     .subscribe();
