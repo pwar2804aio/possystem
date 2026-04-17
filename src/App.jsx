@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.8.6', date: 'Apr 2026', label: 'New: Product images on POS and ordering platforms',
+    changes: [
+      'Supabase Storage bucket product-images created — public read CDN, 5MB limit, authenticated upload',
+      'Image upload UI in item editor Details tab — click to upload, shows preview with Replace/Remove controls',
+      'Location Settings: POS Display section with Show images on POS buttons toggle',
+      'POS buttons: when enabled globally, item buttons show product image as full background with dark gradient overlay for text legibility',
+      'Long-press item info sheet always shows product image in hero regardless of global toggle',
+      'showItemImages loaded from Supabase at boot via SyncBridge, stored in Zustand for instant reads',
+      'images stored as {location_id}/{item_id}.ext — deterministic path, re-upload always replaces cleanly',
+    ],
+  },
+  {
     version: '3.8.5', date: 'Apr 2026', label: 'New: Clone item',
     changes: [
       'Clone button added to item editor footer alongside Archive',

@@ -97,14 +97,24 @@ export default function ItemInfoModal({ item, onClose, onAddToOrder }) {
         {/* ── Hero image ── */}
         <div style={{
           height:160, flexShrink:0, position:'relative',
-          background:`linear-gradient(135deg, ${m.color}33, ${m.color}11)`,
+          background: item.image
+            ? 'transparent'
+            : `linear-gradient(135deg, ${m.color}33, ${m.color}11)`,
           display:'flex', alignItems:'center', justifyContent:'center',
           borderBottom:'1px solid var(--bdr)',
+          overflow:'hidden',
         }}>
-          <span style={{ fontSize:72, filter:'drop-shadow(0 4px 12px rgba(0,0,0,.3))' }}>{m.icon||'🍽'}</span>
+          {item.image ? (
+            <>
+              <img src={item.image} alt={item.name} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }} />
+              <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(0,0,0,.5) 0%, transparent 60%)' }}/>
+            </>
+          ) : (
+            <span style={{ fontSize:72, filter:'drop-shadow(0 4px 12px rgba(0,0,0,.3))' }}>{m.icon||'🍽'}</span>
+          )}
           {/* Category pill */}
           <div style={{ position:'absolute', top:14, left:16, padding:'4px 10px', borderRadius:20, background:'rgba(0,0,0,.4)', backdropFilter:'blur(8px)', fontSize:11, fontWeight:700, color:'#fff', letterSpacing:.04 }}>
-            {item.cat.charAt(0).toUpperCase()+item.cat.slice(1)}
+            {item.cat?.charAt(0).toUpperCase()+(item.cat?.slice(1)||'')}
           </div>
           {/* Close */}
           <button onClick={onClose} style={{ position:'absolute', top:14, right:14, width:32, height:32, borderRadius:'50%', background:'rgba(0,0,0,.4)', backdropFilter:'blur(8px)', border:'none', color:'#fff', cursor:'pointer', fontFamily:'inherit', fontSize:18, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>

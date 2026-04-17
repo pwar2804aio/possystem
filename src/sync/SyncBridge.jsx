@@ -4,6 +4,7 @@ import { subscribeToSessions, scheduleFlush, teardown as teardownSessions } from
 import { initOfflineQueue } from './OfflineQueue';
 import { isMock, supabase } from '../lib/supabase';
 import { startSessionReconciler, stopSessionReconciler } from './SessionReconciler';
+import { getShowItemImages } from '../lib/locationTime';
 
 export const CHANNEL_NAME = 'rpos-sync';
 export const STORAGE_KEY  = 'rpos-shared-state';
@@ -223,6 +224,20 @@ export default function SyncBridge({ onSyncPulse }) {
     // This is the reliable fix for cross-device close sync
     // Realtime DELETE events are unreliable; polling guarantees consistency
     if (!isMock) startSessionReconciler();
+
+    // Load global image display setting
+    if (!isMock) {
+      (async () => {
+        try {
+          const { getLocationId } = await import('../lib/supabase.js');
+          const locId = await getLocationId().catch(() => null);
+          if (locId && supabase) {
+            const show = await getShowItemImages(supabase, locId);
+            useStore.getState().setShowItemImages(show);
+          }
+        } catch {}
+      })();
+    }
 
     // On reconnect — replay pending data
     if (!isMock) {

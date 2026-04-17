@@ -24,7 +24,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
 import { supabase, isMock } from '../../lib/supabase';
-import { upsertMenuItem } from '../../lib/db';
+import { upsertMenuItem, uploadProductImage, deleteProductImage } from '../../lib/db';
 
 // ── Clone item helper ─────────────────────────────────────────────────────────
 async function cloneItem(item, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast, setSelItemId) {
@@ -1227,6 +1227,89 @@ function ItemsLibrary() {
 // ═══════════════════════════════════════════════════════════════════════════
 // ITEM EDITOR
 // ═══════════════════════════════════════════════════════════════════════════
+// ── Item image upload ─────────────────────────────────────────────────────────
+function ItemImageUpload({ item, onUpdate, markBOChange, showToast }) {
+  const [uploading, setUploading] = useState(false);
+  const { locationId } = useStore.getState();
+  const locId = locationId || (() => { try { return JSON.parse(localStorage.getItem('rpos-device-config')||'{}').locationId || JSON.parse(localStorage.getItem('rpos-bo-location')||'null') || '7218c716-eeb4-4f96-b284-f3500823595c'; } catch { return null; } })();
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return showToast('Please select an image file', 'error');
+    if (file.size > 5 * 1024 * 1024) return showToast('Image must be under 5MB', 'error');
+
+    setUploading(true);
+    const { url, error } = await uploadProductImage(item.id, locId, file);
+    setUploading(false);
+
+    if (error) {
+      console.error('Image upload failed:', error);
+      showToast('Upload failed — check connection', 'error');
+      return;
+    }
+    onUpdate({ image: url });
+    markBOChange();
+    showToast('Image uploaded', 'success');
+  };
+
+  const handleRemove = async () => {
+    if (!confirm('Remove this image?')) return;
+    await deleteProductImage(item.id, locId);
+    onUpdate({ image: null });
+    markBOChange();
+    showToast('Image removed', 'info');
+  };
+
+  return (
+    <div>
+      <span style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', display:'block', marginBottom:6 }}>
+        Product image
+        <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0, marginLeft:4 }}>(POS, kiosk &amp; online ordering)</span>
+      </span>
+
+      {item.image ? (
+        <div style={{ position:'relative', borderRadius:12, overflow:'hidden', border:'1px solid var(--bdr)', marginBottom:6 }}>
+          <img src={item.image} alt={item.name} style={{ width:'100%', height:140, objectFit:'cover', display:'block' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(0,0,0,.6) 0%, transparent 60%)', display:'flex', alignItems:'flex-end', justifyContent:'space-between', padding:'10px 12px' }}>
+            <span style={{ fontSize:11, color:'rgba(255,255,255,.8)', fontWeight:600 }}>✓ Image set</span>
+            <div style={{ display:'flex', gap:6 }}>
+              <label style={{ padding:'5px 10px', borderRadius:7, background:'rgba(255,255,255,.15)', color:'#fff', fontSize:11, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,.3)' }}>
+                Replace
+                <input type="file" accept="image/*" style={{ display:'none' }} onChange={handleFile} />
+              </label>
+              <button onClick={handleRemove} style={{ padding:'5px 10px', borderRadius:7, background:'rgba(239,68,68,.3)', color:'#fff', fontSize:11, fontWeight:600, cursor:'pointer', border:'1px solid rgba(239,68,68,.5)', fontFamily:'inherit' }}>
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <label style={{
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+          gap:6, padding:'20px 16px', borderRadius:12, cursor:'pointer',
+          border:'2px dashed var(--bdr2)', background:'var(--bg3)',
+          transition:'border-color .15s',
+        }}
+          onMouseEnter={e=>e.currentTarget.style.borderColor='var(--acc)'}
+          onMouseLeave={e=>e.currentTarget.style.borderColor='var(--bdr2)'}
+        >
+          {uploading ? (
+            <span style={{ fontSize:12, color:'var(--t3)' }}>Uploading…</span>
+          ) : (
+            <>
+              <span style={{ fontSize:24 }}>🖼</span>
+              <span style={{ fontSize:12, fontWeight:600, color:'var(--t2)' }}>Click to upload image</span>
+              <span style={{ fontSize:10, color:'var(--t4)' }}>JPG, PNG or WebP · max 5MB</span>
+            </>
+          )}
+          <input type="file" accept="image/*" style={{ display:'none' }} onChange={handleFile} disabled={uploading} />
+        </label>
+      )}
+    </div>
+  );
+}
+
 function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose, is86, onToggle86, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast }) {
   const { modifierGroupDefs, instructionGroupDefs } = useStore();
   const p        = item.pricing || { base: item.price || 0 };
@@ -1365,6 +1448,10 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
                 <span style={lbl}>Description <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0 }}>(kiosk & online)</span></span>
                 <textarea style={{ ...inp, resize:'none', height:56 }} value={item.description||''} onChange={e=>f('description',e.target.value)} placeholder="Brief description shown to customers…"/>
               </div>
+            )}
+
+            {!isSub && (
+              <ItemImageUpload item={item} onUpdate={onUpdate} markBOChange={markBOChange} showToast={showToast} />
             )}
 
             <div>

@@ -49,6 +49,7 @@ export default function POSSurface() {
     quickScreenIds,
     menus,
     taxRates,
+    showItemImages,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
@@ -720,7 +721,21 @@ export default function POSSurface() {
                       onTouchStart={handlePressStart}
                       onTouchEnd={handlePressEnd}
                       className={`prod-card${is86?' prod-card--disabled':''}${lastAddedUid===item.id?' add-pulse':''}`}
-                      style={{minHeight:108}}>
+                      style={{
+                        minHeight:108,
+                        ...(showItemImages && item.image ? {
+                          backgroundImage: `url(${item.image})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                        } : {}),
+                      }}>
+                      {/* Dark overlay when image is showing */}
+                      {showItemImages && item.image && !is86 && (
+                        <div style={{
+                          position:'absolute', inset:0, borderRadius:'inherit',
+                          background:'linear-gradient(to top, rgba(0,0,0,.75) 0%, rgba(0,0,0,.15) 60%, transparent 100%)',
+                        }}/>
+                      )}
                       {/* Left colour bar */}
                       <div style={{
                         position:'absolute',left:0,top:0,bottom:0,width:4,
@@ -750,10 +765,10 @@ export default function POSSurface() {
                           </div>
                         </div>
                         {/* Name */}
-                        <div style={{fontSize:13,fontWeight:700,color:is86?'var(--t4)':flagged?'var(--red)':'var(--t1)',lineHeight:1.3,flex:1,marginBottom:8}}>{item.name}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:is86?'var(--t4)':flagged?'var(--red)':(showItemImages&&item.image)?'#fff':'var(--t1)',lineHeight:1.3,flex:1,marginBottom:8,textShadow:(showItemImages&&item.image&&!is86)?'0 1px 3px rgba(0,0,0,.8)':'none'}}>{item.name}</div>
                         {/* Bottom: price + type + 86 button */}
                         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:4}}>
-                          <div style={{fontSize:compact?13:18,fontWeight:800,color:accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em'}}>
+                          <div style={{fontSize:compact?13:18,fontWeight:800,color:(showItemImages&&item.image&&!is86)?'#fff':accentColor,fontFamily:'var(--font-mono)',letterSpacing:'-.01em',textShadow:(showItemImages&&item.image&&!is86)?'0 1px 4px rgba(0,0,0,.9)':'none'}}>
                             {item.type==='variants'?`from £${fromPrice.toFixed(2)}`:`£${fromPrice.toFixed(2)}`}
                           </div>
                           <div style={{display:'flex',gap:3,alignItems:'center',flexShrink:0}}>

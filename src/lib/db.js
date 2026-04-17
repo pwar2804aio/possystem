@@ -314,3 +314,32 @@ export const fetchDevices = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
   return supabase.from('devices').select('*, device_profiles(*)').eq('location_id', locationId);
 };
+
+// ── Product images ─────────────────────────────────────────────────────────────
+const BUCKET = 'product-images';
+
+export const uploadProductImage = async (itemId, locationId, file) => {
+  if (!supabase || isMock) return { url: null, error: new Error('Not connected') };
+  // Deterministic path: location/item.ext — re-upload always replaces
+  const ext = file.name.split('.').pop().toLowerCase().replace('jpeg', 'jpg');
+  const path = `${locationId}/${itemId}.${ext}`;
+  const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
+    upsert: true,
+    contentType: file.type,
+    cacheControl: '3600',
+  });
+  if (upErr) return { url: null, error: upErr };
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  // Bust CDN cache with timestamp
+  const url = `${data.publicUrl}?t=${Date.now()}`;
+  return { url, error: null };
+};
+
+export const deleteProductImage = async (itemId, locationId) => {
+  if (!supabase || isMock) return;
+  // Try both jpg and webp/png
+  const exts = ['jpg', 'png', 'webp', 'jpeg'];
+  for (const ext of exts) {
+    await supabase.storage.from(BUCKET).remove([`${locationId}/${itemId}.${ext}`]);
+  }
+};

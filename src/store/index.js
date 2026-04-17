@@ -1398,6 +1398,8 @@ export const useStore = create((set, get) => ({
 
   // ── 86 ────────────────────────────────────
   eightySixIds: [],
+  showItemImages: false,
+  setShowItemImages: (val) => set({ showItemImages: val }),
   toggle86: id => {
     const is86 = get().eightySixIds.includes(id);
     set(s => ({ eightySixIds: is86 ? s.eightySixIds.filter(x=>x!==id) : [...s.eightySixIds, id] }));

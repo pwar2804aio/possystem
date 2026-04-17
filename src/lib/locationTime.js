@@ -129,3 +129,21 @@ export function getTodayStartFallback() {
   d.setHours(0, 0, 0, 0);
   return d;
 }
+
+// ── Show item images setting ──────────────────────────────────────────────────
+let _showItemImages = null;
+
+export async function getShowItemImages(supabase, locationId) {
+  if (_showItemImages !== null) return _showItemImages;
+  try {
+    const { data } = await supabase.from('locations').select('show_item_images').eq('id', locationId).single();
+    _showItemImages = data?.show_item_images ?? false;
+  } catch {
+    _showItemImages = false;
+  }
+  return _showItemImages;
+}
+
+export function clearShowItemImagesCache() {
+  _showItemImages = null;
+}

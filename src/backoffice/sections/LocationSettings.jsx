@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { platformSupabase } from '../../lib/supabase';
+import { platformSupabase, supabase, getLocationId } from '../../lib/supabase';
 import { clearLocationConfigCache } from '../../lib/locationTime';
 
 const TIMEZONES = [
@@ -48,6 +48,8 @@ export default function LocationSettings() {
   const [timezone, setTimezone]     = useState('Europe/London');
   const [bizDayStart, setBizDayStart] = useState('06:00');
   const [shifts, setShifts]         = useState([]);
+  const [showItemImages, setShowItemImages] = useState(false);
+  const [loadingImageSetting, setLoadingImageSetting] = useState(true);
 
   useEffect(() => {
     if (!platformSupabase) { setLoading(false); return; }
@@ -62,6 +64,15 @@ export default function LocationSettings() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    // Load show_item_images from ops DB
+    (async () => {
+      const locId = await getLocationId().catch(() => null);
+      if (!locId || !supabase) { setLoadingImageSetting(false); return; }
+      const { data } = await supabase.from('locations').select('show_item_images').eq('id', locId).single();
+      if (data) setShowItemImages(data.show_item_images ?? false);
+      setLoadingImageSetting(false);
+    })();
   }, []);
 
   const addShift = () => {
@@ -79,6 +90,12 @@ export default function LocationSettings() {
       .from('locations')
       .update({ timezone, business_day_start: bizDayStart, shifts })
       .eq('id', location.id);
+
+    // Save show_item_images to ops DB
+    const locId = await getLocationId().catch(() => null);
+    if (locId && supabase) {
+      await supabase.from('locations').update({ show_item_images: showItemImages }).eq('id', locId);
+    }
     setSaving(false);
     if (err) { setError(err.message); return; }
     clearLocationConfigCache(); // force refresh on next read
@@ -182,6 +199,35 @@ export default function LocationSettings() {
             Gaps between shifts are valid — not all time needs to be covered.
           </div>
         )}
+      </div>
+
+      {/* POS Display */}
+      <div style={S.card}>
+        <div style={S.h2}>🖼 POS Display</div>
+        <div style={S.desc}>
+          When enabled, product images appear as background photos on the POS item buttons.
+          Images can be added per-item in the menu manager. Images always show on long-press regardless of this setting.
+        </div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 0' }}>
+          <div>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)' }}>Show images on POS buttons</div>
+            <div style={{ fontSize:11, color:'var(--t4)', marginTop:2 }}>Applies to all terminals at this location</div>
+          </div>
+          <button
+            onClick={() => setShowItemImages(v => !v)}
+            style={{
+              width:44, height:24, borderRadius:12, border:'none', cursor:'pointer',
+              background: showItemImages ? 'var(--acc)' : 'var(--bdr2)',
+              position:'relative', transition:'background .2s', flexShrink:0,
+            }}>
+            <div style={{
+              position:'absolute', top:3, left: showItemImages ? 23 : 3,
+              width:18, height:18, borderRadius:'50%', background:'#fff',
+              transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.2)',
+            }}/>
+          </button>
+        </div>
+        {loadingImageSetting && <div style={{ fontSize:11, color:'var(--t4)' }}>Loading…</div>}
       </div>
 
       {/* Save */}
