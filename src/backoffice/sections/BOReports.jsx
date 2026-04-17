@@ -41,26 +41,40 @@ export default function BOReports() {
   const locations = []; // Multi-location filter reserved for future
 
   // Always fetch today's checks fresh from Supabase on mount — ensures cross-device consistency
+  const { closedChecks: storeChecks } = useStore();
   useEffect(() => {
     if (isMock) return;
     (async () => {
       try {
-        const locId = await getLocationId();
-        if (!locId || !supabase) return;
         const sod = new Date(); sod.setHours(0, 0, 0, 0);
-        const { data } = await supabase.from('closed_checks')
-          .select('*').eq('location_id', locId)
-          .gte('closed_at', sod.toISOString())
-          .order('closed_at', { ascending: false });
-        if (data) {
-          // Normalise snake_case from DB
-          setTodayLive(data.map(c => ({
-            ...c,
-            closedAt: c.closed_at || c.closedAt,
-            method: c.payment_method || c.method,
-            tableLabel: c.table_label || c.tableLabel,
-          })));
+        // Try Supabase first for cross-device accuracy
+        let locId = await getLocationId().catch(() => null);
+        // Fallback: extract location from the snapshot or user_profiles in localStorage
+        if (!locId) {
+          try {
+            const snap = JSON.parse(localStorage.getItem('rpos-config-snapshot') || '{}');
+            const dev = JSON.parse(localStorage.getItem('rpos-device') || '{}');
+            locId = dev.locationId || snap.locationId || null;
+          } catch {}
         }
+        if (locId && supabase) {
+          const { data } = await supabase.from('closed_checks')
+            .select('*').eq('location_id', locId)
+            .gte('closed_at', sod.toISOString())
+            .order('closed_at', { ascending: false });
+          if (data?.length) {
+            setTodayLive(data.map(c => ({
+              ...c,
+              closedAt: c.closed_at ? new Date(c.closed_at).getTime() : c.closedAt,
+              method: c.payment_method || c.method,
+              tableLabel: c.table_label || c.tableLabel,
+            })));
+            return;
+          }
+        }
+        // Fallback: use store's closedChecks (device-local but better than nothing)
+        const localToday = storeChecks.filter(c => c.closedAt && new Date(c.closedAt) >= sod);
+        if (localToday.length) setTodayLive(localToday);
       } catch {}
     })();
   }, []);

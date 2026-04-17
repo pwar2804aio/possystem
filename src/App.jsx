@@ -58,6 +58,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.5.99', date: 'Apr 2026', label: 'Reports: revenue now shows correctly',
+    changes: [
+      'BOReports todayLive fetch: getLocationId() was returning null in back office context — added fallback to rpos-device localStorage and store',
+      'If Supabase fetch unavailable, falls back to store closedChecks filtered to today',
+    ],
+  },
+  {
     version: '3.5.98', date: 'Apr 2026', label: 'Data resilience: triple-write safety net',
     changes: [
       'DataSafe module: closed checks now triple-written — localStorage first (instant), then Supabase. If Supabase fails the check is queued, never lost',
