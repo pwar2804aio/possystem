@@ -81,7 +81,7 @@ export default function SyncBridge({ onSyncPulse }) {
           const paired = JSON.parse(localStorage.getItem('rpos-device') || 'null');
           const locationId = paired?.locationId;
           if (!locationId) return;
-          const { fetchLatestConfigPush, fetchFloorPlan, fetchMenuItems, fetchMenuCategories, fetchMenus, loadQuickScreenIds } = await import('../lib/db.js');
+          const { fetchLatestConfigPush, fetchFloorPlan, fetchMenuItems, fetchMenuCategories, fetchMenus } = await import('../lib/db.js');
           const { supabase: sb2 } = await import('../lib/supabase.js');
 
           // Load config push (menus, layout, sections)
@@ -93,7 +93,7 @@ export default function SyncBridge({ onSyncPulse }) {
 
           // Load floor plan + active sessions atomically — never set session:null then restore
           const { supabase: sb, getLocationId } = await import('../lib/supabase.js');
-          const [floorRes, itemsRes, catsRes, menusRes, sessionsRes, profilesRes, modGroupsRes, quickIds] = await Promise.all([
+          const [floorRes, itemsRes, catsRes, menusRes, sessionsRes, profilesRes, modGroupsRes] = await Promise.all([
             fetchFloorPlan(locationId),
             fetchMenuItems(locationId),
             fetchMenuCategories(locationId),
@@ -101,7 +101,6 @@ export default function SyncBridge({ onSyncPulse }) {
             sb ? sb.from('active_sessions').select('table_id,session').eq('location_id', locationId) : Promise.resolve({ data: [] }),
             sb2 ? sb2.from('device_profiles').select('*').eq('location_id', locationId) : Promise.resolve({ data: [] }),
             sb ? sb.from('modifier_groups').select('*').eq('location_id', locationId).order('sort_order') : Promise.resolve({ data: [] }),
-            loadQuickScreenIds(locationId),
           ]);
           // Cache profiles to localStorage so they survive offline
           if (profilesRes?.data?.length) {
@@ -221,7 +220,6 @@ export default function SyncBridge({ onSyncPulse }) {
             }
           } catch(e) { console.warn('[SyncBridge] closed checks load error:', e.message); }
 
-          if (quickIds?.length) patch.quickScreenIds = quickIds;
           if (Object.keys(patch).length) useStore.setState(patch);
 
           // Reconcile any pending checks that didn't make it to Supabase
@@ -250,15 +248,20 @@ export default function SyncBridge({ onSyncPulse }) {
       (async () => {
         try {
           const { getLocationId } = await import('../lib/supabase.js');
-          const { loadQuickScreenIds } = await import('../lib/db.js');
           const locId = await getLocationId().catch(() => null);
           if (locId && supabase) {
             // Load image display setting
             const show = await getShowItemImages(supabase, locId);
             useStore.getState().setShowItemImages(show);
-            // Load quick screen IDs — Supabase is single source of truth
-            const ids = await loadQuickScreenIds(locId);
-            if (ids?.length) useStore.getState().setQuickScreenIds(ids);
+            // Load quick screen IDs directly — single source of truth
+            const { data: locData } = await supabase
+              .from('locations')
+              .select('quick_screen_ids')
+              .eq('id', locId)
+              .single();
+            if (locData?.quick_screen_ids?.length) {
+              useStore.getState().setQuickScreenIds(locData.quick_screen_ids);
+            }
           }
         } catch (e) { console.warn('[SyncBridge] settings load failed:', e.message); }
       })();

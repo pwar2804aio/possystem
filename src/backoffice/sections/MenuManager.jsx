@@ -2558,11 +2558,21 @@ function QuickScreenManager() {
 
   const catFor = item => menuCategories.find(c => c.id === item?.cat);
 
-  const save = (newIds) => {
+  const save = async (newIds) => {
     const filtered = newIds.filter(Boolean);
     setQuickScreenIds(filtered);
     markBOChange();
-    saveQuickScreenIds(filtered).catch(e => console.warn('[QuickScreen] save failed:', e.message));
+    // Write directly using the supabase client already in scope — same as image uploads
+    try {
+      const locId = await getLocationId();
+      if (locId && supabase) {
+        const { error } = await supabase
+          .from('locations')
+          .update({ quick_screen_ids: filtered })
+          .eq('id', locId);
+        if (error) console.error('[QuickScreen] save error:', error.message);
+      }
+    } catch (e) { console.error('[QuickScreen] save failed:', e.message); }
   };
 
   const clearSlot = idx => {

@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.3', date: 'Apr 2026', label: 'Fix: Quick Screen saves directly via supabase client',
+    changes: [
+      'QuickScreen save() now calls supabase.from(locations).update() directly using the client already in scope in MenuManager — same pattern that works for image uploads',
+      'SyncBridge boot now queries locations.quick_screen_ids directly via supabase client instead of via db.js loadQuickScreenIds',
+      'Removed all db.js indirection from Quick Screen path — no module bundling issues, no dynamic imports, no intermediate functions',
+      'getLocationId() and supabase are both confirmed working in MenuManager context — image uploads use the same path successfully',
+    ],
+  },
+  {
     version: '4.0.2', date: 'Apr 2026', label: 'Quick Screen saves to Supabase; 86 button moved to long-press modal',
     changes: [
       'Quick Screen: saveQuickScreenIds now uses static import — dynamic import was silently failing in the bundled output, causing zero Supabase writes',
