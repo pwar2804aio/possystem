@@ -198,6 +198,14 @@ export default function SyncBridge({ onSyncPulse }) {
           } catch(e) { console.warn('[SyncBridge] closed checks load error:', e.message); }
 
           if (Object.keys(patch).length) useStore.setState(patch);
+
+          // Reconcile any pending checks that didn't make it to Supabase
+          // (e.g. payment taken while offline, page reloaded before sync)
+          try {
+            const { reconcilePendingChecks } = await import('./DataSafe.js');
+            await reconcilePendingChecks();
+          } catch {}
+
         } catch(e) { console.warn('[SyncBridge] boot load error:', e.message); }
       })();
     }
@@ -206,6 +214,28 @@ export default function SyncBridge({ onSyncPulse }) {
 
     // Init offline queue for durable writes
     if (!isMock) initOfflineQueue(supabase);
+
+    // On reconnect — replay pending data
+    if (!isMock) {
+      window.addEventListener('online', async () => {
+        try {
+          const { onReconnect } = await import('./DataSafe.js');
+          await onReconnect();
+        } catch {}
+      });
+    }
+
+    // Periodic background sync every 60s — catch any missed writes
+    if (!isMock) {
+      const periodicTimer = setInterval(async () => {
+        try {
+          const { periodicSync } = await import('./DataSafe.js');
+          await periodicSync();
+        } catch {}
+      }, 60_000);
+      // Store timer for cleanup
+      window._rposPeriodicTimer = periodicTimer;
+    }
 
     // Subscribe to live session updates from other devices
     if (!isMock) {

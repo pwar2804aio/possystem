@@ -57,6 +57,16 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.5.98', date: 'Apr 2026', label: 'Data resilience: triple-write safety net',
+    changes: [
+      'DataSafe module: closed checks now triple-written — localStorage first (instant), then Supabase. If Supabase fails the check is queued, never lost',
+      'On boot: reconcilePendingChecks() runs — any check in localStorage but not in Supabase is re-inserted automatically',
+      'On reconnect: pending checks replay to Supabase immediately',
+      'Periodic background sync every 60s catches any missed writes',
+      'OfflineBanner now shows amber syncing state when pending checks exist',
+    ],
+  },
   { version: '3.5.97', date: 'Apr 2026', label: 'AI: updated UI chips and suggestions', changes: ['FOH shortcut chips updated: Shift summary, Item sales, Busiest hour, Open tables, Server stats, Allergens', 'BOH chips updated: Sales, Item lookup, Hourly, Server performance, Open tables, Payment breakdown, Menu', 'Suggestion pills updated for both modes to showcase new capabilities', 'Tool progress badges added for all 9 new tools'] },
   {
     version: '3.5.96', date: 'Apr 2026', label: 'AI assistant: massively expanded capabilities',

@@ -180,6 +180,8 @@ export const bumpKDSTicket = async (id) => {
 // ── Closed checks ─────────────────────────────────────────────────────────────
 export const insertClosedCheck = async (check, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
+  if (!locationId) locationId = await getLocationId().catch(() => LOCATION_ID);
+
   const row = {
     id:           check.id,
     location_id:  locationId,
@@ -201,9 +203,10 @@ export const insertClosedCheck = async (check, locationId = LOCATION_ID) => {
     table_id:     check.tableId || null,
     table_label:  check.tableLabel || null,
   };
-  const result = await supabase.from('closed_checks').insert(row);
-  if (result.error) console.error('[DB] closed_checks insert failed:', result.error.message);
-  return result;
+
+  // Use DataSafe triple-write: localStorage → Supabase (queued if offline)
+  const { safeInsertClosedCheck } = await import('../sync/DataSafe.js');
+  return safeInsertClosedCheck(check, row);
 };
 
 export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 500, sinceDate = null) => {
