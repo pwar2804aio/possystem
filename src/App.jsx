@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.7.3', date: 'Apr 2026', label: 'Fix: master correctly identifies itself every time', changes: ['Device validation already fetches device_profiles from Supabase on every boot — now reads is_master from that and writes it into rpos-device-config', 'Master boot reads cfg.isMaster from rpos-device-config — always set correctly because validation runs before this fires', 'No more Supabase queries or localStorage guessing in boot path'] },
   { version: '3.7.2', date: 'Apr 2026', label: 'Fix: master device correctly identifies itself', changes: ['Master detection now queries Supabase devices+device_profiles directly at boot — never relies on stale localStorage cache which was missing isMaster field', 'Fallback to localStorage only if Supabase query fails'] },
   {
     version: '3.7.1', date: 'Apr 2026', label: 'Master-child: hard block, fixed false positives, device counts',
@@ -1665,39 +1666,16 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
     let stopped = false;
     const boot = async () => {
       try {
-        const { getLocationId, supabase: sb } = await import('./lib/supabase.js');
+        const { getLocationId } = await import('./lib/supabase.js');
         const locId = await getLocationId().catch(() => null);
         if (!locId || stopped) return;
 
         const { startMasterHeartbeat, startChildMonitor } = await import('./sync/MasterSync.js');
 
-        // Query Supabase directly for is_master — localStorage cache can be stale
-        let isMasterDevice = false;
-        try {
-          if (sb && pairedDevice.id) {
-            const { data: devRow } = await sb
-              .from('devices')
-              .select('profile_id')
-              .eq('id', pairedDevice.id)
-              .single();
-            if (devRow?.profile_id) {
-              const { data: profRow } = await sb
-                .from('device_profiles')
-                .select('is_master')
-                .eq('id', devRow.profile_id)
-                .single();
-              isMasterDevice = profRow?.is_master === true;
-            }
-          }
-        } catch {}
-
-        // Also check localStorage as fallback
-        if (!isMasterDevice) {
-          const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
-          const cfg = JSON.parse(localStorage.getItem('rpos-device-config') || '{}');
-          const profile = profiles.find(p => p.id === cfg.profileId);
-          isMasterDevice = profile?.isMaster === true;
-        }
+        // isMaster is written to rpos-device-config during device validation (refreshDevice)
+        // which queries device_profiles from Supabase — always authoritative
+        const cfg = JSON.parse(localStorage.getItem('rpos-device-config') || '{}');
+        const isMasterDevice = cfg.isMaster === true;
 
         if (isMasterDevice) {
           // Master: write heartbeat immediately, never monitor
@@ -1705,7 +1683,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             deviceId: pairedDevice.id,
             locationId: locId,
             deviceName: pairedDevice.name,
-            version: '3.7.2',
+            version: '3.7.3',
           });
         } else {
           // Child: wait 20s before first check so master has time to write heartbeat on startup
@@ -1793,6 +1771,8 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
                 hiddenFeatures: dbProfile.hidden_features || [],
                 tableServiceEnabled: dbProfile.table_service_enabled !== false,
                 quickScreenEnabled: dbProfile.quick_screen_enabled !== false,
+                serviceCharge: dbProfile.service_charge || null,
+                isMaster: dbProfile.is_master === true,
               };
             }
           } catch {}
@@ -1813,6 +1793,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
               tableServiceEnabled: profile.tableServiceEnabled !== false,
               quickScreenEnabled: profile.quickScreenEnabled !== false,
               serviceCharge: profile.serviceCharge || null,
+              isMaster: profile.isMaster === true,
             };
             localStorage.setItem('rpos-device-config', JSON.stringify(config));
             useStore.getState().setDeviceConfig(config);
