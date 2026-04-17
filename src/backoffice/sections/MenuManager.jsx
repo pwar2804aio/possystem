@@ -2561,12 +2561,11 @@ function QuickScreenManager() {
   const save = (newIds) => {
     const filtered = newIds.filter(Boolean);
     setQuickScreenIds(filtered);
-    // Persist immediately to localStorage so it survives reload without Push to POS
-    try {
-      const cur = JSON.parse(localStorage.getItem('rpos-shared-state') || '{}');
-      localStorage.setItem('rpos-shared-state', JSON.stringify({ ...cur, quickScreenIds: filtered }));
-    } catch {}
     markBOChange();
+    // Write directly to Supabase — single source of truth, no localStorage
+    import('../../lib/db.js').then(({ saveQuickScreenIds }) => {
+      saveQuickScreenIds(filtered).catch(e => console.warn('[QuickScreen] save failed:', e.message));
+    });
   };
 
   const clearSlot = idx => {
@@ -2610,7 +2609,7 @@ function QuickScreenManager() {
         </div>
 
         <div style={{ flex:1, overflowY:'auto', padding:'16px' }}>
-          <div style={{ display:'grid', gridTemplateColumns:`repeat(${COLS},1fr)`, gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(155px,1fr))', gap:8 }}>
             {slots.map((itemId, idx) => {
               const item  = itemId ? menuItems.find(m => m.id === itemId) : null;
               const cat   = catFor(item);
@@ -2626,22 +2625,34 @@ function QuickScreenManager() {
                   onDragOver={e=>{e.preventDefault();setOverSlot(idx);}}
                   onDragLeave={()=>setOverSlot(null)}
                   onDrop={e=>onSlotDrop(e,idx)}
-                  style={{ aspectRatio:'1/.75', borderRadius:14,
+                  style={{ minHeight:108, borderRadius:14,
                     border:`2px ${isOver?'solid':'dashed'} ${isOver?'var(--acc)':'var(--bdr)'}`,
                     background:isOver?'var(--acc-d)':item?'var(--bg2)':'var(--bg3)',
                     position:'relative', overflow:'hidden', opacity:isDrag?.3:1, transition:'all .1s',
-                    cursor:item?'grab':'default' }}
+                    cursor:item?'grab':'default',
+                    ...(item?.image ? { backgroundImage:`url(${item.image})`, backgroundSize:'cover', backgroundPosition:'center' } : {}),
+                  }}
                   draggable={!!item}
                   onDragStart={e=>{if(item){setDragSrc({type:'slot',id:itemId,slotIdx:idx});e.dataTransfer.effectAllowed='move';}}}
                   onDragEnd={()=>{setDragSrc(null);setOverSlot(null);}}>
 
+                  {/* Dark overlay when image is set — same as POS */}
+                  {item?.image && (
+                    <div style={{ position:'absolute', inset:0, borderRadius:'inherit',
+                      background:'linear-gradient(to top, rgba(0,0,0,.88) 0%, rgba(0,0,0,.55) 45%, rgba(0,0,0,.1) 100%)',
+                      zIndex:0 }}/>
+                  )}
+
                   {item ? (<>
-                    <div style={{ position:'absolute',left:0,top:0,bottom:0,width:4,background:color }}/>
-                    <button onClick={()=>clearSlot(idx)} style={{ position:'absolute',top:4,right:4,width:18,height:18,borderRadius:5,border:'none',background:'rgba(0,0,0,.08)',color:'var(--t3)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
-                    <div style={{ padding:'8px 8px 6px 12px', height:'100%', boxSizing:'border-box', display:'flex', flexDirection:'column' }}>
-                      <div style={{ fontSize:10, color:color, fontWeight:600, marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cat?.icon} {cat?.label}</div>
-                      <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)', flex:1, overflow:'hidden' }}>{item.menuName||item.name}</div>
-                      <div style={{ fontSize:12, fontWeight:800, color:color, fontFamily:'var(--font-mono)', marginTop:'auto' }}>
+                    {!item.image && <div style={{ position:'absolute',left:0,top:0,bottom:0,width:4,background:color,zIndex:1 }}/>}
+                    <button onClick={()=>clearSlot(idx)} style={{ position:'absolute',top:4,right:4,width:18,height:18,borderRadius:5,border:'none',background:'rgba(0,0,0,.2)',color:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',zIndex:2 }}>×</button>
+                    <div style={{ padding:'8px 8px 6px 12px', height:'100%', boxSizing:'border-box', display:'flex', flexDirection:'column', position:'relative', zIndex:1 }}>
+                      {!item.image && <div style={{ fontSize:10, color:color, fontWeight:600, marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cat?.icon} {cat?.label}</div>}
+                      {item.image && <div style={{ flex:1 }}/>}
+                      <div style={{ fontSize:12, fontWeight:700, color:item.image?'#fff':'var(--t1)', flex:item.image?0:1, overflow:'hidden',
+                        textShadow:item.image?'0 1px 4px rgba(0,0,0,1)':'none' }}>{item.menuName||item.name}</div>
+                      <div style={{ fontSize:12, fontWeight:800, fontFamily:'var(--font-mono)', marginTop:'auto',
+                        color:item.image?'#fff':color, textShadow:item.image?'0 1px 6px rgba(0,0,0,1)':'none' }}>
                         {kids.length>0?`from £${fromP.toFixed(2)}`:`£${price.toFixed(2)}`}
                       </div>
                     </div>

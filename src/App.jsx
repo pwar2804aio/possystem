@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.1', date: 'Apr 2026', label: 'Quick Screen: Supabase-backed, image-aware, matches POS exactly',
+    changes: [
+      'quickScreenIds moved from localStorage to Supabase locations.quick_screen_ids column — persists across devices and reloads with zero localStorage dependency',
+      'save() writes directly to Supabase on every change — no Push to POS required for quick screen',
+      'Boot sequence loads quickScreenIds from Supabase in parallel with all other data',
+      'quickScreenIds removed from SHARED_KEYS — now DB-driven, not localStorage-broadcast',
+      'Quick Screen editor slots now show item background images with the same gradient overlay, white text, and text-shadow as the POS buttons — pixel-identical preview',
+      'Colour bar hidden when item has an image, same as POS',
+    ],
+  },
+  {
     version: '4.0.0', date: 'Apr 2026', label: 'Fix: Quick Screen saves persist on reload',
     changes: [
       'quickScreenIds added to SHARED_KEYS — now persists to localStorage and broadcasts to all tabs instantly',

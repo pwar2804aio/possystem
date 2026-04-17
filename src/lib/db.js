@@ -347,3 +347,19 @@ export const deleteProductImage = async (itemId, locationId) => {
 };
 
 // v3.9.0 — image field in upsert
+
+// ── Quick Screen ───────────────────────────────────────────────────────────────
+export const saveQuickScreenIds = async (ids, locationId = LOCATION_ID) => {
+  if (isMock) return;
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return;
+  await supabase.from('locations').update({ quick_screen_ids: ids }).eq('id', locationId);
+};
+
+export const loadQuickScreenIds = async (locationId = LOCATION_ID) => {
+  if (isMock) return [];
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return [];
+  const { data } = await supabase.from('locations').select('quick_screen_ids').eq('id', locationId).single();
+  return data?.quick_screen_ids || [];
+};
