@@ -14,22 +14,22 @@ import { getTodayStartFallback } from './locationTime';
 // ── Menu ──────────────────────────────────────────────────────────────────────
 export const fetchMenus = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId();
-  if (!locationId) return { data: null, error: new Error('No location') };
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
   return supabase.from('menus').select('*').eq('location_id', locationId).order('sort_order');
 };
 
 export const fetchMenuCategories = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId();
-  if (!locationId) return { data: null, error: new Error('No location') };
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
   return supabase.from('menu_categories').select('*').eq('location_id', locationId).order('sort_order');
 };
 
 export const upsertMenuCategory = async (cat, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId();
-  if (!locationId) return { data: null, error: new Error('No location') };
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
   const result = await supabase.from('menu_categories').upsert({
     ...cat,
     location_id: locationId,
@@ -45,8 +45,8 @@ export const upsertMenuCategory = async (cat, locationId = LOCATION_ID) => {
 
 export const fetchMenuItems = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId();
-  if (!locationId) return { data: null, error: new Error('No location') };
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
   return supabase
     .from('menu_items')
     .select('*')
@@ -57,8 +57,9 @@ export const fetchMenuItems = async (locationId = null) => {
 
 export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId();
-  if (!locationId) return { data: null, error: new Error('No location') };
+  // Always resolve real location — 'loc-demo' is the mock fallback, not a real location
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
 
   // Build pricing jsonb — preserve existing or derive from scalar price
   const pricing = item.pricing || { base: item.price || 0 };
@@ -103,8 +104,8 @@ export const archiveMenuItem = async (id) => {
 // ── Floor plan ────────────────────────────────────────────────────────────────
 export const fetchFloorPlan = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId();
-  if (!locationId) return { data: null, error: new Error('No location') };
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
   const [tables, sections] = await Promise.all([
     supabase.from('floor_tables').select('*').eq('location_id', locationId).order('sort_order'),
     supabase.from('sections').select('*').eq('location_id', locationId).order('sort_order'),
@@ -114,8 +115,8 @@ export const fetchFloorPlan = async (locationId = null) => {
 
 export const upsertFloorTable = async (table, locationId = LOCATION_ID) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId();
-  if (!locationId) return { data: null, error: new Error('No location') };
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
   const result = await supabase.from('floor_tables').upsert({ ...table, location_id: locationId });
   if (result.error) console.error('[DB] floor_tables upsert failed:', result.error.message, 'table:', table.id, 'location:', locationId);
   return result;
@@ -153,8 +154,8 @@ export const fetchKDSTickets = async (locationId = null) => {
 
 export const insertKDSTicket = async (ticket, locationId = null) => {
   if (isMock) return { data: null, error: null };
-  if (!locationId) locationId = await getLocationId();
-  if (!locationId) return { data: null, error: new Error('No location') };
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
   // Map camelCase store ticket to snake_case DB columns
   const row = {
     id: ticket.id,
