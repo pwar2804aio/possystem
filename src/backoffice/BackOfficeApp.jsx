@@ -18,6 +18,7 @@ import Inventory from './sections/Inventory';
 import SupabaseSetup from '../lib/SupabaseSetup';
 import CompanyAdmin from './sections/CompanyAdmin';
 import AIAssistantSection from './sections/AIAssistantSection';
+import NetworkStatus from './sections/NetworkStatus';
 import LocationSettings from './sections/LocationSettings';
 import TaxManager from './sections/TaxManager';
 
@@ -35,6 +36,7 @@ const NAV = [
   { id:'eod',        label:'End of day',        icon:'🔒',  group:'Analytics' },
   { id:'tax',        label:'Tax & VAT',          icon:'%',   group:'Analytics' },
   { id:'ai',         label:'AI Assistant',      icon:'✦',   group:'Analytics' },
+  { id:'network',    label:'Network & Sync',     icon:'📡',  group:'Analytics' },
   { id:'location',   label:'Location settings', icon:'⚙️',  group:'Analytics' },
 ];
 
@@ -326,6 +328,7 @@ export default function BackOfficeApp() {
           {section === 'eod'        && <EODClose />}
           {section === 'admin'       && <CompanyAdmin />}
           {section === 'ai'         && <AIAssistantSection />}
+          {section === 'network'     && <NetworkStatus />}
           {section === 'location'   && <LocationSettings />}
           {section === 'tax'        && <TaxManager />}
         </div>

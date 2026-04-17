@@ -75,7 +75,7 @@ export default function DeviceProfiles() {
         assignedSection: p.assigned_section, hiddenFeatures: p.hidden_features || [],
         tableServiceEnabled: p.table_service_enabled !== false,
         quickScreenEnabled: p.quick_screen_enabled !== false,
-        menuId: p.menu_id, deviceCount: 0,
+        menuId: p.menu_id, deviceCount: 0, serviceCharge: p.service_charge || null, isMaster: p.is_master || false,
       }));
       setProfiles(mapped);
       try { localStorage.setItem('rpos-device-profiles', JSON.stringify(mapped)); } catch {}
@@ -119,6 +119,7 @@ export default function DeviceProfiles() {
           menu_id: updated.menuId || null,
           sort_order: updated.sortOrder || 0,
           service_charge: updated.serviceCharge || null,
+          is_master: updated.isMaster || false,
         };
         const res = await fetch(`${SUPABASE_URL}/rest/v1/device_profiles?on_conflict=id`, {
           method: 'POST',
@@ -495,6 +496,23 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+
+        {/* Master POS toggle */}
+        <div style={{ margin:'0 20px 16px', padding:'14px 16px', borderRadius:12,
+          background: form.isMaster ? 'rgba(234,179,8,0.1)' : 'var(--bg3)',
+          border: `1.5px solid ${form.isMaster ? '#ca8a04' : 'var(--bdr)'}`,
+          cursor:'pointer', transition:'all .2s' }}
+          onClick={() => upd('isMaster', !form.isMaster)}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color: form.isMaster ? '#ca8a04' : 'var(--t1)' }}>👑 Master POS</div>
+              <div style={{ fontSize:11, color:'var(--t4)', marginTop:2 }}>Designate this terminal as the network master. Other devices monitor its heartbeat.</div>
+            </div>
+            <div style={{ width:36, height:20, borderRadius:10, background: form.isMaster ? '#ca8a04' : 'var(--bdr2)', position:'relative', flexShrink:0, transition:'background .2s' }}>
+              <div style={{ position:'absolute', top:2, left: form.isMaster ? 18 : 2, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left .2s' }}/>
             </div>
           </div>
         </div>

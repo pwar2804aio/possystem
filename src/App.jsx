@@ -50,6 +50,7 @@ import CompanyAdminApp from './admin/CompanyAdminApp';
 import DeviceSetup from './surfaces/DeviceSetup';
 import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
+import MasterOfflineModal from './components/MasterOfflineModal';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
 import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
@@ -57,6 +58,17 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.6.5', date: 'Apr 2026', label: 'Master-child architecture: network resilience',
+    changes: [
+      'Device Profiles: Master POS toggle — designate one terminal as the network master',
+      'Master terminal writes a heartbeat to Supabase every 10 seconds',
+      'Child terminals check the heartbeat every 15 seconds — if master not seen in 30s, a blocking error screen appears',
+      'Blocking error: "Master POS not found on network" with instructions, Force Sync from cloud button, and Continue Anyway option',
+      'Back office: new Network & Sync section showing all device heartbeats, online/offline status, open tables per device',
+      'Force Sync button: pulls authoritative sessions and closed checks from Supabase and reconciles with local state — use when devices have drifted',
+    ],
+  },
   { version: '3.6.4', date: 'Apr 2026', label: 'Fix: modifiers working again on POS', changes: ['SyncBridge item load from Supabase was missing assignedModifierGroups mapping — DB uses assigned_modifier_groups (snake_case), modifier modal reads assignedModifierGroups (camelCase). Items from Supabase never had the camelCase property so modifier modal never opened', 'Also maps assignedInstructionGroups correctly'] },
   { version: '3.6.3', date: 'Apr 2026', label: 'Fix: table-close now syncs across devices', changes: ['Supabase Realtime does not support row-level filters on DELETE events — removed filter from sessionsChannel DELETE handler, now checks location_id in the handler body instead', 'With REPLICA IDENTITY FULL set, the full row including location_id and table_id is available in the DELETE payload'] },
   {
@@ -1592,6 +1604,46 @@ export default function App() {
 
 function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shift, theme, setTheme, syncPulse, handleSyncPulse, showWhatsNew, setShowWhatsNew, deviceConfig }) {
   const [deviceValid, setDeviceValid] = useState(null); // null=checking, true=ok, false=revoked
+  const [masterOffline, setMasterOffline] = useState(false);
+  const [masterInfo, setMasterInfo] = useState(null);
+  const [masterDismissed, setMasterDismissed] = useState(false);
+
+  // Start master/child sync after device is validated
+  useEffect(() => {
+    if (!pairedDevice || isMock) return;
+    let started = false;
+    const boot = async () => {
+      try {
+        const locId = await import('./lib/supabase.js').then(m => m.getLocationId());
+        if (!locId) return;
+        const { startMasterHeartbeat, startChildMonitor, forceSyncFromSupabase } = await import('./sync/MasterSync.js');
+        // Check if this device's profile is designated master
+        const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+        const cfg = JSON.parse(localStorage.getItem('rpos-device-config') || '{}');
+        const profile = profiles.find(p => p.id === cfg.profileId);
+        if (profile?.isMaster) {
+          startMasterHeartbeat({ deviceId: pairedDevice.id, locationId: locId, deviceName: pairedDevice.name, version: '3.6.5' });
+        } else {
+          startChildMonitor({ locationId: locId });
+        }
+        started = true;
+      } catch {}
+    };
+    // Run after device is validated
+    if (deviceValid === true) boot();
+    return () => {};
+  }, [deviceValid]);
+
+  useEffect(() => {
+    const onOffline = (e) => { setMasterInfo(e.detail); setMasterOffline(true); setMasterDismissed(false); };
+    const onOnline  = (e) => { setMasterInfo(e.detail); setMasterOffline(false); };
+    window.addEventListener('rpos-master-offline', onOffline);
+    window.addEventListener('rpos-master-online',  onOnline);
+    return () => {
+      window.removeEventListener('rpos-master-offline', onOffline);
+      window.removeEventListener('rpos-master-online',  onOnline);
+    };
+  }, []);
 
   useEffect(() => {
     if (isMock) { setDeviceValid(true); return; }
@@ -1845,6 +1897,13 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
       <SyncBridge onSyncPulse={handleSyncPulse}/>
+      {masterOffline && !masterDismissed && (
+        <MasterOfflineModal
+          masterName={masterInfo?.device_name}
+          lastSeen={masterInfo}
+          onDismiss={() => setMasterDismissed(true)}
+        />
+      )}
       
       <ShiftBar version={VERSION} onWhatsNew={()=>setShowWhatsNew(true)} theme={theme} onToggleTheme={()=>setTheme(theme==='dark'?'light':'dark')} syncPulse={syncPulse}/>
       <ConfigSyncBanner />
