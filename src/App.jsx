@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.7.5', date: 'Apr 2026', label: 'Items no longer flicker. Table close syncs.',
+    changes: [
+      'Items flickering/disappearing on add: adding items to an order was writing to Supabase active_sessions. Supabase echoed the write back as an UPDATE event, which overwrote the local store with stale data — items appeared to vanish. Fix: item add/remove no longer triggers a session flush. Only table open/close, covers change, and send-to-kitchen trigger a flush.',
+      'Echo-back blocked: sessionsChannel UPDATE handler now skips updates for the table currently being edited on this device. Cross-device updates still apply to all other tables.',
+      'Table close syncs: closed_checks INSERT already fires correctly. When received on another device, it now clears the matching table from the floor AND adds to history simultaneously.',
+      'VERSION used in master heartbeat.',
+    ],
+  },
+  {
     version: '3.7.4', date: 'Apr 2026', label: 'Sync fixed, master works, qty lag gone',
     changes: [
       'Table close sync: closed_checks INSERT now ALSO clears the table from the other device floor plan — belt and suspenders alongside the DELETE event. Table will clear on any device the moment payment is taken elsewhere',

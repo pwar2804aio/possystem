@@ -291,11 +291,9 @@ export default function SyncBridge({ onSyncPulse }) {
         const tSent = (t.session?.items || []).filter(i => i.status === 'sent').length;
         const pSent = (p.session?.items || []).filter(i => i.status === 'sent').length;
         if (tSent !== pSent) return true;
-        // Item count changed (added/voided, not just qty tweak)
-        const tCount = (t.session?.items || []).filter(i => !i.voided).length;
-        const pCount = (p.session?.items || []).filter(i => !i.voided).length;
-        if (tCount !== pCount) return true;
         return false;
+        // Item add/remove intentionally excluded: flush only on send/open/close/covers
+        // Adding items must NOT write to Supabase — the echo-back overwrites local state
       });
       if (meaningful) scheduleFlush();
     }) : () => {};

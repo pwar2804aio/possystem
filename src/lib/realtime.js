@@ -137,6 +137,10 @@ export function startRealtime(store, locationId = LOCATION_ID) {
       filter: `location_id=eq.${locationId}`,
     }, ({ new: row }) => {
       if (!row?.table_id) return;
+      // Skip if this is the table currently being edited on this device
+      // to prevent Supabase echo-back from overwriting local state mid-edit
+      const activeTableId = store.getState().activeTableId;
+      if (row.table_id === activeTableId) return;
       store.setState(s => ({
         tables: s.tables.map(t =>
           t.id === row.table_id
