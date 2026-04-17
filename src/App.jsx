@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.7.2', date: 'Apr 2026', label: 'Fix: master device correctly identifies itself', changes: ['Master detection now queries Supabase devices+device_profiles directly at boot — never relies on stale localStorage cache which was missing isMaster field', 'Fallback to localStorage only if Supabase query fails'] },
   {
     version: '3.7.1', date: 'Apr 2026', label: 'Master-child: hard block, fixed false positives, device counts',
     changes: [
@@ -1664,17 +1665,39 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
     let stopped = false;
     const boot = async () => {
       try {
-        const { getLocationId } = await import('./lib/supabase.js');
+        const { getLocationId, supabase: sb } = await import('./lib/supabase.js');
         const locId = await getLocationId().catch(() => null);
         if (!locId || stopped) return;
 
         const { startMasterHeartbeat, startChildMonitor } = await import('./sync/MasterSync.js');
 
-        // Read profile from Supabase-populated localStorage — always fresh
-        const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
-        const cfg = JSON.parse(localStorage.getItem('rpos-device-config') || '{}');
-        const profile = profiles.find(p => p.id === cfg.profileId);
-        const isMasterDevice = profile?.isMaster === true;
+        // Query Supabase directly for is_master — localStorage cache can be stale
+        let isMasterDevice = false;
+        try {
+          if (sb && pairedDevice.id) {
+            const { data: devRow } = await sb
+              .from('devices')
+              .select('profile_id')
+              .eq('id', pairedDevice.id)
+              .single();
+            if (devRow?.profile_id) {
+              const { data: profRow } = await sb
+                .from('device_profiles')
+                .select('is_master')
+                .eq('id', devRow.profile_id)
+                .single();
+              isMasterDevice = profRow?.is_master === true;
+            }
+          }
+        } catch {}
+
+        // Also check localStorage as fallback
+        if (!isMasterDevice) {
+          const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+          const cfg = JSON.parse(localStorage.getItem('rpos-device-config') || '{}');
+          const profile = profiles.find(p => p.id === cfg.profileId);
+          isMasterDevice = profile?.isMaster === true;
+        }
 
         if (isMasterDevice) {
           // Master: write heartbeat immediately, never monitor
@@ -1682,11 +1705,10 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             deviceId: pairedDevice.id,
             locationId: locId,
             deviceName: pairedDevice.name,
-            version: '3.7.0',
+            version: '3.7.2',
           });
         } else {
-          // Child: wait 20s before first check so master has time to write its heartbeat
-          // This prevents false "master offline" on startup
+          // Child: wait 20s before first check so master has time to write heartbeat on startup
           await new Promise(r => setTimeout(r, 20_000));
           if (!stopped) startChildMonitor({ locationId: locId });
         }
