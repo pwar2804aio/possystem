@@ -58,6 +58,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.6.2', date: 'Apr 2026', label: 'Fix: modifiers restored, table-close sync fixed',
+    changes: [
+      'REGRESSION FIX: SyncBridge modifier mapping used wrong column names (type/required) — should be selectionType/selection_type. Overwrote correct snapshot data with broken objects, breaking all modifiers on boot',
+      'sessionsChannel DELETE handler now includes location_id filter — with REPLICA IDENTITY FULL this correctly routes table-close events to the right devices',
+      'Removed duplicate active_sessions subscription in SyncBridge — realtime.js sessionsChannel now owns all session sync (INSERT/UPDATE/DELETE)',
+    ],
+  },
+  {
     version: '3.6.1', date: 'Apr 2026', label: 'Critical sync fix: closed checks and table clears now sync across all devices',
     changes: [
       'ROOT CAUSE: insertClosedCheck was writing location_id = loc-demo instead of the real location UUID — every check was invisible to other devices',

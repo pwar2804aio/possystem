@@ -149,6 +149,7 @@ export function startRealtime(store, locationId = LOCATION_ID) {
       event: 'DELETE',
       schema: 'public',
       table: 'active_sessions',
+      filter: `location_id=eq.${locationId}`,
     }, ({ old: row }) => {
       const tid = row?.table_id;
       if (!tid) return;

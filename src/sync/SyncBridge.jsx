@@ -172,10 +172,10 @@ export default function SyncBridge({ onSyncPulse }) {
           }));
           if (menusRes.data?.length) patch.menus = menusRes.data;
           if (modGroupsRes.data?.length) patch.modifierGroupDefs = modGroupsRes.data.map(g => ({
-            id: g.id, name: g.name, type: g.type,
+            id: g.id, name: g.name,
             min: g.min ?? 0, max: g.max ?? 1,
-            required: g.required ?? false,
-            options: g.options || [],
+            selectionType: g.selection_type ?? 'single',
+            options: g.options ?? [],
             sortOrder: g.sort_order ?? 0,
           }));
 
@@ -237,10 +237,8 @@ export default function SyncBridge({ onSyncPulse }) {
       window._rposPeriodicTimer = periodicTimer;
     }
 
-    // Subscribe to live session updates from other devices
-    if (!isMock) {
-      subscribeToSessions();
-    }
+    // Note: active_sessions realtime is handled by startRealtime() in realtime.js (sessionsChannel)
+    // which has INSERT/UPDATE/DELETE with REPLICA IDENTITY FULL for correct cross-device sync
 
     channelInstance = new BroadcastChannel(CHANNEL_NAME);
 
