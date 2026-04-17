@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { subscribeToSessions, scheduleFlush, teardown as teardownSessions } from './SessionSync';
 import { initOfflineQueue } from './OfflineQueue';
 import { isMock, supabase } from '../lib/supabase';
+import { startSessionReconciler, stopSessionReconciler } from './SessionReconciler';
 
 export const CHANNEL_NAME = 'rpos-sync';
 export const STORAGE_KEY  = 'rpos-shared-state';
@@ -218,6 +219,11 @@ export default function SyncBridge({ onSyncPulse }) {
     // Init offline queue for durable writes
     if (!isMock) initOfflineQueue(supabase);
 
+    // Session reconciler — polls active_sessions every 10s
+    // This is the reliable fix for cross-device close sync
+    // Realtime DELETE events are unreliable; polling guarantees consistency
+    if (!isMock) startSessionReconciler();
+
     // On reconnect — replay pending data
     if (!isMock) {
       window.addEventListener('online', async () => {
@@ -336,7 +342,7 @@ export default function SyncBridge({ onSyncPulse }) {
       }, 80);
     });
 
-    return () => { clearTimeout(timer); channelInstance?.close(); channelInstance = null; unsub(); unsubSessions(); if (!isMock) teardownSessions(); };
+    return () => { clearTimeout(timer); channelInstance?.close(); channelInstance = null; unsub(); unsubSessions(); stopSessionReconciler(); if (!isMock) teardownSessions(); };
   }, []);
 
   return null;

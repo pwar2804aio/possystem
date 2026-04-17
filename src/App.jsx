@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.7.6', date: 'Apr 2026', label: 'Session sync: polling replaces unreliable DELETE events',
+    changes: [
+      'SessionReconciler: polls Supabase active_sessions every 10 seconds and reconciles with local store',
+      'Any table closed on another device will clear within 10s — guaranteed, no dependency on realtime DELETE events',
+      'Any table opened on another device will appear within 10s',
+      'Skips the currently active table (being edited) to prevent overwriting local changes',
+      'Replaces the unreliable Supabase Realtime DELETE event approach that was never working consistently',
+    ],
+  },
+  {
     version: '3.7.5', date: 'Apr 2026', label: 'Items no longer flicker. Table close syncs.',
     changes: [
       'Items flickering/disappearing on add: adding items to an order was writing to Supabase active_sessions. Supabase echoed the write back as an UPDATE event, which overwrote the local store with stale data — items appeared to vanish. Fix: item add/remove no longer triggers a session flush. Only table open/close, covers change, and send-to-kitchen trigger a flush.',
