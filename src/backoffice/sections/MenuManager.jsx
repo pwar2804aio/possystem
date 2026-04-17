@@ -2178,24 +2178,47 @@ function ModifiersTab() {
               })}
             </div>
 
-            {/* ── REQUIRED / OPTIONAL + MAX (hidden for single) ── */}
-            <div style={{ display:'grid', gridTemplateColumns: sel.selectionType==='single' ? '1fr' : '1fr 1fr', gap:6 }}>
-              {/* Required/Optional */}
+            {/* ── REQUIRED / OPTIONAL + MIN + MAX ── */}
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+
+              {/* Optional / Required toggle — always shown */}
               <div style={{ display:'flex', gap:5 }}>
-                {[[false,'Optional'],[true,'Required']].map(([req,label])=>{
-                  const act = req?(sel.min||0)>0:!(sel.min>0);
-                  return <button key={label} onClick={()=>upd({min:req?1:0})} style={{ flex:1, padding:'5px 6px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'center', border:`1.5px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', fontSize:10, fontWeight:act?700:400, color:act?'var(--acc)':'var(--t3)' }}>{label}</button>;
+                {[[false,'Optional — skip if desired'],[true,'Required — must pick']].map(([req,label])=>{
+                  const act = req ? (sel.min||0)>0 : !(sel.min>0);
+                  return <button key={label} onClick={()=>upd({ min: req ? (sel.selectionType==='single' ? 1 : (sel.min>1?sel.min:1)) : 0 })}
+                    style={{ flex:1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'center',
+                      border:`1.5px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)',
+                      fontSize:10, fontWeight:act?700:400, color:act?'var(--acc)':'var(--t3)' }}>{label}</button>;
                 })}
               </div>
+
+              {/* Min picks — only shown for multi/quantity when required */}
+              {sel.selectionType !== 'single' && (sel.min||0) > 0 && (
+                <div style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 10px', borderRadius:8, background:'var(--bg3)', border:'1px solid var(--bdr)' }}>
+                  <span style={{ fontSize:10, color:'var(--t4)', flexShrink:0 }}>Min picks:</span>
+                  {[1,2,3,4,5].map(v => {
+                    const act = (sel.min||1) === v;
+                    const valid = v <= (sel.max>=99 ? 99 : (sel.max||3));
+                    if (!valid) return null;
+                    return <button key={v} onClick={()=>upd({min:v})} style={{ width:28, height:28, borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)', flexShrink:0 }}>{v}</button>;
+                  })}
+                  <input type="number" min="1" max={sel.max>=99?50:sel.max||3} style={{ ...inp, width:44, padding:'3px 5px', fontSize:11 }}
+                    value={!([1,2,3,4,5].includes(sel.min||1)) ? (sel.min||1) : ''} placeholder="N"
+                    onChange={e=>upd({min:Math.max(1,parseInt(e.target.value)||1)})}/>
+                  <span style={{ fontSize:9, color:'var(--t4)', flexShrink:0 }}>of {sel.max>=99?'∞':sel.max||3}</span>
+                </div>
+              )}
+
               {/* Max picks — only shown for multi/quantity */}
               {sel.selectionType !== 'single' && (
                 <div style={{ display:'flex', alignItems:'center', gap:5 }}>
                   <span style={{ fontSize:10, color:'var(--t4)', flexShrink:0 }}>Max picks:</span>
                   {[['2',2],['3',3],['4',4],['5',5],['∞',99]].map(([l,v])=>{
                     const act = v===99 ? (sel.max||0)>=99 : (sel.max||3)===v;
-                    return <button key={l} onClick={()=>upd({max:v})} style={{ width:28, height:28, borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)', flexShrink:0 }}>{l}</button>;
+                    return <button key={l} onClick={()=>upd({max:v, min: (sel.min||0)>v&&v<99?v:sel.min||0})} style={{ width:28, height:28, borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)', flexShrink:0 }}>{l}</button>;
                   })}
-                  <input type="number" min="2" max="50" style={{ ...inp, width:44, padding:'3px 5px', fontSize:11 }} value={(sel.max||3)<99&&![2,3,4,5].includes(sel.max||3)?sel.max:''} placeholder="N" onChange={e=>upd({max:parseInt(e.target.value)||2})}/>
+                  <input type="number" min="2" max="50" style={{ ...inp, width:44, padding:'3px 5px', fontSize:11 }} value={(sel.max||3)<99&&![2,3,4,5].includes(sel.max||3)?sel.max:''} placeholder="N"
+                    onChange={e=>upd({max:parseInt(e.target.value)||2, min:(sel.min||0)>parseInt(e.target.value)?parseInt(e.target.value):sel.min||0})}/>
                 </div>
               )}
             </div>

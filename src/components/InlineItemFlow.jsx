@@ -404,19 +404,28 @@ function ModifierStep({ modGroups, instGroups, allModDefs, menuItems, selections
                 {group.name || group.label}
               </span>
               {isRequired ? (
-                <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6, background:'var(--red-d)', color:'var(--red)', border:'1px solid var(--red-b)' }}>Required</span>
+                <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:6, background:'var(--red-d)', color:'var(--red)', border:'1px solid var(--red-b)' }}>
+                  {/* Show exactly what's required */}
+                  {minPicks > 0 && minPicks === maxPicks
+                    ? `Pick exactly ${minPicks}`
+                    : minPicks > 1
+                      ? `Min ${minPicks}${maxPicks < 999 ? `, max ${maxPicks}` : ''}`
+                      : 'Required'}
+                </span>
               ) : (
                 <span style={{ fontSize:10, color:'var(--t4)' }}>Optional</span>
               )}
-              {isMulti && maxPicks < 999 && (
-                <span style={{ fontSize:10, color:'var(--t4)' }}>
-                  · {minPicks > 0 && minPicks === maxPicks ? `choose ${maxPicks}` : `up to ${maxPicks}`}
-                </span>
+              {!isRequired && isMulti && maxPicks < 999 && (
+                <span style={{ fontSize:10, color:'var(--t4)' }}>· up to {maxPicks}</span>
               )}
               {/* Running tally */}
               {totalPicked > 0 && (
-                <span style={{ fontSize:10, fontWeight:700, color: atMax ? 'var(--grn)' : 'var(--acc)', marginLeft:'auto' }}>
-                  {atMax ? `✓ ${totalPicked}` : `${totalPicked}${maxPicks < 999 ? `/${maxPicks}` : ''}`} picked
+                <span style={{ fontSize:10, fontWeight:700, marginLeft:'auto',
+                  color: minPicks > 0 && totalPicked >= minPicks && (totalPicked >= maxPicks || maxPicks >= 999) ? 'var(--grn)'
+                       : minPicks > 0 && totalPicked >= minPicks ? 'var(--grn)'
+                       : 'var(--acc)' }}>
+                  {totalPicked}{maxPicks < 999 ? `/${maxPicks}` : ''} picked
+                  {minPicks > 0 && totalPicked >= minPicks && ' ✓'}
                 </span>
               )}
             </div>

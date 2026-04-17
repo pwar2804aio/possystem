@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.9.8', date: 'Apr 2026', label: 'Modifier groups: min picks control',
+    changes: [
+      'Required toggle now reveals a Min picks row — set exactly how many options the customer must pick (e.g. min 3 of 3 for a Box of 3)',
+      'Min picks buttons: 1, 2, 3, 4, 5 or custom N. Only shows values up to current max',
+      'Max picks automatically clamps min if max is reduced below current min',
+      'POS header shows precise requirement: Pick exactly 3, Min 2 max 5, Required, etc.',
+      'Tally shows green check once min is reached, even if not at max',
+    ],
+  },
+  {
     version: '3.9.7', date: 'Apr 2026', label: 'Fix: image upload now persists to Supabase correctly',
     changes: [
       'ItemImageUpload now does a direct targeted UPDATE (image, updated_at) to Supabase immediately after storage upload succeeds',
