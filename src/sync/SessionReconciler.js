@@ -40,12 +40,16 @@ export async function startSessionReconciler() {
       });
 
       let changed = false;
+      const now = Date.now();
+      const GRACE_MS = 30_000; // 30s grace period for new sessions before we trust Supabase
+
       const newTables = tables.map(t => {
         const inSupabase = supabaseOpen.has(t.id);
         const inStore = !!t.session;
         const isActive = t.id === store.activeTableId;
+        const isNew = t.session?.seatedAt && (now - t.session.seatedAt) < GRACE_MS;
 
-        if (inStore && !inSupabase && !isActive) {
+        if (inStore && !inSupabase && !isActive && !isNew) {
           // Table is open in store but NOT in Supabase — another device closed it
           changed = true;
           return { ...t, session: null, status: 'available' };

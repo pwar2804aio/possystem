@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.7.7', date: 'Apr 2026', label: 'Session reconciler: grace period + architecture review', changes: ['SessionReconciler: 30s grace period for newly opened tables before Supabase is trusted — prevents premature clearing of sessions not yet flushed', 'History and reports confirmed cross-device: closed_checks realtime broadcasts to all devices, BOReports queries Supabase directly. Scales to 20+ terminals.'] },
   {
     version: '3.7.6', date: 'Apr 2026', label: 'Session sync: polling replaces unreliable DELETE events',
     changes: [
