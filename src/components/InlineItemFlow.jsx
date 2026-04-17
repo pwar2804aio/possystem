@@ -266,6 +266,13 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
             onToggleSingle={toggleSingle}
             onAddMulti={addMulti}
             onRemoveMulti={removeMulti}
+            onQtyChange={(gid, id, delta) => setSelections(s => {
+              const prev = (s[gid] || {})[id] || 0;
+              const next = Math.max(0, prev + delta);
+              const updated = { ...(s[gid] || {}), [id]: next };
+              if (next === 0) delete updated[id];
+              return { ...s, [gid]: updated };
+            })}
             onToggleInst={toggleInst}
             onQty={setQty}
             onNotes={setNotes}
@@ -350,7 +357,7 @@ function VariantStep({ item, variantChildren, onPick }) {
 }
 
 // ── Modifier step: sequential groups ─────────────────────────────────────────
-function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelections, qty, notes, missingRequired = [], onToggleSingle, onAddMulti, onRemoveMulti, onToggleInst, onQty, onNotes }) {
+function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelections, qty, notes, missingRequired = [], onToggleSingle, onAddMulti, onRemoveMulti, onQtyChange, onToggleInst, onQty, onNotes }) {
   const hasContent = modGroups.length > 0 || instGroups.length > 0;
   if (!hasContent) {
     return (
@@ -429,13 +436,7 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                       {/* Qty controls */}
                       <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
                         <button
-                          onClick={() => setSelections(s => {
-                            const prev = (s[group.id] || {})[id] || 0;
-                            const next = Math.max(0, prev - 1);
-                            const updated = { ...(s[group.id] || {}), [id]: next };
-                            if (next === 0) delete updated[id];
-                            return { ...s, [group.id]: updated };
-                          })}
+                          onClick={() => onQtyChange(group.id, id, -1)}
                           disabled={optQty === 0}
                           style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${optQty>0?'var(--acc)':'var(--bdr)'}`, background:optQty>0?'var(--acc-d)':'var(--bg3)', color:optQty>0?'var(--acc)':'var(--t4)', cursor:optQty>0?'pointer':'default', fontSize:18, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'inherit' }}>
                           −
@@ -444,12 +445,7 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                           {optQty}
                         </span>
                         <button
-                          onClick={() => setSelections(s => {
-                            const prev = (s[group.id] || {})[id] || 0;
-                            if (atMax) return s; // can't add more total
-                            const updated = { ...(s[group.id] || {}), [id]: prev + 1 };
-                            return { ...s, [group.id]: updated };
-                          })}
+                          onClick={() => { if (!atMax) onQtyChange(group.id, id, +1); }}
                           disabled={atMax}
                           style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${atMax?'var(--bdr)':'var(--acc)'}`, background:atMax?'var(--bg3)':'var(--acc)', color:atMax?'var(--t4)':'#0b0c10', cursor:atMax?'not-allowed':'pointer', fontSize:18, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'inherit', opacity:atMax?0.4:1 }}>
                           +
@@ -484,7 +480,7 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                       <button
                         onClick={() => {
                           if (isMulti) {
-                            if (!atMax) addMulti(group.id, { ...opt, id, label: opt.name || opt.label || id }, maxPicks);
+                            if (!atMax) onAddMulti(group.id, { ...opt, id, label: opt.name || opt.label || id }, maxPicks);
                           } else {
                             onToggleSingle(group.id, { ...opt, id, label: opt.name || opt.label || id });
                           }
@@ -523,7 +519,7 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                       {isSel && isMulti && (
                         <div style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center', gap:3 }}>
                           <button
-                            onClick={e => { e.stopPropagation(); const all=(cur||[]).filter(o=>(o.id||o.label)===id); removeMulti(group.id, all[all.length-1]?._uid); }}
+                            onClick={e => { e.stopPropagation(); const all=(cur||[]).filter(o=>(o.id||o.label)===id); onRemoveMulti(group.id, all[all.length-1]?._uid); }}
                             style={{ width:22, height:22, borderRadius:6, border:'1.5px solid var(--acc)', background:'var(--acc-d)', color:'var(--acc)', cursor:'pointer', fontFamily:'inherit', fontSize:15, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>−</button>
                           <span style={{ fontSize:13, fontWeight:900, color:'var(--acc)', minWidth:16, textAlign:'center' }}>{optQty}</span>
                         </div>
