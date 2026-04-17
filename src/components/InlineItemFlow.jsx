@@ -379,13 +379,20 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                     }}
                     style={{
                       display:'flex', alignItems:'center', justifyContent:'space-between',
-                      padding:'12px 14px', borderRadius:12, cursor: atMax && !isSel ? 'not-allowed' : 'pointer',
+                      padding: opt.image ? '8px 14px' : '12px 14px',
+                      borderRadius:12, cursor: atMax && !isSel ? 'not-allowed' : 'pointer',
                       fontFamily:'inherit', textAlign:'left', transition:'all .1s',
                       border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr)'}`,
                       background: isSel ? 'var(--acc-d)' : 'var(--bg2)',
                       opacity: atMax && !isSel ? 0.4 : 1,
                     }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      {/* Modifier option image */}
+                      {opt.image && (
+                        <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0, border:`1px solid ${isSel?'var(--acc)':'var(--bdr)'}` }}>
+                          <img src={opt.image} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                        </div>
+                      )}
                       <div style={{ width:18, height:18, borderRadius: isMulti ? 4 : '50%', border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr2)'}`, background: isSel ? 'var(--acc)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                         {isSel && <div style={{ width:6, height:6, borderRadius: isMulti ? 2 : '50%', background:'#0b0c10' }}/>}
                       </div>

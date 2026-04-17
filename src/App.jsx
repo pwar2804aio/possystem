@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.9.0', date: 'Apr 2026', label: 'Modifier option images',
+    changes: [
+      'Modifier options now support images — click the image thumbnail (🖼) next to any option in the Modifier Groups editor to upload a photo',
+      'Images show as 40px thumbnails in the POS modifier selection screen when the customer picks options',
+      'Image persistence: re-upload any item image that was uploaded before v3.8.9 to save it to Supabase permanently',
+      'Storage path: modifier images stored as product-images/{location_id}/{option_id}.ext',
+    ],
+  },
+  {
     version: '3.8.9', date: 'Apr 2026', label: 'Fix: product images now show on POS',
     changes: [
       'image field was missing from upsertMenuItem db row — image URL uploaded to storage but never written to menu_items.image column in Supabase. POS loaded items from Supabase with no image field. Fixed.',

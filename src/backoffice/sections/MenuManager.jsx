@@ -2165,8 +2165,26 @@ function ModifiersTab() {
                 onDrop={e=>{e.preventDefault();if(dragOIdx!==null&&dragOIdx!==oi)reorderOpts(dragOIdx,oi);setDragOIdx(null);setOverOIdx(null);}}
                 onDragEnd={()=>{setDragOIdx(null);setOverOIdx(null);}}
                 style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, border:`1px solid ${overOIdx===oi?'var(--acc)':'var(--bdr)'}`, background:'var(--bg2)', opacity:dragOIdx===oi?.4:1 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'14px 1fr 90px auto', gap:6, alignItems:'center' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'14px 36px 1fr 90px auto', gap:6, alignItems:'center' }}>
                   <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⠿</span>
+                  {/* Option image thumbnail */}
+                  <label style={{ width:36, height:36, borderRadius:7, overflow:'hidden', border:'1px solid var(--bdr)', background:'var(--bg3)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, position:'relative' }}>
+                    {opt.image
+                      ? <img src={opt.image} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="" />
+                      : <span style={{ fontSize:14, opacity:.5 }}>🖼</span>
+                    }
+                    <input type="file" accept="image/*" style={{ display:'none' }} onChange={async e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const locId = await getLocationId().catch(()=>null);
+                      if (!locId) return showToast('Could not resolve location', 'error');
+                      const { url, error } = await uploadProductImage(opt.id, locId, file);
+                      if (error) return showToast('Upload failed', 'error');
+                      updOpt(opt.id, { image: url });
+                      markBOChange();
+                      showToast('Image added', 'success');
+                    }}/>
+                  </label>
                   <input style={{ ...inp, fontSize:13, fontWeight:600 }} value={opt.name} onChange={e=>updOpt(opt.id,{name:e.target.value})} placeholder="Option name"/>
                   <div style={{ position:'relative' }}>
                     <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t4)', fontWeight:700 }}>£</span>
