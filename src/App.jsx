@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.8.2', date: 'Apr 2026', label: 'Fix: archived variants now persist to Supabase', changes: ['archiveMenuItem was only updating local Zustand state — no Supabase write. Variants deleted via Archive item button appeared to be gone but reloaded on refresh because the database never changed. Now calls upsertMenuItem with archived:true immediately after updating store.'] },
   { version: '3.8.1', date: 'Apr 2026', label: 'Fix: variant/size delete now persists to Supabase', changes: ['All db.js calls in store/index.js were dynamic imports — import(...).then(...). In the bundled output these were silently failing, meaning menu item updates (archive, parent_id clear) never reached Supabase. Replaced with static top-level import. Every menu write — variant delete, price update, 86, KDS ticket, closed check — now fires reliably.'] },
   {
     version: '3.8.0', date: 'Apr 2026', label: 'AI: menu lookup fixed, always sees current data',

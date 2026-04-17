@@ -692,9 +692,13 @@ export const useStore = create((set, get) => ({
     const dupe = { ...source, id:`m-${Date.now()}`, menuName:`${source.menuName} (copy)`, receiptName:`${source.receiptName} (copy)`, kitchenName:`${source.kitchenName} (copy)` };
     set(s => ({ menuItems: [...s.menuItems, dupe] }));
   },
-  archiveMenuItem: id => set(s => ({
-    menuItems: s.menuItems.map(item => item.id===id ? { ...item, archived:true } : item)
-  })),
+  archiveMenuItem: id => {
+    const fullItem = get().menuItems.find(i => i.id === id);
+    set(s => ({
+      menuItems: s.menuItems.map(item => item.id === id ? { ...item, archived: true } : item)
+    }));
+    if (fullItem) upsertMenuItem({ ...fullItem, archived: true });
+  },
 
   // ── Editable floor plan ────────────────────────────────────────────────────
   // Tables state already exists in `tables` — floor plan builder just edits positions
