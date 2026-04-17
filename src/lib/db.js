@@ -344,3 +344,5 @@ export const deleteProductImage = async (itemId, locationId) => {
     await supabase.storage.from(BUCKET).remove([`${locationId}/${itemId}.${ext}`]);
   }
 };
+
+// v3.9.0 — image field in upsert
