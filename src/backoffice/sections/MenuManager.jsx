@@ -1242,8 +1242,12 @@ function ItemImageUpload({ item, onUpdate, markBOChange, showToast }) {
     if (!file.type.startsWith('image/')) return showToast('Please select an image file', 'error');
     if (file.size > 5 * 1024 * 1024) return showToast('Image must be under 5MB', 'error');
 
+    // Re-resolve locId fresh every time — don't rely on stale state
+    const resolvedLocId = locId || await getLocationId().catch(() => null);
+    if (!resolvedLocId) return showToast('Could not resolve location', 'error');
+
     setUploading(true);
-    const { url, error } = await uploadProductImage(item.id, locId, file);
+    const { url, error } = await uploadProductImage(item.id, resolvedLocId, file);
     setUploading(false);
 
     if (error) {
@@ -1251,15 +1255,44 @@ function ItemImageUpload({ item, onUpdate, markBOChange, showToast }) {
       showToast('Upload failed — check connection', 'error');
       return;
     }
+
+    // 1. Update local store state
     onUpdate({ image: url });
+
+    // 2. Directly write image to Supabase — targeted UPDATE, no full upsert needed
+    // This bypasses any store/locationId timing issues
+    const { supabase } = await import('../../lib/supabase.js');
+    if (supabase) {
+      const { error: dbErr } = await supabase
+        .from('menu_items')
+        .update({ image: url, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
+      if (dbErr) {
+        console.error('[ItemImageUpload] DB write failed:', dbErr.message);
+        showToast('Image saved locally but not synced — try again', 'warning');
+        return;
+      }
+    }
+
     markBOChange();
     showToast('Image uploaded', 'success');
   };
 
   const handleRemove = async () => {
     if (!confirm('Remove this image?')) return;
-    await deleteProductImage(item.id, locId);
+    const resolvedLocId = locId || await getLocationId().catch(() => null);
+    await deleteProductImage(item.id, resolvedLocId);
     onUpdate({ image: null });
+
+    // Direct DB write for remove too
+    const { supabase } = await import('../../lib/supabase.js');
+    if (supabase) {
+      await supabase
+        .from('menu_items')
+        .update({ image: null, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
+    }
+
     markBOChange();
     showToast('Image removed', 'info');
   };

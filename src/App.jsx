@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.9.7', date: 'Apr 2026', label: 'Fix: image upload now persists to Supabase correctly',
+    changes: [
+      'ItemImageUpload now does a direct targeted UPDATE (image, updated_at) to Supabase immediately after storage upload succeeds',
+      'Bypasses the store upsertMenuItem path entirely — no loc-demo risk, no timing race, no full item reconstruction',
+      'Re-resolves locationId fresh on every upload — never uses stale state',
+      'Same direct write for image remove',
+    ],
+  },
+  {
     version: '3.9.6', date: 'Apr 2026', label: 'Fix: images and all menu writes now persist correctly to Supabase',
     changes: [
       "Root cause: LOCATION_ID defaults to 'loc-demo' (mock sentinel). Every db.js function received loc-demo as locationId — truthy so getLocationId() was never called, and upserts wrote to location_id=loc-demo which matches nothing in Supabase",
