@@ -58,6 +58,16 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.8.5', date: 'Apr 2026', label: 'New: Clone item',
+    changes: [
+      'Clone button added to item editor footer alongside Archive',
+      'Prompts for a new name pre-filled with Item Name (Copy) — accept or rename before creating',
+      'Clones all item properties: price, modifiers, allergens, visibility, category',
+      'If the original has size variants (Small/Medium/Large), all sizes are cloned to the new item too',
+      'New cloned item is immediately selected in the editor so you can make changes straight away',
+    ],
+  },
   { version: '3.8.4', date: 'Apr 2026', label: 'Fix: variant delete definitively works', changes: ['upsertMenuItem was silently returning when getLocationId() had not yet resolved — no network call ever fired. Replaced all variant/size archive operations with direct supabase.from(menu_items).update({archived:true}).eq(id) calls which use the already-authenticated supabase client directly. No location ID lookup required.'] },
   {
     version: '3.8.3', date: 'Apr 2026', label: 'Fix: variants delete, modifiers fixed, Espresso modal gone',

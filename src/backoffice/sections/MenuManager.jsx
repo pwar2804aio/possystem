@@ -26,7 +26,74 @@ import { ALLERGENS } from '../../data/seed';
 import { supabase, isMock } from '../../lib/supabase';
 import { upsertMenuItem } from '../../lib/db';
 
-// ── Tax section for item editor ───────────────────────────────────────────────
+// ── Clone item helper ─────────────────────────────────────────────────────────
+async function cloneItem(item, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast, setSelItemId) {
+  const baseName = item.menuName || item.name || 'Item';
+  const cloneName = window.prompt('Name for the cloned item:', `${baseName} (Copy)`);
+  if (!cloneName?.trim()) return; // cancelled
+
+  const name = cloneName.trim();
+
+  // Clone the parent item — strip id, parentId, keep everything else
+  const newItem = addMenuItem({
+    name, menuName: name, receiptName: name, kitchenName: name,
+    description:              item.description || '',
+    type:                     item.type === 'variants' ? 'simple' : (item.type || 'simple'),
+    cat:                      item.cat,
+    cats:                     item.cats || [],
+    price:                    item.price,
+    pricing:                  item.pricing ? { ...item.pricing } : { base: item.price || 0 },
+    allergens:                [...(item.allergens || [])],
+    assignedModifierGroups:   [...(item.assignedModifierGroups || [])],
+    assignedInstructionGroups:[...(item.assignedInstructionGroups || [])],
+    modifierGroups:           item.modifierGroups ? [...item.modifierGroups] : undefined,
+    visibility:               { ...(item.visibility || { pos:true, kiosk:true, online:true }) },
+    soldAlone:                item.soldAlone ?? true,
+    centreId:                 item.centreId || null,
+    sortOrder:                (item.sortOrder ?? 0) + 1,
+  });
+
+  // Clone child variants if the original has sizes
+  if (item.type === 'variants') {
+    const children = menuItems.filter(c => c.parentId === item.id && !c.archived)
+      .sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
+
+    // Update the cloned parent to be variants type
+    await new Promise(r => setTimeout(r, 100)); // let addMenuItem settle
+    const newParentId = useStore.getState().menuItems.slice(-1)[0]?.id;
+    if (newParentId) {
+      updateMenuItem(newParentId, { type: 'variants' });
+      children.forEach((child, i) => {
+        addMenuItem({
+          name: child.menuName || child.name,
+          menuName: child.menuName || child.name,
+          receiptName: child.receiptName || child.name,
+          kitchenName: child.kitchenName || child.name,
+          type: 'simple',
+          parentId: newParentId,
+          cat: item.cat,
+          price: child.price,
+          pricing: child.pricing ? { ...child.pricing } : { base: child.price || 0 },
+          allergens: [...(child.allergens || [])],
+          assignedModifierGroups: [...(child.assignedModifierGroups || [])],
+          sortOrder: i,
+        });
+      });
+    }
+  }
+
+  markBOChange();
+  showToast(`"${name}" cloned`, 'success');
+
+  // Select the new item
+  setTimeout(() => {
+    const all = useStore.getState().menuItems;
+    const newest = all.filter(i => i.name === name).slice(-1)[0];
+    if (newest) setSelItemId(newest.id);
+  }, 150);
+}
+
+
 const ORDER_TYPES_TAX = ['dine-in', 'takeaway', 'delivery', 'bar', 'counter'];
 
 function TaxSection({ item, onUpdate, markBOChange }) {
@@ -627,6 +694,7 @@ function MenuTab() {
           allCategories={menuCategories.filter(c=>!c.isSpecial)}
           onUpdate={patch=>{updateMenuItem(selItem.id,patch);markBOChange();}}
           onArchive={()=>{archiveMenuItem(selItem.id);setSelItemId(null);markBOChange();showToast('Archived','info');}}
+          onClone={()=>cloneItem(selItem,menuItems,addMenuItem,updateMenuItem,markBOChange,showToast,setSelItemId)}
           onClose={()=>setSelItemId(null)}
           is86={eightySixIds.includes(selItem.id)} onToggle86={()=>toggle86(selItem.id)}
           menuItems={menuItems} addMenuItem={addMenuItem} updateMenuItem={updateMenuItem}
@@ -1139,6 +1207,7 @@ function ItemsLibrary() {
           allCategories={allCats}
           onUpdate={patch=>{ updateMenuItem(selItem.id,patch); markBOChange(); }}
           onArchive={()=>{ archiveMenuItem(selItem.id); setSelItemId(null); markBOChange(); showToast('Archived','info'); }}
+          onClone={()=>cloneItem(selItem,menuItems,addMenuItem,updateMenuItem,markBOChange,showToast,setSelItemId)}
           onClose={()=>setSelItemId(null)}
           is86={eightySixIds.includes(selItem.id)}
           onToggle86={()=>toggle86(selItem.id)}
@@ -1158,7 +1227,7 @@ function ItemsLibrary() {
 // ═══════════════════════════════════════════════════════════════════════════
 // ITEM EDITOR
 // ═══════════════════════════════════════════════════════════════════════════
-function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, onToggle86, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast }) {
+function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose, is86, onToggle86, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast }) {
   const { modifierGroupDefs, instructionGroupDefs } = useStore();
   const p        = item.pricing || { base: item.price || 0 };
   const isSub    = item.type === 'subitem';
@@ -1717,8 +1786,9 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
       </div>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <div style={{ padding:'8px 16px', borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
-        <button onClick={()=>{if(confirm('Archive this item?'))onArchive();}} style={{ width:'100%', padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'transparent', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:11, fontWeight:600 }}>Archive item</button>
+      <div style={{ padding:'8px 16px', borderTop:'1px solid var(--bdr)', flexShrink:0, display:'flex', gap:8 }}>
+        <button onClick={onClone} style={{ flex:1, padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'transparent', border:'1px solid var(--acc-b)', color:'var(--acc)', fontSize:11, fontWeight:600 }}>⧉ Clone item</button>
+        <button onClick={()=>{if(confirm('Archive this item?'))onArchive();}} style={{ flex:1, padding:'7px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'transparent', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:11, fontWeight:600 }}>Archive item</button>
       </div>
     </div>
   );
