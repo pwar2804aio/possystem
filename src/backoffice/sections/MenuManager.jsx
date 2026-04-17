@@ -757,8 +757,8 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
     }, 30);
   };
 
-  const typeLabel = t => ({ simple:'Simple', modifiable:'Options', variants:'Has sizes', pizza:'Pizza', combo:'Combo', subitem:'Sub item' }[t] || t);
-  const typeColor = t => ({ simple:'var(--t4)', modifiable:'var(--acc)', variants:'var(--grn)', pizza:'#f97316', combo:'#8b5cf6' }[t] || 'var(--t4)');
+  const typeLabel = t => ({ simple:'Simple', modifiable:'Options', variants:'Has sizes', pizza:'Pizza', combo:'Combo', subitem:'Sub item', spacer:'Spacer' }[t] || t);
+  const typeColor = t => ({ simple:'var(--t4)', modifiable:'var(--acc)', variants:'var(--grn)', pizza:'#f97316', combo:'#8b5cf6', spacer:'var(--t4)' }[t] || 'var(--t4)');
 
   return (
     <div style={{ flex:1, overflowY:'auto' }}>
@@ -786,6 +786,24 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
         const fromP    = hasVars && variants.length > 0 ? Math.min(...variants.map(v=>v.pricing?.base??v.price??0)) : price;
         const modCount = (item.assignedModifierGroups||[]).length + (item.assignedInstructionGroups||[]).length;
         const allergCount = (item.allergens||[]).length;
+
+        // Spacer — renders as a draggable blank-space placeholder
+        if (item.type === 'spacer') return (
+          <div key={item.id}
+            draggable
+            onDragStart={()=>setDragIdx(i)}
+            onDragOver={e=>{e.preventDefault();setOverIdx(i);}}
+            onDrop={e=>{e.preventDefault();if(dragIdx!==null&&dragIdx!==i)reorder(dragIdx,i);setDragIdx(null);setOverIdx(null);}}
+            onDragEnd={()=>{setDragIdx(null);setOverIdx(null);}}
+            style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 12px', borderBottom:'1px solid var(--bdr)', opacity:dragIdx===i?.4:1, cursor:'grab', background:'transparent' }}>
+            <span style={{ fontSize:10, color:'var(--t4)' }}>⠿</span>
+            <div style={{ flex:1, height:1, borderTop:'2px dashed var(--bdr2)', borderRadius:1 }}/>
+            <span style={{ fontSize:9, fontWeight:600, color:'var(--t4)', letterSpacing:'.05em' }}>SPACER</span>
+            <div style={{ flex:1, height:1, borderTop:'2px dashed var(--bdr2)', borderRadius:1 }}/>
+            <button onClick={()=>{ archiveMenuItem(item.id); markBOChange(); }}
+              style={{ width:20, height:20, borderRadius:5, border:'1px solid var(--bdr)', background:'none', color:'var(--t4)', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>×</button>
+          </div>
+        );
 
         return (
           <div key={item.id}>
@@ -957,6 +975,15 @@ function ItemsLibrary() {
     setTimeout(()=>{ const last=useStore.getState().menuItems.slice(-1)[0]; if(last) setSelItemId(last.id); }, 30);
   };
 
+  const addNewSpacer = () => {
+    const defCat = catFilter!=='all' ? catFilter : (allCats.find(c=>!c.parentId)?.id||'');
+    addMenuItem({ name:'Spacer', menuName:'', receiptName:'', kitchenName:'',
+      type:'spacer', cat:defCat, allergens:[], pricing:{base:0},
+      assignedModifierGroups:[], assignedInstructionGroups:[], cats:[], sortOrder:999,
+      visibility:{ pos:true, kiosk:false, online:false, onlineDelivery:false } });
+    markBOChange();
+  };
+
   const addVariant = (parentId, cat, allergens, count) => {
     addMenuItem({ name:'New size', menuName:'New size', receiptName:'New size', kitchenName:'New size',
       type:'simple', parentId, cat, allergens:[...allergens], pricing:{base:0},
@@ -997,6 +1024,7 @@ function ItemsLibrary() {
           <button onClick={()=>{setShowArchived(v=>!v);setSelItemId(null);}} style={{ padding:'7px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:showArchived?'var(--red-d)':'var(--bg3)', border:`1px solid ${showArchived?'var(--red-b)':'var(--bdr)'}`, color:showArchived?'var(--red)':'var(--t3)', fontSize:12, fontWeight:showArchived?700:400, flexShrink:0 }}>
             {showArchived ? '← Back to active' : `Archived${archivedCount>0?` (${archivedCount})`:''}`}
           </button>
+          {!showArchived && <button onClick={addNewSpacer} style={{ padding:'7px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t3)', fontSize:12, fontWeight:600, flexShrink:0 }}>+ Spacer</button>}
           {!showArchived && <button onClick={addNewItem} style={{ padding:'7px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700, flexShrink:0 }}>+ Item</button>}
         </div>
 

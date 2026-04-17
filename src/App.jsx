@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.4', date: 'Apr 2026', label: 'Course bug fix + Spacer items',
+    changes: [
+      'Fix: course fired calculation now uses same full parent-category fallback as course assignment — variants/subitems with no cat set directly now correctly inherit immediate/course from parent category',
+      'Fix: Larger pint and Large half (or any variants) no longer end up in different courses when they share a parent category',
+      'New: Spacer item type — add blank grid cells to arrange products better on POS',
+      'Spacer: shows as dashed placeholder row in back office Items list, draggable and removable',
+      'Spacer: renders as transparent empty cell on POS — invisible to customers, no tap action',
+      'Spacer: excluded from search results and category item counts',
+      '+ Spacer button added to Items toolbar next to + Item',
+    ],
+  },
+  {
     version: '4.0.3', date: 'Apr 2026', label: 'Fix: Quick Screen saves directly via supabase client',
     changes: [
       'QuickScreen save() now calls supabase.from(locations).update() directly using the client already in scope in MenuManager — same pattern that works for image uploads',

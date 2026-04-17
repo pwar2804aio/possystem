@@ -153,7 +153,7 @@ export default function POSSurface() {
     if (!search.trim()) return catItems;
     const q = search.toLowerCase();
     return MENU_ITEMS.filter(i =>
-      !i.archived && (i.type !== 'subitem' || i.soldAlone) && !i.parentId &&
+      !i.archived && i.type !== 'spacer' && (i.type !== 'subitem' || i.soldAlone) && !i.parentId &&
       ((i.menuName||i.name||'').toLowerCase().includes(q) || i.description?.toLowerCase().includes(q))
     );
   }, [cat, search, catItems, MENU_ITEMS]);
@@ -552,7 +552,7 @@ export default function POSSurface() {
             const subIds = menuCategories.filter(s => s.parentId === c.id).map(s => s.id);
             const count = c.id === 'quick'
               ? quickItems.length
-              : MENU_ITEMS.filter(i => !i.archived && !i.parentId && (i.type !== 'subitem' || i.soldAlone) && (i.cat === c.id || subIds.includes(i.cat))).length;
+              : MENU_ITEMS.filter(i => !i.archived && !i.parentId && i.type !== 'spacer' && (i.type !== 'subitem' || i.soldAlone) && (i.cat === c.id || subIds.includes(i.cat))).length;
             const hasSubcats = subIds.length > 0;
             return (
               <button key={c.id} onClick={() => { setCat(c.id); setSearch(''); }} className="cat-btn" style={{
@@ -681,6 +681,11 @@ export default function POSSurface() {
             )}
             <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?115:155}px,1fr))`,gridAutoRows:`minmax(${compact?80:110}px,auto)`,gap:compact?4:8}}>
                 {displayItems.map(item=>{
+                  // Spacer — empty grid cell, no interaction
+                  if (item.type === 'spacer') return (
+                    <div key={item.id} style={{ borderRadius:14, background:'transparent', pointerEvents:'none' }}/>
+                  );
+
                   // Resolve category colour/icon from store (Menu Manager categories)
                   const storeCat = menuCategories.find(c => c.id === item.cat);
                   const legacyMeta = CAT_META[item.cat] || CAT_META.quick;

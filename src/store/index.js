@@ -947,7 +947,9 @@ export const useStore = create((set, get) => ({
       })(),
       fired: (() => {
         const cats = useStore.getState().menuCategories || [];
-        const cat = cats.find(c => c.id === item.cat);
+        const cat = cats.find(c => c.id === item.cat) ||
+                    cats.find(c => c.id === item.cats?.[0]) ||
+                    (item.parentId ? cats.find(c => c.id === (useStore.getState().menuItems||[]).find(m=>m.id===item.parentId)?.cat) : null);
         return (cat?.defaultCourse ?? 1) === 0;
       })(),
       status: 'pending',
