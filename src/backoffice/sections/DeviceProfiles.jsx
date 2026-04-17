@@ -133,19 +133,8 @@ export default function DeviceProfiles() {
         if (!locId) throw new Error('Could not resolve location ID');
 
         const row = toDbRow(updated, locId);
-        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-        const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/device_profiles?on_conflict=id`, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates,return=minimal',
-          },
-          body: JSON.stringify([row]),
-        });
-        if (!res.ok) throw new Error(await res.text());
+        const { error } = await supabase.from('device_profiles').upsert(row, { onConflict: 'id' });
+        if (error) throw error;
         showToast(`"${updated.name}" saved`, 'success');
       } catch (err) {
         console.error('Profile save failed:', err);

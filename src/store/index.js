@@ -1002,13 +1002,8 @@ export const useStore = create((set, get) => ({
     const { activeTableId } = get();
     const applyQty = items => {
       const item = items.find(i => i.uid === itemUid);
-      if (!item) return items;
-      const newQty = item.qty + delta;
-      if (newQty <= 0) {
-        // Pending items can be removed by dragging to 0; committed items must be voided
-        if (item.status === 'sent' || item.voided) return items;
-        return items.filter(i => i.uid !== itemUid);
-      }
+      if (!item || item.voided) return items;
+      const newQty = Math.max(1, item.qty + delta); // Clamp at 1 — never auto-remove
       return items.map(i => i.uid === itemUid ? { ...i, qty: newQty } : i);
     };
     if (activeTableId) {

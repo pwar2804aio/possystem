@@ -58,6 +58,14 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.6.9', date: 'Apr 2026', label: 'Fix: profiles save, items no longer vanish on qty change',
+    changes: [
+      'Device profiles: raw fetch was returning 401 (anon key rejected for writes). Replaced with supabase client upsert which uses authenticated session — profiles now persist on refresh',
+      'Qty glitch: updateItemQty was removing items when qty hit 0 — rapid tapping would overshoot and silently delete items from the order. Now clamped at minimum 1. Only explicit void removes an item',
+      'Qty lag: unsubSessions now correctly skips Supabase flush for qty-only changes (item count unchanged, no sends, no covers change). Only meaningful cross-device events trigger a flush',
+    ],
+  },
   { version: '3.6.8', date: 'Apr 2026', label: 'Fix: device profiles now save and persist correctly', changes: ['addProfile had if (!isMock && locationId) guard — if locationId state was null (async getLocationId not yet resolved) the Supabase insert was skipped entirely. Profile appeared locally, disappeared on refresh', 'toDbRow was missing service_charge, is_master, sort_order columns — new profiles lost those fields', 'resolveLocId() helper always gets real locationId before any write — never saves with null location_id', 'Panel now closes immediately on save (optimistic) before the network request completes', 'Both save and addProfile now show correct error toast if Supabase write fails'] },
   { version: '3.6.7', date: 'Apr 2026', label: 'Fix: device profile dropdown now shows real profiles', changes: ['ProfileSelect in Devices page was calling getProfiles() statically at render time — never updated when Supabase loaded profiles into localStorage', 'Now uses useState + useEffect to fetch profiles from Supabase directly on mount, and listens for localStorage changes', 'The hardcoded DEFAULT_PROFILES fallback (Main counter / Bar terminal / Server handheld) no longer appears once real profiles are loaded'] },
   {
