@@ -58,6 +58,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.6.0', date: 'Apr 2026', label: 'Full system hardening — data integrity milestone',
+    changes: [
+      'Service charge backfill: deviceConfig always gets serviceCharge from profile on every device validation — no more stale sessions missing SC',
+      'DataSafe triple-write: closed checks localStorage → Supabase, reconcile on boot and reconnect, periodic 60s sync',
+      'Open orders report fixed: activeSessions derived from tables[], was always undefined',
+      'Reports revenue: live Supabase fetch with locationId fallback, falls back to store if needed',
+      'Modifier groups load from Supabase on POS boot — no Push to POS needed',
+      'AI assistant: 9 new tools, all reporting queries hit Supabase directly for cross-device accuracy',
+      'Realtime closed_checks subscription: all devices receive new payments instantly',
+      'SQL editor: dedicated Restaurant OS Schema Changes snippet — no more editing wrong saved queries',
+    ],
+  },
+  {
     version: '3.5.99', date: 'Apr 2026', label: 'Reports: revenue now shows correctly',
     changes: [
       'BOReports todayLive fetch: getLocationId() was returning null in back office context — added fallback to rpos-device localStorage and store',
@@ -1683,6 +1696,17 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             useStore.getState().setDeviceConfig(minConfig);
           }
         } catch(e) {}
+      }
+      // Always ensure serviceCharge is in deviceConfig (backfill for existing sessions)
+      const currentConfig = useStore.getState().deviceConfig;
+      if (currentConfig && !currentConfig.serviceCharge && currentConfig.profileId) {
+        try {
+          const profiles = JSON.parse(localStorage.getItem('rpos-device-profiles') || '[]');
+          const match = profiles.find(p => p.id === currentConfig.profileId);
+          if (match?.serviceCharge) {
+            useStore.getState().setDeviceConfig({ ...currentConfig, serviceCharge: match.serviceCharge });
+          }
+        } catch {}
       }
       setDeviceValid(true);
     };
