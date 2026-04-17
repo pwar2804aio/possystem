@@ -59,13 +59,34 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
-    version: '3.9.2', date: 'Apr 2026', label: 'Modifier overhaul — quantity select, unified min/max, auto-sync',
+    version: '3.9.4', date: 'Apr 2026', label: 'Fix: modifier images inherit from sub-items automatically',
     changes: [
-      'Multi-quantity modifier selection: tap to add (+1 per tap up to max), shows count badge, minus button to remove one. e.g. select Donut 1 x2, Donut 3 x1 in a box of 3',
-      'Unified min/max: POS now inherits min/max from the Modifier Group definition only. Per-item override removed. One source of truth.',
-      'Auto-sync: on boot, back office detects any items that only exist locally (not in Supabase) and writes them automatically. Fixes Box of 3 and prevents data loss permanently.',
-      'Item editor Modifiers tab now shows group max from definition instead of editable override',
-      'image field now mapped when loading items from Supabase',
+      'Modifier option images now inherit automatically from the matching sub-item menu item — set the image once on the item, it shows everywhere',
+      'No more per-option image upload on modifier groups — image is the single source of truth on the item itself',
+      'Modifier editor shows a live preview of the inherited image (or ghost icon if none set)',
+      'Works for all modes: quantity picker, checkbox multi-select, and radio single-select',
+      'resolveOptImage() checks option\'s own image first, then looks up sub-item by name match (case-insensitive)',
+    ],
+  },
+  {
+    version: '3.9.3', date: 'Apr 2026', label: 'Fix: modifier +/− buttons completely broken — root cause fixed',
+    changes: [
+      'ModifierStep is a separate child function component — setSelections, addMulti, removeMulti were defined in the parent InlineItemFlow and NOT in scope inside ModifierStep',
+      'Every +/− click silently threw a ReferenceError that React swallowed — buttons appeared to do nothing',
+      'Fix: added onQtyChange(groupId, optId, delta) prop — parent defines it with full setSelections access, child just calls it',
+      'Fix: multi-select + button now correctly calls onAddMulti (was calling undefined addMulti)',
+      'Fix: multi-select − button now correctly calls onRemoveMulti (was calling undefined removeMulti)',
+      'All three modifier modes now work correctly: quantity picker, multi-select checkboxes, single-select radio',
+    ],
+  },
+  {
+    version: '3.9.2', date: 'Apr 2026', label: 'Modifier overhaul — unified 3-mode picker, single source of truth',
+    changes: [
+      'Modifier Group editor: new unified 3-mode picker — Pick 1 (radio) / Pick many (checkboxes) / Pick with qty (counters, repeats allowed)',
+      'Max picks buttons: 2, 3, 4, 5, ∞ or custom N — single click, no hidden toggle',
+      'Required/Optional moved to compact toggle pair below the mode picker',
+      'Per-item min/max overrides removed from Flow tab and Modifiers tab — group definition is the single source of truth',
+      'Orphaned duplicate rendering block removed from InlineItemFlow (was dead code causing parse confusion)',
     ],
   },
   {
