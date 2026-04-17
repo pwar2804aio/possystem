@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '3.7.0', date: 'Apr 2026', label: 'Fix: device profiles finally save correctly',
+    changes: [
+      'Root cause: DeviceProfiles.jsx only imported isMock from supabase — supabase client and getLocationId were missing from the top-level import. Dynamic imports inside resolveLocId and loadFromDB did not resolve correctly in the Vite bundle, so supabase.upsert was never called',
+      'Fixed: added supabase and getLocationId to the top-level import. Removed all dynamic imports inside the component. The supabase client used in save/addProfile is now the same authenticated instance used by all other back office operations',
+    ],
+  },
+  {
     version: '3.6.9', date: 'Apr 2026', label: 'Fix: profiles save, items no longer vanish on qty change',
     changes: [
       'Device profiles: raw fetch was returning 401 (anon key rejected for writes). Replaced with supabase client upsert which uses authenticated session — profiles now persist on refresh',

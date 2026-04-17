@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../../store';
-import { isMock } from '../../lib/supabase';
+import { supabase, isMock, getLocationId } from '../../lib/supabase';
 
 const SURFACES = [
   { id:'tables', label:'Floor plan', icon:'⬚', desc:'Opens to the table layout view' },
@@ -63,7 +63,7 @@ export default function DeviceProfiles() {
   useEffect(() => {
     if (isMock) { setProfiles(DEFAULT_PROFILES); return; }
     const loadFromDB = async () => {
-      const { getLocationId } = await import('../../lib/supabase.js');
+      
       const locId = await getLocationId().catch(() => null);
       if (!locId) return;
       setLocationId(locId);
@@ -103,7 +103,7 @@ export default function DeviceProfiles() {
   // Always resolve a real locationId — never save with null
   const resolveLocId = async () => {
     if (locationId) return locationId;
-    const { getLocationId } = await import('../../lib/supabase.js');
+    
     const id = await getLocationId().catch(() => null);
     if (id) setLocationId(id);
     return id;
