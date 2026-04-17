@@ -58,6 +58,15 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  {
+    version: '3.8.0', date: 'Apr 2026', label: 'AI: menu lookup fixed, always sees current data',
+    changes: [
+      'getStoreState was memoised with useCallback — if menu items loaded from Supabase after the AI panel opened, the snapshot was stale and the AI saw 0 items. Replaced with direct useStore.getState() call at execution time so every tool call reads live data.',
+      'get_menu_items: was filtering on i.categoryId but items from Supabase use i.cat — both fields now checked. Limit raised from 30 to 50 items.',
+      'add_to_order: now filters archived items out before searching, includes fallback matching in both directions, and shows available item names in the error message if not found.',
+      'get_item_detail: category lookup now checks both i.cat and i.categoryId.',
+    ],
+  },
   { version: '3.7.9', date: 'Apr 2026', label: 'Fix: deleted variants no longer reappear on refresh', changes: ['upsertMenuItem was using || for parent_id mapping — when parentId was set to null (on variant delete), || treated null as falsy and fell through to the old parent_id from the loaded item, writing the original value back to Supabase. Fixed to use explicit undefined check so null is correctly written as null.'] },
   {
     version: '3.7.8', date: 'Apr 2026', label: 'Fix: first item no longer vanishes. History syncing.',

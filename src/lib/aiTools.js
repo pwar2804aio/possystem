@@ -341,7 +341,7 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
         result: {
           found: true,
           items: matches.slice(0, 3).map(i => {
-            const cat = menuCategories.find(c => c.id === i.cat);
+            const cat = menuCategories.find(c => c.id === (i.cat || i.categoryId));
             const mods = (i.assignedModifierGroups || []).map(mg => {
               const group = modifierGroupDefs.find(g => g.id === (mg.groupId || mg));
               return group ? group.name : mg.groupId || mg;
@@ -364,18 +364,24 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
       const catFilter = toolInput.category?.toLowerCase();
       let items = menuItems.filter(i => !i.archived);
       if (catFilter) {
-        const cat = menuCategories.find(c => c.name?.toLowerCase().includes(catFilter));
-        if (cat) items = items.filter(i => i.categoryId === cat.id);
+        const cat = menuCategories.find(c =>
+          c.name?.toLowerCase().includes(catFilter) ||
+          c.label?.toLowerCase().includes(catFilter)
+        );
+        if (cat) items = items.filter(i => i.cat === cat.id || i.categoryId === cat.id);
       }
       return {
         result: {
           count: items.length,
-          items: items.slice(0, 30).map(i => ({
-            id:       i.id,
-            name:     i.name,
-            price:    `£${(i.price || 0).toFixed(2)}`,
-            category: menuCategories.find(c => c.id === i.categoryId)?.name || 'Unknown',
-          })),
+          items: items.slice(0, 50).map(i => {
+            const cat = menuCategories.find(c => c.id === (i.cat || i.categoryId));
+            return {
+              id:       i.id,
+              name:     i.name,
+              price:    `£${(i.price || 0).toFixed(2)}`,
+              category: cat?.name || cat?.label || 'Unknown',
+            };
+          }),
         },
       };
     }
@@ -510,11 +516,14 @@ export async function executeTool(toolName, toolInput, storeState = {}) {
       if (!activeTableId) {
         return { result: { error: 'No active order — staff must open a table or start an order on the POS first.' } };
       }
-      const query = toolInput.item_name?.toLowerCase() || '';
-      const item = menuItems.find(i => i.name?.toLowerCase() === query)
-                || menuItems.find(i => i.name?.toLowerCase().includes(query));
+      const query = toolInput.item_name?.toLowerCase().trim() || '';
+      const available = menuItems.filter(i => !i.archived);
+      const item = available.find(i => i.name?.toLowerCase() === query)
+                || available.find(i => i.name?.toLowerCase().includes(query))
+                || available.find(i => query.includes(i.name?.toLowerCase()));
       if (!item) {
-        return { result: { error: `No menu item found matching "${toolInput.item_name}". Check the menu and try again.` } };
+        const names = available.slice(0, 20).map(i => i.name).join(', ');
+        return { result: { error: `No menu item found matching "${toolInput.item_name}". Available items include: ${names}` } };
       }
       const qty = toolInput.qty || 1;
       return {

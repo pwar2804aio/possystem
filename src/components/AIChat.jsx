@@ -74,16 +74,21 @@ export default function AIChat({ mode = 'foh', initialContext = '', placeholder 
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading, pendingAction]);
 
-  const getStoreState = useCallback(() => ({
-    menuItems:         store.menuItems || [],
-    menuCategories:    store.menuCategories || [],
-    modifierGroupDefs: store.modifierGroupDefs || [],
-    closedChecks:      store.closedChecks || [],
-    tables:            store.tables || [],
-    activeTableId:     store.activeTableId || null,
-    walkInOrder:       store.walkInOrder || null,
-    eightySixIds:      store.eightySixIds || [],
-  }), [store]);
+  // Always read fresh from store.getState() — never use stale snapshot
+  // This ensures the AI always sees the current menu, even if items loaded after mount
+  const getStoreState = () => {
+    const s = useStore.getState();
+    return {
+      menuItems:         s.menuItems || [],
+      menuCategories:    s.menuCategories || [],
+      modifierGroupDefs: s.modifierGroupDefs || [],
+      closedChecks:      s.closedChecks || [],
+      tables:            s.tables || [],
+      activeTableId:     s.activeTableId || null,
+      walkInOrder:       s.walkInOrder || null,
+      eightySixIds:      s.eightySixIds || [],
+    };
+  };
 
   const getStoreActions = useCallback(() => ({
     addMenuItem:    store.addMenuItem,
