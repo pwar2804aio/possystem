@@ -1364,7 +1364,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
 
   // ── Modifier assignment ────────────────────────────────────────────────────
   const assignedMods = item.assignedModifierGroups || [];
-  const addMod    = gid => { if (assignedMods.find(ag=>ag.groupId===gid)) return; onUpdate({ assignedModifierGroups:[...assignedMods,{groupId:gid,min:0,max:1}] }); markBOChange(); setModSearch(''); };
+  const addMod    = gid => { if (assignedMods.find(ag=>ag.groupId===gid)) return; onUpdate({ assignedModifierGroups:[...assignedMods,{groupId:gid}] }); markBOChange(); setModSearch(''); };
   const removeMod = gid => { onUpdate({ assignedModifierGroups:assignedMods.filter(ag=>ag.groupId!==gid) }); markBOChange(); };
   const updateMod = (gid,patch) => { onUpdate({ assignedModifierGroups:assignedMods.map(ag=>ag.groupId===gid?{...ag,...patch}:ag) }); markBOChange(); };
   const reorderMods = (from, to) => {
@@ -1547,7 +1547,8 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
               const def = (modifierGroupDefs||[]).find(g => g.id === ag.groupId);
               if (!def) return null;
               const stepNum = isParent ? i+2 : i+1;
-              const isReq = (ag.min||0) > 0;
+              const isReq = (def.min||0) > 0; // read from group def — single source of truth
+              const modeLabel = def.selectionType==='quantity' ? `qty, up to ${def.max||'∞'}` : def.selectionType==='multiple' ? `up to ${def.max||'∞'}` : 'pick 1';
               return (
                 <div key={ag.groupId} draggable
                   onDragStart={()=>setDragModIdx(i)} onDragOver={e=>{e.preventDefault();setOverModIdx(i);}}
@@ -1558,10 +1559,9 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
                     <div style={{ width:22, height:22, borderRadius:'50%', background:isReq?'var(--red)':'var(--bg4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:isReq?'#fff':'var(--t3)', flexShrink:0 }}>{stepNum}</div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <span style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>{def.name}</span>
-                      {isReq && <span style={{ fontSize:9, fontWeight:700, color:'var(--red)', marginLeft:5 }}>REQUIRED</span>}
+                      <span style={{ fontSize:9, color:'var(--t4)', marginLeft:6 }}>{isReq?'required':'optional'} · {modeLabel}</span>
                     </div>
                     <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⠿</span>
-                    <button onClick={()=>updateMod(ag.groupId,{min:isReq?0:1})} style={{ padding:'2px 7px', borderRadius:6, cursor:'pointer', fontFamily:'inherit', fontSize:9, fontWeight:700, border:`1px solid ${isReq?'var(--red-b)':'var(--bdr)'}`, background:isReq?'var(--red-d)':'var(--bg3)', color:isReq?'var(--red)':'var(--t4)' }}>{isReq?'Required':'Optional'}</button>
                     <button onClick={()=>removeMod(ag.groupId)} style={{ width:22,height:22,borderRadius:6,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
                   </div>
                   <div style={{ paddingLeft:30 }}>
@@ -1718,19 +1718,19 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
                   {assignedMods.map((ag, i) => {
                     const def = (modifierGroupDefs||[]).find(g => g.id === ag.groupId);
                     if (!def) return null;
-                    const isReq = (ag.min||0) > 0;
+                    const isReq = (def.min||0) > 0; // single source of truth: group def
+                    const modeLabel = def.selectionType==='quantity' ? `qty pick, max ${def.max>=99?'∞':def.max}` : def.selectionType==='multiple' ? `multi, max ${def.max>=99?'∞':def.max}` : 'pick 1';
                     return (
                       <div key={ag.groupId} draggable
                         onDragStart={()=>setDragModIdx(i)} onDragOver={e=>{e.preventDefault();setOverModIdx(i);}}
                         onDrop={e=>{e.preventDefault();if(dragModIdx!==null&&dragModIdx!==i)reorderMods(dragModIdx,i);setDragModIdx(null);setOverModIdx(null);}}
                         onDragEnd={()=>{setDragModIdx(null);setOverModIdx(null);}}
-                        style={{ display:'grid', gridTemplateColumns:'18px 1fr auto auto auto', gap:6, alignItems:'center', padding:'8px 10px', marginBottom:5, borderRadius:9, border:`1.5px solid ${overModIdx===i?'var(--acc)':'var(--bdr)'}`, background:overModIdx===i?'var(--acc-d)':'var(--bg3)', opacity:dragModIdx===i?.4:1, cursor:'default' }}>
+                        style={{ display:'grid', gridTemplateColumns:'18px 1fr auto', gap:6, alignItems:'center', padding:'8px 10px', marginBottom:5, borderRadius:9, border:`1.5px solid ${overModIdx===i?'var(--acc)':'var(--bdr)'}`, background:overModIdx===i?'var(--acc-d)':'var(--bg3)', opacity:dragModIdx===i?.4:1, cursor:'default' }}>
                         <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⠿</span>
                         <div>
                           <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>{def.name}</div>
-                          <div style={{ fontSize:9, color:'var(--t4)' }}>{(def.options||[]).length} opts · max {def.max&&def.max<99?def.max:'∞'} from group def</div>
+                          <div style={{ fontSize:9, color:'var(--t4)' }}>{(def.options||[]).length} options · {isReq?'required':'optional'} · {modeLabel}</div>
                         </div>
-                        <button onClick={()=>updateMod(ag.groupId,{min:isReq?0:1})} style={{ padding:'2px 8px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:9, fontWeight:700, border:`1px solid ${isReq?'var(--red-b)':'var(--bdr)'}`, background:isReq?'var(--red-d)':'var(--bg2)', color:isReq?'var(--red)':'var(--t4)', whiteSpace:'nowrap' }}>{isReq?'Required':'Optional'}</button>
                         <button onClick={()=>removeMod(ag.groupId)} style={{ width:24,height:24,borderRadius:6,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
                       </div>
                     );
@@ -2123,28 +2123,50 @@ function ModifiersTab() {
 
           {/* Header */}
           <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
-            <input style={{ ...inp, fontSize:16, fontWeight:800, border:'none', background:'transparent', padding:'0 0 8px', color:'var(--t1)' }} value={sel.name} onChange={e=>upd({name:e.target.value})} placeholder="Group name"/>
+            <input style={{ ...inp, fontSize:16, fontWeight:800, border:'none', background:'transparent', padding:'0 0 10px', color:'var(--t1)' }} value={sel.name} onChange={e=>upd({name:e.target.value})} placeholder="Group name"/>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
-              {[[false,'Optional','Skip if desired'],[true,'Required','Must pick at least one']].map(([req,label,hint])=>{
-                const act = req?(sel.min||0)>0:!(sel.min>0);
-                return <button key={label} onClick={()=>upd({min:req?1:0})} style={{ padding:'7px 8px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`2px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:act?'var(--acc)':'var(--t2)' }}>{label}</div>
-                  <div style={{ fontSize:9, color:'var(--t4)' }}>{hint}</div>
-                </button>;
+            {/* ── UNIFIED SELECTION MODE PICKER ── */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
+              {[
+                { id:'single',   label:'Pick 1',         hint:'Customer picks exactly one option',          icon:'◉' },
+                { id:'multiple', label:'Pick many',       hint:'Different options, each selectable once',    icon:'☑' },
+                { id:'quantity', label:'Pick with qty',   hint:'Same option can be chosen more than once',   icon:'＋' },
+              ].map(mode => {
+                const act = sel.selectionType === mode.id || (!sel.selectionType && mode.id === 'single');
+                return (
+                  <button key={mode.id} onClick={()=>upd({
+                    selectionType: mode.id,
+                    max: mode.id==='single' ? 1 : (sel.max||1)===1 ? 3 : (sel.max||3),
+                    min: sel.min||0,
+                  })} style={{ padding:'8px 8px 7px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`2px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)' }}>
+                    <div style={{ fontSize:15, marginBottom:3 }}>{mode.icon}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:act?'var(--acc)':'var(--t2)' }}>{mode.label}</div>
+                    <div style={{ fontSize:9, color:'var(--t4)', lineHeight:1.4 }}>{mode.hint}</div>
+                  </button>
+                );
               })}
             </div>
 
-            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <span style={{ fontSize:11, fontWeight:600, color:'var(--t3)' }}>Max picks:</span>
-              {[['1','1 only',1],['∞','Unlimited',99]].map(([l,h,v])=>{
-                const act = v===1?(sel.max||1)===1:maxUnlimited&&(sel.max||1)!==1;
-                return <button key={l} onClick={()=>upd({max:v,selectionType:v===1?'single':'multiple'})} style={{ padding:'3px 10px', borderRadius:12, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)' }} title={h}>{l}</button>;
-              })}
-              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                <span style={{ fontSize:10, color:'var(--t4)' }}>Custom:</span>
-                <input type="number" min="2" max="20" style={{ ...inp, width:48, padding:'3px 6px', fontSize:11 }} value={!maxUnlimited&&(sel.max||1)!==1?sel.max:''} placeholder="N" onChange={e=>upd({max:parseInt(e.target.value)||2,selectionType:'multiple'})}/>
+            {/* ── REQUIRED / OPTIONAL + MAX (hidden for single) ── */}
+            <div style={{ display:'grid', gridTemplateColumns: sel.selectionType==='single' ? '1fr' : '1fr 1fr', gap:6 }}>
+              {/* Required/Optional */}
+              <div style={{ display:'flex', gap:5 }}>
+                {[[false,'Optional'],[true,'Required']].map(([req,label])=>{
+                  const act = req?(sel.min||0)>0:!(sel.min>0);
+                  return <button key={label} onClick={()=>upd({min:req?1:0})} style={{ flex:1, padding:'5px 6px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', textAlign:'center', border:`1.5px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', fontSize:10, fontWeight:act?700:400, color:act?'var(--acc)':'var(--t3)' }}>{label}</button>;
+                })}
               </div>
+              {/* Max picks — only shown for multi/quantity */}
+              {sel.selectionType !== 'single' && (
+                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  <span style={{ fontSize:10, color:'var(--t4)', flexShrink:0 }}>Max picks:</span>
+                  {[['2',2],['3',3],['4',4],['5',5],['∞',99]].map(([l,v])=>{
+                    const act = v===99 ? (sel.max||0)>=99 : (sel.max||3)===v;
+                    return <button key={l} onClick={()=>upd({max:v})} style={{ width:28, height:28, borderRadius:7, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:act?700:400, border:`1px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)', color:act?'var(--acc)':'var(--t3)', flexShrink:0 }}>{l}</button>;
+                  })}
+                  <input type="number" min="2" max="50" style={{ ...inp, width:44, padding:'3px 5px', fontSize:11 }} value={(sel.max||3)<99&&![2,3,4,5].includes(sel.max||3)?sel.max:''} placeholder="N" onChange={e=>upd({max:parseInt(e.target.value)||2})}/>
+                </div>
+              )}
             </div>
           </div>
 

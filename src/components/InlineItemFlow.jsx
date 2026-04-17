@@ -99,15 +99,17 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
     modGroups.forEach(g => {
       const isRequired = g.required || (g.min || 0) > 0;
       const sel = selections[g.id];
-      // Check top-level group
       if (isRequired) {
-        if (Array.isArray(sel) ? sel.length < (g.min || 1) : !sel) {
-          missing.push(g);
-          return; // if top-level not filled, don't check its sub-group
+        // Quantity mode: sel is { optionId: qty }, count total qty
+        if (g.selectionType === 'quantity') {
+          const totalQty = Object.values(sel || {}).reduce((s, n) => s + (n || 0), 0);
+          if (totalQty < (g.min || 1)) { missing.push(g); return; }
+        } else if (Array.isArray(sel) ? sel.length < (g.min || 1) : !sel) {
+          missing.push(g); return;
         }
       }
-      // Check required nested sub-group: if the selected option has a subGroupId
-      const selOpt = !Array.isArray(sel) ? sel : null;
+      // Check required nested sub-group
+      const selOpt = !Array.isArray(sel) && g.selectionType !== 'quantity' ? sel : null;
       if (selOpt?.subGroupId) {
         const subDef = modifierGroupDefs?.find(d => d.id === selOpt.subGroupId);
         if (subDef && ((subDef.min || 0) > 0)) {
@@ -122,8 +124,19 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
 
   const canAdd = step === 'variant' ? false : missingRequired.length === 0;
 
-  const extraCost = Object.values(selections).flat().filter(Boolean)
-    .reduce((s, m) => s + (m?.price || 0), 0);
+  const extraCost = modGroups.reduce((total, group) => {
+    const cur = selections[group.id];
+    if (!cur) return total;
+    if (group.selectionType === 'quantity') {
+      // cur is { optionId: qty }
+      return total + Object.entries(cur).reduce((s, [id, qty]) => {
+        const opt = (group.options||[]).find(o => (o.id||o.name) === id);
+        return s + (opt?.price || 0) * (qty || 0);
+      }, 0);
+    }
+    const arr = Array.isArray(cur) ? cur : (cur ? [cur] : []);
+    return total + arr.reduce((s, m) => s + (m?.price || 0), 0);
+  }, 0);
   const basePrice = selectedVariant
     ? (selectedVariant.pricing?.base ?? selectedVariant.price ?? 0)
     : (item.pricing?.base ?? item.price ?? 0);
@@ -134,6 +147,19 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
     const mods = Object.entries(selections).flatMap(([gid, val]) => {
       if (!val) return [];
       const group = modGroups.find(g => g.id === gid);
+      // Quantity mode: { optionId: qty } → expand to flat mods with qty label
+      if (group?.selectionType === 'quantity') {
+        return Object.entries(val).filter(([,q]) => q > 0).map(([id, qty]) => {
+          const opt = (group.options||[]).find(o => (o.id||o.name) === id);
+          const label = opt?.name || opt?.label || id;
+          return {
+            groupLabel: group.name || group.label,
+            label: qty > 1 ? `${label} ×${qty}` : label,
+            price: (opt?.price || 0) * qty,
+            qty,
+          };
+        });
+      }
       const arr = Array.isArray(val) ? val : [val];
       return arr.filter(Boolean).map(m => ({
         groupLabel: group?.name || group?.label,
@@ -337,15 +363,22 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
       {modGroups.map(group => {
-        const isRequired  = group.required || (group.min || 0) > 0;
-        const isMissing   = missingRequired.includes(group.id);
-        const max         = group.max >= 99 || !group.max ? 999 : group.max;
-        const isMulti     = max > 1;
-        const cur         = selections[group.id];
-        const selectedCount = Array.isArray(cur) ? cur.length : (cur ? 1 : 0);
+        const isRequired    = group.required || (group.min || 0) > 0;
+        const isMissing     = missingRequired.includes(group.id);
+        const maxPicks      = group.max >= 99 || !group.max ? 999 : group.max;
+        const minPicks      = group.min || 0;
+        const isQuantityMode = group.selectionType === 'quantity'; // same option multiple times
+        const isMulti        = maxPicks > 1;
+        const cur            = selections[group.id];
+        // Total picks across all options
+        const totalPicked    = isQuantityMode
+          ? Object.values(cur || {}).reduce((s, n) => s + (n || 0), 0)
+          : Array.isArray(cur) ? cur.length : (cur ? 1 : 0);
+        const atMax          = isMulti && totalPicked >= maxPicks;
 
         return (
           <div key={group.id} style={{ padding: isMissing ? '10px 12px' : 0, borderRadius: isMissing ? 12 : 0, border: isMissing ? '2px solid var(--red-b)' : 'none', background: isMissing ? 'var(--red-d)' : 'transparent', transition: 'all .2s' }}>
+            {/* Header */}
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
               <span style={{ fontSize:12, fontWeight:800, color:'var(--t1)', textTransform:'uppercase', letterSpacing:'.06em' }}>
                 {group.name || group.label}
@@ -355,99 +388,154 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
               ) : (
                 <span style={{ fontSize:10, color:'var(--t4)' }}>Optional</span>
               )}
-              {isMulti && max < 99 && <span style={{ fontSize:10, color:'var(--t4)' }}>· pick up to {max}</span>}
-              {selectedCount > 0 && <span style={{ fontSize:10, fontWeight:700, color:'var(--grn)', marginLeft:'auto' }}>✓ {selectedCount} selected</span>}
+              {isMulti && maxPicks < 999 && (
+                <span style={{ fontSize:10, color:'var(--t4)' }}>
+                  · {minPicks > 0 && minPicks === maxPicks ? `choose ${maxPicks}` : `up to ${maxPicks}`}
+                </span>
+              )}
+              {/* Running tally */}
+              {totalPicked > 0 && (
+                <span style={{ fontSize:10, fontWeight:700, color: atMax ? 'var(--grn)' : 'var(--acc)', marginLeft:'auto' }}>
+                  {atMax ? `✓ ${totalPicked}` : `${totalPicked}${maxPicks < 999 ? `/${maxPicks}` : ''}`} picked
+                </span>
+              )}
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:8 }}>
-              {(group.options || []).map(opt => {
-                const id = opt.id || opt.label || opt.name;
-                // How many times this specific option is selected
-                const optQty = isMulti
-                  ? (cur || []).filter(o => (o.id || o.label) === id).length
-                  : (cur?.id === id || cur?.label === id ? 1 : 0);
-                const isSel = optQty > 0;
-                const atMax = isMulti && selectedCount >= max;
+            {/* QUANTITY MODE: +/- counter per option */}
+            {isQuantityMode ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {(group.options || []).map(opt => {
+                  const id = opt.id || opt.label || opt.name;
+                  const optQty = (cur || {})[id] || 0;
+                  const canAdd = !atMax || optQty > 0; // can always reduce; can only add if not at max
 
-                return (
-                  <div key={id} style={{ position:'relative' }}>
-                    <button
-                      onClick={() => {
-                        if (isMulti) {
-                          // Always add (up to max) — never deselect on tap
-                          if (!atMax) addMulti(group.id, { ...opt, id, label: opt.name || opt.label || id }, max);
-                        } else {
-                          onToggleSingle(group.id, { ...opt, id, label: opt.name || opt.label || id });
-                        }
-                      }}
-                      style={{
-                        width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
-                        padding: opt.image ? '8px 14px' : '12px 14px',
-                        borderRadius:12,
-                        cursor: atMax && !isSel ? 'not-allowed' : 'pointer',
-                        fontFamily:'inherit', textAlign:'left', transition:'all .1s',
-                        border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr)'}`,
-                        background: isSel ? 'var(--acc-d)' : 'var(--bg2)',
-                        opacity: atMax && !isSel ? 0.4 : 1,
-                        paddingRight: isSel && isMulti ? 40 : 14,
-                      }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                        {/* Modifier option image */}
-                        {opt.image && (
-                          <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0, border:`1px solid ${isSel?'var(--acc)':'var(--bdr)'}` }}>
-                            <img src={opt.image} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                          </div>
-                        )}
-                        {/* Checkbox / radio indicator */}
-                        <div style={{ width:18, height:18, borderRadius: isMulti ? 4 : '50%', border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr2)'}`, background: isSel ? 'var(--acc)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                          {isSel && <div style={{ width:6, height:6, borderRadius: isMulti ? 2 : '50%', background:'#0b0c10' }}/>}
+                  return (
+                    <div key={id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:12, border:`2px solid ${optQty > 0 ? 'var(--acc)' : 'var(--bdr)'}`, background: optQty > 0 ? 'var(--acc-d)' : 'var(--bg2)', transition:'all .1s' }}>
+                      {/* Image */}
+                      {opt.image && (
+                        <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0 }}>
+                          <img src={opt.image} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                         </div>
-                        <span style={{ fontSize:13, fontWeight: isSel ? 700 : 400, color: isSel ? 'var(--acc)' : 'var(--t1)' }}>
-                          {opt.name || opt.label}
-                        </span>
-                      </div>
-                      {(opt.price || 0) > 0 && (
-                        <span style={{ fontSize:12, fontWeight:700, color: isSel ? 'var(--acc)' : 'var(--t3)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
-                          +£{opt.price.toFixed(2)}
-                        </span>
                       )}
-                    </button>
-
-                    {/* Quantity badge + minus button — only for multi-select when selected */}
-                    {isSel && isMulti && (
-                      <div style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center', gap:3 }}>
+                      {/* Name + price */}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight: optQty > 0 ? 700 : 400, color: optQty > 0 ? 'var(--acc)' : 'var(--t1)' }}>
+                          {opt.name || opt.label}
+                        </div>
+                        {(opt.price || 0) > 0 && (
+                          <div style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--font-mono)' }}>+£{opt.price.toFixed(2)} each</div>
+                        )}
+                      </div>
+                      {/* Qty controls */}
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
                         <button
-                          onClick={e => { e.stopPropagation(); const all=(cur||[]).filter(o=>(o.id||o.label)===id); removeMulti(group.id, all[all.length-1]?._uid); }}
-                          style={{ width:22, height:22, borderRadius:6, border:'1.5px solid var(--acc)', background:'var(--acc-d)', color:'var(--acc)', cursor:'pointer', fontFamily:'inherit', fontSize:15, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>
+                          onClick={() => setSelections(s => {
+                            const prev = (s[group.id] || {})[id] || 0;
+                            const next = Math.max(0, prev - 1);
+                            const updated = { ...(s[group.id] || {}), [id]: next };
+                            if (next === 0) delete updated[id];
+                            return { ...s, [group.id]: updated };
+                          })}
+                          disabled={optQty === 0}
+                          style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${optQty>0?'var(--acc)':'var(--bdr)'}`, background:optQty>0?'var(--acc-d)':'var(--bg3)', color:optQty>0?'var(--acc)':'var(--t4)', cursor:optQty>0?'pointer':'default', fontSize:18, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'inherit' }}>
                           −
                         </button>
-                        <span style={{ fontSize:13, fontWeight:900, color:'var(--acc)', minWidth:16, textAlign:'center' }}>
+                        <span style={{ fontSize:18, fontWeight:900, color: optQty > 0 ? 'var(--acc)' : 'var(--t4)', minWidth:24, textAlign:'center', fontFamily:'var(--font-mono)' }}>
                           {optQty}
                         </span>
+                        <button
+                          onClick={() => setSelections(s => {
+                            const prev = (s[group.id] || {})[id] || 0;
+                            if (atMax) return s; // can't add more total
+                            const updated = { ...(s[group.id] || {}), [id]: prev + 1 };
+                            return { ...s, [group.id]: updated };
+                          })}
+                          disabled={atMax}
+                          style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${atMax?'var(--bdr)':'var(--acc)'}`, background:atMax?'var(--bg3)':'var(--acc)', color:atMax?'var(--t4)':'#0b0c10', cursor:atMax?'not-allowed':'pointer', fontSize:18, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'inherit', opacity:atMax?0.4:1 }}>
+                          +
+                        </button>
                       </div>
-                    )}
+                    </div>
+                  );
+                })}
+                {/* Summary chips */}
+                {totalPicked > 0 && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
+                    {Object.entries(cur || {}).filter(([,q])=>q>0).map(([id, q]) => {
+                      const opt = (group.options||[]).find(o=>(o.id||o.name)===id);
+                      const label = opt?.name || opt?.label || id;
+                      return <span key={id} style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:12, background:'var(--acc)', color:'#0b0c10' }}>{q > 1 ? `${label} ×${q}` : label}</span>;
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </div>
+            ) : (
+              /* STANDARD MODE: checkbox (multi) or radio (single) */
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:8 }}>
+                {(group.options || []).map(opt => {
+                  const id = opt.id || opt.label || opt.name;
+                  const optQty = isMulti
+                    ? (cur || []).filter(o => (o.id || o.label) === id).length
+                    : (cur?.id === id || cur?.label === id ? 1 : 0);
+                  const isSel = optQty > 0;
 
-            {/* Running tally chips for multi-select */}
-            {isMulti && Array.isArray(cur) && cur.length > 0 && (() => {
-              // Group by option label for compact display
-              const tally = {};
-              cur.forEach(o => { const k = o.name||o.label; tally[k] = (tally[k]||0)+1; });
-              return (
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:8 }}>
-                  {Object.entries(tally).map(([label, qty]) => (
-                    <span key={label} style={{ fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:12, background:'var(--acc)', color:'#0b0c10' }}>
-                      {qty > 1 ? `${label} ×${qty}` : label}
-                    </span>
-                  ))}
-                </div>
-              );
-            })()}
-            {/* Nested modifier: if selected option has subGroupId, show linked group */}
-            {(() => {
+                  return (
+                    <div key={id} style={{ position:'relative' }}>
+                      <button
+                        onClick={() => {
+                          if (isMulti) {
+                            if (!atMax) addMulti(group.id, { ...opt, id, label: opt.name || opt.label || id }, maxPicks);
+                          } else {
+                            onToggleSingle(group.id, { ...opt, id, label: opt.name || opt.label || id });
+                          }
+                        }}
+                        style={{
+                          width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+                          padding: opt.image ? '8px 14px' : '12px 14px',
+                          borderRadius:12,
+                          cursor: atMax && !isSel ? 'not-allowed' : 'pointer',
+                          fontFamily:'inherit', textAlign:'left', transition:'all .1s',
+                          border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr)'}`,
+                          background: isSel ? 'var(--acc-d)' : 'var(--bg2)',
+                          opacity: atMax && !isSel ? 0.4 : 1,
+                          paddingRight: isSel && isMulti ? 40 : 14,
+                        }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                          {opt.image && (
+                            <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0, border:`1px solid ${isSel?'var(--acc)':'var(--bdr)'}` }}>
+                              <img src={opt.image} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                            </div>
+                          )}
+                          <div style={{ width:18, height:18, borderRadius: isMulti ? 4 : '50%', border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr2)'}`, background: isSel ? 'var(--acc)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                            {isSel && <div style={{ width:6, height:6, borderRadius: isMulti ? 2 : '50%', background:'#0b0c10' }}/>}
+                          </div>
+                          <span style={{ fontSize:13, fontWeight: isSel ? 700 : 400, color: isSel ? 'var(--acc)' : 'var(--t1)' }}>
+                            {opt.name || opt.label}
+                          </span>
+                        </div>
+                        {(opt.price || 0) > 0 && (
+                          <span style={{ fontSize:12, fontWeight:700, color: isSel ? 'var(--acc)' : 'var(--t3)', fontFamily:'var(--font-mono)', flexShrink:0 }}>
+                            +£{opt.price.toFixed(2)}
+                          </span>
+                        )}
+                      </button>
+                      {/* Qty badge + minus for multi */}
+                      {isSel && isMulti && (
+                        <div style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center', gap:3 }}>
+                          <button
+                            onClick={e => { e.stopPropagation(); const all=(cur||[]).filter(o=>(o.id||o.label)===id); removeMulti(group.id, all[all.length-1]?._uid); }}
+                            style={{ width:22, height:22, borderRadius:6, border:'1.5px solid var(--acc)', background:'var(--acc-d)', color:'var(--acc)', cursor:'pointer', fontFamily:'inherit', fontSize:15, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>−</button>
+                          <span style={{ fontSize:13, fontWeight:900, color:'var(--acc)', minWidth:16, textAlign:'center' }}>{optQty}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Nested sub-group for single-select */}
+            {!isQuantityMode && (() => {
               const selOpt = !isMulti ? cur : null;
               if (!selOpt?.subGroupId) return null;
               const subDef = allModDefs?.find(d => d.id === selOpt.subGroupId);
