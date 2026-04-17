@@ -258,6 +258,7 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
             modGroups={modGroups}
             instGroups={instGroups}
             allModDefs={modifierGroupDefs}
+            menuItems={menuItems}
             selections={selections}
             instSelections={instSelections}
             qty={qty}
@@ -357,7 +358,19 @@ function VariantStep({ item, variantChildren, onPick }) {
 }
 
 // ── Modifier step: sequential groups ─────────────────────────────────────────
-function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelections, qty, notes, missingRequired = [], onToggleSingle, onAddMulti, onRemoveMulti, onQtyChange, onToggleInst, onQty, onNotes }) {
+function ModifierStep({ modGroups, instGroups, allModDefs, menuItems, selections, instSelections, qty, notes, missingRequired = [], onToggleSingle, onAddMulti, onRemoveMulti, onQtyChange, onToggleInst, onQty, onNotes }) {
+  // Resolve image for a modifier option: option's own image > matching sub-item image
+  const resolveOptImage = (opt) => {
+    if (opt.image) return opt.image;
+    if (!menuItems) return null;
+    const name = opt.name || opt.label || '';
+    const match = menuItems.find(i =>
+      i.type === 'subitem' &&
+      !i.archived &&
+      (i.menuName || i.name || '').toLowerCase() === name.toLowerCase()
+    );
+    return match?.image || null;
+  };
   const hasContent = modGroups.length > 0 || instGroups.length > 0;
   if (!hasContent) {
     return (
@@ -415,13 +428,14 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                   const id = opt.id || opt.label || opt.name;
                   const optQty = (cur || {})[id] || 0;
                   const canAdd = !atMax || optQty > 0; // can always reduce; can only add if not at max
+                  const optImage = resolveOptImage(opt);
 
                   return (
                     <div key={id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:12, border:`2px solid ${optQty > 0 ? 'var(--acc)' : 'var(--bdr)'}`, background: optQty > 0 ? 'var(--acc-d)' : 'var(--bg2)', transition:'all .1s' }}>
-                      {/* Image */}
-                      {opt.image && (
+                      {/* Image — from option directly or inherited from matching sub-item */}
+                      {optImage && (
                         <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0 }}>
-                          <img src={opt.image} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                          <img src={optImage} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                         </div>
                       )}
                       {/* Name + price */}
@@ -474,6 +488,7 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                     ? (cur || []).filter(o => (o.id || o.label) === id).length
                     : (cur?.id === id || cur?.label === id ? 1 : 0);
                   const isSel = optQty > 0;
+                  const optImage = resolveOptImage(opt);
 
                   return (
                     <div key={id} style={{ position:'relative' }}>
@@ -487,7 +502,7 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                         }}
                         style={{
                           width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
-                          padding: opt.image ? '8px 14px' : '12px 14px',
+                          padding: optImage ? '8px 14px' : '12px 14px',
                           borderRadius:12,
                           cursor: atMax && !isSel ? 'not-allowed' : 'pointer',
                           fontFamily:'inherit', textAlign:'left', transition:'all .1s',
@@ -497,9 +512,9 @@ function ModifierStep({ modGroups, instGroups, allModDefs, selections, instSelec
                           paddingRight: isSel && isMulti ? 40 : 14,
                         }}>
                         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                          {opt.image && (
+                          {optImage && (
                             <div style={{ width:40, height:40, borderRadius:8, overflow:'hidden', flexShrink:0, border:`1px solid ${isSel?'var(--acc)':'var(--bdr)'}` }}>
-                              <img src={opt.image} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                              <img src={optImage} alt={opt.name||opt.label} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                             </div>
                           )}
                           <div style={{ width:18, height:18, borderRadius: isMulti ? 4 : '50%', border:`2px solid ${isSel ? 'var(--acc)' : 'var(--bdr2)'}`, background: isSel ? 'var(--acc)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
