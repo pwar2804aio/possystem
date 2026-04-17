@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.8.4', date: 'Apr 2026', label: 'Fix: variant delete definitively works', changes: ['upsertMenuItem was silently returning when getLocationId() had not yet resolved — no network call ever fired. Replaced all variant/size archive operations with direct supabase.from(menu_items).update({archived:true}).eq(id) calls which use the already-authenticated supabase client directly. No location ID lookup required.'] },
   {
     version: '3.8.3', date: 'Apr 2026', label: 'Fix: variants delete, modifiers fixed, Espresso modal gone',
     changes: [

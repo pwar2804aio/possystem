@@ -693,11 +693,15 @@ export const useStore = create((set, get) => ({
     set(s => ({ menuItems: [...s.menuItems, dupe] }));
   },
   archiveMenuItem: id => {
-    const fullItem = get().menuItems.find(i => i.id === id);
     set(s => ({
       menuItems: s.menuItems.map(item => item.id === id ? { ...item, archived: true } : item)
     }));
-    if (fullItem) upsertMenuItem({ ...fullItem, archived: true });
+    if (!isMock) {
+      supabase.from('menu_items')
+        .update({ archived: true, parent_id: null, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .then(({ error }) => { if (error) console.error('[Store] archiveMenuItem failed:', error.message); });
+    }
   },
 
   // ── Editable floor plan ────────────────────────────────────────────────────

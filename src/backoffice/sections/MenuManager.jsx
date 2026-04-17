@@ -794,7 +794,7 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
                       <span style={{ fontSize:10, color:(v.allergens||[]).length>0?'var(--red)':'var(--t4)' }}>
                         {(v.allergens||[]).length>0?(v.allergens||[]).length:''}
                       </span>
-                      <button onClick={e=>{e.stopPropagation();if(confirm('Remove this size?')){updateMenuItem(v.id,{archived:true,parentId:null});if(!isMock){const full={...menuItems.find(i=>i.id===v.id),...{archived:true,parentId:null,parent_id:null}};upsertMenuItem(full);}markBOChange();showToast('Size removed','info');}}} style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
+                      <button onClick={e=>{e.stopPropagation();if(confirm('Remove this size?')){updateMenuItem(v.id,{archived:true,parentId:null});if(!isMock){supabase.from('menu_items').update({archived:true,parent_id:null,updated_at:new Date().toISOString()}).eq('id',v.id).then(({error})=>{if(error)console.error('[MenuManager] size archive failed:',error.message);});}markBOChange();showToast('Size removed','info');}}} style={{ width:18,height:18,borderRadius:4,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
                     </div>
                   );
                 })}
@@ -1190,9 +1190,13 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClose, is86, o
   };
   const updVariant   = (id, patch) => { updateMenuItem(id, patch); markBOChange(); };
   const removeVariant = id => {
-    const full = { ...menuItems.find(i => i.id === id), archived: true, parentId: null, parent_id: null };
     updateMenuItem(id, { archived: true, parentId: null });
-    if (!isMock) upsertMenuItem(full);
+    if (!isMock) {
+      supabase.from('menu_items')
+        .update({ archived: true, parent_id: null, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .then(({ error }) => { if (error) console.error('[MenuManager] variant archive failed:', error.message); });
+    }
     markBOChange();
     showToast('Variant removed', 'info');
     if (variants.filter(v => v.id !== id).length === 0) onUpdate({ type: 'simple' });
