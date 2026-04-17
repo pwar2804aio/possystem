@@ -1230,8 +1230,11 @@ function ItemsLibrary() {
 // ── Item image upload ─────────────────────────────────────────────────────────
 function ItemImageUpload({ item, onUpdate, markBOChange, showToast }) {
   const [uploading, setUploading] = useState(false);
-  const { locationId } = useStore.getState();
-  const locId = locationId || (() => { try { return JSON.parse(localStorage.getItem('rpos-device-config')||'{}').locationId || JSON.parse(localStorage.getItem('rpos-bo-location')||'null') || '7218c716-eeb4-4f96-b284-f3500823595c'; } catch { return null; } })();
+  const [locId, setLocId] = useState(null);
+
+  useEffect(() => {
+    getLocationId().then(id => { if (id) setLocId(id); }).catch(() => {});
+  }, []);
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];

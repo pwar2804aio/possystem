@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.8.7', date: 'Apr 2026', label: 'Fix: image upload uses correct location ID', changes: ['ItemImageUpload now resolves location ID via getLocationId() async instead of hardcoded fallback'] },
   {
     version: '3.8.6', date: 'Apr 2026', label: 'New: Product images on POS and ordering platforms',
     changes: [
