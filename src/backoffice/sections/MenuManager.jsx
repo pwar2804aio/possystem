@@ -23,7 +23,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
-import { supabase, isMock } from '../../lib/supabase';
+import { supabase, isMock, getLocationId } from '../../lib/supabase';
 import { upsertMenuItem, uploadProductImage, deleteProductImage } from '../../lib/db';
 
 // ── Clone item helper ─────────────────────────────────────────────────────────
