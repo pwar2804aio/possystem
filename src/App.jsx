@@ -58,6 +58,7 @@ import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
 
 const CHANGELOG = [
+  { version: '3.8.1', date: 'Apr 2026', label: 'Fix: variant/size delete now persists to Supabase', changes: ['All db.js calls in store/index.js were dynamic imports — import(...).then(...). In the bundled output these were silently failing, meaning menu item updates (archive, parent_id clear) never reached Supabase. Replaced with static top-level import. Every menu write — variant delete, price update, 86, KDS ticket, closed check — now fires reliably.'] },
   {
     version: '3.8.0', date: 'Apr 2026', label: 'AI: menu lookup fixed, always sees current data',
     changes: [

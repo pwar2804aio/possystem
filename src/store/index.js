@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase, isMock, getLocationId } from '../lib/supabase';
 import { calculateOrderTax } from '../lib/tax';
 import { resolveServiceCharge } from '../lib/serviceCharge';
+import { upsertMenuItem, upsertFloorTable, insertKDSTicket, insertClosedCheck, toggle86DB } from '../lib/db';
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 const sbUpsertMenu = async (menu) => {
@@ -627,7 +628,7 @@ export const useStore = create((set, get) => ({
       // Write the FULL updated item to Supabase (not just the patch)
       const fullItem = items.find(i => i.id === id);
       if (fullItem) {
-        import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem(fullItem));
+        upsertMenuItem(fullItem);
       }
       return { menuItems: items };
     });
@@ -649,7 +650,7 @@ export const useStore = create((set, get) => ({
       pricing: item.pricing || { base, dineIn:null, takeaway:null, collection:null, delivery:null },
     };
     set(s => ({ menuItems: [...s.menuItems, newItem] }));
-    import('../lib/db.js').then(({ upsertMenuItem }) => upsertMenuItem(newItem));
+    upsertMenuItem(newItem);
     return newItem;
   },
 
@@ -699,12 +700,12 @@ export const useStore = create((set, get) => ({
   // Tables state already exists in `tables` — floor plan builder just edits positions
   updateTableLayout: (id, patch) => {
     set(s => ({ tables: s.tables.map(t => t.id===id ? { ...t, ...patch } : t) }));
-    import('../lib/db.js').then(({ upsertFloorTable }) => upsertFloorTable({ id, ...patch }));
+    upsertFloorTable({ id, ...patch });
   },
   addTableToLayout: (table) => {
     const newTable = { id:`t-${Date.now()}`, status:'available', session:null, ...table };
     set(s => ({ tables: [...s.tables, newTable] }));
-    import('../lib/db.js').then(({ upsertFloorTable }) => upsertFloorTable(newTable));
+    upsertFloorTable(newTable);
   },
   removeTableFromLayout: (id) => set(s => ({
     tables: s.tables.filter(t => t.id!==id && t.parentId!==id)
@@ -1208,7 +1209,7 @@ export const useStore = create((set, get) => ({
         }),
         kdsTickets: [...s.kdsTickets, ...newTickets],
       }));
-      import('../lib/db.js').then(({ insertKDSTicket }) => newTickets.forEach(t => insertKDSTicket(t)));
+      newTickets.forEach(t => insertKDSTicket(t));
       get().showToast('Sent to kitchen','success');
     } else {
       const order = get().walkInOrder;
@@ -1236,7 +1237,7 @@ export const useStore = create((set, get) => ({
         walkInOrder: { ...(s.walkInOrder||{}), ref, sentAt: Date.now(), items: (s.walkInOrder?.items||[]).map(i => [0,1].includes(i.course ?? 1) ? {...i, fired:true, status:'sent'} : i) },
         kdsTickets: [...s.kdsTickets, ...newTickets],
       }));
-      import('../lib/db.js').then(({ insertKDSTicket }) => newTickets.forEach(t => insertKDSTicket(t)));
+      newTickets.forEach(t => insertKDSTicket(t));
       get().showToast(customer?.name ? `Order sent — ${customer.name}` : 'Sent to kitchen', 'success');
     }
   },
@@ -1393,7 +1394,7 @@ export const useStore = create((set, get) => ({
     const is86 = get().eightySixIds.includes(id);
     set(s => ({ eightySixIds: is86 ? s.eightySixIds.filter(x=>x!==id) : [...s.eightySixIds, id] }));
     // Write to Supabase (no-op in mock mode)
-    import('../lib/db.js').then(({ toggle86DB }) => toggle86DB(id, is86));
+    toggle86DB(id, is86);
   },
 
   // ── Daily counts / par levels ──────────────────────────────────────────────
@@ -1525,7 +1526,7 @@ export const useStore = create((set, get) => ({
       taxBreakdown,
     };
     set(s => ({ closedChecks: [record, ...s.closedChecks] }));
-    import('../lib/db.js').then(({ insertClosedCheck }) => insertClosedCheck(record));
+    insertClosedCheck(record);
     return record;
   },
 
@@ -1539,7 +1540,7 @@ export const useStore = create((set, get) => ({
       ...record,
     };
     set(s => ({ closedChecks: [fullRecord, ...s.closedChecks] }));
-    import('../lib/db.js').then(({ insertClosedCheck }) => insertClosedCheck(fullRecord).catch(()=>{}));
+    insertClosedCheck(fullRecord).catch(()=>{});
     return fullRecord;
   },
 
@@ -1568,7 +1569,7 @@ export const useStore = create((set, get) => ({
       refunds: [],
     };
     set(s => ({ closedChecks: [record, ...s.closedChecks] }));
-    import('../lib/db.js').then(({ insertClosedCheck }) => insertClosedCheck(record));
+    insertClosedCheck(record);
     return record;
   },
 
