@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.7', date: 'Apr 2026', label: 'Spacer: drag works, persists to Supabase; course bug fully fixed',
+    changes: [
+      'SPACER PERSISTENCE: sbUpsertCategory in store was a separate function from upsertMenuCategory in db.js — spacer_slots was only added to db.js. Now added to sbUpsertCategory which is what actually fires when categories are updated.',
+      'SPACER DRAG: unified reorderGrid function handles dragging both items AND spacers in the same grid. Reassigns sequential sortOrders to all items and updates spacerSlots in one atomic operation.',
+      'SPACER REMOVE: x button calls removeSpacer which filters the spacer from the category spacerSlots and saves to Supabase immediately.',
+      'COURSE: sbUpsertCategory now correctly saves default_course — this is the real write path for course settings.',
+    ],
+  },
+  {
     version: '4.0.6', date: 'Apr 2026', label: 'Course bug fixed properly; spacer drag and remove working',
     changes: [
       'COURSE BUG: defaultCourse was never mapped from DB — default_course (snake_case) was not converted to defaultCourse (camelCase) when loading categories from Supabase. Every category defaulted to course 1 regardless of setting.',

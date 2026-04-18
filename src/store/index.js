@@ -40,6 +40,7 @@ const sbUpsertCategory = async (cat) => {
     accounting_group: cat.accountingGroup || '',
     sort_order: cat.sortOrder || 0,
     default_course: cat.defaultCourse ?? 1,
+    spacer_slots: cat.spacerSlots ?? [],
     updated_at: new Date().toISOString(),
   });
   if (error) console.error('[Supabase] menu_categories upsert error:', error);

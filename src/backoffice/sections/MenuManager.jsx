@@ -261,16 +261,34 @@ function MenuTab() {
     markBOChange();
   };
 
-  const moveSpacer = (spacerId, newSortOrder) => {
-    if (!selCat) return;
-    const existing = selCat.spacerSlots || [];
-    updateCategory(selCat.id, {
-      spacerSlots: existing.map(s =>
-        (s.id || s) === spacerId ? { ...s, sortOrder: newSortOrder } : s
-      )
+  // Unified reorder — handles dragging items AND spacers in the same grid
+  const reorderGrid = useCallback((dragId, targetId) => {
+    if (!dragId || dragId === targetId) return;
+    const all = gridWithSpacers;
+    const dragIdx = all.findIndex(i => i.id === dragId);
+    const targetIdx = all.findIndex(i => i.id === targetId);
+    if (dragIdx === -1 || targetIdx === -1) return;
+    // Build new order
+    const without = all.filter(i => i.id !== dragId);
+    const newTargetIdx = without.findIndex(i => i.id === targetId);
+    const insertAt = dragIdx < targetIdx ? newTargetIdx + 1 : newTargetIdx;
+    const reordered = [...without.slice(0, insertAt), all[dragIdx], ...without.slice(insertAt)];
+    // Assign new sortOrders sequentially
+    reordered.forEach((item, idx) => {
+      if (!item) return;
+      if (item._spacer) return; // spacers updated below
+      if ((item.sortOrder ?? 999) !== idx) updateMenuItem(item.id, { sortOrder: idx });
     });
+    // Update spacers with new sort orders
+    const newSpacers = reordered
+      .map((item, idx) => item._spacer ? { id: item.id, sortOrder: idx } : null)
+      .filter(Boolean);
+    if (selCat) {
+      updateCategory(selCat.id, { spacerSlots: newSpacers });
+    }
     markBOChange();
-  };
+    showToast('Order updated','success');
+  }, [gridWithSpacers, updateMenuItem, updateCategory, selCat, markBOChange, showToast]);
 
   const searchResults = useMemo(()=>{
     if (!search.trim()) return [];
@@ -634,19 +652,7 @@ function MenuTab() {
                       onDragOver={e=>{e.preventDefault();if(dragItemId&&dragItemId!==item.id)setOverItemId(item.id);}}
                       onDragLeave={()=>setOverItemId(null)}
                       onDragEnd={()=>{setDragItemId(null);setOverItemId(null);}}
-                      onDrop={e=>{
-                        e.preventDefault();
-                        if (!dragItemId || dragItemId===item.id) { setDragItemId(null); setOverItemId(null); return; }
-                        // Swap sort orders
-                        const draggedItem = gridWithSpacers.find(i=>i.id===dragItemId);
-                        if (draggedItem?._spacer) {
-                          moveSpacer(dragItemId, item.sortOrder ?? 999);
-                          moveSpacer(item.id, draggedItem.sortOrder ?? 999);
-                        } else {
-                          onItemDrop(e, item.id);
-                        }
-                        setDragItemId(null); setOverItemId(null);
-                      }}
+                      onDrop={e=>{e.preventDefault();reorderGrid(dragItemId,item.id);setDragItemId(null);setOverItemId(null);}}
                       style={{ position:'relative', borderRadius:14, minHeight:90, opacity:dragItemId===item.id?.3:1,
                         border:`2px dashed ${overItemId===item.id?'var(--acc)':'var(--bdr2)'}`,
                         background:overItemId===item.id?'var(--acc-d)':'var(--bg3)',
@@ -676,7 +682,7 @@ function MenuTab() {
                         onDragOver={e=>{e.preventDefault();if(dragItemId&&dragItemId!==item.id)setOverItemId(item.id);}}
                         onDragLeave={()=>setOverItemId(null)}
                         onDragEnd={()=>{setDragItemId(null);setOverItemId(null);}}
-                        onDrop={e=>{e.preventDefault();onItemDrop(e,item.id);}}
+                        onDrop={e=>{e.preventDefault();reorderGrid(dragItemId,item.id);}}
                         onClick={()=>setSelItemId(active?null:item.id)}
                         style={{
                           position:'relative', borderRadius:14, cursor:'pointer', userSelect:'none',
