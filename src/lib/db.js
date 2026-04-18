@@ -36,6 +36,8 @@ export const upsertMenuCategory = async (cat, locationId = LOCATION_ID) => {
     parent_id: cat.parentId ?? cat.parent_id ?? null,
     menu_id: cat.menuId ?? cat.menu_id ?? null,
     sort_order: cat.sortOrder ?? cat.sort_order ?? 0,
+    default_course: cat.defaultCourse ?? cat.default_course ?? 1,
+    spacer_slots: cat.spacerSlots ?? cat.spacer_slots ?? [],
     updated_at: new Date().toISOString(),
   });
   if (result.error) console.error('[DB] menu_categories upsert failed:', result.error.message);

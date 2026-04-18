@@ -230,43 +230,45 @@ function MenuTab() {
       .sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
   },[selCatId, menuCategories, menuItems]);
 
-  // Spacer slots for selected category — stored as sortOrder positions in category.spacerSlots
-  // Merged into displayGrid as { _spacer: true, _spacerIdx: n } objects between real items
+  // Spacers stored as [{id, sortOrder}] on selCat.spacerSlots
+  // Merged with gridItems by sortOrder — fully draggable via sortOrder updates
   const gridWithSpacers = useMemo(() => {
     if (!selCat) return gridItems;
-    const spacerSlots = selCat.spacerSlots || [];
-    if (!spacerSlots.length) return gridItems;
-    // Build merged list: insert spacer markers at their sort positions
-    const merged = [];
-    let si = 0;
-    const sorted = [...spacerSlots].sort((a,b)=>a-b);
-    for (const item of gridItems) {
-      while (si < sorted.length && sorted[si] <= (item.sortOrder??999)) {
-        merged.push({ _spacer: true, _spacerIdx: sorted[si], id: `spacer-${sorted[si]}` });
-        si++;
-      }
-      merged.push(item);
-    }
-    while (si < sorted.length) {
-      merged.push({ _spacer: true, _spacerIdx: sorted[si], id: `spacer-${sorted[si]}` });
-      si++;
-    }
-    return merged;
+    const spacers = (selCat.spacerSlots || []).map(s =>
+      typeof s === 'object' ? s : { id: `spacer-${s}`, sortOrder: s }
+    );
+    if (!spacers.length) return gridItems;
+    const all = [
+      ...gridItems.map(i => ({ ...i, _spacer: false })),
+      ...spacers.map(s => ({ ...s, _spacer: true })),
+    ].sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+    return all;
   }, [gridItems, selCat]);
 
   const addSpacer = () => {
     if (!selCat) return;
-    const maxSort = Math.max(...gridItems.map(i=>i.sortOrder??0), 0);
+    const maxSort = Math.max(...gridWithSpacers.map(i => i.sortOrder ?? 0), 0);
     const existing = selCat.spacerSlots || [];
-    const newSlot = maxSort + 0.5; // insert at end
-    updateCategory(selCat.id, { spacerSlots: [...existing, newSlot] });
+    const newSpacer = { id: `spacer-${Date.now()}`, sortOrder: maxSort + 1 };
+    updateCategory(selCat.id, { spacerSlots: [...existing, newSpacer] });
     markBOChange();
   };
 
-  const removeSpacer = (spacerIdx) => {
+  const removeSpacer = (spacerId) => {
     if (!selCat) return;
     const existing = selCat.spacerSlots || [];
-    updateCategory(selCat.id, { spacerSlots: existing.filter(s => s !== spacerIdx) });
+    updateCategory(selCat.id, { spacerSlots: existing.filter(s => (s.id || s) !== spacerId) });
+    markBOChange();
+  };
+
+  const moveSpacer = (spacerId, newSortOrder) => {
+    if (!selCat) return;
+    const existing = selCat.spacerSlots || [];
+    updateCategory(selCat.id, {
+      spacerSlots: existing.map(s =>
+        (s.id || s) === spacerId ? { ...s, sortOrder: newSortOrder } : s
+      )
+    });
     markBOChange();
   };
 
@@ -624,15 +626,36 @@ function MenuTab() {
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10 }}>
                 {gridWithSpacers.map(item=>{
-                  // Spacer cell — pure layout, no data, shown only in back office
+                  // Spacer cell — draggable blank layout cell
                   if (item._spacer) return (
-                    <div key={item.id} style={{ position:'relative', borderRadius:14, minHeight:90,
-                      border:'2px dashed var(--bdr2)', background:'var(--bg3)',
-                      display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:4 }}>
-                      <span style={{ fontSize:20, opacity:.15 }}>□</span>
+                    <div key={item.id}
+                      draggable
+                      onDragStart={e=>{setDragItemId(item.id);e.dataTransfer.effectAllowed='move';}}
+                      onDragOver={e=>{e.preventDefault();if(dragItemId&&dragItemId!==item.id)setOverItemId(item.id);}}
+                      onDragLeave={()=>setOverItemId(null)}
+                      onDragEnd={()=>{setDragItemId(null);setOverItemId(null);}}
+                      onDrop={e=>{
+                        e.preventDefault();
+                        if (!dragItemId || dragItemId===item.id) { setDragItemId(null); setOverItemId(null); return; }
+                        // Swap sort orders
+                        const draggedItem = gridWithSpacers.find(i=>i.id===dragItemId);
+                        if (draggedItem?._spacer) {
+                          moveSpacer(dragItemId, item.sortOrder ?? 999);
+                          moveSpacer(item.id, draggedItem.sortOrder ?? 999);
+                        } else {
+                          onItemDrop(e, item.id);
+                        }
+                        setDragItemId(null); setOverItemId(null);
+                      }}
+                      style={{ position:'relative', borderRadius:14, minHeight:90, opacity:dragItemId===item.id?.3:1,
+                        border:`2px dashed ${overItemId===item.id?'var(--acc)':'var(--bdr2)'}`,
+                        background:overItemId===item.id?'var(--acc-d)':'var(--bg3)',
+                        display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:4,
+                        cursor:'grab', transition:'all .1s' }}>
+                      <span style={{ fontSize:20, opacity:.2 }}>□</span>
                       <span style={{ fontSize:9, color:'var(--t4)', fontWeight:600, letterSpacing:'.05em' }}>SPACER</span>
-                      <button onClick={()=>removeSpacer(item._spacerIdx)}
-                        style={{ position:'absolute', top:4, right:4, width:18, height:18, borderRadius:5, border:'1px solid var(--bdr)', background:'var(--bg4)', color:'var(--t4)', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                      <button onClick={e=>{e.stopPropagation();removeSpacer(item.id);}}
+                        style={{ position:'absolute', top:4, right:4, width:18, height:18, borderRadius:5, border:'1px solid var(--bdr)', background:'var(--bg4)', color:'var(--t4)', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'inherit' }}>×</button>
                     </div>
                   );
 

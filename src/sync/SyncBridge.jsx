@@ -192,6 +192,8 @@ export default function SyncBridge({ onSyncPulse }) {
             label: cat.label ?? cat.name ?? 'Category',
             icon: cat.icon ?? '🍽',
             color: cat.color ?? '#3b82f6',
+            defaultCourse: cat.default_course ?? cat.defaultCourse ?? 1,
+            spacerSlots: cat.spacer_slots ?? cat.spacerSlots ?? [],
           }));
           if (menusRes.data?.length) patch.menus = menusRes.data;
           if (modGroupsRes.data?.length) patch.modifierGroupDefs = modGroupsRes.data.map(g => ({

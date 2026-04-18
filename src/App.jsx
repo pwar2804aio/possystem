@@ -59,6 +59,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.6', date: 'Apr 2026', label: 'Course bug fixed properly; spacer drag and remove working',
+    changes: [
+      'COURSE BUG: defaultCourse was never mapped from DB — default_course (snake_case) was not converted to defaultCourse (camelCase) when loading categories from Supabase. Every category defaulted to course 1 regardless of setting.',
+      'Fix: SyncBridge category mapping now includes defaultCourse: cat.default_course ?? cat.defaultCourse ?? 1',
+      'Fix: upsertMenuCategory now writes default_course correctly to Supabase',
+      'SPACER: spacer_slots column added to menu_categories in Supabase',
+      'SPACER: stored as [{id, sortOrder}] objects — fully draggable alongside items by sortOrder',
+      'SPACER: drag a spacer to reposition it between items. Items can also be dropped onto a spacer to swap positions.',
+      'SPACER: × button removes the spacer immediately',
+      'SPACER: shows as transparent empty cell on POS — invisible to customers',
+    ],
+  },
+  {
     version: '4.0.5', date: 'Apr 2026', label: 'Spacer: pure layout cell, no data model; course bug fixed',
     changes: [
       'Spacer is stored as spacerSlots[] on menuCategories — no fake menu items, no new tables, zero data model impact',

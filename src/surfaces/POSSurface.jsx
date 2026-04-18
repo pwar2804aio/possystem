@@ -151,23 +151,14 @@ export default function POSSurface() {
     }
     // Inject spacers from category config — pure layout cells, zero data
     const activeCat = menuCategories.find(c => c.id === (subCat || cat));
-    const spacerSlots = activeCat?.spacerSlots || [];
-    if (!spacerSlots.length) return items;
-    const merged = [];
-    let si = 0;
-    const sorted = [...spacerSlots].sort((a,b) => a-b);
-    for (const item of items) {
-      while (si < sorted.length && sorted[si] <= (item.sortOrder??999)) {
-        merged.push({ _spacer: true, id: `spacer-${sorted[si]}` });
-        si++;
-      }
-      merged.push(item);
-    }
-    while (si < sorted.length) {
-      merged.push({ _spacer: true, id: `spacer-${sorted[si]}` });
-      si++;
-    }
-    return merged;
+    const rawSpacers = activeCat?.spacerSlots || [];
+    if (!rawSpacers.length) return items;
+    const spacers = rawSpacers.map(s => typeof s === 'object' ? s : { id: `spacer-${s}`, sortOrder: s });
+    const all = [
+      ...items,
+      ...spacers.map(s => ({ _spacer: true, id: s.id, sortOrder: s.sortOrder })),
+    ].sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+    return all;
   }, [cat, subCat, subCategories, MENU_ITEMS, quickItems, menuCategories]);
 
   const displayItems = useMemo(() => {
