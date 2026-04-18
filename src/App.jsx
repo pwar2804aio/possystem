@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.9', date: 'Apr 2026', label: 'Native Android printer bridge — direct TCP to WiFi printers',
+    changes: [
+      'Android: PrinterBridge.java exposes window.RposPrinter to the React app via JavascriptInterface',
+      'Android: NetworkPrinter.java opens direct TCP socket to printer IP:9100 on background thread',
+      'Android: cash drawer triggered via ESC p command through the same TCP path',
+      'React: PrintService now checks for native bridge first, falls back to Supabase queue for browser testing',
+      'React: isNativeBridgeAvailable() exported so UI can show correct print transport status',
+      'Android: cleartext traffic enabled for local network printer IPs',
+      'No print agent required — printing is fully self-contained in the Android app',
+    ],
+  },
+  {
     version: '4.0.8', date: 'Apr 2026', label: 'Fix: spacers now persist after refresh',
     changes: [
       'Root cause: BackOfficeApp.jsx has its own category mapping from Supabase that did not include spacerSlots. On every back office load it overwrote menuCategories in the store, stripping spacerSlots.',

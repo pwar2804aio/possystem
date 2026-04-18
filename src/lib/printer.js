@@ -231,6 +231,44 @@ function browserPrint(html) {
   w.document.close();
 }
 
+
+// ─── Native Android/iOS bridge ────────────────────────────────────────────────
+// On Android: window.RposPrinter is injected by PrinterBridge.java
+// On iOS: window.RposPrinter will be injected by WKScriptMessageHandler (future)
+// On browser: window.RposPrinter is undefined → falls back to Supabase queue
+
+let _callbackCounter = 0;
+const _pendingCallbacks = {};
+
+// Called by Android Java via evaluateJavascript
+if (typeof window !== 'undefined') {
+  window.__rposPrintCallback = (callbackId, success, error) => {
+    const cb = _pendingCallbacks[callbackId];
+    if (cb) {
+      delete _pendingCallbacks[callbackId];
+      if (success) cb.resolve({ ok: true, transport: 'native' });
+      else cb.reject(new Error(error || 'Print failed'));
+    }
+  };
+}
+
+function nativePrint(bytes, printerAddress, port = 9100) {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.RposPrinter) {
+      reject(new Error('Native bridge not available'));
+      return;
+    }
+    const callbackId = 'cb_' + (++_callbackCounter);
+    _pendingCallbacks[callbackId] = { resolve, reject };
+    const base64 = btoa(String.fromCharCode(...bytes));
+    window.RposPrinter.print(base64, printerAddress, port, callbackId);
+  });
+}
+
+function isNativeBridgeAvailable() {
+  return typeof window !== 'undefined' && !!window.RposPrinter;
+}
+
 // ─── Print Service ────────────────────────────────────────────────────────────
 class PrintService {
   constructor() {
@@ -252,9 +290,23 @@ class PrintService {
     return this._printers.find(p => p.roles?.includes(role)) || this._printers[0] || null;
   }
 
-  // Submit a job to Supabase — the print agent picks it up instantly via realtime
+  // Submit a print job — prefers native TCP bridge, falls back to Supabase queue
   async _submitJob(printer, jobType, bytes) {
-    if (!supabase) throw new Error('Supabase not connected');
+    const ip = printer.address;
+    const port = printer.port || 9100;
+
+    // ── Path 1: Native Android/iOS bridge (direct TCP to printer) ──────────────
+    if (isNativeBridgeAvailable() && ip) {
+      try {
+        const result = await nativePrint(bytes, ip, port);
+        return { ...result, printer: printer.name };
+      } catch (e) {
+        console.warn('[Print] Native bridge failed, falling back to Supabase queue:', e.message);
+      }
+    }
+
+    // ── Path 2: Supabase queue → print agent on LAN (browser / fallback) ───────
+    if (!supabase) throw new Error('No print path available — native bridge not found and Supabase not connected');
 
     const locationId = await getLocationId();
     if (!locationId) throw new Error('No location ID');
@@ -264,15 +316,14 @@ class PrintService {
     const { error, data } = await supabase.from('print_jobs').insert({
       location_id: locationId,
       printer_id:  printer.id,
-      printer_ip:  printer.address,
-      printer_port: printer.port || 9100,
+      printer_ip:  ip,
+      printer_port: port,
       job_type:    jobType,
       payload,
       status:      'pending',
     }).select('id');
 
     if (error) throw new Error(`Supabase insert failed: ${error.message}`);
-    // Return jobId so callers can watch the job's outcome
     return { ok: true, transport: 'supabase', printer: printer.name, jobId: data?.[0]?.id };
   }
 
@@ -377,4 +428,4 @@ class PrintService {
 }
 
 export const printService = new PrintService();
-export { EscPosBuilder };
+export { EscPosBuilder, isNativeBridgeAvailable };

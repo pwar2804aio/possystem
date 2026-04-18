@@ -5,10 +5,12 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.*;
+import co.posup.rpos.printer.PrinterBridge;
 
 public class MainActivity extends Activity {
     private static final String POS_URL = "https://possystem-liard.vercel.app/?mode=pos";
     private WebView webView;
+    private PrinterBridge printerBridge;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,6 +29,10 @@ public class MainActivity extends Activity {
 
         webView = new WebView(this);
         setContentView(webView);
+
+        // Wire native printer bridge — exposes window.RposPrinter to React app
+        printerBridge = new PrinterBridge(webView);
+        webView.addJavascriptInterface(printerBridge, "RposPrinter");
 
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
@@ -102,5 +108,12 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         webView.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (printerBridge != null) printerBridge.destroy();
+        if (webView != null) webView.destroy();
     }
 }
