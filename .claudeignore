@@ -1,0 +1,38 @@
+# .claudeignore — files Claude should skip when reading the repo
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+coverage/
+.turbo/
+.cache/
+
+# Lockfiles (too large, not useful for Claude)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+*.log
+npm-debug.log*
+
+# Large binary/generated assets
+public/icons/
+public/icon-192.png
+public/icon-512.png
+public/apple-touch-icon.png
+src/assets/
+
+# Android build artifacts
+android/gradle/
+android/.gradle/
+android/build/
+
+# Environment files with secrets
+.env.local
+.env.*.local

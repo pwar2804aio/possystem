@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.8', date: 'Apr 2026', label: 'Fix: spacers now persist after refresh',
+    changes: [
+      'Root cause: BackOfficeApp.jsx has its own category mapping from Supabase that did not include spacerSlots. On every back office load it overwrote menuCategories in the store, stripping spacerSlots.',
+      'Fix: added spacerSlots: c.spacer_slots ?? c.spacerSlots ?? [] to BackOfficeApp category mapping.',
+      'Data in Supabase was correct all along (spacer_slots column exists, sbUpsertCategory writes it). Only the read path was broken.',
+    ],
+  },
+  {
     version: '4.0.7', date: 'Apr 2026', label: 'Spacer: drag works, persists to Supabase; course bug fully fixed',
     changes: [
       'SPACER PERSISTENCE: sbUpsertCategory in store was a separate function from upsertMenuCategory in db.js — spacer_slots was only added to db.js. Now added to sbUpsertCategory which is what actually fires when categories are updated.',

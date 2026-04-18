@@ -108,6 +108,7 @@ export default function BackOfficeApp() {
       accountingGroup: c.accounting_group ?? c.accountingGroup,
       sortOrder: c.sort_order ?? c.sortOrder,
       defaultCourse: c.default_course ?? c.defaultCourse ?? 1,
+      spacerSlots: c.spacer_slots ?? c.spacerSlots ?? [],
     }));
     if (itemsRes.data?.length)   patch.menuItems       = itemsRes.data.map(item => ({
       ...item,
