@@ -230,6 +230,46 @@ function MenuTab() {
       .sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999));
   },[selCatId, menuCategories, menuItems]);
 
+  // Spacer slots for selected category — stored as sortOrder positions in category.spacerSlots
+  // Merged into displayGrid as { _spacer: true, _spacerIdx: n } objects between real items
+  const gridWithSpacers = useMemo(() => {
+    if (!selCat) return gridItems;
+    const spacerSlots = selCat.spacerSlots || [];
+    if (!spacerSlots.length) return gridItems;
+    // Build merged list: insert spacer markers at their sort positions
+    const merged = [];
+    let si = 0;
+    const sorted = [...spacerSlots].sort((a,b)=>a-b);
+    for (const item of gridItems) {
+      while (si < sorted.length && sorted[si] <= (item.sortOrder??999)) {
+        merged.push({ _spacer: true, _spacerIdx: sorted[si], id: `spacer-${sorted[si]}` });
+        si++;
+      }
+      merged.push(item);
+    }
+    while (si < sorted.length) {
+      merged.push({ _spacer: true, _spacerIdx: sorted[si], id: `spacer-${sorted[si]}` });
+      si++;
+    }
+    return merged;
+  }, [gridItems, selCat]);
+
+  const addSpacer = () => {
+    if (!selCat) return;
+    const maxSort = Math.max(...gridItems.map(i=>i.sortOrder??0), 0);
+    const existing = selCat.spacerSlots || [];
+    const newSlot = maxSort + 0.5; // insert at end
+    updateCategory(selCat.id, { spacerSlots: [...existing, newSlot] });
+    markBOChange();
+  };
+
+  const removeSpacer = (spacerIdx) => {
+    if (!selCat) return;
+    const existing = selCat.spacerSlots || [];
+    updateCategory(selCat.id, { spacerSlots: existing.filter(s => s !== spacerIdx) });
+    markBOChange();
+  };
+
   const searchResults = useMemo(()=>{
     if (!search.trim()) return [];
     const q = search.toLowerCase();
@@ -466,6 +506,12 @@ function MenuTab() {
                 <span style={{ fontSize:10, color:'var(--t4)' }}>{displayItems.length} items</span>
               </div>
             )}
+            {selCat && !search && (
+              <button onClick={addSpacer} title="Add blank spacer cell to this category's grid"
+                style={{ padding:'5px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t3)', fontSize:11, fontWeight:600, flexShrink:0, marginLeft:'auto' }}>
+                + Spacer
+              </button>
+            )}
             <div style={{ position:'relative', flex:1, maxWidth:260 }}>
               <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'var(--t4)' }}>🔍</span>
               <input style={{ ...inp, paddingLeft:28, fontSize:12 }} placeholder="Search all items…" value={search} onChange={e=>setSearch(e.target.value)}/>
@@ -577,7 +623,19 @@ function MenuTab() {
               </div>
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10 }}>
-                {displayItems.map(item=>{
+                {gridWithSpacers.map(item=>{
+                  // Spacer cell — pure layout, no data, shown only in back office
+                  if (item._spacer) return (
+                    <div key={item.id} style={{ position:'relative', borderRadius:14, minHeight:90,
+                      border:'2px dashed var(--bdr2)', background:'var(--bg3)',
+                      display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:4 }}>
+                      <span style={{ fontSize:20, opacity:.15 }}>□</span>
+                      <span style={{ fontSize:9, color:'var(--t4)', fontWeight:600, letterSpacing:'.05em' }}>SPACER</span>
+                      <button onClick={()=>removeSpacer(item._spacerIdx)}
+                        style={{ position:'absolute', top:4, right:4, width:18, height:18, borderRadius:5, border:'1px solid var(--bdr)', background:'var(--bg4)', color:'var(--t4)', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                    </div>
+                  );
+
                   const active   = selItemId===item.id;
                   const isOver   = overItemId===item.id;
                   const isDragging= dragItemId===item.id;
@@ -757,8 +815,8 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
     }, 30);
   };
 
-  const typeLabel = t => ({ simple:'Simple', modifiable:'Options', variants:'Has sizes', pizza:'Pizza', combo:'Combo', subitem:'Sub item', spacer:'Spacer' }[t] || t);
-  const typeColor = t => ({ simple:'var(--t4)', modifiable:'var(--acc)', variants:'var(--grn)', pizza:'#f97316', combo:'#8b5cf6', spacer:'var(--t4)' }[t] || 'var(--t4)');
+  const typeLabel = t => ({ simple:'Simple', modifiable:'Options', variants:'Has sizes', pizza:'Pizza', combo:'Combo', subitem:'Sub item' }[t] || t);
+  const typeColor = t => ({ simple:'var(--t4)', modifiable:'var(--acc)', variants:'var(--grn)', pizza:'#f97316', combo:'#8b5cf6' }[t] || 'var(--t4)');
 
   return (
     <div style={{ flex:1, overflowY:'auto' }}>
@@ -787,23 +845,6 @@ function ListItemView({ items, menuItems, selItemId, setSelItemId, catColor, add
         const modCount = (item.assignedModifierGroups||[]).length + (item.assignedInstructionGroups||[]).length;
         const allergCount = (item.allergens||[]).length;
 
-        // Spacer — renders as a draggable blank-space placeholder
-        if (item.type === 'spacer') return (
-          <div key={item.id}
-            draggable
-            onDragStart={()=>setDragIdx(i)}
-            onDragOver={e=>{e.preventDefault();setOverIdx(i);}}
-            onDrop={e=>{e.preventDefault();if(dragIdx!==null&&dragIdx!==i)reorder(dragIdx,i);setDragIdx(null);setOverIdx(null);}}
-            onDragEnd={()=>{setDragIdx(null);setOverIdx(null);}}
-            style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 12px', borderBottom:'1px solid var(--bdr)', opacity:dragIdx===i?.4:1, cursor:'grab', background:'transparent' }}>
-            <span style={{ fontSize:10, color:'var(--t4)' }}>⠿</span>
-            <div style={{ flex:1, height:1, borderTop:'2px dashed var(--bdr2)', borderRadius:1 }}/>
-            <span style={{ fontSize:9, fontWeight:600, color:'var(--t4)', letterSpacing:'.05em' }}>SPACER</span>
-            <div style={{ flex:1, height:1, borderTop:'2px dashed var(--bdr2)', borderRadius:1 }}/>
-            <button onClick={()=>{ archiveMenuItem(item.id); markBOChange(); }}
-              style={{ width:20, height:20, borderRadius:5, border:'1px solid var(--bdr)', background:'none', color:'var(--t4)', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>×</button>
-          </div>
-        );
 
         return (
           <div key={item.id}>
@@ -1024,7 +1065,6 @@ function ItemsLibrary() {
           <button onClick={()=>{setShowArchived(v=>!v);setSelItemId(null);}} style={{ padding:'7px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:showArchived?'var(--red-d)':'var(--bg3)', border:`1px solid ${showArchived?'var(--red-b)':'var(--bdr)'}`, color:showArchived?'var(--red)':'var(--t3)', fontSize:12, fontWeight:showArchived?700:400, flexShrink:0 }}>
             {showArchived ? '← Back to active' : `Archived${archivedCount>0?` (${archivedCount})`:''}`}
           </button>
-          {!showArchived && <button onClick={addNewSpacer} style={{ padding:'7px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t3)', fontSize:12, fontWeight:600, flexShrink:0 }}>+ Spacer</button>}
           {!showArchived && <button onClick={addNewItem} style={{ padding:'7px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700, flexShrink:0 }}>+ Item</button>}
         </div>
 

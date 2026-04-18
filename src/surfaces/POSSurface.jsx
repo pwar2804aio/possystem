@@ -141,19 +141,40 @@ export default function POSSurface() {
     const base = MENU_ITEMS.filter(i => !i.archived && (i.type !== 'subitem' || i.soldAlone) && !i.parentId)
       .slice().sort((a,b) => (a.sortOrder??999) - (b.sortOrder??999));
     const inCat = (i, id) => i.cat === id || (i.cats||[]).includes(id);
-    if (subCat) return base.filter(i => inCat(i, subCat));
-    if (subCategories.length > 0) {
+    let items;
+    if (subCat) items = base.filter(i => inCat(i, subCat));
+    else if (subCategories.length > 0) {
       const subIds = subCategories.map(s => s.id);
-      return base.filter(i => inCat(i, cat) || subIds.some(sid => inCat(i, sid)));
+      items = base.filter(i => inCat(i, cat) || subIds.some(sid => inCat(i, sid)));
+    } else {
+      items = base.filter(i => inCat(i, cat));
     }
-    return base.filter(i => inCat(i, cat));
-  }, [cat, subCat, subCategories, MENU_ITEMS, quickItems]);
+    // Inject spacers from category config — pure layout cells, zero data
+    const activeCat = menuCategories.find(c => c.id === (subCat || cat));
+    const spacerSlots = activeCat?.spacerSlots || [];
+    if (!spacerSlots.length) return items;
+    const merged = [];
+    let si = 0;
+    const sorted = [...spacerSlots].sort((a,b) => a-b);
+    for (const item of items) {
+      while (si < sorted.length && sorted[si] <= (item.sortOrder??999)) {
+        merged.push({ _spacer: true, id: `spacer-${sorted[si]}` });
+        si++;
+      }
+      merged.push(item);
+    }
+    while (si < sorted.length) {
+      merged.push({ _spacer: true, id: `spacer-${sorted[si]}` });
+      si++;
+    }
+    return merged;
+  }, [cat, subCat, subCategories, MENU_ITEMS, quickItems, menuCategories]);
 
   const displayItems = useMemo(() => {
     if (!search.trim()) return catItems;
     const q = search.toLowerCase();
     return MENU_ITEMS.filter(i =>
-      !i.archived && i.type !== 'spacer' && (i.type !== 'subitem' || i.soldAlone) && !i.parentId &&
+      !i.archived && (i.type !== 'subitem' || i.soldAlone) && !i.parentId &&
       ((i.menuName||i.name||'').toLowerCase().includes(q) || i.description?.toLowerCase().includes(q))
     );
   }, [cat, search, catItems, MENU_ITEMS]);
@@ -552,7 +573,7 @@ export default function POSSurface() {
             const subIds = menuCategories.filter(s => s.parentId === c.id).map(s => s.id);
             const count = c.id === 'quick'
               ? quickItems.length
-              : MENU_ITEMS.filter(i => !i.archived && !i.parentId && i.type !== 'spacer' && (i.type !== 'subitem' || i.soldAlone) && (i.cat === c.id || subIds.includes(i.cat))).length;
+              : MENU_ITEMS.filter(i => !i.archived && !i.parentId && (i.type !== 'subitem' || i.soldAlone) && (i.cat === c.id || subIds.includes(i.cat))).length;
             const hasSubcats = subIds.length > 0;
             return (
               <button key={c.id} onClick={() => { setCat(c.id); setSearch(''); }} className="cat-btn" style={{
@@ -681,10 +702,8 @@ export default function POSSurface() {
             )}
             <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?115:155}px,1fr))`,gridAutoRows:`minmax(${compact?80:110}px,auto)`,gap:compact?4:8}}>
                 {displayItems.map(item=>{
-                  // Spacer — empty grid cell, no interaction
-                  if (item.type === 'spacer') return (
-                    <div key={item.id} style={{ borderRadius:14, background:'transparent', pointerEvents:'none' }}/>
-                  );
+                  // Spacer — empty transparent cell, invisible to customers
+                  if (item._spacer) return <div key={item.id} style={{ borderRadius:14, background:'transparent', pointerEvents:'none' }}/>;
 
                   // Resolve category colour/icon from store (Menu Manager categories)
                   const storeCat = menuCategories.find(c => c.id === item.cat);

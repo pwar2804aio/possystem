@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.0.5', date: 'Apr 2026', label: 'Spacer: pure layout cell, no data model; course bug fixed',
+    changes: [
+      'Spacer is stored as spacerSlots[] on menuCategories — no fake menu items, no new tables, zero data model impact',
+      'Back office Menus tab: + Spacer button adds a dashed placeholder cell to the selected category grid. Click × to remove.',
+      'POS: spacer cells render as transparent empty divs — completely invisible to customers, not tappable, not counted',
+      'Spacers save automatically via updateCategory which already writes to Supabase',
+      'Course bug fixed: fired flag now uses same parent-category fallback as course — variants no longer end up in different courses',
+    ],
+  },
+  {
     version: '4.0.4', date: 'Apr 2026', label: 'Course bug fix + Spacer items',
     changes: [
       'Fix: course fired calculation now uses same full parent-category fallback as course assignment — variants/subitems with no cat set directly now correctly inherit immediate/course from parent category',
