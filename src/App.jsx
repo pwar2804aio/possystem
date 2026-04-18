@@ -59,6 +59,24 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.1.0', date: 'Apr 2026', label: 'AI Menu Import — drop a menu file, AI builds the menu',
+    changes: [
+      'Back Office → Menus tab: new "↗ Import menu" button in the top nav',
+      'Drop zone accepts PDF, Word (.docx), Excel (.xlsx/.xls), and images (JPG, PNG, WEBP) up to 7MB',
+      'PDFs + images: sent directly to Claude Sonnet 4.6 via document/image content blocks',
+      'Word docs: text extracted server-side with mammoth before sending to Claude',
+      'Spreadsheets: parsed with SheetJS and sent as CSV per sheet',
+      'Claude returns a strict structured draft (tool-constrained output) — categories, items, prices, allergens, sizes/variants, per-item confidence (high/medium/low)',
+      'Review panel: inline-edit any field, delete categories/items, low-confidence items flagged in red for extra attention',
+      'Publish button creates real categories + items in one batch using pre-generated IDs (no collision risk, no timing hacks)',
+      'Menu source of truth remains the RPOS menu builder — imported menus are drafts, nothing lands in the DB until Publish',
+      'Variants: items with sizes (Small/Medium/Large, 8oz/12oz, Glass/Bottle) auto-created as variants-parent + child items',
+      'Allergens: auto-detected from V/VE/GF/DF symbols only when clearly indicated; never inferred from ingredients',
+      'Endpoint: POST /api/ai/menu-import — 60s Vercel function timeout, 10MB body limit, full error handling',
+      'Token usage reported to UI so operators can see API cost per import',
+    ],
+  },
+  {
     version: '4.0.9', date: 'Apr 2026', label: 'Native Android printer bridge — direct TCP to WiFi printers',
     changes: [
       'Android: PrinterBridge.java exposes window.RposPrinter to the React app via JavascriptInterface',

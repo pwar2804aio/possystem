@@ -25,6 +25,7 @@ import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
 import { upsertMenuItem, uploadProductImage, deleteProductImage, saveQuickScreenIds } from '../../lib/db';
+import MenuImportModal from '../components/MenuImportModal';
 
 // ── Clone item helper ─────────────────────────────────────────────────────────
 async function cloneItem(item, menuItems, addMenuItem, updateMenuItem, markBOChange, showToast, setSelItemId) {
@@ -169,14 +170,24 @@ const ICONS   = ['🍽','🥗','🍖','🍕','🍸','☕','🎂','🥤','🌿','
 // ── Root ─────────────────────────────────────────────────────────────────────
 export default function MenuManager() {
   const [tab, setTab] = useState('menu');
+  const [importOpen, setImportOpen] = useState(false);
+  const { menus } = useStore();
+  const defaultMenuId = menus?.[0]?.id;
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
-      <nav style={{ display:'flex', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+      <nav style={{ display:'flex', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0, alignItems:'center' }}>
         {[['menu','🍽 Menus'],['quick','⚡ Quick Screen'],['items','📋 Items'],['modifiers','⊕ Modifier groups'],['instructions','📝 Instruction groups']].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{ padding:'0 20px', height:46, cursor:'pointer', fontFamily:'inherit', border:'none', borderBottom:`3px solid ${tab===id?'var(--acc)':'transparent'}`, background:'transparent', color:tab===id?'var(--acc)':'var(--t3)', fontSize:13, fontWeight:tab===id?800:500 }}>
             {label}
           </button>
         ))}
+        <div style={{ flex:1 }} />
+        <button
+          onClick={()=>setImportOpen(true)}
+          title="Drop a menu file, AI builds it"
+          style={{ margin:'0 12px', padding:'0 14px', height:32, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:700, border:'1px solid var(--acc-b)', borderRadius:8, background:'var(--acc-d)', color:'var(--acc)' }}>
+          ↗ Import menu
+        </button>
       </nav>
       <div style={{ flex:1, overflow:'hidden' }}>
         {tab==='menu'         && <MenuTab />}
@@ -185,6 +196,12 @@ export default function MenuManager() {
         {tab==='modifiers'    && <ModifiersTab />}
         {tab==='instructions' && <InstructionsTab />}
       </div>
+      {importOpen && (
+        <MenuImportModal
+          menuId={defaultMenuId}
+          onClose={()=>setImportOpen(false)}
+        />
+      )}
     </div>
   );
 }
