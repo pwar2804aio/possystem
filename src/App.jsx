@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.2.1', date: 'Apr 2026', label: 'Order panel: Actions dropdown — frees space on compact screens',
+    changes: [
+      'The five order-panel action buttons (Review, Discount, Print, Reprint, Void) are now collapsed into a single ⋯ Actions dropdown',
+      'Reclaims a full row of vertical space on the order panel — important for Sunmi D3 Pro compact mode where the panel is tight',
+      'Send and Pay buttons keep their own dedicated row (primary actions, always one tap away)',
+      'Dropdown opens upward above its button — never obstructs the order total or Pay button',
+      'Closes on outside click, on Escape, and after selecting any action',
+      'Items show/hide based on context exactly as before: Reprint appears only after a kitchen send, Void appears only for an open table with sent items',
+      'Void is styled in red inside the menu to match its destructive weight',
+    ],
+  },
+  {
     version: '4.2.0', date: 'Apr 2026', label: 'Printing fully wired — 19 models across 7 brands, retry + offline durability',
     changes: [
       'Fixed the printing gap: routePrintJob now actually prints instead of just showing a toast',

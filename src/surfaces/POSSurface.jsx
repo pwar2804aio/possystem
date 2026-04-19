@@ -98,6 +98,8 @@ export default function POSSurface() {
   const [showSendModal, setShowSendModal] = useState(false);
   const [showAllergenGate, setShowAllergenGate] = useState(false);
   const [showTableActions, setShowTableActions] = useState(false);
+  const [showActions, setShowActions]   = useState(false);  // 4.2.1 action dropdown
+  const actionsMenuRef = useRef(null);
   const [lastAddedUid, setLastAddedUid] = useState(null);
   const longPressTimer = useRef(null);
 
@@ -130,6 +132,25 @@ export default function POSSurface() {
 
   // When the main category changes, reset the subcategory selection
   useEffect(() => { setSubCat(null); }, [cat]);
+
+  // 4.2.1 — close Actions dropdown on outside click / Escape
+  useEffect(() => {
+    if (!showActions) return;
+    const onDown = (e) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target)) {
+        setShowActions(false);
+      }
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setShowActions(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showActions]);
 
   // Find subcategories of the active category
   const subCategories = useMemo(() =>
@@ -499,13 +520,40 @@ export default function POSSurface() {
                 </div>
               )}
 
-              {/* Action row */}
-              <div style={{padding:'6px 10px 4px',display:'flex',gap:4,flexWrap:'wrap'}}>
-                <button onClick={()=>setShowReview(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>📋 Review</button>
-                <button onClick={()=>setShowDiscount(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>🏷 Discount</button>
-                <button onClick={()=>setShowReceipt(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>🖨 Print</button>
-                {hasSent&&<button onClick={()=>setShowReprint(true)} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11,fontWeight:700,minWidth:60}}>↻ Reprint</button>}
-                {activeTableId&&hasSent&&<button onClick={()=>setVoidTarget({type:'check',items:items.filter(i=>!i.voided)})} style={{flex:1,height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:11,fontWeight:700,minWidth:60}}>⊘ Void</button>}
+              {/* Actions dropdown — 4.2.1 (was 5 individual buttons) */}
+              <div ref={actionsMenuRef} style={{padding:'6px 10px 4px',position:'relative'}}>
+                <button
+                  onClick={()=>setShowActions(s=>!s)}
+                  style={{width:'100%',height:32,borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:showActions?'var(--bg4)':'var(--bg3)',border:`1px solid ${showActions?'var(--bdr3)':'var(--bdr)'}`,color:'var(--t2)',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8,transition:'all .12s'}}
+                  aria-haspopup="menu"
+                  aria-expanded={showActions}>
+                  <span style={{letterSpacing:1,fontSize:14,lineHeight:1}}>⋯</span>
+                  <span>Actions</span>
+                  <span style={{fontSize:9,color:'var(--t4)',marginLeft:'auto'}}>{showActions?'▾':'▴'}</span>
+                </button>
+                {showActions && (() => {
+                  const actions = [
+                    { icon:'📋', label:'Review order',          onClick:()=>setShowReview(true) },
+                    { icon:'🏷', label:'Apply discount',        onClick:()=>setShowDiscount(true) },
+                    { icon:'🖨', label:'Print receipt',         onClick:()=>setShowReceipt(true) },
+                    ...(hasSent ? [{ icon:'↻', label:'Reprint kitchen ticket', onClick:()=>setShowReprint(true) }] : []),
+                    ...(activeTableId && hasSent ? [{ icon:'⊘', label:'Void check', danger:true, onClick:()=>setVoidTarget({type:'check',items:items.filter(i=>!i.voided)}) }] : []),
+                  ];
+                  return (
+                    <div role="menu" style={{position:'absolute',bottom:'calc(100% - 2px)',left:10,right:10,background:'var(--bg2)',border:'1px solid var(--bdr2)',borderRadius:12,boxShadow:'var(--sh3)',overflow:'hidden',zIndex:30,marginBottom:4}}>
+                      {actions.map((a,i)=>(
+                        <button key={i} role="menuitem"
+                          onClick={()=>{ a.onClick(); setShowActions(false); }}
+                          style={{width:'100%',padding:'11px 14px',background:'transparent',border:'none',borderBottom:i<actions.length-1?'1px solid var(--bdr)':'none',color:a.danger?'var(--red)':'var(--t1)',fontSize:13,fontWeight:600,textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:11,fontFamily:'inherit',transition:'background .1s'}}
+                          onMouseEnter={e=>e.currentTarget.style.background=a.danger?'var(--red-d)':'var(--bg3)'}
+                          onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                          <span style={{fontSize:16,lineHeight:1,width:18,textAlign:'center'}}>{a.icon}</span>
+                          <span>{a.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </>
           )}
