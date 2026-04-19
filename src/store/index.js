@@ -3,6 +3,7 @@ import { supabase, isMock, getLocationId } from '../lib/supabase';
 import { calculateOrderTax } from '../lib/tax';
 import { resolveServiceCharge } from '../lib/serviceCharge';
 import { upsertMenuItem, upsertFloorTable, insertKDSTicket, insertClosedCheck, toggle86DB } from '../lib/db';
+import { printService } from '../lib/printer';
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 const sbUpsertMenu = async (menu) => {
@@ -1207,7 +1208,16 @@ export const useStore = create((set, get) => ({
         return centre?.printer?.name || centre?.name || { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' }[centreId] || 'Kitchen';
       };
       newTickets.forEach(t => {
-        if (t.items.length) get().routePrintJob({ centreId:t.centreId, printerName:getCentrePrinter(t.centreId), tableLabel:t.table, items:t.items, type:'kitchen' });
+        if (t.items.length) get().routePrintJob({
+          centreId: t.centreId,
+          printerName: getCentrePrinter(t.centreId),
+          tableLabel: t.table,
+          server: t.server,
+          covers: t.covers,
+          course: t.firedCourses?.[0] ?? 1,
+          items: t.items,
+          type: 'kitchen',
+        });
       });
       set(s=>({
         tables: s.tables.map(t=>{
@@ -1725,15 +1735,136 @@ export const useStore = create((set, get) => ({
   },
 
   // ── Print job routing ─────────────────────────────────────────────────────
-  // In production this would POST to the Sunmi NT311 ESC/POS bridge.
-  // For now we record jobs with status so the Printers UI can show them.
+  // Dispatches a kitchen/bar/pass ticket to the printer assigned to the centre.
+  // Retries 3x with exponential backoff on transient failures.
+  // When fully offline (navigator.onLine === false AND no native bridge), the
+  // job is persisted to Supabase print_jobs as 'pending' via _submitJob → the
+  // existing OfflineQueue + Node agent pick it up when connectivity returns.
   printJobs: [],
-  routePrintJob: (job) => {
-    // job: { id, centreId, printerName, tableLabel, items, type:'kitchen'|'pass'|'bar' }
-    const printJob = { ...job, id:`pj-${Date.now()}`, sentAt:Date.now(), status:'sent' };
-    set(s=>({ printJobs:[printJob, ...s.printJobs.slice(0,49)] }));
-    // In a real integration: POST to Sunmi native bridge or ESC/POS server
-    get().showToast(`Printed to ${job.printerName}`, 'info');
+  routePrintJob: async (job) => {
+    // job shape: { centreId, printerName, tableLabel, items, type, server, covers, course }
+    const jobId = `pj-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+    const basePrintJob = { ...job, id: jobId, sentAt: Date.now() };
+
+    // Look up the printer configured for this centre from the routing config
+    const routingConfig = (() => {
+      try {
+        const stored = useStore.getState().printRouting;
+        if (stored?.centres?.length) return stored;
+        return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres: [], routing: {} };
+      } catch { return { centres: [], routing: {} }; }
+    })();
+
+    const centre = routingConfig.centres?.find(c => c.id === job.centreId);
+    const printerId = centre?.printer?.id || null;
+
+    // No printer mapped → still creates KDS ticket, warns staff
+    if (!printerId) {
+      set(s => ({ printJobs: [{ ...basePrintJob, status: 'no-printer' }, ...s.printJobs.slice(0, 49)] }));
+      get().showToast(`No printer mapped for ${centre?.name || job.centreId} — ticket shown on KDS only`, 'warn');
+      return;
+    }
+
+    // Mark job as sending
+    set(s => ({ printJobs: [{ ...basePrintJob, status: 'sending', printerId, attempts: 0 }, ...s.printJobs.slice(0, 49)] }));
+
+    // Retry with exponential backoff: immediate, 2s, 8s
+    const DELAYS = [0, 2000, 8000];
+    let lastError = null;
+    let lastResult = null;
+
+    for (let attempt = 0; attempt < DELAYS.length; attempt++) {
+      if (DELAYS[attempt] > 0) {
+        await new Promise(r => setTimeout(r, DELAYS[attempt]));
+        // Update attempt counter in UI
+        set(s => ({
+          printJobs: s.printJobs.map(pj =>
+            pj.id === jobId ? { ...pj, status: 'retrying', attempts: attempt } : pj
+          ),
+        }));
+      }
+
+      try {
+        const result = await printService.printKitchenTicket({
+          table: job.tableLabel || '',
+          server: job.server || '',
+          covers: job.covers || 0,
+          course: job.course || null,
+          centreName: centre?.name || job.printerName || 'Kitchen',
+          items: job.items || [],
+          sentAt: basePrintJob.sentAt,
+        }, printerId);
+
+        lastResult = result;
+
+        if (result?.ok) {
+          // Success — update job + printer health, done
+          set(s => ({
+            printJobs: s.printJobs.map(pj =>
+              pj.id === jobId ? { ...pj, status: 'printed', transport: result.transport, attempts: attempt + 1 } : pj
+            ),
+          }));
+          printService.recordPrinterHealth(printerId, 'online');
+          return;
+        }
+        lastError = result?.error || 'Unknown print failure';
+      } catch (err) {
+        lastError = err.message || 'Print failed';
+      }
+    }
+
+    // All retries exhausted → mark failed, record health, warn staff
+    set(s => ({
+      printJobs: s.printJobs.map(pj =>
+        pj.id === jobId ? { ...pj, status: 'failed', error: lastError, attempts: DELAYS.length } : pj
+      ),
+    }));
+    printService.recordPrinterHealth(printerId, 'offline', lastError);
+    get().showToast(`Print failed after ${DELAYS.length} attempts: ${centre?.name || 'Kitchen'} — ${lastError}. Tap status icon to reprint.`, 'error');
+  },
+
+  // Print a customer receipt (called from close-check flow, ReceiptModal, etc.)
+  // Safe to call even if no receipt printer is configured — falls back to browser print.
+  printCustomerReceipt: async ({ location, check, items, totals }, printerId = null) => {
+    try {
+      const result = await printService.printReceipt({ location, check, items, totals }, printerId);
+      if (result?.ok && result.transport !== 'browser' && printerId) {
+        printService.recordPrinterHealth(printerId, 'online');
+      }
+      return result;
+    } catch (err) {
+      get().showToast(`Receipt print failed: ${err.message}`, 'error');
+      return { ok: false, error: err.message };
+    }
+  },
+
+  // Open the cash drawer attached to the receipt printer
+  openCashDrawer: async (printerId = null) => {
+    try {
+      return await printService.openCashDrawer(printerId);
+    } catch (err) {
+      get().showToast(`Cash drawer failed: ${err.message}`, 'error');
+      return { ok: false, error: err.message };
+    }
+  },
+
+  // Manually reprint a failed or pending print_jobs row (called from StatusDrawer)
+  // Uses the job's stored payload rather than rebuilding — exact reprint.
+  reprintJob: async (supabaseRow) => {
+    try {
+      if (!supabase) throw new Error('No Supabase connection');
+      // Reset the job to pending so the agent / native path picks it up again
+      const { error } = await supabase
+        .from('print_jobs')
+        .update({ status: 'pending', error: null, attempts: 0 })
+        .eq('id', supabaseRow.id);
+      if (error) throw error;
+      get().showToast('Job requeued for printing', 'info');
+      return { ok: true };
+    } catch (err) {
+      get().showToast(`Reprint failed: ${err.message}`, 'error');
+      return { ok: false, error: err.message };
+    }
   },
 
   // ── Shift ─────────────────────────────────

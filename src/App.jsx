@@ -59,6 +59,27 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.2.0', date: 'Apr 2026', label: 'Printing fully wired — 19 models across 7 brands, retry + offline durability',
+    changes: [
+      'Fixed the printing gap: routePrintJob now actually prints instead of just showing a toast',
+      'Production-center routing dispatches to the printer assigned to each centre (Back Office → Print Routing)',
+      'Ticket data (server, covers, course, table) flows from sendToKitchen → routePrintJob → ESC/POS bytes → TCP/9100',
+      'Back Office printer registry expanded to 19 models grouped by brand: Sunmi (NT311, NT310), Epson (TM-T88 V/VI/VII, T20 II/III, m30/m30II, T82, T70), Star (TSP143III, TSP100, TSP654II, TSP700II, TSP800II, mC-Print3, mC-Print2), Bixolon (SRP-350III, SRP-Q300), Citizen (CT-S310II, CT-E351), Xprinter (XP-T80/N160II), plus Generic ESC/POS for anything else',
+      'All models speak ESC/POS over TCP/9100 — same code path for all, no per-model drivers needed',
+      'Connection type UI: WiFi/Ethernet is the only supported option for now. Bluetooth and USB are visibly disabled with "Soon" tags — prevents staff selecting something that would silently fail',
+      'Uses existing native bridges: Android (NetworkPrinter.java) + iOS (NetworkPrinter.swift) — direct TCP socket, no agent required',
+      'Browser fallback unchanged: Supabase print_jobs queue → rpos-print-agent.js Node script polls and sends',
+      'Retry with exponential backoff: 3 attempts at 0ms / 2s / 8s before marking failed. Handles transient TCP failures, printer power-cycle, WiFi blips.',
+      'Offline durability: when device is offline AND no native bridge, jobs still insert to print_jobs as pending. OfflineQueue + agent drain on reconnect. No data loss.',
+      'Job lifecycle tracked: sending → retrying → printed / failed / no-printer with attempt count + error recorded',
+      'Printer health updated in printer_health table after each job — StatusDrawer reads this to show red/green indicators',
+      'Existing Retry button in StatusDrawer → Print queue continues to work, now also exposed via useStore().reprintJob() for other surfaces',
+      'Unmapped centres (no printer assigned) still create KDS tickets; warn toast "ticket shown on KDS only"',
+      'New store actions: printCustomerReceipt(), openCashDrawer(), reprintJob() for POS surfaces',
+      'No new deps, no new DB tables — leverages existing OfflineQueue (IndexedDB), printer_health, printer_agents, print_jobs tables',
+    ],
+  },
+  {
     version: '4.1.0', date: 'Apr 2026', label: 'AI Menu Import — drop a menu file, AI builds the menu',
     changes: [
       'Back Office → Menus tab: new "↗ Import menu" button in the top nav',

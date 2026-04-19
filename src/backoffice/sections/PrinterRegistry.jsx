@@ -3,18 +3,40 @@ import { supabase, isMock, getLocationId } from '../../lib/supabase';
 import { printService } from '../../lib/printer';
 
 const MODELS = [
-  { id:'sunmi-nt311', label:'Sunmi NT311', icon:'🖨', desc:'80mm cloud printer — WiFi/LAN/BT/USB' },
-  { id:'sunmi-nt310', label:'Sunmi NT310', icon:'🖨', desc:'58mm cloud printer — WiFi/LAN/BT' },
-  { id:'epson-tm88',  label:'Epson TM-T88', icon:'🖨', desc:'80mm receipt printer — USB/LAN/BT' },
-  { id:'epson-tm20',  label:'Epson TM-T20', icon:'🖨', desc:'80mm receipt printer — USB/LAN' },
-  { id:'star-tsp100', label:'Star TSP100', icon:'🖨', desc:'80mm receipt printer — USB/LAN/BT' },
-  { id:'generic',     label:'Generic ESC/POS', icon:'🖨', desc:'Any ESC/POS compatible printer' },
+  // ── Sunmi ──────────────────────────────────────────────────────────────────
+  { id:'sunmi-nt311',     label:'Sunmi NT311',              icon:'🖨', desc:'80mm cloud printer — WiFi/LAN', brand:'Sunmi' },
+  { id:'sunmi-nt310',     label:'Sunmi NT310',              icon:'🖨', desc:'58mm cloud printer — WiFi/LAN', brand:'Sunmi' },
+  // ── Epson TM series ────────────────────────────────────────────────────────
+  { id:'epson-tm-t88',    label:'Epson TM-T88V / VI / VII', icon:'🖨', desc:'80mm LAN — industry standard',   brand:'Epson' },
+  { id:'epson-tm-t20',    label:'Epson TM-T20 II / III',    icon:'🖨', desc:'80mm LAN — budget option',       brand:'Epson' },
+  { id:'epson-tm-m30',    label:'Epson TM-m30 / m30II',     icon:'🖨', desc:'80mm LAN — compact/tablet',      brand:'Epson' },
+  { id:'epson-tm-t82',    label:'Epson TM-T82 III',         icon:'🖨', desc:'80mm LAN — entry level',          brand:'Epson' },
+  { id:'epson-tm-t70',    label:'Epson TM-T70 II',          icon:'🖨', desc:'80mm LAN — under-counter',        brand:'Epson' },
+  // ── Star TSP / mC-Print ────────────────────────────────────────────────────
+  { id:'star-tsp143',     label:'Star TSP143III LAN',       icon:'🖨', desc:'80mm LAN — popular modern',       brand:'Star' },
+  { id:'star-tsp100',     label:'Star TSP100 ECO / futurePRNT', icon:'🖨', desc:'80mm LAN — very common',      brand:'Star' },
+  { id:'star-tsp654',     label:'Star TSP654II LAN',        icon:'🖨', desc:'80mm LAN — kitchen workhorse',    brand:'Star' },
+  { id:'star-tsp700',     label:'Star TSP700II LAN',        icon:'🖨', desc:'80mm LAN — two-colour capable',   brand:'Star' },
+  { id:'star-tsp800',     label:'Star TSP800II LAN',        icon:'🖨', desc:'112mm LAN — wider labels',        brand:'Star' },
+  { id:'star-mcprint3',   label:'Star mC-Print3',           icon:'🖨', desc:'80mm LAN — newest Star',          brand:'Star' },
+  { id:'star-mcprint2',   label:'Star mC-Print2',           icon:'🖨', desc:'58mm LAN',                         brand:'Star' },
+  // ── Bixolon ────────────────────────────────────────────────────────────────
+  { id:'bixolon-srp350',  label:'Bixolon SRP-350III',       icon:'🖨', desc:'80mm LAN',                         brand:'Bixolon' },
+  { id:'bixolon-srpq300', label:'Bixolon SRP-Q300',         icon:'🖨', desc:'80mm LAN — compact',               brand:'Bixolon' },
+  // ── Citizen ────────────────────────────────────────────────────────────────
+  { id:'citizen-cts310',  label:'Citizen CT-S310II',        icon:'🖨', desc:'80mm LAN',                         brand:'Citizen' },
+  { id:'citizen-cte351',  label:'Citizen CT-E351',          icon:'🖨', desc:'80mm LAN',                         brand:'Citizen' },
+  // ── Budget / generic ──────────────────────────────────────────────────────
+  { id:'xprinter-xp80',   label:'Xprinter XP-T80 / N160II', icon:'🖨', desc:'80mm LAN — budget ESC/POS',        brand:'Xprinter' },
+  { id:'generic',         label:'Other / Generic ESC/POS',  icon:'🖨', desc:'Any ESC/POS printer on TCP 9100',  brand:'Generic' },
 ];
 
+// Only network is currently supported end-to-end (Android NetworkPrinter.java + iOS NetworkPrinter.swift).
+// Bluetooth and USB require additional native bridges — mark as disabled until built.
 const CONN_TYPES = [
-  { id:'network', label:'WiFi / Ethernet', icon:'🌐', placeholder:'192.168.1.100' },
-  { id:'bluetooth', label:'Bluetooth', icon:'🔵', placeholder:'e.g. AA:BB:CC:DD:EE:FF' },
-  { id:'usb', label:'USB', icon:'🔌', placeholder:'Auto-detected' },
+  { id:'network',   label:'WiFi / Ethernet', icon:'🌐', placeholder:'192.168.1.100',              enabled:true,  note:'Recommended — works on all supported printers' },
+  { id:'bluetooth', label:'Bluetooth',       icon:'🔵', placeholder:'e.g. AA:BB:CC:DD:EE:FF',     enabled:false, note:'Coming soon — native BT bridge not yet built' },
+  { id:'usb',       label:'USB',             icon:'🔌', placeholder:'Auto-detected',              enabled:false, note:'Coming soon — requires device-specific driver' },
 ];
 
 const ROLES = [
@@ -109,38 +131,67 @@ function PrinterForm({ initial, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Model picker */}
+      {/* Model picker — grouped by brand */}
       <div style={{ marginBottom:14 }}>
         <label style={S.label}>Printer model</label>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-          {MODELS.map(m => (
-            <button key={m.id} onClick={() => f('model', m.id)} style={{
-              padding:'7px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600,
-              background: form.model === m.id ? 'var(--acc-d)' : 'var(--bg3)',
-              border: `1.5px solid ${form.model === m.id ? 'var(--acc)' : 'var(--bdr)'}`,
-              color: form.model === m.id ? 'var(--acc)' : 'var(--t2)',
-            }}>
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize:11, color:'var(--t3)', marginTop:5 }}>{model.desc}</div>
+        {(() => {
+          const brands = [...new Set(MODELS.map(m => m.brand))];
+          return (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {brands.map(brand => (
+                <div key={brand}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:4 }}>{brand}</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                    {MODELS.filter(m => m.brand === brand).map(m => (
+                      <button key={m.id} onClick={() => f('model', m.id)} style={{
+                        padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600,
+                        background: form.model === m.id ? 'var(--acc-d)' : 'var(--bg3)',
+                        border: `1.5px solid ${form.model === m.id ? 'var(--acc)' : 'var(--bdr)'}`,
+                        color: form.model === m.id ? 'var(--acc)' : 'var(--t2)',
+                      }}>
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+        <div style={{ fontSize:11, color:'var(--t3)', marginTop:8 }}>{model.desc}</div>
       </div>
 
       {/* Connection type */}
       <div style={{ marginBottom:14 }}>
         <label style={S.label}>Connection</label>
         <div style={{ display:'flex', gap:6, marginBottom:10 }}>
-          {CONN_TYPES.map(c => (
-            <button key={c.id} onClick={() => f('connectionType', c.id)} style={{
-              padding:'7px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600,
-              background: form.connectionType === c.id ? 'var(--acc-d)' : 'var(--bg3)',
-              border: `1.5px solid ${form.connectionType === c.id ? 'var(--acc)' : 'var(--bdr)'}`,
-              color: form.connectionType === c.id ? 'var(--acc)' : 'var(--t2)',
-            }}>
-              {c.icon} {c.label}
-            </button>
-          ))}
+          {CONN_TYPES.map(c => {
+            const isSelected = form.connectionType === c.id;
+            const isDisabled = !c.enabled;
+            return (
+              <button
+                key={c.id}
+                onClick={() => !isDisabled && f('connectionType', c.id)}
+                disabled={isDisabled}
+                title={c.note}
+                style={{
+                  padding:'7px 14px', borderRadius:8,
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  fontFamily:'inherit', fontSize:12, fontWeight:600,
+                  background: isDisabled ? 'var(--bg2)' : (isSelected ? 'var(--acc-d)' : 'var(--bg3)'),
+                  border: `1.5px solid ${isSelected ? 'var(--acc)' : 'var(--bdr)'}`,
+                  color: isDisabled ? 'var(--t5)' : (isSelected ? 'var(--acc)' : 'var(--t2)'),
+                  opacity: isDisabled ? 0.55 : 1,
+                  position:'relative',
+                }}>
+                {c.icon} {c.label}
+                {isDisabled && <span style={{ marginLeft:6, fontSize:9, fontWeight:700, color:'var(--t5)', textTransform:'uppercase', letterSpacing:0.5 }}>Soon</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize:11, color:'var(--t4)', marginBottom:6 }}>
+          {conn.note}
         </div>
 
         {form.connectionType !== 'usb' && (
