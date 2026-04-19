@@ -59,6 +59,24 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.3.0', date: 'Apr 2026', label: 'Print reliability — master-coordinated retries, durable queue, failure resolution',
+    changes: [
+      'Single durable pipeline: every print (native bridge OR browser) is written to print_jobs before dispatch. If the app closes mid-retry the job survives and is picked up by another device or the print agent.',
+      'Master POS is the print orchestrator — polls every 2 seconds and claims pending/failed jobs atomically via claimed_by. No two devices can dispatch the same job.',
+      'Child terminals as failover — if master is offline, children with a native bridge pick jobs up after a 10s grace period. When master returns it simply polls first and takes over automatically.',
+      'Retry with exponential backoff: 0s, 2s, 10s, 30s, 120s (5 attempts over ~2.5 min). Handles transient TCP drops, printer power-cycle, WiFi blips — jobs typically succeed on retry 2 or 3 without operator action.',
+      'Idempotency keys on every job (receipt-{ref}, kitchen-{table}-{centre}-{course}-{sentAt}) — network retries, double taps and reconnects cannot create duplicate tickets.',
+      'Stuck-claim reclaim: if a device crashes mid-dispatch, its claim expires after 30s and any other worker can pick the job up.',
+      'After 5 failed attempts a job is marked failed_permanent — shown in Status drawer with Action required banner, Retry and Dismiss buttons.',
+      'KDS ticket sends now durable — if the network drops when Send-to-kitchen fires, the ticket is queued to IndexedDB (OfflineQueue) and replayed automatically on reconnect. No more silently-lost kitchen tickets.',
+      'Status drawer print queue rewritten — shows attempt count (e.g. attempt 3/5), retry schedule, error message, and a Dismiss control for exhausted jobs. Reads pending/claimed/sending/failed/failed_permanent in one view.',
+      'Status drawer uses the new orchestrator operator helpers — Retry resets attempts + next_retry_at + claim fields; Dismiss sets dismissed_at so the job disappears from the queue without polluting the log.',
+      'Print-agent keeps working unchanged for browser-only terminals — now shares the retry schedule with the master POS, so behaviour is consistent whichever path a job takes.',
+      'SQL migration supabase/v4.3_print_reliability.sql adds idempotency_key (UNIQUE), claimed_by, claim_expires_at, attempts, max_attempts, next_retry_at, dismissed_at, error_message and two indexes for fast dispatcher and failure-queue polls. Safe to run multiple times.',
+      'No new dependencies. No new tables. Leverages existing print_jobs, printer_health, printer_agents, OfflineQueue (IndexedDB).',
+    ],
+  },
+  {
     version: '4.2.0', date: 'Apr 2026', label: 'Printing fully wired — 19 models across 7 brands, retry + offline durability',
     changes: [
       'Fixed the printing gap: routePrintJob now actually prints instead of just showing a toast',
@@ -2013,6 +2031,30 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
           // Child: wait 20s before first check so master has time to write heartbeat on startup
           await new Promise(r => setTimeout(r, 20_000));
           if (!stopped) startChildMonitor({ locationId: locId });
+        }
+
+        // v4.3 — Print reliability
+        // PrintOrchestrator: runs on every native-bridge device (master or child) so any
+        //   terminal can dispatch jobs. Master polls fast (2s), children slower (15s)
+        //   with a 10s grace period so master claims first under normal conditions.
+        // PrintRetrier: master-only scheduler for exponential backoff retries. Works
+        //   even without a native bridge (resets failed jobs to pending so the LAN
+        //   print-agent picks them back up).
+        try {
+          if (stopped) return;
+          const { startPrintOrchestrator } = await import('./sync/PrintOrchestrator.js');
+          startPrintOrchestrator({
+            deviceId: pairedDevice.id,
+            locationId: locId,
+            isMaster: isMasterDevice,
+          });
+
+          if (isMasterDevice) {
+            const { startPrintRetrier } = await import('./sync/PrintRetrier.js');
+            startPrintRetrier();
+          }
+        } catch (e) {
+          console.warn('[PrintReliability] boot error:', e.message);
         }
       } catch (e) {
         console.warn('[MasterSync] boot error:', e.message);

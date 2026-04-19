@@ -269,6 +269,20 @@ function isNativeBridgeAvailable() {
   return typeof window !== 'undefined' && !!window.RposPrinter;
 }
 
+// Get a stable device ID used for claim attribution (shared with MasterSync device id)
+function getDeviceId() {
+  try {
+    const dev = JSON.parse(localStorage.getItem('rpos-device') || 'null');
+    return dev?.id || 'unknown-device';
+  } catch { return 'unknown-device'; }
+}
+
+// Small UUID-ish for idempotency key — enough entropy for our volume
+function genIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `ik-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // ─── Print Service ────────────────────────────────────────────────────────────
 class PrintService {
   constructor() {
@@ -290,60 +304,189 @@ class PrintService {
     return this._printers.find(p => p.roles?.includes(role)) || this._printers[0] || null;
   }
 
-  // Submit a print job — prefers native TCP bridge, falls back to Supabase queue
-  async _submitJob(printer, jobType, bytes) {
+  // v4.3.0 — DURABLE-FIRST SUBMIT
+  // Always inserts a print_jobs row before attempting to dispatch. If the app
+  // crashes mid-dispatch, the row survives and the PrintRetrier picks it up.
+  //
+  // Returns { ok, transport, jobId, printer } on success
+  //         { ok:false, error, jobId? } on failure (but job row still exists)
+  async _submitJob(printer, jobType, bytes, opts = {}) {
     const ip = printer.address;
     const port = printer.port || 9100;
+    const payload = btoa(String.fromCharCode(...bytes));
+    const idempotencyKey = opts.idempotencyKey || genIdempotencyKey();
+    const metadata = opts.metadata || null;
 
-    // ── Path 1: Native Android/iOS bridge (direct TCP to printer) ──────────────
-    if (isNativeBridgeAvailable() && ip) {
+    // ── Step 1: Insert durable row BEFORE any dispatch attempt ─────────────────
+    let jobId = null;
+    if (supabase) {
       try {
-        const result = await nativePrint(bytes, ip, port);
-        return { ...result, printer: printer.name };
+        const locationId = await getLocationId();
+        if (locationId) {
+          const row = {
+            location_id:     locationId,
+            printer_id:      printer.id,
+            printer_ip:      ip,
+            printer_port:    port,
+            job_type:        jobType,
+            payload,
+            status:          'pending',
+            idempotency_key: idempotencyKey,
+            attempts:        0,
+            metadata,
+          };
+          const { data, error } = await supabase.from('print_jobs').insert(row).select('id').single();
+          if (!error) jobId = data?.id;
+          else if (error.code === '23505') {
+            // idempotency_key collision — job already exists, look it up
+            const { data: existing } = await supabase.from('print_jobs').select('id,status').eq('idempotency_key', idempotencyKey).single();
+            if (existing) {
+              // Already succeeded? Skip dispatch.
+              if (existing.status === 'printed' || existing.status === 'done') {
+                return { ok: true, transport: 'idempotent', printer: printer.name, jobId: existing.id };
+              }
+              jobId = existing.id;
+            }
+          } else {
+            console.warn('[Print] Durable insert failed, will try offline queue:', error.message);
+          }
+        }
       } catch (e) {
-        console.warn('[Print] Native bridge failed, falling back to Supabase queue:', e.message);
+        console.warn('[Print] Durable insert threw:', e.message);
       }
     }
 
-    // ── Path 2: Supabase queue → print agent on LAN (browser / fallback) ───────
-    if (!supabase) throw new Error('No print path available — native bridge not found and Supabase not connected');
+    // If Supabase insert failed, queue it durably via OfflineQueue — will replay on reconnect
+    if (!jobId) {
+      try {
+        const { queueWrite } = await import('../sync/OfflineQueue.js');
+        const locationId = (await getLocationId().catch(() => null));
+        await queueWrite({
+          type: 'insert',
+          table: 'print_jobs',
+          kind: 'print_job',
+          label: opts.label || `${jobType} → ${printer.name}`,
+          payload: {
+            location_id:     locationId,
+            printer_id:      printer.id,
+            printer_ip:      ip,
+            printer_port:    port,
+            job_type:        jobType,
+            payload,
+            status:          'pending',
+            idempotency_key: idempotencyKey,
+            attempts:        0,
+            metadata,
+          },
+        });
+      } catch (e) {
+        // Last resort: try native bridge directly without durability.
+        // Only acceptable fallback if supabase is genuinely unreachable.
+        console.warn('[Print] OfflineQueue unavailable:', e.message);
+      }
+    }
 
-    const locationId = await getLocationId();
-    if (!locationId) throw new Error('No location ID');
+    // ── Step 2: Try to dispatch immediately via native bridge (fast path) ───────
+    if (isNativeBridgeAvailable() && ip) {
+      const deviceId = getDeviceId();
+      if (jobId && supabase) {
+        // Claim the job so retrier won't race us
+        try {
+          await supabase.from('print_jobs')
+            .update({ status: 'sending', claimed_by: deviceId, claimed_at: new Date().toISOString() })
+            .eq('id', jobId);
+        } catch {}
+      }
+      try {
+        const result = await nativePrint(bytes, ip, port);
+        // Update job row to printed
+        if (jobId && supabase) {
+          try {
+            await supabase.from('print_jobs').update({
+              status: 'done',
+              processed_at: new Date().toISOString(),
+              agent_id: deviceId,
+            }).eq('id', jobId);
+          } catch {}
+        }
+        return { ...result, transport: 'native', printer: printer.name, jobId };
+      } catch (e) {
+        // Native bridge failed — mark failed with short retry, PrintRetrier will pick up
+        const errMsg = e.message || 'Native bridge failure';
+        if (jobId && supabase) {
+          try {
+            const nextRetry = new Date(Date.now() + 2000).toISOString();
+            await supabase.from('print_jobs').update({
+              status: 'failed',
+              error_message: errMsg,
+              attempts: 1,
+              next_retry_at: nextRetry,
+              claimed_by: null,
+              claimed_at: null,
+              processed_at: new Date().toISOString(),
+            }).eq('id', jobId);
+          } catch {}
+        }
+        console.warn('[Print] Native bridge failed — row marked for retry:', errMsg);
+        return { ok: false, error: errMsg, transport: 'native-failed', jobId };
+      }
+    }
 
-    const payload = btoa(String.fromCharCode(...bytes));
-
-    const { error, data } = await supabase.from('print_jobs').insert({
-      location_id: locationId,
-      printer_id:  printer.id,
-      printer_ip:  ip,
-      printer_port: port,
-      job_type:    jobType,
-      payload,
-      status:      'pending',
-    }).select('id');
-
-    if (error) throw new Error(`Supabase insert failed: ${error.message}`);
-    return { ok: true, transport: 'supabase', printer: printer.name, jobId: data?.[0]?.id };
+    // ── Step 3: No native bridge — row is pending, agent will pick up ──────────
+    return { ok: true, transport: 'queued', printer: printer.name, jobId };
   }
 
-  // Public API
-  async printReceipt({ location, check, items, totals }, printerId = null) {
+  // Called by PrintRetrier (master POS only) to redispatch a failed/retry-pending job.
+  // Only dispatches via native bridge — agent handles its own polling.
+  async dispatchJob(jobRow) {
+    if (!isNativeBridgeAvailable() || !jobRow.printer_ip) {
+      return { ok: false, error: 'No native bridge on this device' };
+    }
+    const deviceId = getDeviceId();
+    const bytes = Uint8Array.from(atob(jobRow.payload), c => c.charCodeAt(0));
+    try {
+      await nativePrint(bytes, jobRow.printer_ip, jobRow.printer_port || 9100);
+      // Mark printed
+      if (supabase) {
+        await supabase.from('print_jobs').update({
+          status: 'done',
+          processed_at: new Date().toISOString(),
+          agent_id: deviceId,
+          claimed_by: null,
+          claimed_at: null,
+        }).eq('id', jobRow.id);
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  }
+
+  // Public API — opts: { idempotencyKey?, metadata?, label? }
+  async printReceipt({ location, check, items, totals }, printerId = null, opts = {}) {
     const printer = this._printerForRole('receipt', printerId);
     if (printer?.address) {
       const bytes = buildCustomerReceipt({ location, check, items, totals });
-      return this._submitJob(printer, 'receipt', bytes);
+      return this._submitJob(printer, 'receipt', bytes, {
+        idempotencyKey: opts.idempotencyKey || (check?.ref ? `receipt-${check.ref}` : undefined),
+        metadata: { ref: check?.ref, total: totals?.grand, tableLabel: check?.tableLabel, orderType: check?.orderType, server: check?.server },
+        label: `Receipt ${check?.ref || ''} — £${(totals?.grand || 0).toFixed(2)}`.trim(),
+      });
     }
     // Fallback: browser print
     browserPrint(buildReceiptHtml({ location, check, items, totals }));
     return { ok: true, transport: 'browser' };
   }
 
-  async printKitchenTicket(ticketData, printerId = null) {
+  async printKitchenTicket(ticketData, printerId = null, opts = {}) {
     const printer = this._printerForRole('kitchen', printerId);
     if (printer?.address) {
       const bytes = buildKitchenTicket(ticketData);
-      return this._submitJob(printer, 'kitchen', bytes);
+      return this._submitJob(printer, 'kitchen', bytes, {
+        idempotencyKey: opts.idempotencyKey,
+        metadata: { tableLabel: ticketData.table, server: ticketData.server, covers: ticketData.covers, course: ticketData.course, centreName: ticketData.centreName },
+        label: `Kitchen ticket — ${ticketData.table || 'Walk-in'} (${ticketData.centreName || 'kitchen'})`,
+      });
     }
     return { ok: false, error: 'No kitchen printer configured' };
   }
@@ -351,7 +494,9 @@ class PrintService {
   async printTestPage(printer) {
     if (!printer?.address) throw new Error('No printer address');
     const bytes = buildTestPage();
-    return this._submitJob(printer, 'test', bytes);
+    return this._submitJob(printer, 'test', bytes, {
+      label: `Test print → ${printer.name}`,
+    });
   }
 
   async openCashDrawer(printerId = null) {

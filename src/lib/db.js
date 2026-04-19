@@ -173,7 +173,27 @@ export const insertKDSTicket = async (ticket, locationId = null) => {
     all_courses: ticket.allCourses || [],
     sent_at: ticket.sentAt ? new Date(ticket.sentAt).toISOString() : new Date().toISOString(),
   };
-  return supabase.from('kds_tickets').insert(row);
+
+  // v4.3 — durable send: if the network/Supabase fails, queue the write to
+  // IndexedDB so it replays when the device comes back online. No lost tickets.
+  const handleFailure = async (err) => {
+    try {
+      const { queueWrite } = await import('../sync/OfflineQueue');
+      await queueWrite({ type: 'upsert', table: 'kds_tickets', payload: row, onConflict: 'id' });
+      console.warn('[KDS] Send failed, queued for retry:', err?.message || err);
+    } catch (qe) {
+      console.error('[KDS] CRITICAL: send failed AND queueing failed:', qe?.message || qe);
+    }
+  };
+
+  try {
+    const res = await supabase.from('kds_tickets').insert(row);
+    if (res?.error) await handleFailure(res.error);
+    return res;
+  } catch (err) {
+    await handleFailure(err);
+    return { data: null, error: err };
+  }
 };
 
 export const bumpKDSTicket = async (id) => {

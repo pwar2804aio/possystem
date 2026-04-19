@@ -131,30 +131,29 @@ function PrinterForm({ initial, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Model picker — grouped by brand */}
+      {/* Model picker — brand then model dropdown (replaces 20-button wall) */}
       <div style={{ marginBottom:14 }}>
         <label style={S.label}>Printer model</label>
         {(() => {
           const brands = [...new Set(MODELS.map(m => m.brand))];
+          const currentBrand = model.brand;
+          const modelsForBrand = MODELS.filter(m => m.brand === currentBrand);
+          const onBrandChange = (newBrand) => {
+            // Pick first model in the new brand
+            const firstInBrand = MODELS.find(m => m.brand === newBrand);
+            if (firstInBrand) f('model', firstInBrand.id);
+          };
+          const selectStyle = { ...S.input, cursor:'pointer', appearance:'none', WebkitAppearance:'none',
+            backgroundImage:`url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M6 8L0 0h12z'/%3E%3C/svg%3E")`,
+            backgroundRepeat:'no-repeat', backgroundPosition:'right 12px center', paddingRight:32 };
           return (
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {brands.map(brand => (
-                <div key={brand}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:4 }}>{brand}</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                    {MODELS.filter(m => m.brand === brand).map(m => (
-                      <button key={m.id} onClick={() => f('model', m.id)} style={{
-                        padding:'6px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', fontSize:12, fontWeight:600,
-                        background: form.model === m.id ? 'var(--acc-d)' : 'var(--bg3)',
-                        border: `1.5px solid ${form.model === m.id ? 'var(--acc)' : 'var(--bdr)'}`,
-                        color: form.model === m.id ? 'var(--acc)' : 'var(--t2)',
-                      }}>
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div style={{ display:'grid', gridTemplateColumns:'minmax(140px, 1fr) 2fr', gap:8 }}>
+              <select value={currentBrand} onChange={e => onBrandChange(e.target.value)} style={selectStyle}>
+                {brands.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <select value={form.model} onChange={e => f('model', e.target.value)} style={selectStyle}>
+                {modelsForBrand.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
             </div>
           );
         })()}

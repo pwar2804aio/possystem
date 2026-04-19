@@ -1743,10 +1743,15 @@ export const useStore = create((set, get) => ({
   printJobs: [],
   routePrintJob: async (job) => {
     // job shape: { centreId, printerName, tableLabel, items, type, server, covers, course }
+    //
+    // v4.3.0 — DURABLE-FIRST dispatch.
+    // printService._submitJob inserts a print_jobs row before attempting any
+    // dispatch. That row is the durable source of truth. This function just
+    // does ONE immediate attempt; the master-side PrintRetrier handles retries.
     const jobId = `pj-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
     const basePrintJob = { ...job, id: jobId, sentAt: Date.now() };
 
-    // Look up the printer configured for this centre from the routing config
+    // Look up the printer configured for this centre
     const routingConfig = (() => {
       try {
         const stored = useStore.getState().printRouting;
@@ -1765,62 +1770,51 @@ export const useStore = create((set, get) => ({
       return;
     }
 
-    // Mark job as sending
+    // Stable idempotency key so replays don't double-print this same ticket
+    const idempotencyKey = `kitchen-${job.tableLabel || 'walkin'}-${job.centreId}-${job.course || 0}-${basePrintJob.sentAt}`;
+
+    // Local UI job marker — reflects Supabase-side state via realtime subs
     set(s => ({ printJobs: [{ ...basePrintJob, status: 'sending', printerId, attempts: 0 }, ...s.printJobs.slice(0, 49)] }));
 
-    // Retry with exponential backoff: immediate, 2s, 8s
-    const DELAYS = [0, 2000, 8000];
-    let lastError = null;
-    let lastResult = null;
+    try {
+      const result = await printService.printKitchenTicket({
+        table: job.tableLabel || '',
+        server: job.server || '',
+        covers: job.covers || 0,
+        course: job.course || null,
+        centreName: centre?.name || job.printerName || 'Kitchen',
+        items: job.items || [],
+        sentAt: basePrintJob.sentAt,
+      }, printerId, { idempotencyKey });
 
-    for (let attempt = 0; attempt < DELAYS.length; attempt++) {
-      if (DELAYS[attempt] > 0) {
-        await new Promise(r => setTimeout(r, DELAYS[attempt]));
-        // Update attempt counter in UI
+      // Any outcome here is "first attempt done". PrintRetrier handles persistent retries.
+      if (result?.ok) {
         set(s => ({
           printJobs: s.printJobs.map(pj =>
-            pj.id === jobId ? { ...pj, status: 'retrying', attempts: attempt } : pj
+            pj.id === jobId ? { ...pj, status: result.transport === 'queued' ? 'queued' : 'printed', transport: result.transport, supabaseJobId: result.jobId } : pj
           ),
         }));
+        if (result.transport !== 'queued') printService.recordPrinterHealth(printerId, 'online');
+      } else {
+        // Native bridge failed — durable row is in place, PrintRetrier will pick it up.
+        // Update local UI to show pending retry instead of hard failure.
+        set(s => ({
+          printJobs: s.printJobs.map(pj =>
+            pj.id === jobId ? { ...pj, status: 'retry-pending', error: result.error, supabaseJobId: result.jobId, attempts: 1 } : pj
+          ),
+        }));
+        // Don't toast yet — retrier may still succeed. Only toast on permanent failure (handled elsewhere).
       }
-
-      try {
-        const result = await printService.printKitchenTicket({
-          table: job.tableLabel || '',
-          server: job.server || '',
-          covers: job.covers || 0,
-          course: job.course || null,
-          centreName: centre?.name || job.printerName || 'Kitchen',
-          items: job.items || [],
-          sentAt: basePrintJob.sentAt,
-        }, printerId);
-
-        lastResult = result;
-
-        if (result?.ok) {
-          // Success — update job + printer health, done
-          set(s => ({
-            printJobs: s.printJobs.map(pj =>
-              pj.id === jobId ? { ...pj, status: 'printed', transport: result.transport, attempts: attempt + 1 } : pj
-            ),
-          }));
-          printService.recordPrinterHealth(printerId, 'online');
-          return;
-        }
-        lastError = result?.error || 'Unknown print failure';
-      } catch (err) {
-        lastError = err.message || 'Print failed';
-      }
+    } catch (err) {
+      // Shouldn't normally happen — _submitJob catches its own errors
+      set(s => ({
+        printJobs: s.printJobs.map(pj =>
+          pj.id === jobId ? { ...pj, status: 'failed', error: err.message } : pj
+        ),
+      }));
+      printService.recordPrinterHealth(printerId, 'offline', err.message);
+      get().showToast(`Print failed: ${err.message}. Check the status drawer.`, 'error');
     }
-
-    // All retries exhausted → mark failed, record health, warn staff
-    set(s => ({
-      printJobs: s.printJobs.map(pj =>
-        pj.id === jobId ? { ...pj, status: 'failed', error: lastError, attempts: DELAYS.length } : pj
-      ),
-    }));
-    printService.recordPrinterHealth(printerId, 'offline', lastError);
-    get().showToast(`Print failed after ${DELAYS.length} attempts: ${centre?.name || 'Kitchen'} — ${lastError}. Tap status icon to reprint.`, 'error');
   },
 
   // Print a customer receipt (called from close-check flow, ReceiptModal, etc.)
