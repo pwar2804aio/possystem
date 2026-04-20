@@ -75,7 +75,19 @@ export default function MenuImportModal({ menuId, onClose }) {
         body: JSON.stringify({ filename: file.name, mimeType: file.type, base64 }),
       });
 
-      const data = await res.json();
+      // Read response as text first so we can surface the real error even if
+      // the server returned HTML (e.g. Vercel "An error occurred" page) instead
+      // of JSON. Previously `res.json()` threw on HTML and hid the real error.
+      const rawText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        // Non-JSON response. Show a truncated preview and the status code so the
+        // real server error is visible to the user.
+        const preview = rawText.slice(0, 200).replace(/\s+/g, ' ').trim();
+        throw new Error(`Server returned non-JSON (${res.status}): ${preview}`);
+      }
       if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
 
       if (!data.draft || !Array.isArray(data.draft.categories) || !Array.isArray(data.draft.items)) {
