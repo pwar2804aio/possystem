@@ -321,37 +321,48 @@ export default function POSSurface() {
       };
     })() : null;
 
-    if (activeTableId) {
-      // If table has unsent items, fire them to kitchen before closing
-      const session = useStore.getState().tables.find(t=>t.id===activeTableId)?.session;
-      const hasUnsent = session?.items?.some(i => i.status === 'pending' && !i.voided);
-      if (hasUnsent) sendToKitchen();
-      clearTable(activeTableId, paymentInfo);
-      showToast('Payment complete — table cleared','success');
-      setSurface('tables');
-    } else {
-      // Walk-in: if order hasn't been sent to kitchen yet, fire it now
-      const order = useStore.getState().walkInOrder;
-      const hasUnsent = order?.items?.some(i => i.status === 'pending' && !i.voided);
-      if (hasUnsent) sendToKitchen();
-      recordWalkInClosed(useStore.getState().walkInOrder, orderType, customer, paymentInfo);
-      clearWalkIn();
-      showToast('Payment complete','success');
+    // v4.4.7: Wrap state mutations in try/catch so a throw inside clearTable/
+    // recordWalkInClosed does NOT prevent the auto-print dispatch. Print is
+    // fire-and-forget via the durable print_jobs queue.
+    console.info('[PayComplete] shouldPrint=', shouldPrint, 'deviceConfig.apc=', deviceConfig?.autoPrintReceiptOnClose, 'paymentInfo.printReceipt=', paymentInfo.printReceipt);
+    try {
+      if (activeTableId) {
+        // If table has unsent items, fire them to kitchen before closing
+        const session = useStore.getState().tables.find(t => t.id === activeTableId);
+        const hasUnsent = session?.items?.some(i => i.status === 'pending' && !i.voided);
+        if (hasUnsent) sendToKitchen(activeTableId);
+        clearTable(activeTableId, paymentInfo);
+        showToast('Payment complete, table cleared', 'success');
+        setSurface('tables');
+      } else {
+        // Walk-in: if order hasn't been sent to kitchen yet, fire it now
+        const order = useStore.getState().walkInOrder;
+        const hasUnsent = order?.items?.some(i => i.status === 'pending' && !i.voided);
+        if (hasUnsent) sendToKitchen(null);
+        recordWalkInClosed(useStore.getState().walkInOrder, orderType, customer, paymentInfo);
+        clearWalkIn();
+        showToast('Payment complete', 'success');
+      }
+    } catch (mutErr) {
+      console.error('[PayComplete] State mutation failed — continuing to print:', mutErr?.message || mutErr);
     }
 
     // Fire-and-forget: dispatch happens via the durable print_jobs queue so
     // a failed printer doesn't block the UI. Errors surface via StatusDrawer.
     if (receiptSnapshot) {
-      // Pull the real ref from the closedCheck that clearTable/recordWalkInClosed
+      // Pull the real ref from closedCheck that clearTable/recordWalkInClosed
       // just appended. Fall back to a short timestamp if for any reason the
-      // store didn't record one (shouldn't happen but print should never fail here).
+      // store didn't record one (shouldn't happen, but print should never fail here).
       const closedChecks = useStore.getState().closedChecks;
       const freshRef = closedChecks[closedChecks.length - 1]?.ref
-        || `#${Date.now().toString().slice(-4)}`;
+        || ('#' + Date.now().toString().slice(-4));
       receiptSnapshot.check.ref = freshRef;
+      console.info('[PayComplete] dispatching auto-print with ref=', freshRef);
       printService.printReceipt(receiptSnapshot).catch(err => {
         console.warn('[Print] Auto-print on close failed:', err?.message || err);
       });
+    } else {
+      console.info('[PayComplete] no receiptSnapshot — auto-print skipped');
     }
   };
 
