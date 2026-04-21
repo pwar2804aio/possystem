@@ -659,7 +659,7 @@ function MenuTab() {
                 <button onClick={()=>setShowAddPanel(true)} style={{ padding:'8px 18px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:700 }}>+ Add items to this category</button>
               </div>
             ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:10 }}>
                 {gridWithSpacers.map(item=>{
                   // Spacer cell — draggable blank layout cell
                   if (item._spacer) return (
