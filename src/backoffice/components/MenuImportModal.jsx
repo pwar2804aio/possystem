@@ -32,8 +32,7 @@ const CONFIDENCE_META = {
 };
 
 export default function MenuImportModal({ menuId, onClose }) {
-  const { addCategory, addMenuItem, showToast, markBOChange, menuCategories } = useStore();
-  const existingRootCats = (menuCategories || []).filter(c => !c.parentId && !c.isSpecial);
+  const { addCategory, addMenuItem, showToast, markBOChange } = useStore();
 
   const [phase, setPhase] = useState('drop'); // drop | uploading | parsing | review | publishing | done
   const [statusMsg, setStatusMsg] = useState('');
@@ -334,6 +333,8 @@ export default function MenuImportModal({ menuId, onClose }) {
 
 // ── Review panel ─────────────────────────────────────────────────────────────
 function ReviewPanel({ draft, meta, updateCat, removeCat, updateItem, removeItem }) {
+  const { menuCategories } = useStore();
+  const existingRootCats = (menuCategories || []).filter(c => !c.parentId && !c.isSpecial);
   const byCategory = {};
   for (const cat of draft.categories) byCategory[cat.id] = [];
   for (const item of draft.items) {
