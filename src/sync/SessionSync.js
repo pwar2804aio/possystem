@@ -52,12 +52,12 @@ export async function flushSessions() {
     }).then(() => {
       // If online, also write directly for immediate sync
       if (isOnline()) {
-        supabase.from('active_sessions').upsert({
+        Promise.resolve(supabase.from('active_sessions').upsert({
           location_id: _locationId,
           table_id: t.id,
           session: t.session,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'location_id,table_id' }).catch(e => console.warn('[SessionSync]', e.message));
+        }, { onConflict: 'location_id,table_id' })).catch(e => console.warn('[SessionSync]', e.message));
       }
     });
   }
@@ -83,9 +83,10 @@ export async function flushSessions() {
         match: { location_id: _locationId, table_id: tid },
       });
       if (isOnline()) {
-        supabase.from('active_sessions')
-          .delete().eq('location_id', _locationId).eq('table_id', tid)
-          .catch(e => console.warn('[SessionSync] delete error:', e.message));
+        Promise.resolve(
+          supabase.from('active_sessions')
+            .delete().eq('location_id', _locationId).eq('table_id', tid)
+        ).catch(e => console.warn('[SessionSync] delete error:', e.message));
       }
     }
   }
