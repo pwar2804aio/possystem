@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.5.0', date: '21 Apr 2026', label: 'Menu grid lock, category UX, import merge, long labels, instruction-groups DB fix',
+    changes: [
+      'Feat: POS and back-office product grids both locked to 6 columns (was auto-fill with varying min-widths). Spacer placement in the menu builder now matches exactly what appears on the POS regardless of screen width — deterministic layout instead of per-device drift.',
+      'Feat: category tree in Back Office → Menu Manager is readable — panel widened 200→240px, parent labels 11→13px in primary colour, child labels 10→12px in secondary colour, header label brighter, rename buttons (✎) always visible instead of hover-only. Subcategory nesting workflow (drag parent-onto-parent, or ↕ move button) was already present but was invisible behind the dim old styling.',
+      'Feat: AI Menu Import → Review now offers “Merge into existing category” per draft category. Previously every import created a new category even when the content belonged in one you already had; now a dropdown per draft category lets you pick “+ Create new” (default) or any existing root category by name. Picking an existing one skips addCategory on publish, maps the draft category-id to the existing real id, and imports the items straight into it.',
+      'Feat: POS category nav labels wrap to 2 lines instead of single-line ellipsis truncation. Long restaurant category names (“Small Plates & Starters”, “Breakfast Specials”) now render in full. Cat-btn CSS changed from fixed height:60px to min-height:60px so short names still look consistent but long ones have room to grow.',
+      'Fix: menu_items.assigned_instruction_groups column was TYPED AS text[] in Postgres but the application writes it using the same array-of-objects shape as assigned_modifier_groups (which is correctly jsonb). text[] rejects objects — so every save/push/deploy silently wiped this column, which is why instruction groups kept disappearing from products. Migrated the column to jsonb (migrations/2026-04-21-instruction-groups-jsonb.sql). Historical data was already gone so nothing to restore — re-assign instruction groups once and they will persist from now on.',
+      'Fix: MenuImportModal — existingRootCats hook was declared in MenuImportModal but the category-header JSX that used it lives inside the ReviewPanel sub-component. Moved the useStore hook into ReviewPanel so the dropdown actually renders (was throwing ReferenceError: existingRootCats is not defined on Review step open).',
+    ],
+  },
+  {
     version: '4.4.9', date: '21 Apr 2026', label: 'User/PIN system fixes — manager bypass, live staff, permission persistence',
     changes: [
       'Fix: VoidModal, DiscountModal and RefundModal (in CheckHistory) no longer read the manager PIN list from the hardcoded seed file. They now read live staffMembers from the store (populated from Supabase), so the PINs set in Back Office → Staff & Access are the ones that actually work. Previously only the seed default PIN 1234 (Alex) was accepted.',
