@@ -59,6 +59,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.4.1', date: '21 Apr 2026', label: 'Receipt fixes from first test round',
+    changes: [
+      'Ops Supabase: receipt-control migration executed — auto_print_receipt_on_close and receipt_branding columns now exist',
+      'Ops Supabase: Storage bucket receipt-assets (public) created — logo/QR uploads now work',
+      'Fix: TOTAL line alignment on printed receipt — switched from doubleBoth to doubleHeight so the 42-char column math stays correct',
+      'Fix: ORDER number now prominent on printed receipt — bold, double-height, centered ORDER # line above the date',
+      'Fix: Receipt branding save no longer silently succeeds when 0 rows match — detects and throws with clear message',
+      'Fix: Device profile save no longer silently succeeds when 0 rows match — detects and throws with clear message',
+      'Fix: Logo/QR upload errors now surface in a persistent red banner on the Back Office Receipt page (toasts dismissed too fast)',
+      'Fix: Upload error message now names the Storage bucket explicitly so operators know what to create in Supabase',
+    ]
+  },
+  {
     version: '4.4.0', date: '21 Apr 2026', label: 'Receipt branding + auto-print control',
     changes: [
       'Back Office: new Receipt section — logo upload, business details, footer message, QR editor, live 80mm preview',
