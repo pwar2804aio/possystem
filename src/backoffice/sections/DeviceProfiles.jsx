@@ -33,6 +33,7 @@ const DEFAULT_PROFILES = [
     defaultSurface:'tables', enabledOrderTypes:['dine-in','takeaway','collection'],
     assignedSection:null, hiddenFeatures:[], tableServiceEnabled:true,
     quickScreenEnabled:true, receiptPrinterId:'pr1', deviceCount:1,
+    autoPrintReceiptOnClose:true,
   },
   {
     id:'prof-2', name:'Bar terminal', color:'#e8a020',
@@ -40,6 +41,7 @@ const DEFAULT_PROFILES = [
     assignedSection:'bar', hiddenFeatures:['courses','kiosk','reports'],
     tableServiceEnabled:false, quickScreenEnabled:true,
     receiptPrinterId:'pr3', deviceCount:1,
+    autoPrintReceiptOnClose:true,
   },
   {
     id:'prof-3', name:'Server handheld', color:'#22c55e',
@@ -47,6 +49,7 @@ const DEFAULT_PROFILES = [
     assignedSection:null, hiddenFeatures:['kiosk','reports','discounts','voids'],
     tableServiceEnabled:true, quickScreenEnabled:true,
     receiptPrinterId:'pr1', deviceCount:1,
+    autoPrintReceiptOnClose:true,
   },
 ];
 
@@ -86,6 +89,7 @@ export default function DeviceProfiles() {
         assignedSection: p.assigned_section, hiddenFeatures: p.hidden_features || [],
         tableServiceEnabled: p.table_service_enabled !== false,
         quickScreenEnabled: p.quick_screen_enabled !== false,
+        autoPrintReceiptOnClose: p.auto_print_receipt_on_close !== false,
         menuId: p.menu_id,
         deviceCount: countMap[p.id] || 0,
         serviceCharge: p.service_charge || null,
@@ -108,6 +112,7 @@ export default function DeviceProfiles() {
     hidden_features: p.hiddenFeatures || [],
     table_service_enabled: p.tableServiceEnabled !== false,
     quick_screen_enabled: p.quickScreenEnabled !== false,
+    auto_print_receipt_on_close: p.autoPrintReceiptOnClose !== false,
     menu_id: p.menuId || null,
     sort_order: p.sortOrder || 0,
     service_charge: p.serviceCharge || null,
@@ -258,6 +263,7 @@ export default function DeviceProfiles() {
                   <ConfigRow label="Default screen" value={SURFACES.find(s => s.id === prof.defaultSurface)?.label}/>
                   <ConfigRow label="Order types" value={prof.enabledOrderTypes.map(t => ORDER_TYPES.find(o => o.id === t)?.icon + ' ' + ORDER_TYPES.find(o => o.id === t)?.label).join(' · ')}/>
                   <ConfigRow label="Table service" value={prof.tableServiceEnabled ? '✓ Enabled' : '✕ Disabled'} valueColor={prof.tableServiceEnabled ? 'var(--grn)' : 'var(--red)'}/>
+                  <ConfigRow label="Auto-print receipt" value={prof.autoPrintReceiptOnClose !== false ? '✓ Enabled' : '✕ Disabled'} valueColor={prof.autoPrintReceiptOnClose !== false ? 'var(--grn)' : 'var(--red)'}/>
                   <ConfigRow label="Section" value={prof.assignedSection || 'All sections'}/>
                   {prof.hiddenFeatures.length > 0 && (
                     <ConfigRow label="Hidden features" value={prof.hiddenFeatures.join(', ')} truncate/>
@@ -281,6 +287,7 @@ export default function DeviceProfiles() {
                     hiddenFeatures: prof.hiddenFeatures,
                     tableServiceEnabled: prof.tableServiceEnabled,
                     quickScreenEnabled: prof.quickScreenEnabled,
+                    autoPrintReceiptOnClose: prof.autoPrintReceiptOnClose !== false,
                     menuId: prof.menuId,
                     receiptPrinterId: prof.receiptPrinterId,
                   });
@@ -319,6 +326,7 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
     defaultSurface:'tables', enabledOrderTypes:['dine-in'],
     assignedSection:null, hiddenFeatures:[],
     tableServiceEnabled:true, quickScreenEnabled:true, receiptPrinterId:'pr1', menuId:null,
+    autoPrintReceiptOnClose:true,
   });
 
   const upd = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -426,6 +434,20 @@ function ProfileEditor({ profile, onSave, onDelete, onClose }) {
               background: form.tableServiceEnabled ? 'var(--grn)' : 'var(--bg4)', transition:'all .2s', flexShrink:0, position:'relative',
             }}>
               <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff', position:'absolute', top:3, left: form.tableServiceEnabled ? 22 : 3, transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.3)' }}/>
+            </button>
+          </div>
+
+          {/* Auto-print receipt on close toggle */}
+          <div style={{ marginBottom:18, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', background:'var(--bg3)', borderRadius:10, border:'1px solid var(--bdr)' }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>Auto-print receipt on close</div>
+              <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>Print customer receipt automatically when payment completes. Staff can still untick per-transaction on the pay screen.</div>
+            </div>
+            <button onClick={() => upd('autoPrintReceiptOnClose', form.autoPrintReceiptOnClose === false)} style={{
+              width:44, height:24, borderRadius:12, border:'none', cursor:'pointer',
+              background: form.autoPrintReceiptOnClose !== false ? 'var(--grn)' : 'var(--bg4)', transition:'all .2s', flexShrink:0, position:'relative',
+            }}>
+              <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff', position:'absolute', top:3, left: form.autoPrintReceiptOnClose !== false ? 22 : 3, transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.3)' }}/>
             </button>
           </div>
 
