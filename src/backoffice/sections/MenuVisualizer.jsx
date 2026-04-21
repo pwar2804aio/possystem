@@ -72,9 +72,10 @@ export default function MenuVisualizer() {
       const def = modifierGroupDefs?.find(d=>d.id===ag.groupId);
       if (def) flow.push({ type:'modifier', group:def, required:(ag.min||0)>0 });
     });
-    (item.assignedInstructionGroups||[]).forEach(gid => {
+    (item.assignedInstructionGroups||[]).forEach(e => {
+      const gid = typeof e === 'string' ? e : e?.groupId;
       const def = instructionGroupDefs?.find(d=>d.id===gid);
-      if (def) flow.push({ type:'instruction', group:def });
+      if (def) flow.push({ type:'instruction', group:def, required: (e?.min ?? def.min ?? 0) > 0 });
     });
     return flow;
   };
@@ -371,7 +372,9 @@ function ItemQuickEdit({ item, onClose, menuItems, menuCategories, modifierGroup
   const fp = (k,v) => updateMenuItem(item.id,{pricing:{...p,[k]:v===''?null:parseFloat(v)||0},...(k==='base'?{price:parseFloat(v)||0}:{})});
 
   const assignedMods = item.assignedModifierGroups||[];
-  const assignedInst = item.assignedInstructionGroups||[];
+  // Shape-tolerant: accept legacy string[] or new [{groupId,min?}] and always write objects
+  const assignedInst = (item.assignedInstructionGroups||[]).map(e => typeof e === 'string' ? { groupId: e } : e);
+  const hasInst = gid => assignedInst.some(a => a.groupId === gid);
 
   const addMod = gid => {
     if (assignedMods.find(ag=>ag.groupId===gid)) return;
@@ -384,11 +387,11 @@ function ItemQuickEdit({ item, onClose, menuItems, menuCategories, modifierGroup
     const arr=[...assignedMods];const[m]=arr.splice(from,1);arr.splice(to,0,m);
     updateMenuItem(item.id,{assignedModifierGroups:arr});
   };
-  const addInst = gid => { if(assignedInst.includes(gid))return; updateMenuItem(item.id,{assignedInstructionGroups:[...assignedInst,gid]}); setInstSearch(''); };
-  const removeInst = gid => updateMenuItem(item.id,{assignedInstructionGroups:assignedInst.filter(g=>g!==gid)});
+  const addInst = gid => { if(hasInst(gid))return; updateMenuItem(item.id,{assignedInstructionGroups:[...assignedInst, { groupId: gid }]}); setInstSearch(''); };
+  const removeInst = gid => updateMenuItem(item.id,{assignedInstructionGroups:assignedInst.filter(a=>a.groupId!==gid)});
 
   const filteredMods = (allMods||[]).filter(g=>!assignedMods.find(ag=>ag.groupId===g.id)&&(modSearch===''||(g.name||'').toLowerCase().includes(modSearch.toLowerCase())));
-  const filteredInst = (allInsts||[]).filter(g=>!assignedInst.includes(g.id)&&(instSearch===''||(g.name||'').toLowerCase().includes(instSearch.toLowerCase())));
+  const filteredInst = (allInsts||[]).filter(g=>!hasInst(g.id)&&(instSearch===''||(g.name||'').toLowerCase().includes(instSearch.toLowerCase())));
 
   const SECS = [
     {id:'details',label:'Details'},
