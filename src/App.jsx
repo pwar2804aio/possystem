@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.4.2', date: '21 Apr 2026', label: 'Receipt branding actually reaches printer',
+    changes: [
+      'CRITICAL fix: printer.js was missing import of loadLocationBranding + mergeBrandingIntoLocation — saved branding never reached the receipt (ReferenceError swallowed by try/catch, silent plain-receipt fallback)',
+      'Storage RLS: 4 policies added for receipt-assets bucket (select/insert/update/delete for authenticated role) — mirrors product-images pattern; logo/QR upload no longer 403s',
+      'v4.4.2 is the patch that actually delivers the v4.4.0 receipt-branding feature end-to-end',
+    ]
+  },
+  {
     version: '4.4.1', date: '21 Apr 2026', label: 'Receipt fixes from first test round',
     changes: [
       'Ops Supabase: receipt-control migration executed — auto_print_receipt_on_close and receipt_branding columns now exist',
