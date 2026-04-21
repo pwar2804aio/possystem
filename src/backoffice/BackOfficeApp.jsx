@@ -420,12 +420,12 @@ function PushToPOSButton() {
             location_id: locationId,
             tax_rate_id: item.taxRateId ?? item.tax_rate_id ?? null,
             tax_overrides: item.taxOverrides ?? item.tax_overrides ?? {},
-          }, locationId).catch(() => {});
+          }, locationId).catch(e => console.warn('[push] upsertMenuItem failed for', item.id, item.name, '—', e?.message || e));
         }
       }
       if (locationId && menuCategories?.length) {
         for (const cat of menuCategories) {
-          upsertMenuCategory({ ...cat, location_id: locationId }, locationId).catch(() => {});
+          upsertMenuCategory({ ...cat, location_id: locationId }, locationId).catch(e => console.warn('[push] upsertMenuCategory failed for', cat.id, cat.label, '—', e?.message || e));
         }
       }
     });
