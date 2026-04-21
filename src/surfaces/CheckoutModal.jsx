@@ -270,11 +270,15 @@ function CashTransaction({ grand, onComplete, onBack }) {
 // ─── Main checkout modal ──────────────────────────────────────────────────────
 export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
   const compact = useCompact();
-  const { taxRates } = useStore();
+  const { taxRates, deviceConfig } = useStore();
   const [screen, setScreen] = useState('review');
   const [namesOnly, setNamesOnly] = useState(false);
   const [tipAmt, setTipAmt] = useState(0);
   const [showSplit, setShowSplit] = useState(false);
+  // Staff per-transaction override of the device-profile default. Default
+  // tracks the device profile so existing behaviour is preserved when the
+  // toggle is true (legacy). When toggle is false the checkbox lands unchecked.
+  const [printReceipt, setPrintReceipt] = useState(deviceConfig?.autoPrintReceiptOnClose !== false);
 
   const isBarTab = orderType==='bar-tab';
   const skipTip  = isBarTab || orderType==='takeaway' || orderType==='collection';
@@ -289,7 +293,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
   const hasExclusive = taxBreakdown?.hasExclusiveTax;
 
   const complete = (method, tip=tipAmt, tendered=null) => {
-    onComplete({ method: method, tip, grand: total+tip, tendered });
+    onComplete({ method: method, tip, grand: total+tip, tendered, printReceipt });
   };
 
   const handleCardPress = () => {
@@ -450,6 +454,30 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                 </div>
               </div>
 
+              {/* ── Print receipt checkbox ── */}
+              <div
+                onClick={()=>setPrintReceipt(v => !v)}
+                style={{
+                  marginBottom:10, padding:'10px 14px', borderRadius:10, cursor:'pointer',
+                  background:'var(--bg3)', border:`1.5px solid ${printReceipt ? 'var(--acc-b)' : 'var(--bdr)'}`,
+                  display:'flex', alignItems:'center', gap:10,
+                  transition:'border-color .14s, background .14s',
+                }}
+              >
+                <div style={{
+                  width:18, height:18, borderRadius:4, flexShrink:0,
+                  border:`2px solid ${printReceipt ? 'var(--acc)' : 'var(--bdr2)'}`,
+                  background: printReceipt ? 'var(--acc)' : 'transparent',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                }}>
+                  {printReceipt && <div style={{ fontSize:11, color:'#0e0f14', fontWeight:900, lineHeight:1 }}>✓</div>}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>Print receipt</div>
+                  <div style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>Automatically print a customer receipt when payment completes</div>
+                </div>
+              </div>
+
               {/* ── Primary payment buttons ── */}
               <div style={{ display:'flex', gap:10, marginBottom:10 }}>
                 <button onClick={handleCardPress} style={{
@@ -523,7 +551,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
           items={items}
           total={total}
           covers={covers}
-          onComplete={(portions)=>{ setShowSplit(false); onComplete({ method:'split', tip:0, grand:total, portions }); }}
+          onComplete={(portions)=>{ setShowSplit(false); onComplete({ method:'split', tip:0, grand:total, portions, printReceipt }); }}
           onClose={()=>setShowSplit(false)}
         />
       )}
