@@ -462,6 +462,30 @@ class PrintService {
     }
   }
 
+  // Called by PrintOrchestrator.dispatchJob (v4.3). Thin wrapper that dispatches
+  // bytes via the native bridge and returns { ok, error } — orchestrator handles
+  // the durable-row state transitions itself.
+  //
+  // This method was referenced by PrintOrchestrator since v4.3 but never
+  // implemented on PrintService, which caused every orchestrator dispatch on
+  // native-bridge devices (Sunmi etc.) to throw TypeError and mark the row
+  // failed. Symptom: "Printer offline" in Back Office, jobs stuck in failed/
+  // failed_permanent despite printer being fully reachable.
+  async _dispatchBytesDirect(bytes, ip, port = 9100) {
+    if (!isNativeBridgeAvailable()) {
+      return { ok: false, error: 'No native bridge on this device (browser-only)' };
+    }
+    if (!ip) {
+      return { ok: false, error: 'No printer IP' };
+    }
+    try {
+      await nativePrint(bytes, ip, port);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.message || 'Native print failed' };
+    }
+  }
+
   // Public API — opts: { idempotencyKey?, metadata?, label? }
   async printReceipt({ location, check, items, totals }, printerId = null, opts = {}) {
     const printer = this._printerForRole('receipt', printerId);
