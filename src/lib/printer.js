@@ -21,12 +21,17 @@ class EscPosBuilder {
 
   _push(...args) {
     for (const a of args) {
-      if (Array.isArray(a)) this.bytes.push(...a);
-      else if (typeof a === 'string') { for (let i = 0; i < a.length; i++) this.bytes.push(a.charCodeAt(i) & 0xff); }
+      if (a instanceof Uint8Array) { for (let i = 0; i < a.length; i++) this.bytes.push(a[i]); }
+      else if (Array.isArray(a)) this.bytes.push(...a);
+      else if (typeof a === 'string') {
+        for (let i = 0; i < a.length; i++) this.bytes.push(a.charCodeAt(i) & 0xff);
+      }
       else this.bytes.push(a);
     }
     return this;
   }
+  /** Append raw ESC/POS bytes (from rasteriser, QR helper, etc.). */
+  raw(bytes) { return this._push(bytes); }
 
   init()             { return this._push([ESC,0x40]); }
   cut()              { return this._push([GS,0x56,0x42,0x00]); }
@@ -65,20 +70,57 @@ class EscPosBuilder {
 }
 
 // ─── Receipt templates ────────────────────────────────────────────────────────
-export function buildCustomerReceipt({ location, check, items, totals }) {
+// buildCustomerReceipt is async because it may await image rasterisation
+// (header logo, footer QR image mode). The native QR path is synchronous.
+// All branding is optional: a location with no receipt_branding falls back
+// to the legacy text-only receipt unchanged.
+export async function buildCustomerReceipt({ location, check, items, totals }) {
   const b = new EscPosBuilder(42);
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const dateStr = now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
 
-  b.init().center().bold(true).doubleBoth().text(location?.name||'Restaurant').lf()
-   .normal().center()
-   .line(location?.address||'').lf()
-   .divider()
-   .left()
-   .twoCol(`Ref: ${check?.ref||''}`, `${dateStr} ${timeStr}`)
-   .twoCol(`Server: ${check?.server||''}`, check?.covers>1?`${check.covers} covers`:'')
-   .twoCol(`${check?.tableLabel||check?.orderType||''}`, '')
+  const branding = location?.receipt_branding || null;
+  const header = branding?.header || null;
+  const footer = branding?.footer || null;
+
+  b.init();
+
+  // ── Header logo (raster) ────────────────────────────────────────────────
+  if (header?.logo_url) {
+    try {
+      const { imageUrlToEscPosRaster } = await import('./receiptRaster.js');
+      const rasterBytes = await imageUrlToEscPosRaster(
+        header.logo_url,
+        header.logo_width_dots || 384,
+      );
+      b.center().raw(rasterBytes).lf();
+    } catch (e) {
+      // Never let a missing/slow logo block the receipt — just skip it.
+      console.warn('[Print] Logo rasterise failed, skipping:', e.message);
+    }
+  }
+
+  // ── Business name / address / phone / tax id ────────────────────────────
+  const businessName = header?.business_name || location?.name || 'Restaurant';
+  b.center().bold(true).doubleBoth().text(businessName).lf().normal().center();
+
+  const addressLines = header?.address_lines?.length
+    ? header.address_lines.filter(Boolean)
+    : (location?.address ? String(location.address).split('\n') : []);
+  addressLines.forEach(line => b.line(line));
+
+  if (header?.phone)  b.line(header.phone);
+  if (header?.tax_id) b.fontB().line(header.tax_id).fontA();
+
+  b.lf().divider().left();
+
+  // ── Check header ────────────────────────────────────────────────────────
+  b.twoCol(`Ref: ${check?.ref||''}`, `${dateStr} ${timeStr}`);
+  if (header?.show_server_name !== false) {
+    b.twoCol(`Server: ${check?.server||''}`, check?.covers>1 && header?.show_covers !== false ? `${check.covers} covers` : '');
+  }
+  b.twoCol(`${check?.tableLabel||check?.orderType||''}`, '')
    .divider()
    .bold(true).line('ITEMS').bold(false);
 
@@ -123,9 +165,32 @@ export function buildCustomerReceipt({ location, check, items, totals }) {
 
   if(check?.method) b.divider().twoCol('Payment',check.method.toUpperCase()).twoCol('Status','PAID');
 
-  b.lf().center()
-   .line(location?.receiptFooter||'Thank you for dining with us!')
-   .fontB().line('Powered by Restaurant OS').fontA()
+  // ── Footer message ─────────────────────────────────────────────────────
+  const footerMsg = footer?.message || location?.receiptFooter || 'Thank you for dining with us!';
+  b.lf().center().line(footerMsg);
+
+  // ── Footer QR code ─────────────────────────────────────────────────────
+  const qr = footer?.qr;
+  if (qr?.enabled) {
+    try {
+      if (qr.mode === 'url' && qr.url_value) {
+        // Native ESC/POS QR — crisp at any paper width, no image fetch
+        const { qrTextToEscPosBytes } = await import('./receiptRaster.js');
+        const moduleSize = Math.max(1, Math.min(16, Math.round((qr.size_dots || 160) / 25)));
+        b.lf().center().raw(qrTextToEscPosBytes(qr.url_value, moduleSize, 'M')).lf();
+      } else if (qr.mode === 'upload' && qr.image_url) {
+        // Uploaded QR as a rasterised image
+        const { imageUrlToEscPosRaster } = await import('./receiptRaster.js');
+        const rasterBytes = await imageUrlToEscPosRaster(qr.image_url, qr.size_dots || 160);
+        b.lf().center().raw(rasterBytes).lf();
+      }
+      if (qr.caption) b.fontB().center().line(qr.caption).fontA();
+    } catch (e) {
+      console.warn('[Print] Footer QR render failed, skipping:', e.message);
+    }
+  }
+
+  b.fontB().line('Powered by Restaurant OS').fontA()
    .lf(4).cut();
 
   return b.toBytes();
@@ -486,11 +551,25 @@ class PrintService {
     }
   }
 
-  // Public API — opts: { idempotencyKey?, metadata?, label? }
+  // Public API — opts: { idempotencyKey?, metadata?, label?, skipBranding? }
   async printReceipt({ location, check, items, totals }, printerId = null, opts = {}) {
+    // Auto-fetch per-location branding so callers don't have to. Non-blocking:
+    // if the branding fetch fails for any reason we fall through to the plain
+    // text receipt using the location fields already present.
+    let locationWithBranding = location;
+    if (!opts.skipBranding && location?.id && !location?.receipt_branding) {
+      try {
+        const { loadLocationBranding, mergeBrandingIntoLocation } = await import('./receiptBranding.js');
+        const branding = await loadLocationBranding(location.id);
+        if (branding) locationWithBranding = mergeBrandingIntoLocation(location, branding);
+      } catch (e) {
+        console.warn('[Print] Branding fetch failed, using plain receipt:', e.message);
+      }
+    }
+
     const printer = this._printerForRole('receipt', printerId);
     if (printer?.address) {
-      const bytes = buildCustomerReceipt({ location, check, items, totals });
+      const bytes = await buildCustomerReceipt({ location: locationWithBranding, check, items, totals });
       return this._submitJob(printer, 'receipt', bytes, {
         idempotencyKey: opts.idempotencyKey || (check?.ref ? `receipt-${check.ref}` : undefined),
         metadata: { ref: check?.ref, total: totals?.grand, tableLabel: check?.tableLabel, orderType: check?.orderType, server: check?.server },
@@ -498,7 +577,7 @@ class PrintService {
       });
     }
     // Fallback: browser print
-    browserPrint(buildReceiptHtml({ location, check, items, totals }));
+    browserPrint(buildReceiptHtml({ location: locationWithBranding, check, items, totals }));
     return { ok: true, transport: 'browser' };
   }
 
