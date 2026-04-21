@@ -32,7 +32,8 @@ const CONFIDENCE_META = {
 };
 
 export default function MenuImportModal({ menuId, onClose }) {
-  const { addCategory, addMenuItem, showToast, markBOChange } = useStore();
+  const { addCategory, addMenuItem, showToast, markBOChange, menuCategories } = useStore();
+  const existingRootCats = (menuCategories || []).filter(c => !c.parentId && !c.isSpecial);
 
   const [phase, setPhase] = useState('drop'); // drop | uploading | parsing | review | publishing | done
   const [statusMsg, setStatusMsg] = useState('');
@@ -147,10 +148,15 @@ export default function MenuImportModal({ menuId, onClose }) {
       const genCatId  = () => `cat-${batch}-${(cCounter++).toString(36)}`;
       const genItemId = () => `m-${batch}-${(iCounter++).toString(36)}`;
 
-      // 1) Create categories with pre-assigned IDs
+      // 1) Create categories with pre-assigned IDs (or reuse existing if user picked one)
       const catIdMap = {};
       for (let i = 0; i < draft.categories.length; i++) {
         const c = draft.categories[i];
+        if (c.existingId) {
+          // User chose to merge imported items into an existing category
+          catIdMap[c.id] = c.existingId;
+          continue;
+        }
         const realId = genCatId();
         catIdMap[c.id] = realId;
         addCategory({
@@ -353,11 +359,26 @@ function ReviewPanel({ draft, meta, updateCat, removeCat, updateItem, removeItem
       {draft.categories.map(cat => (
         <div key={cat.id} style={{ marginBottom:18, border:'1px solid var(--bdr)', borderRadius:10, overflow:'hidden' }}>
           {/* Category header */}
-          <div style={{ display:'flex', gap:8, alignItems:'center', padding:10, background:'var(--bg2)', borderBottom:'1px solid var(--bdr)' }}>
-            <input style={{ ...inp, width:50, textAlign:'center' }}
-              value={cat.icon} onChange={e=>updateCat(cat.id, { icon: e.target.value })} />
-            <input style={{ ...inp, flex:1, fontWeight:700 }}
-              value={cat.label} onChange={e=>updateCat(cat.id, { label: e.target.value })} />
+          <div style={{ display:'flex', gap:8, alignItems:'center', padding:10, background:'var(--bg2)', borderBottom:'1px solid var(--bdr)', flexWrap:'wrap' }}>
+            <select
+              value={cat.existingId || ''}
+              onChange={e=>updateCat(cat.id, { existingId: e.target.value || null })}
+              style={{ ...inp, width:170, fontSize:11 }}
+              title="Merge into an existing category instead of creating a new one"
+            >
+              <option value="">➕ Create new category</option>
+              {existingRootCats.map(c => (
+                <option key={c.id} value={c.id}>{c.icon || '🍽'} {c.label} (merge)</option>
+              ))}
+            </select>
+            <input style={{ ...inp, width:50, textAlign:'center', opacity: cat.existingId ? 0.4 : 1 }}
+              disabled={!!cat.existingId}
+              value={cat.existingId ? (existingRootCats.find(c=>c.id===cat.existingId)?.icon || cat.icon) : cat.icon}
+              onChange={e=>updateCat(cat.id, { icon: e.target.value })} />
+            <input style={{ ...inp, flex:1, fontWeight:700, opacity: cat.existingId ? 0.4 : 1 }}
+              disabled={!!cat.existingId}
+              value={cat.existingId ? (existingRootCats.find(c=>c.id===cat.existingId)?.label || cat.label) : cat.label}
+              onChange={e=>updateCat(cat.id, { label: e.target.value })} />
             <span style={{ fontSize:10, color:'var(--t4)' }}>{byCategory[cat.id]?.length || 0} items</span>
             <button onClick={()=>removeCat(cat.id)}
               style={{ ...inp, cursor:'pointer', color:'var(--red)', background:'transparent' }}>✕</button>
