@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.4.3', date: '21 Apr 2026', label: 'Branding actually reaches the print, order number matches store',
+    changes: [
+      'Fix: mergeBrandingIntoLocation now exposes header/footer/paper_width_mm at the top level of the merged location so buildCustomerReceipt can read location.header.logo_url, location.header.phone, location.header.tax_id, location.header.address_lines, location.footer.message etc. Before this, only three legacy flat fields (name/address/receiptFooter) were set — all other branding lookups returned undefined and silently skipped.',
+      'Fix: Auto-print receipt now uses the store-assigned short ref (#NNNN) from the freshly appended closedCheck, matching what Check History shows. Before, POSSurface was generating a throwaway R12345678 format that bore no relation to the stored check.',
+      'Together with v4.4.2 this is the patch that actually delivers working end-to-end receipt branding.',
+    ]
+  },
+  {
     version: '4.4.2', date: '21 Apr 2026', label: 'Receipt branding actually reaches printer',
     changes: [
       'CRITICAL fix: printer.js was missing import of loadLocationBranding + mergeBrandingIntoLocation — saved branding never reached the receipt (ReferenceError swallowed by try/catch, silent plain-receipt fallback)',
