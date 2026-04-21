@@ -2361,7 +2361,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
       </div>
       <a href="?mode=pos" onClick={() => {
           sessionStorage.setItem(`rpos-reclaim-${pairedDevice.id}`, '1');
-          sessionStorage.removeItem(SESSION_TOKEN_KEY);
+          sessionStorage.removeItem(`rpos-session-${pairedDevice.id}`);
           localStorage.setItem('rpos-device-mode', 'pos');
         }}
         style={{ padding:'14px 32px', borderRadius:12, background:'#6366f1', color:'#fff', fontWeight:700, fontSize:15, textDecoration:'none', fontFamily:'inherit', display:'inline-block' }}>
