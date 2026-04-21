@@ -1471,6 +1471,8 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
   const [instSearch, setInstSearch] = useState('');
   const [dragModIdx, setDragModIdx] = useState(null);
   const [overModIdx, setOverModIdx] = useState(null);
+  const [dragInstIdx, setDragInstIdx] = useState(null);
+  const [overInstIdx, setOverInstIdx] = useState(null);
 
   const f   = (k,v) => onUpdate({ [k]: v });
   const fp  = (k,v) => onUpdate({ pricing: { ...p, [k]: v===''?null:parseFloat(v)||0 }, ...(k==='base'?{price:parseFloat(v)||0}:{}) });
@@ -1518,9 +1520,17 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
   };
 
   // ── Instruction assignment ─────────────────────────────────────────────────
-  const assignedInst = item.assignedInstructionGroups || [];
-  const addInst    = gid => { if (assignedInst.includes(gid)) return; onUpdate({ assignedInstructionGroups:[...assignedInst,gid] }); markBOChange(); setInstSearch(''); };
-  const removeInst = gid => { onUpdate({ assignedInstructionGroups:assignedInst.filter(g=>g!==gid) }); markBOChange(); };
+  // Shape-tolerant: accepts legacy ['gid', ...] strings OR new [{groupId, min?}] objects.
+  // On any write we normalise to the object shape, so old data auto-upgrades next save.
+  const assignedInst = (item.assignedInstructionGroups || []).map(e => typeof e === 'string' ? { groupId: e } : e);
+  const hasInst     = gid => assignedInst.some(a => a.groupId === gid);
+  const addInst    = gid => { if (hasInst(gid)) return; onUpdate({ assignedInstructionGroups:[...assignedInst, { groupId: gid }] }); markBOChange(); setInstSearch(''); };
+  const removeInst = gid => { onUpdate({ assignedInstructionGroups:assignedInst.filter(a=>a.groupId!==gid) }); markBOChange(); };
+  const updateInst = (gid, patch) => { onUpdate({ assignedInstructionGroups:assignedInst.map(a=>a.groupId===gid?{...a,...patch}:a) }); markBOChange(); };
+  const reorderInst = (from, to) => {
+    const arr = [...assignedInst]; const [moved] = arr.splice(from,1); arr.splice(to,0,moved);
+    onUpdate({ assignedInstructionGroups:arr }); markBOChange();
+  };
 
   // ── Filtered search lists ──────────────────────────────────────────────────
   const filteredMods = (modifierGroupDefs||[]).filter(g =>
@@ -1528,7 +1538,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
     (modSearch==='' || (g.name||'').toLowerCase().includes(modSearch.toLowerCase()))
   );
   const filteredInst = (instructionGroupDefs||[]).filter(g =>
-    !assignedInst.includes(g.id) &&
+    !hasInst(g.id) &&
     (instSearch==='' || (g.name||'').toLowerCase().includes(instSearch.toLowerCase()))
   );
 
@@ -1724,18 +1734,30 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
               );
             })}
 
-            {/* Instruction groups */}
-            {assignedInst.length > 0 && assignedInst.map((gid, i) => {
-              const def = (instructionGroupDefs||[]).find(g=>g.id===gid);
+            {/* Instruction groups — drag-reorderable + per-assignment required toggle */}
+            {assignedInst.length > 0 && assignedInst.map((ag, i) => {
+              const def = (instructionGroupDefs||[]).find(g=>g.id===ag.groupId);
               if (!def) return null;
               const stepNum = (isParent ? 1 : 0) + assignedMods.length + i + 1;
+              // Per-assignment min overrides group-def min; either being >0 means required
+              const effectiveMin = ag.min ?? def.min ?? 0;
+              const isReq = effectiveMin > 0;
               return (
-                <div key={gid} style={{ marginBottom:14 }}>
+                <div key={ag.groupId} draggable
+                  onDragStart={()=>setDragInstIdx(i)} onDragOver={e=>{e.preventDefault();setOverInstIdx(i);}}
+                  onDrop={e=>{e.preventDefault();if(dragInstIdx!==null&&dragInstIdx!==i)reorderInst(dragInstIdx,i);setDragInstIdx(null);setOverInstIdx(null);}}
+                  onDragEnd={()=>{setDragInstIdx(null);setOverInstIdx(null);}}
+                  style={{ marginBottom:14, opacity:dragInstIdx===i?.4:1, border:`1.5px solid ${overInstIdx===i?'var(--acc)':'transparent'}`, borderRadius:10, padding:overInstIdx===i?'4px':0, transition:'all .1s' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                    <div style={{ width:22, height:22, borderRadius:'50%', background:'var(--grn)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff', flexShrink:0 }}>{stepNum}</div>
-                    <span style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>{def.name}</span>
-                    <span style={{ fontSize:9, fontWeight:600, color:'var(--grn)' }}>no charge</span>
-                    <button onClick={()=>removeInst(gid)} style={{ width:22,height:22,borderRadius:6,border:'1px solid var(--grn-b)',background:'var(--grn-d)',color:'var(--grn)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',marginLeft:'auto' }}>×</button>
+                    <div style={{ width:22, height:22, borderRadius:'50%', background:isReq?'var(--red)':'var(--grn)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff', flexShrink:0 }}>{stepNum}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>{def.name}</span>
+                      <span style={{ fontSize:9, fontWeight:600, color:isReq?'var(--red)':'var(--grn)', marginLeft:6 }}>{isReq?'required':'optional'} · no charge</span>
+                    </div>
+                    <button onClick={()=>updateInst(ag.groupId,{min:isReq?0:1})} title={isReq?'Make optional':'Mark as required'}
+                      style={{ padding:'3px 9px', borderRadius:6, border:`1px solid ${isReq?'var(--red-b)':'var(--bdr)'}`, background:isReq?'var(--red-d)':'var(--bg3)', color:isReq?'var(--red)':'var(--t3)', cursor:'pointer', fontSize:10, fontWeight:700 }}>{isReq?'Required':'Optional'}</button>
+                    <span style={{ fontSize:10, color:'var(--t4)', cursor:'grab' }}>⣿</span>
+                    <button onClick={()=>removeInst(ag.groupId)} style={{ width:22,height:22,borderRadius:6,border:'1px solid var(--grn-b)',background:'var(--grn-d)',color:'var(--grn)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center' }}>×</button>
                   </div>
                   <div style={{ paddingLeft:30 }}>
                     {(def.options||[]).map((opt,oi) => (
