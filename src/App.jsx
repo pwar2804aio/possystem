@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.0', date: '21 Apr 2026', label: 'Instruction groups: reorder + per-assignment required (end-to-end)',
+    changes: [
+      'Feat: Back Office → Menu Manager → item flow panel: instruction groups on a product are now drag-reorderable (same pattern as modifier groups) and each assignment has its own Required / Optional toggle. The order you drag in the builder is exactly the order that renders on the POS ordering flow.',
+      'Feat: POS runtime (ProductModal — both VariantsModal and ModifiersModal — plus InlineItemFlow) now enforces required instruction picks. The Add-to-order button stays disabled until every group marked required has a selection. Required instruction step numbers render red in the flow, optional ones stay green.',
+      'Data shape upgrade: assignedInstructionGroups on a menu item changed from an array of string IDs (legacy) to an array of {groupId, min?} objects so each assignment can carry its own required flag without touching the shared group definition. Reads are shape-tolerant — legacy string arrays still load correctly — and writes always produce the new shape, so existing items auto-upgrade on next save. No migration needed (the Supabase column is already jsonb after v4.5.0).',
+      'Per-assignment min wins over group-def min. Mark a group as required on just one product without affecting every other product that uses the same instruction group.',
+    ],
+  },
+  {
     version: '4.5.0', date: '21 Apr 2026', label: 'Menu grid lock, category UX, import merge, long labels, instruction-groups DB fix',
     changes: [
       'Feat: POS and back-office product grids both locked to 6 columns (was auto-fill with varying min-widths). Spacer placement in the menu builder now matches exactly what appears on the POS regardless of screen width — deterministic layout instead of per-device drift.',
