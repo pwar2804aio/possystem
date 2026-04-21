@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.4.9', date: '21 Apr 2026', label: 'User/PIN system fixes — manager bypass, live staff, permission persistence',
+    changes: [
+      'Fix: VoidModal, DiscountModal and RefundModal (in CheckHistory) no longer read the manager PIN list from the hardcoded seed file. They now read live staffMembers from the store (populated from Supabase), so the PINs set in Back Office → Staff & Access are the ones that actually work. Previously only the seed default PIN 1234 (Alex) was accepted.',
+      'Fix: a logged-in Manager no longer has to re-enter a PIN to authorise voids, discounts (including Comp 100%) or refunds. The current user is recorded as the authoriser instead. Non-managers still see the PIN prompt and it validates against the real live manager list.',
+      'Fix: Back Office → Staff & Access edits (name, role, PIN, colour, permissions) now persist to Supabase. Previously save() mutated the Zustand store only and the next page refresh re-fetched the unchanged DB row, wiping the edit. Writes use .update(...).eq(id).select(id) with a zero-row toast so silent saves are caught (v4.4.1 lesson).',
+      'Fix: staff_members.permissions column is now read and written instead of being hardcoded to []. Requires running migrations/2026-04-21-staff-permissions.sql on Ops Supabase — adds the jsonb column and backfills existing Manager rows with the full permission set so managers are not accidentally locked out on first post-deploy login.',
+      'Chore: version.js bumped from drifted 4.4.8 to 4.4.9.',
+    ],
+  },
+  {
     version: '4.4.3', date: '21 Apr 2026', label: 'Branding actually reaches the print, order number matches store',
     changes: [
       'Fix: mergeBrandingIntoLocation now exposes header/footer/paper_width_mm at the top level of the merged location so buildCustomerReceipt can read location.header.logo_url, location.header.phone, location.header.tax_id, location.header.address_lines, location.footer.message etc. Before this, only three legacy flat fields (name/address/receiptFooter) were set — all other branding lookups returned undefined and silently skipped.',
