@@ -333,7 +333,7 @@ export default function BackOfficeApp() {
           {section === 'ai'         && <AIAssistantSection />}
           {section === 'network'     && <NetworkStatus />}
           {section === 'location'   && <LocationSettings />}
-          {activeSection === 'receipt' && <ReceiptBranding/>}
+          {section === 'receipt' && <ReceiptBranding/>}
           {section === 'tax'        && <TaxManager />}
         </div>
       </div>
