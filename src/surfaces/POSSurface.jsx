@@ -278,7 +278,9 @@ export default function POSSurface() {
       // Use a timestamp-based ref; the durable closed_checks row gets its own
       // ref inside the store, but the printer only needs a stable display
       // string and an idempotency key (which printService generates itself).
-      const ref = `R${Date.now().toString().slice(-8)}`;
+      // Placeholder — will be overwritten after clearTable/recordWalkInClosed runs,
+      // using the store-assigned "#NNNN" ref from the freshly appended closedCheck.
+      const ref = 'PENDING';
       return {
         location,
         check: { ref, server, tableLabel, orderType, covers, method: paymentInfo.method, customer },
@@ -308,6 +310,13 @@ export default function POSSurface() {
     // Fire-and-forget: dispatch happens via the durable print_jobs queue so
     // a failed printer doesn't block the UI. Errors surface via StatusDrawer.
     if (receiptSnapshot) {
+      // Pull the real ref from the closedCheck that clearTable/recordWalkInClosed
+      // just appended. Fall back to a short timestamp if for any reason the
+      // store didn't record one (shouldn't happen but print should never fail here).
+      const closedChecks = useStore.getState().closedChecks;
+      const freshRef = closedChecks[closedChecks.length - 1]?.ref
+        || `#${Date.now().toString().slice(-4)}`;
+      receiptSnapshot.check.ref = freshRef;
       printService.printReceipt(receiptSnapshot).catch(err => {
         console.warn('[Print] Auto-print on close failed:', err?.message || err);
       });
