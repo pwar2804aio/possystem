@@ -26,7 +26,7 @@ export const fetchMenuCategories = async (locationId = null) => {
   return supabase.from('menu_categories').select('*').eq('location_id', locationId).order('sort_order');
 };
 
-export const upsertMenuCategory = async (cat, locationId = LOCATION_ID) => {
+export const upsertMenuCategory = async (cat, locationId = null) => {
   if (isMock) return { data: null, error: null };
   if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
   if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
@@ -57,7 +57,7 @@ export const fetchMenuItems = async (locationId = null) => {
     .order('sort_order');
 };
 
-export const upsertMenuItem = async (item, locationId = LOCATION_ID) => {
+export const upsertMenuItem = async (item, locationId = null) => {
   if (isMock) return { data: null, error: null };
   // Always resolve real location — 'loc-demo' is the mock fallback, not a real location
   if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
@@ -115,7 +115,7 @@ export const fetchFloorPlan = async (locationId = null) => {
   return { data: { tables: tables.data, sections: sections.data }, error: tables.error || sections.error };
 };
 
-export const upsertFloorTable = async (table, locationId = LOCATION_ID) => {
+export const upsertFloorTable = async (table, locationId = null) => {
   if (isMock) return { data: null, error: null };
   if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
   if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
@@ -135,7 +135,7 @@ export const fetch86List = async (locationId = null) => {
   return supabase.from('eighty_six').select('item_id').eq('location_id', locationId);
 };
 
-export const toggle86DB = async (itemId, is86, locationId = LOCATION_ID) => {
+export const toggle86DB = async (itemId, is86, locationId = null) => {
   if (isMock) return { data: null, error: null };
   if (is86) {
     return supabase.from('eighty_six').delete().eq('location_id', locationId).eq('item_id', itemId);
@@ -247,7 +247,7 @@ export const insertClosedCheck = async (check, locationId = null) => {
   return safeInsertClosedCheck(check, row);
 };
 
-export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 500, sinceDate = null) => {
+export const fetchClosedChecks = async (locationId = null, limit = 500, sinceDate = null) => {
   if (isMock) return { data: null, error: null };
   // Use provided date or fall back to today's start (will be refined by locationTime once config loads)
   const since = sinceDate || getTodayStartFallback();
@@ -274,7 +274,7 @@ export const fetchClosedChecks = async (locationId = LOCATION_ID, limit = 500, s
 };
 
 // For reports — fetch checks across any date range
-export const fetchClosedChecksRange = async (locationId = LOCATION_ID, fromDate, toDate, limit = 1000) => {
+export const fetchClosedChecksRange = async (locationId = null, fromDate, toDate, limit = 1000) => {
   if (isMock) return { data: null, error: null };
   let query = supabase
     .from('closed_checks')
@@ -301,7 +301,7 @@ export const fetchClosedChecksRange = async (locationId = LOCATION_ID, fromDate,
 };
 
 // ── Config pushes ─────────────────────────────────────────────────────────────
-export const insertConfigPush = async (push, locationId = LOCATION_ID) => {
+export const insertConfigPush = async (push, locationId = null) => {
   if (isMock) return { data: null, error: null };
   const result = await supabase.from('config_pushes').insert({ ...push, location_id: locationId });
   if (result.error) console.error('[DB] config_pushes insert failed:', result.error.message);
@@ -371,14 +371,14 @@ export const deleteProductImage = async (itemId, locationId) => {
 // v3.9.0 — image field in upsert
 
 // ── Quick Screen ───────────────────────────────────────────────────────────────
-export const saveQuickScreenIds = async (ids, locationId = LOCATION_ID) => {
+export const saveQuickScreenIds = async (ids, locationId = null) => {
   if (isMock) return;
   if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
   if (!locationId || locationId === 'loc-demo') return;
   await supabase.from('locations').update({ quick_screen_ids: ids }).eq('id', locationId);
 };
 
-export const loadQuickScreenIds = async (locationId = LOCATION_ID) => {
+export const loadQuickScreenIds = async (locationId = null) => {
   if (isMock) return [];
   if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
   if (!locationId || locationId === 'loc-demo') return [];
