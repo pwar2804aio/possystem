@@ -29,6 +29,8 @@ export default function PINScreen() {
             id: r.id, name: r.name, role: r.role, pin: r.pin,
             color: r.color || '#3b82f6',
             initials: r.initials || r.name.slice(0,2).toUpperCase(),
+            permissions: Array.isArray(r.permissions) ? r.permissions : [],
+            active: r.active,
           }));
           useStore.setState({ staffMembers: mapped });
           setLoadedStaff(mapped);
