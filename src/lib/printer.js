@@ -116,7 +116,9 @@ export async function buildCustomerReceipt({ location, check, items, totals }) {
   b.lf().divider().left();
 
   // ── Check header ────────────────────────────────────────────────────────
-  b.twoCol(`Ref: ${check?.ref||''}`, `${dateStr} ${timeStr}`);
+  // Order number — prominent, centered, double-height so it's impossible to miss.
+  b.bold(true).doubleHeight().center().line(`ORDER # ${check?.ref||''}`).normal().left();
+  b.twoCol('Date', `${dateStr} ${timeStr}`);
   if (header?.show_server_name !== false) {
     b.twoCol(`Server: ${check?.server||''}`, check?.covers>1 && header?.show_covers !== false ? `${check.covers} covers` : '');
   }
@@ -159,7 +161,7 @@ export async function buildCustomerReceipt({ location, check, items, totals }) {
     }
   }
 
-  b.bold(true).doubleBoth()
+  b.bold(true).doubleHeight()
    .twoCol('TOTAL',`\xA3${totals.grand.toFixed(2)}`)
    .normal();
 
@@ -246,7 +248,7 @@ export function buildTestPage() {
    .divider()
    .twoCol('Subtotal', '\xA312.50')
    .twoCol('Service',  '\xA3 1.56')
-   .bold(true).doubleBoth().twoCol('TOTAL','\xA314.06').normal()
+   .bold(true).doubleHeight().twoCol('TOTAL','\xA314.06').normal()
    .divider()
    .center().bold(true).line('Connection OK \u2713').bold(false)
    .fontB().line(new Date().toLocaleString()).fontA()
