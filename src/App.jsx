@@ -69,6 +69,17 @@ const CHANGELOG = [
     ],
   },
   {
+    version: '4.4.8', date: '21 Apr 2026', label: 'Auto-print on close: end of the v4.4.4 → v4.4.8 debug arc',
+    changes: [
+      'v4.4.8 (final): idempotency_key in printer.js _submitJob was `receipt-${check.ref}` — first close inserted fine, every subsequent close hit Supabase unique-violation 23505, and _submitJob silently returned {ok: true, transport: \'idempotent\'} making the caller think print succeeded when no print_jobs row was created. Fixed by appending Date.now() to the key so each close gets a fresh row (matches the manual Reprint pattern that had always worked).',
+      'v4.4.7: added [PayComplete] console.info instrumentation around the auto-print decision path + try/catch on handlePayComplete mutations. The logging was what made the v4.4.8 diagnosis possible — we could see shouldPrint=true, dispatching auto-print with ref=#6201, but zero DB rows. The mutations themselves were never the problem.',
+      'v4.4.6: added autoPrintReceiptOnClose to every rpos-device-config write site in App.jsx (3 sites) and DevSwitcher.jsx. The store\'s setDeviceConfig only persists a whitelist of fields; actual localStorage writes happen outside the store. Without this, the APC toggle was invisible to the POS after any device switch.',
+      'v4.4.5: useEffect in POSSurface re-syncs deviceConfig.autoPrintReceiptOnClose from DB on mount, so stale localStorage caches from before the v4.4.0 migration get refreshed on next page load.',
+      'v4.4.4: printReceipt falls back to `await getLocationId()` if POSSurface passes location=undefined (the Zustand store has no location field, so POSSurface couldn\'t pass one).',
+      'Process lesson (already recorded in the gist CURRENT_WORK.md): six hours and five version bumps got spent chasing symptoms because two diagnostic questions — "does manual Reprint work?" and "does a print_jobs row get created on close?" — would have jumped straight to _submitJob on turn one. Silent try/catch plus {ok: true} idempotency short-circuits in write paths are extraordinarily dangerous; either log a warning when the short-circuit fires, or guarantee the key is unique so no collision is possible.',
+    ],
+  },
+  {
     version: '4.4.3', date: '21 Apr 2026', label: 'Branding actually reaches the print, order number matches store',
     changes: [
       'Fix: mergeBrandingIntoLocation now exposes header/footer/paper_width_mm at the top level of the merged location so buildCustomerReceipt can read location.header.logo_url, location.header.phone, location.header.tax_id, location.header.address_lines, location.footer.message etc. Before this, only three legacy flat fields (name/address/receiptFooter) were set — all other branding lookups returned undefined and silently skipped.',
