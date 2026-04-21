@@ -10,6 +10,7 @@ import CustomerModal from '../components/CustomerModal';
 import VoidModal from '../components/VoidModal';
 import DiscountModal from '../components/DiscountModal';
 import { ReceiptModal, ReprintModal } from '../components/ReceiptModal';
+import { printService } from '../lib/printer';
 import CheckHistory from '../components/CheckHistory';
 import ItemInfoModal from '../components/ItemInfoModal';
 import OrderReviewModal from '../components/OrderReviewModal';
@@ -50,6 +51,7 @@ export default function POSSurface() {
     menus,
     taxRates,
     showItemImages,
+    location,
   } = useStore();
 
   // Use store's editable menu — prefer menuName for display, fall back to name
@@ -257,6 +259,34 @@ export default function POSSurface() {
 
   const handlePayComplete = (paymentInfo = {}) => {
     setShowCheckout(false);
+
+    // ── Snapshot everything needed to print the customer receipt BEFORE
+    //    we clear the table/walk-in. After clear, items/session are gone.
+    const shouldPrint = paymentInfo.printReceipt !== false
+      && (deviceConfig?.autoPrintReceiptOnClose !== false || paymentInfo.printReceipt === true);
+
+    const receiptSnapshot = shouldPrint ? (() => {
+      const nonVoided = items.filter(i => !i.voided);
+      const tip = paymentInfo.tip || 0;
+      const grand = total + tip;
+      let taxBreakdown = null;
+      if (taxRates?.length) {
+        try { taxBreakdown = calculateOrderTax(nonVoided, taxRates, orderType || 'dine-in'); } catch {}
+      }
+      const tableLabel = activeTable?.label || null;
+      const server = session?.server || staff?.name || null;
+      // Use a timestamp-based ref; the durable closed_checks row gets its own
+      // ref inside the store, but the printer only needs a stable display
+      // string and an idempotency key (which printService generates itself).
+      const ref = `R${Date.now().toString().slice(-8)}`;
+      return {
+        location,
+        check: { ref, server, tableLabel, orderType, covers, method: paymentInfo.method, customer },
+        items: nonVoided,
+        totals: { subtotal, service, tip, grand, taxBreakdown },
+      };
+    })() : null;
+
     if (activeTableId) {
       // If table has unsent items, fire them to kitchen before closing
       const session = useStore.getState().tables.find(t=>t.id===activeTableId)?.session;
@@ -273,6 +303,14 @@ export default function POSSurface() {
       recordWalkInClosed(useStore.getState().walkInOrder, orderType, customer, paymentInfo);
       clearWalkIn();
       showToast('Payment complete','success');
+    }
+
+    // Fire-and-forget: dispatch happens via the durable print_jobs queue so
+    // a failed printer doesn't block the UI. Errors surface via StatusDrawer.
+    if (receiptSnapshot) {
+      printService.printReceipt(receiptSnapshot).catch(err => {
+        console.warn('[Print] Auto-print on close failed:', err?.message || err);
+      });
     }
   };
 
