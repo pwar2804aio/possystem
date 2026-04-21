@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../store';
-import { STAFF } from '../data/seed';
 import { printService } from '../lib/printer';
 
 const REFUND_REASONS = [
@@ -8,7 +7,10 @@ const REFUND_REASONS = [
   'Overcharge / pricing error','Allergy / dietary concern',
   'Item not received','Manager discretion','Other',
 ];
-const mgrs = STAFF.filter(s=>s.role==='Manager').map(s=>({pin:s.pin,name:s.name,id:s.id}));
+const managersFrom = (staffMembers) =>
+  (staffMembers || [])
+    .filter(s => s.role === 'Manager' && s.active !== false)
+    .map(s => ({ pin: s.pin, name: s.name, id: s.id }));
 const METHOD_ICON = {card:'💳',cash:'💵',split:'⚖','bar-tab':'🍸'};
 const STATUS_META = {
   paid:           {color:'var(--grn)',bg:'var(--grn-d)',border:'var(--grn-b)',label:'Paid'},
@@ -26,6 +28,10 @@ function fmtTime(d){
 
 // ── Refund Modal ──────────────────────────────────────────────────────────────
 function RefundModal({check, onConfirm, onCancel}){
+  const { staffMembers, staff: currentUser } = useStore();
+  const mgrs = managersFrom(staffMembers);
+  const managerLoggedIn = currentUser?.role === 'Manager';
+
   const [step,setStep]=useState('select');  // select|pin|reason|tender|cash_confirm
   const [isFullRefund,setFull]=useState(false);
   const [selections,setSelections]=useState(()=>
@@ -33,7 +39,7 @@ function RefundModal({check, onConfirm, onCancel}){
   );
   const [pin,setPin]=useState('');
   const [pinErr,setPinErr]=useState('');
-  const [manager,setManager]=useState(null);
+  const [manager,setManager]=useState(managerLoggedIn ? currentUser : null);
   const [reason,setReason]=useState('');
   const [freeText,setFreeText]=useState('');
   const [tenderMethod,setTenderMethod]=useState(null);   // 'card'|'cash'
@@ -198,7 +204,7 @@ function RefundModal({check, onConfirm, onCancel}){
               </div>}
               <div style={{display:'flex',gap:8,marginTop:16}}>
                 <button className="btn btn-ghost" style={{flex:1}} onClick={onCancel}>Cancel</button>
-                <button className="btn btn-acc" style={{flex:2,height:44}} disabled={!selectedItems.length} onClick={()=>setStep('pin')}>Authorise →</button>
+                <button className="btn btn-acc" style={{flex:2,height:44}} disabled={!selectedItems.length} onClick={()=>setStep(managerLoggedIn ? 'reason' : 'pin')}>Authorise →</button>
               </div>
             </>
           )}
@@ -239,7 +245,7 @@ function RefundModal({check, onConfirm, onCancel}){
               </div>
               {reason==='Other'&&<input className="input" placeholder="Describe the reason…" value={freeText} onChange={e=>setFreeText(e.target.value)} style={{marginBottom:14}} autoFocus/>}
               <div style={{display:'flex',gap:8}}>
-                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStep('pin')}>← Back</button>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStep(managerLoggedIn ? 'select' : 'pin')}>← Back</button>
                 <button className="btn btn-acc" style={{flex:2,height:44}}
                   disabled={!reason||(reason==='Other'&&!freeText.trim())}
                   onClick={()=>setStep('tender')}>Choose tender →</button>
