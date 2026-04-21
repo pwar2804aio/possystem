@@ -42,7 +42,11 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
 
   const buildInstGroups = (targetItem) =>
     (targetItem?.assignedInstructionGroups || [])
-      .map(gid => instructionGroupDefs?.find(g => g.id === gid))
+      .map(e => typeof e === 'string' ? { groupId: e } : e)
+      .map(a => {
+        const def = instructionGroupDefs?.find(g => g.id === a.groupId);
+        return def ? { ...def, min: a.min ?? def.min ?? 0 } : null;
+      })
       .filter(Boolean);
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -96,6 +100,11 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
 
   const missingRequired = useMemo(() => {
     const missing = [];
+    // Required instruction groups must have a pick
+    instGroups.forEach(g => {
+      const isReq = g.required || (g.min || 0) > 0;
+      if (isReq && !instSelections[g.id]) missing.push({ ...g, _isInst: true });
+    });
     modGroups.forEach(g => {
       const isRequired = g.required || (g.min || 0) > 0;
       const sel = selections[g.id];
@@ -120,7 +129,7 @@ export default function InlineItemFlow({ item, menuItems, activeAllergens = [], 
       }
     });
     return missing;
-  }, [modGroups, selections, modifierGroupDefs]);
+  }, [modGroups, selections, modifierGroupDefs, instGroups, instSelections]);
 
   const canAdd = step === 'variant' ? false : missingRequired.length === 0;
 
