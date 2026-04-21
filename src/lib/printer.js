@@ -583,7 +583,7 @@ class PrintService {
     if (printer?.address) {
       const bytes = await buildCustomerReceipt({ location: locationWithBranding, check, items, totals });
       return this._submitJob(printer, 'receipt', bytes, {
-        idempotencyKey: opts.idempotencyKey || (check?.ref ? `receipt-${check.ref}` : undefined),
+        idempotencyKey: opts.idempotencyKey || (check?.ref ? `receipt-${check.ref}-${Date.now()}` : undefined),
         metadata: { ref: check?.ref, total: totals?.grand, tableLabel: check?.tableLabel, orderType: check?.orderType, server: check?.server },
         label: `Receipt ${check?.ref || ''} — £${(totals?.grand || 0).toFixed(2)}`.trim(),
       });
