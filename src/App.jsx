@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.2', date: '21 Apr 2026', label: 'Kitchen docket TABLE line: centered + single line (was right-aligned + wrapped)',
+    changes: [
+      'Fix: buildKitchenTicket rendered the “TABLE X” line using centeredLine() which builds its padding from spaces to reach the full 42-column paper width. That works fine in normal character size, but the kitchen docket runs the TABLE line in doubleBoth() mode — every character (including the padding spaces) prints at double physical width. 42 logical cols of padded content became ~50 physical cols on 80 mm paper, overflowing the right edge and wrapping to a second line, so the table number looked shoved-right and broken across two rows.',
+      'Replaced the two centeredLine calls with the printer\'s native ESC center command (center().line().left()) which the printer handles correctly at any character size. Left a multi-line comment above the change explaining why so a future cleanup doesn\'t revert to centeredLine.',
+      'Result: TABLE label is now single-line centered, same bold-double-wide visual weight as before, no wrap.',
+    ],
+  },
+  {
     version: '4.6.1', date: '21 Apr 2026', label: 'ROOT CAUSE FIX: instruction groups vanished on every push/reload',
     changes: [
       'Fix: BackOfficeApp.loadLocationData — the function that loads all menu data when the Back Office mounts — was missing the assignedInstructionGroups snake→camel mapping. It had the modifier equivalent (assignedModifierGroups) but the instruction line was simply absent. Every BO boot loaded items with assignedInstructionGroups=undefined. Editors displayed empty flow. Clicking Push to POS built a snapshot from these undefined values, JSON.stringify dropped the field entirely, and the POS applied a snapshot that wiped instructions from every item on its side too. The data in Supabase\'s assigned_instruction_groups column was intact the whole time — the bug was purely on the read/serialise path.',
