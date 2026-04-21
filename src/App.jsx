@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.1', date: '21 Apr 2026', label: 'ROOT CAUSE FIX: instruction groups vanished on every push/reload',
+    changes: [
+      'Fix: BackOfficeApp.loadLocationData — the function that loads all menu data when the Back Office mounts — was missing the assignedInstructionGroups snake→camel mapping. It had the modifier equivalent (assignedModifierGroups) but the instruction line was simply absent. Every BO boot loaded items with assignedInstructionGroups=undefined. Editors displayed empty flow. Clicking Push to POS built a snapshot from these undefined values, JSON.stringify dropped the field entirely, and the POS applied a snapshot that wiped instructions from every item on its side too. The data in Supabase\'s assigned_instruction_groups column was intact the whole time — the bug was purely on the read/serialise path.',
+      'Diagnosis method that finally cracked it: inspected live localStorage snapshot on dev.pos-up.com. Saw 22 items with modifier groups but ZERO with instruction groups, and the sample item had assignedInstructionGroupsType:"undefined". Searching grep for the snake_case→camelCase pattern found BackOfficeApp had its own item loader (separate from SyncBridge) that had been drifting for months. Same bug pattern as the historical v3.6.4 SyncBridge fix — just in a different loader that was added later and missed the copy-paste.',
+      'One-line fix with a hefty comment documenting why the line matters so nobody removes it again: assignedInstructionGroups: item.assigned_instruction_groups ?? item.assignedInstructionGroups ?? [].',
+      'After deploy: hard-refresh the Back Office. loadLocationData will now populate the field from Supabase. Click Push to POS once to overwrite the stale snapshot in config_pushes with good data. All future boots and cross-device pushes will carry instruction groups correctly.',
+    ],
+  },
+  {
     version: '4.6.0', date: '21 Apr 2026', label: 'Instruction groups: reorder + per-assignment required (end-to-end)',
     changes: [
       'Feat: Back Office → Menu Manager → item flow panel: instruction groups on a product are now drag-reorderable (same pattern as modifier groups) and each assignment has its own Required / Optional toggle. The order you drag in the builder is exactly the order that renders on the POS ordering flow.',
