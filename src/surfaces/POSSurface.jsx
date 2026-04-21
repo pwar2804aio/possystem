@@ -666,7 +666,7 @@ export default function POSSurface() {
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:1}}>
                     <span style={{fontSize:compact?15:20,lineHeight:1,flexShrink:0}}>{c.icon||'•'}</span>
-                    <span style={{fontSize:12,fontWeight:700,color:isActive?color:'var(--t2)',letterSpacing:.01,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.label}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:isActive?color:'var(--t2)',letterSpacing:.01,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',lineHeight:1.2,wordBreak:'break-word'}}>{c.label}</span>
                     {hasSubcats && <span style={{fontSize:8,color:'var(--t4)',flexShrink:0}}>▾</span>}
                   </div>
                   <div style={{fontSize:9,color:'var(--t4)',paddingLeft:26}}>{count} items</div>
