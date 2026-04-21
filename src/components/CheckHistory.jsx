@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { STAFF } from '../data/seed';
+import { printService } from '../lib/printer';
 
 const REFUND_REASONS = [
   'Wrong item served','Quality issue','Customer complaint',
@@ -334,11 +335,12 @@ function RefundModal({check, onConfirm, onCancel}){
 
 // ── Check History Panel ───────────────────────────────────────────────────────
 export default function CheckHistory(){
-  const {closedChecks,refundCheck,showToast}=useStore();
+  const {closedChecks,refundCheck,showToast,location,taxRates}=useStore();
   const [search,setSearch]=useState('');
   const [dateFilter,setDateFilter]=useState('today');
   const [selected,setSelected]=useState(null);
   const [showRefund,setShowRefund]=useState(false);
+  const [reprinting,setReprinting]=useState(false);
 
   const selectedCheck=closedChecks.find(c=>c.id===selected);
   const now=new Date();
@@ -366,6 +368,56 @@ export default function CheckHistory(){
     refundCheck(selectedCheck.id,opts);
     setShowRefund(false);
     showToast(`Refund of £${opts.amount.toFixed(2)} processed — ${opts.tenderMethod}`,'success');
+  };
+
+  const handleReprint = async () => {
+    if (!selectedCheck || reprinting) return;
+    setReprinting(true);
+    try {
+      // Build a fresh tax breakdown from the stored items so the reprinted
+      // receipt matches what was printed originally.
+      const nonVoided = (selectedCheck.items || []).filter(i => !i.voided);
+      let taxBreakdown = null;
+      if (taxRates?.length) {
+        try {
+          const { calculateOrderTax } = await import('../lib/tax');
+          taxBreakdown = calculateOrderTax(nonVoided, taxRates, selectedCheck.orderType || 'dine-in');
+        } catch {}
+      }
+      const result = await printService.printReceipt({
+        location,
+        check: {
+          ref: selectedCheck.ref,
+          server: selectedCheck.server,
+          tableLabel: selectedCheck.tableLabel,
+          orderType: selectedCheck.orderType,
+          covers: selectedCheck.covers,
+          method: selectedCheck.method,
+          customer: selectedCheck.customer,
+        },
+        items: nonVoided,
+        totals: {
+          subtotal: selectedCheck.subtotal,
+          service: selectedCheck.service || 0,
+          tip: selectedCheck.tip || 0,
+          grand: selectedCheck.total,
+          taxBreakdown,
+        },
+      }, null, {
+        // Distinct idempotency key so a reprint is never deduped against the
+        // original close-check print.
+        idempotencyKey: `reprint-${selectedCheck.ref}-${Date.now()}`,
+      });
+      if (result?.ok === false) {
+        showToast(`Reprint failed: ${result.error || 'unknown error'}`, 'error');
+      } else {
+        showToast(`Reprinted ${selectedCheck.ref}`, 'success');
+      }
+    } catch (err) {
+      showToast(`Reprint failed: ${err?.message || err}`, 'error');
+    } finally {
+      setReprinting(false);
+    }
   };
 
   return(
@@ -540,14 +592,17 @@ export default function CheckHistory(){
               )}
             </div>
 
-            {/* Refund CTA */}
-            {selectedCheck.status!=='refunded'&&(
-              <div style={{padding:'12px 18px',borderTop:'1px solid var(--bdr)',flexShrink:0}}>
-                <button onClick={()=>setShowRefund(true)} style={{width:'100%',height:42,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:13,fontWeight:700}}>
+            {/* Reprint + Refund CTAs */}
+            <div style={{padding:'12px 18px',borderTop:'1px solid var(--bdr)',flexShrink:0,display:'flex',gap:8}}>
+              <button onClick={handleReprint} disabled={reprinting} style={{flex:selectedCheck.status!=='refunded'?1:undefined,width:selectedCheck.status==='refunded'?'100%':undefined,height:42,borderRadius:10,cursor:reprinting?'wait':'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr2)',color:'var(--t2)',fontSize:13,fontWeight:700,opacity:reprinting?0.6:1}}>
+                {reprinting ? '…' : '🖨 Print receipt'}
+              </button>
+              {selectedCheck.status!=='refunded'&&(
+                <button onClick={()=>setShowRefund(true)} style={{flex:1,height:42,borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--red-d)',border:'1px solid var(--red-b)',color:'var(--red)',fontSize:13,fontWeight:700}}>
                   ↩ Issue refund
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
       </div>
