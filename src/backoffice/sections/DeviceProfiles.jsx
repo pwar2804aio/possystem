@@ -157,7 +157,8 @@ export default function DeviceProfiles() {
         const existing = await supabase.from('device_profiles').select('id').eq('id', row.id).single();
         if (existing.data) {
           // Update all fields explicitly
-          const { error: e } = await supabase.from('device_profiles').update(row).eq('id', row.id);
+          const { error: e, data: dataUp } = await supabase.from('device_profiles').update(row).eq('id', row.id).select('id');
+          if (!dataUp || dataUp.length === 0) throw new Error(`Profile update matched 0 rows for id=${p.id}. Column may be missing (run migration) or RLS blocked it.`);
           error = e;
         } else {
           const { error: e } = await supabase.from('device_profiles').insert(row);
