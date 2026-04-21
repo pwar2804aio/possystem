@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { STAFF } from '../data/seed';
+import { useStore } from '../store';
 
 const PRESETS = [
   { id:'staff50',  label:'Staff meal',       type:'percent', value:50,  requiresManager:false },
@@ -10,9 +10,16 @@ const PRESETS = [
   { id:'comp',     label:'Comp (100%)',        type:'percent', value:100, requiresManager:true  },
 ];
 
-const mgrs = STAFF.filter(s=>s.role==='Manager').map(s=>({pin:s.pin,name:s.name,id:s.id}));
+const managersFrom = (staffMembers) =>
+  (staffMembers || [])
+    .filter(s => s.role === 'Manager' && s.active !== false)
+    .map(s => ({ pin: s.pin, name: s.name, id: s.id }));
 
 export default function DiscountModal({ items, subtotal, onConfirm, onCancel }) {
+  const { staffMembers, staff: currentUser } = useStore();
+  const mgrs = managersFrom(staffMembers);
+  const managerLoggedIn = currentUser?.role === 'Manager';
+
   const [step, setStep]         = useState('amount');  // amount | apply | pin
   const [selected, setSelected] = useState(null);       // preset id or 'custom'
   const [customType, setCT]     = useState('percent');
@@ -21,7 +28,7 @@ export default function DiscountModal({ items, subtotal, onConfirm, onCancel }) 
   const [itemSel, setItemSel]   = useState([]);         // selected item uids
   const [pin, setPin]           = useState('');
   const [pinErr, setPinErr]     = useState('');
-  const [manager, setManager]   = useState(null);
+  const [manager, setManager]   = useState(managerLoggedIn ? currentUser : null);
 
   const preset  = PRESETS.find(p=>p.id===selected);
   const needPin = preset?.requiresManager && !manager;
