@@ -55,6 +55,7 @@ export default function DevSwitcher() {
         hiddenFeatures: profile?.hiddenFeatures || [],
         tableServiceEnabled: profile?.tableServiceEnabled !== false,
         quickScreenEnabled: profile?.quickScreenEnabled !== false,
+        autoPrintReceiptOnClose: profile?.autoPrintReceiptOnClose !== false,
       }));
       localStorage.setItem('rpos-device-mode', 'pos');
     }
