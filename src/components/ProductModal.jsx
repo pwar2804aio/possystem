@@ -178,14 +178,21 @@ function VariantsModal({ item, activeAllergens, onConfirm, onCancel }) {
       };
     })
     .filter(Boolean);
-  const instGroupIds = [...new Set([...(item.assignedInstructionGroups||[]), ...(childItem?.assignedInstructionGroups||[])])];
-  const instGroups = instGroupIds.map(gid=>instructionGroupDefs?.find(g=>g.id===gid)).filter(Boolean);
+  // Shape-tolerant: accept legacy string[] and new [{groupId,min}][]; preserve per-assignment min
+  const _normInst = arr => (arr||[]).map(e => typeof e === 'string' ? { groupId: e } : e);
+  const _mergedInst = [..._normInst(item.assignedInstructionGroups), ..._normInst(childItem?.assignedInstructionGroups)];
+  const _seenInst = new Set();
+  const _uniqueInst = _mergedInst.filter(a => _seenInst.has(a.groupId) ? false : _seenInst.add(a.groupId));
+  const instGroups = _uniqueInst.map(a => {
+    const def = instructionGroupDefs?.find(g => g.id === a.groupId);
+    return def ? { ...def, min: a.min ?? def.min ?? 0 } : null;
+  }).filter(Boolean);
 
   const hasModifiers = allGroups.length > 0 || instGroups.length > 0;
   const allRequired  = allGroups.filter(g=>(g.min||0)>0).every(g => {
     const cur = selections[g.id];
     return g.selectionType==='single' ? !!cur : (Array.isArray(cur)?cur.length:0) >= (g.min||1);
-  });
+  }) && instGroups.filter(g=>(g.min||0)>0).every(g => !!instSel[g.id]);
 
   const extraCost = Object.values(selections).flat().filter(Boolean).reduce((s,m)=>s+(m?.price||0),0);
   const basePrice = selected ? selected.price : 0;
@@ -430,9 +437,13 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
     return all;
   };
 
-  // Instruction groups (no price, separate state)
+  // Instruction groups (no price, separate state) — shape-tolerant + preserve per-assignment min
   const instrGroups = (item.assignedInstructionGroups || [])
-    .map(gid => instructionGroupDefs?.find(g => g.id === gid))
+    .map(e => typeof e === 'string' ? { groupId: e } : e)
+    .map(a => {
+      const def = instructionGroupDefs?.find(g => g.id === a.groupId);
+      return def ? { ...def, min: a.min ?? def.min ?? 0 } : null;
+    })
     .filter(Boolean);
 
   const allModGroups = buildGroups();
@@ -471,7 +482,7 @@ function ModifiersModal({ item, activeAllergens, onConfirm, onCancel }) {
       const selType = getSelType(g);
       if (selType === 'single') return !!selections[g.id];
       return (selections[g.id]?.length || 0) >= (g.min || 1);
-    });
+    }) && instrGroups.filter(g => isRequired(g)).every(g => !!instSelections[g.id]);
 
   const extraCost = Object.values(selections).flat().filter(Boolean).reduce((s, m) => s + (m?.price || 0), 0);
   const basePrice = item.pricing?.base ?? item.price ?? 0;
