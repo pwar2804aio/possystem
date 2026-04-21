@@ -1,6 +1,7 @@
 import { useCompact } from '../lib/useCompact';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { supabase } from '../lib/supabase';
 import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
 import { calculateOrderTax } from '../lib/tax';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
@@ -45,6 +46,7 @@ export default function POSSurface() {
     addCheckDiscount, removeCheckDiscount, addWalkInDiscount, removeWalkInDiscount,
     addItemDiscount, removeItemDiscount,
     deviceConfig,
+    setDeviceConfig,
     menuItems: storeMenuItems,
     menuCategories,
     quickScreenIds,
@@ -256,6 +258,36 @@ export default function POSSurface() {
     setActiveTableId(null);
     showToast(`${label} — sent to kitchen`, 'success');
   };
+
+  // Keep deviceConfig.autoPrintReceiptOnClose fresh from DB. The cached value
+  // may be stale if the profile was edited in Back Office but this terminal
+  // hasn't re-applied the profile. Without this, the print-decision logic
+  // reads undefined and defaults to 'print', causing surprises when staff
+  // set a profile to 'don't print'.
+  useEffect(() => {
+    const sync = async () => {
+      const profId = deviceConfig?.profileId;
+      if (!profId) return;
+      try {
+        const { data, error } = await supabase
+          .from('device_profiles')
+          .select('auto_print_receipt_on_close')
+          .eq('id', profId)
+          .single();
+        if (error || !data) return;
+        if (deviceConfig?.autoPrintReceiptOnClose !== data.auto_print_receipt_on_close) {
+          setDeviceConfig({
+            ...deviceConfig,
+            autoPrintReceiptOnClose: data.auto_print_receipt_on_close,
+          });
+        }
+      } catch (e) {
+        console.warn('[POSSurface] autoPrintReceiptOnClose sync failed:', e?.message || e);
+      }
+    };
+    sync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceConfig?.profileId]);
 
   const handlePayComplete = (paymentInfo = {}) => {
     setShowCheckout(false);
