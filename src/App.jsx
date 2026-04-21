@@ -59,6 +59,21 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.4.0', date: '21 Apr 2026', label: 'Receipt branding + auto-print control',
+    changes: [
+      'Back Office: new Receipt section — logo upload, business details, footer message, QR editor, live 80mm preview',
+      'Receipts now render a header logo (fetched + dithered to ESC/POS raster in-browser)',
+      'Receipts now render a footer QR — native ESC/POS command (URL mode) or uploaded image',
+      'Receipts now include business name, address lines, phone, and VAT/tax ID from Back Office',
+      'Pay screen: new "Print receipt" checkbox — staff can override per transaction',
+      'Device Profiles: new "Auto-print receipt on close" toggle (default on)',
+      'Check History: new "Print receipt" button next to Refund for reprinting closed checks',
+      'Schema: device_profiles.auto_print_receipt_on_close + locations.receipt_branding (run migrations/2026-04-21-receipt-control.sql)',
+      'Supabase Storage bucket receipt-assets (public) required for logo/QR uploads',
+      'EscPosBuilder.raw() method for appending raw ESC/POS byte sequences',
+    ]
+  },
+  {
     version: '4.3.0', date: 'Apr 2026', label: 'Print reliability — master-coordinated retries, durable queue, failure resolution',
     changes: [
       'Single durable pipeline: every print (native bridge OR browser) is written to print_jobs before dispatch. If the app closes mid-retry the job survives and is picked up by another device or the print agent.',
