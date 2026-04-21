@@ -82,9 +82,14 @@ export function mergeBrandingIntoLocation(location, branding) {
   return {
     ...(location || {}),
     receipt_branding: branding,
-    // Keep the legacy flat fields populated from branding when present so any
-    // consumer still reading location.name / location.address / location.receiptFooter
-    // gets the new values.
+    // Expose header/footer/paper_width at the top level so buildCustomerReceipt
+    // can read location.header.logo_url, location.header.phone, location.footer.message,
+    // etc., without having to traverse location.receipt_branding.
+    header: branding.header || {},
+    footer: branding.footer || {},
+    paper_width_mm: branding.paper_width_mm || location?.paper_width_mm,
+    // Keep the legacy flat fields populated too for any consumer still reading
+    // location.name / location.address / location.receiptFooter directly.
     name: branding.header?.business_name || location?.name,
     address: (branding.header?.address_lines || []).filter(Boolean).join('\n') || location?.address,
     receiptFooter: branding.footer?.message || location?.receiptFooter,
