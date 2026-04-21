@@ -207,8 +207,12 @@ export function buildKitchenTicket({ table, server, covers, course, centreName, 
    .normal().center().line(time).divider('=')
    .left().bold(true).doubleBoth();
 
-  if(table) b.centeredLine(`TABLE ${table}`);
-  else b.centeredLine('WALK-IN');
+  // Use native ESC center (not space-padded centeredLine) — centeredLine pads to
+  // full charWidth (42) which overflows when doubleBoth is active: spaces print
+  // double-wide too, so 42 cols of padded content becomes ~50 physical cols and wraps.
+  // Result looked like the table number was right-aligned and on two lines.
+  if(table) b.center().line(`TABLE ${table}`).left();
+  else b.center().line('WALK-IN').left();
 
   b.normal();
   if(server) b.fontB().line(`Server: ${server}`).fontA();
