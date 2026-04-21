@@ -71,6 +71,8 @@ export default function ReceiptBranding() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingQR, setUploadingQR] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Persistent error banner — toasts dismiss too fast and these errors need visibility.
+  const [saveError, setSaveError] = useState(null);
   const logoInputRef = useRef(null);
   const qrInputRef = useRef(null);
 
@@ -107,7 +109,9 @@ export default function ReceiptBranding() {
       setDirty(true);
       showToast('Logo uploaded', 'success');
     } catch (err) {
-      showToast(`Upload failed: ${err.message || err}`, 'error');
+      const msg = `Logo upload failed: ${err.message || err}. Check that the Supabase Storage bucket "receipt-assets" exists and is public.`;
+      showToast(msg, 'error');
+      setSaveError(msg);
     } finally {
       setUploadingLogo(false);
     }
@@ -125,26 +129,37 @@ export default function ReceiptBranding() {
       setDirty(true);
       showToast('QR image uploaded', 'success');
     } catch (err) {
-      showToast(`Upload failed: ${err.message || err}`, 'error');
+      const msg = `QR image upload failed: ${err.message || err}. Check that the Supabase Storage bucket "receipt-assets" exists and is public.`;
+      showToast(msg, 'error');
+      setSaveError(msg);
     } finally {
       setUploadingQR(false);
     }
   };
 
   const handleSave = async () => {
-    if (!locationId) { showToast('No location — cannot save', 'error'); return; }
+    if (!locationId) { showToast('No location — cannot save', 'error'); setSaveError('No location ID — cannot save. Are you signed in?'); return; }
     setSaving(true);
+    setSaveError(null);
     try {
-      const { error } = await supabase
+      // `.select()` so PostgREST returns the updated rows — we use data.length to
+      // detect the silent-no-match case (where error stays null but 0 rows updated).
+      const { data, error } = await supabase
         .from('locations')
         .update({ receipt_branding: branding })
-        .eq('id', locationId);
+        .eq('id', locationId)
+        .select('id');
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(`No rows matched id=${locationId}. The location may not exist or RLS blocked the update.`);
+      }
       invalidateBrandingCache(locationId);
       setDirty(false);
-      showToast('Receipt branding saved — next print will use it', 'success');
+      showToast(`Receipt branding saved (${data.length} row) — next print will use it`, 'success');
     } catch (err) {
-      showToast(`Save failed: ${err.message || err}`, 'error');
+      const msg = `Save failed: ${err.message || err}`;
+      showToast(msg, 'error');
+      setSaveError(msg);
     } finally {
       setSaving(false);
     }
@@ -187,6 +202,14 @@ export default function ReceiptBranding() {
             {saving ? 'Saving…' : dirty ? 'Save branding' : 'Saved'}
           </button>
         </div>
+
+        {/* Persistent error banner — visible until dismissed or successful retry */}
+        {saveError && (
+          <div style={{ marginBottom:16, padding:'12px 14px', borderRadius:10, background:'var(--red-d)', border:'1.5px solid var(--red-b)', color:'var(--red)', fontSize:12, display:'flex', alignItems:'flex-start', gap:10 }}>
+            <div style={{ flex:1, whiteSpace:'pre-wrap' }}>{saveError}</div>
+            <button onClick={() => setSaveError(null)} style={{ background:'transparent', border:'none', color:'var(--red)', cursor:'pointer', fontSize:18, lineHeight:1, padding:'0 4px', flexShrink:0 }} aria-label="Dismiss">×</button>
+          </div>
+        )}
 
         {/* Header section */}
         <Section title="Header">
