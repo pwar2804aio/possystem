@@ -122,6 +122,12 @@ export default function BackOfficeApp() {
       soldAlone:   item.sold_alone   ?? item.soldAlone,
       parentId:    item.parent_id    ?? item.parentId,
       assignedModifierGroups: item.assigned_modifier_groups ?? item.assignedModifierGroups ?? [],
+      // THE BUG: this line was missing for months. Without it, BackOfficeApp's loader leaves
+      // assignedInstructionGroups undefined on every item. MenuManager shows empty. Push
+      // builds a snapshot where JSON.stringify drops the undefined field — POS receives
+      // items without instruction groups — from the user's POV they “vanish on push”.
+      // The DB still has the data in assigned_instruction_groups (jsonb) the whole time.
+      assignedInstructionGroups: item.assigned_instruction_groups ?? item.assignedInstructionGroups ?? [],
       taxRateId:   item.tax_rate_id  ?? item.taxRateId  ?? null,
       taxOverrides: item.tax_overrides ?? item.taxOverrides ?? {},
     }));
