@@ -20,6 +20,7 @@ import CompanyAdmin from './sections/CompanyAdmin';
 import AIAssistantSection from './sections/AIAssistantSection';
 import NetworkStatus from './sections/NetworkStatus';
 import LocationSettings from './sections/LocationSettings';
+import ReceiptBranding from './sections/ReceiptBranding';
 import TaxManager from './sections/TaxManager';
 
 const NAV = [
@@ -38,6 +39,7 @@ const NAV = [
   { id:'ai',         label:'AI Assistant',      icon:'✦',   group:'Analytics' },
   { id:'network',    label:'Network & Sync',     icon:'📡',  group:'Analytics' },
   { id:'location',   label:'Location settings', icon:'⚙️',  group:'Analytics' },
+  { id: 'receipt', label: 'Receipt', icon: '🧾', group: 'Configuration' },
 ];
 
 export default function BackOfficeApp() {
@@ -331,6 +333,7 @@ export default function BackOfficeApp() {
           {section === 'ai'         && <AIAssistantSection />}
           {section === 'network'     && <NetworkStatus />}
           {section === 'location'   && <LocationSettings />}
+          {activeSection === 'receipt' && <ReceiptBranding/>}
           {section === 'tax'        && <TaxManager />}
         </div>
       </div>
