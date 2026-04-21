@@ -59,6 +59,7 @@ export default function PairingScreen({ onPaired }) {
         hiddenFeatures: ['reports','discounts','voids','courses'],
         tableServiceEnabled: false,
         quickScreenEnabled: false,
+        autoPrintReceiptOnClose: false,
       }));
     }
 
@@ -83,6 +84,7 @@ export default function PairingScreen({ onPaired }) {
             hiddenFeatures: profile.hiddenFeatures || [],
             tableServiceEnabled: profile.tableServiceEnabled !== false,
             quickScreenEnabled: profile.quickScreenEnabled !== false,
+            autoPrintReceiptOnClose: true,
           }));
         }
       } catch(e) { console.warn('Profile apply failed:', e); }
