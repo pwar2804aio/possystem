@@ -781,7 +781,7 @@ export default function POSSurface() {
                 })}
               </div>
             )}
-            <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${compact?115:155}px,1fr))`,gridAutoRows:`minmax(${compact?80:110}px,auto)`,gap:compact?4:8}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(6, 1fr)',gridAutoRows:`minmax(${compact?80:110}px,auto)`,gap:compact?4:8}}>
                 {displayItems.map(item=>{
                   // Spacer — empty transparent cell, invisible to customers
                   if (item._spacer) return <div key={item.id} style={{ borderRadius:14, background:'transparent', pointerEvents:'none' }}/>;
