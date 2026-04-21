@@ -560,13 +560,22 @@ class PrintService {
     // if the branding fetch fails for any reason we fall through to the plain
     // text receipt using the location fields already present.
     let locationWithBranding = location;
-    if (!opts.skipBranding && location?.id && !location?.receipt_branding) {
+
+    // If caller didn't populate location.id, fall back to getLocationId() —
+    // POSSurface destructures `location` from the Zustand store, but the store
+    // has no `location` field, so location is undefined at call time. Without
+    // this fallback the branding fetch is skipped entirely.
+    let effectiveLocationId = location?.id || null;
+    if (!effectiveLocationId && !opts?.skipBranding) {
+      try { effectiveLocationId = await getLocationId(); } catch {}
+    }
+
+    if (!opts?.skipBranding && (effectiveLocationId || location?.receipt_branding)) {
       try {
-        const { loadLocationBranding, mergeBrandingIntoLocation } = await import('./receiptBranding.js');
-        const branding = await loadLocationBranding(location.id);
-        if (branding) locationWithBranding = mergeBrandingIntoLocation(location, branding);
+        const branding = location?.receipt_branding || await loadLocationBranding(effectiveLocationId);
+        if (branding) locationWithBranding = mergeBrandingIntoLocation(location || { id: effectiveLocationId }, branding);
       } catch (e) {
-        console.warn('[Print] Branding fetch failed, using plain receipt:', e.message);
+        console.warn('[Print] Branding fetch failed, using plain receipt:', e?.message || e);
       }
     }
 
