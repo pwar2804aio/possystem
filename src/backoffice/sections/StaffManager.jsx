@@ -50,7 +50,8 @@ export default function StaffManager() {
         useStore.setState({ staffMembers: rows.map(r => ({
           id: r.id, name: r.name, role: r.role, pin: r.pin,
           color: r.color || '#3b82f6', initials: r.initials || r.name.slice(0,2).toUpperCase(),
-          permissions: [], active: r.active,
+          permissions: Array.isArray(r.permissions) ? r.permissions : (ROLE_DEFAULTS[r.role] || []),
+          active: r.active,
         })) });
       }
     })();
@@ -81,6 +82,32 @@ export default function StaffManager() {
   const save = (id, patch) => {
     updateStaffMember(id, patch);
     markBOChange();
+
+    // Persist patch to Supabase (real mode only). Fire-and-forget but
+    // surface silent 0-row updates (v4.4.1 lesson) via a toast.
+    if (isMock) return;
+    if (String(id).startsWith('s-')) {
+      // In-memory row that was never inserted to Supabase (addMember fallback
+      // path when locationId was unavailable). Nothing to update server-side.
+      return;
+    }
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff_members')
+          .update(patch)
+          .eq('id', id)
+          .select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          console.warn('[StaffManager] save: 0 rows updated for id', id, 'patch', patch);
+          showToast('Save did not land — row not found on server', 'error');
+        }
+      } catch (e) {
+        console.error('[StaffManager] save failed:', e.message, 'patch', patch);
+        showToast(`Save failed: ${e.message}`, 'error');
+      }
+    })();
   };
 
   const addMember = () => {
@@ -106,7 +133,9 @@ export default function StaffManager() {
           const { error } = await supabase.from('staff_members').insert({
             location_id: locationId, org_id: profile?.org_id,
             name: member.name, role: member.role, pin: member.pin,
-            color: member.color || '#3b82f6', initials: member.initials, active: true,
+            color: member.color || '#3b82f6', initials: member.initials,
+            permissions: member.permissions || [],
+            active: true,
           });
           if (error) console.error('Staff save failed:', error.message);
         } else {
