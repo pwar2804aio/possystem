@@ -20,9 +20,23 @@ const TIMEZONES = [
   { value:'Asia/Tokyo',         label:'Asia/Tokyo (JST)' },
 ];
 
-const HOURS = Array.from({ length: 24 }, (_, h) =>
-  ({ value: `${String(h).padStart(2,'0')}:00`, label: `${String(h).padStart(2,'0')}:00` })
-);
+const HOURS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = (i % 2) * 30;
+  const s = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  return { value: s, label: s };
+});
+
+// v4.6.25: Duration in minutes between a start and end HH:MM. Handles
+// overnight wrap where end <= start (e.g. late bar 22:00 -> 02:00).
+function shiftDurationMinutes(start, end) {
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const startMin = sh * 60 + sm;
+  const endMin   = eh * 60 + em;
+  return endMin > startMin ? endMin - startMin : (24 * 60) - startMin + endMin;
+}
 
 const S = {
   page: { padding:'32px 40px', maxWidth:760, overflowY:'auto' },
@@ -160,7 +174,10 @@ export default function LocationSettings() {
           shift context. Leave empty to use whole-day reporting only.
         </div>
 
-        {shifts.map((sh, i) => (
+        {shifts.map((sh, i) => {
+          const dur = shiftDurationMinutes(sh.start, sh.end);
+          const tooLong = dur > 12 * 60;  // More than 12h likely indicates misconfiguration
+          return (
           <div key={sh.id} style={S.row}>
             <div>
               {i === 0 && <label style={S.label}>Name</label>}
@@ -170,15 +187,20 @@ export default function LocationSettings() {
             </div>
             <div>
               {i === 0 && <label style={S.label}>Start</label>}
-              <select style={S.select} value={sh.start} onChange={e => updateShift(sh.id, 'start', e.target.value)}>
+              <select style={{ ...S.select, ...(tooLong ? { borderColor:'var(--red-b)' } : {}) }} value={sh.start} onChange={e => updateShift(sh.id, 'start', e.target.value)}>
                 {HOURS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
               </select>
             </div>
             <div>
               {i === 0 && <label style={S.label}>End</label>}
-              <select style={S.select} value={sh.end} onChange={e => updateShift(sh.id, 'end', e.target.value)}>
+              <select style={{ ...S.select, ...(tooLong ? { borderColor:'var(--red-b)' } : {}) }} value={sh.end} onChange={e => updateShift(sh.id, 'end', e.target.value)}>
                 {HOURS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
               </select>
+              {tooLong && (
+                <div style={{ fontSize:10, color:'var(--red)', marginTop:4 }}>
+                  {Math.floor(dur/60)}h long — check start/end are correct
+                </div>
+              )}
             </div>
             <div>
               {i === 0 && <label style={S.label}>&nbsp;</label>}
@@ -186,16 +208,27 @@ export default function LocationSettings() {
                 style={{ ...S.btn, background:'var(--red-d)', color:'var(--red)', border:'1px solid var(--red-b)', padding:'9px 12px' }}>✕</button>
             </div>
           </div>
-        ))}
+          );
+        })}
 
-        <button onClick={addShift}
-          style={{ ...S.btn, background:'var(--bg3)', color:'var(--t2)', border:'1px solid var(--bdr)', marginTop:4 }}>
-          + Add shift
-        </button>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:4 }}>
+          <button onClick={addShift}
+            style={{ ...S.btn, background:'var(--bg3)', color:'var(--t2)', border:'1px solid var(--bdr)' }}>
+            + Add shift
+          </button>
+          <button onClick={() => setShifts([
+            { id:`shift-${Date.now()}-b`, name:'Breakfast', start:'07:00', end:'11:00' },
+            { id:`shift-${Date.now()}-l`, name:'Lunch',     start:'11:00', end:'17:00' },
+            { id:`shift-${Date.now()}-d`, name:'Dinner',    start:'17:00', end:'23:00' },
+          ])}
+            style={{ ...S.btn, background:'transparent', color:'var(--t3)', border:'1px solid var(--bdr)' }}>
+            Use defaults (Breakfast / Lunch / Dinner)
+          </button>
+        </div>
 
         {shifts.length > 0 && (
           <div style={{ marginTop:12, fontSize:11, color:'var(--t4)', lineHeight:1.8 }}>
-            ⓘ Shifts appear in the AI assistant context and will be used to filter reports in a future update.
+            ⓘ Service periods drive Shifts, Daypart, and Business summary reports (v4.6.25+). They also appear in the AI assistant context.
             Gaps between shifts are valid — not all time needs to be covered.
           </div>
         )}

@@ -3,10 +3,14 @@
 // Shows: 4 headline tiles with period-over-period compare chips,
 // a revenue breakdown ladder (gross → discounts/voids/refunds → net → tax/service/tips → total),
 // and an exceptions snapshot for quick visibility.
+//
+// v4.6.25: When locationConfig.shifts is defined, a service-period breakdown
+// (Breakfast / Lunch / Dinner) sits between the headline tiles and the revenue
+// ladder so Peter's service periods are visible at a glance.
 
 import { useMemo } from 'react';
 import { StatTile, ExportBtn, EmptyState } from './_charts';
-import { pctDelta } from './_filters';
+import { pctDelta, classifyShift } from './_filters';
 import { toCsv, downloadCsv } from './_csv';
 
 // Compute the headline statistics from a list of closed checks.
@@ -40,13 +44,38 @@ export function computeSalesStats(checks) {
   return { gross, discounts, voids, refunds, service, tips, tax: taxTotal, taxStored, taxDerived, total, covers, count, net };
 }
 
-export default function SalesSummary({ checks, prevChecks, fmt, fmtN }) {
+export default function SalesSummary({ checks, prevChecks, fmt, fmtN, locationConfig }) {
   const cur  = useMemo(() => computeSalesStats(checks),     [checks]);
   const prev = useMemo(() => computeSalesStats(prevChecks), [prevChecks]);
   const avgCheck     = cur.count  ? cur.net  / cur.count  : 0;
   const prevAvgCheck = prev.count ? prev.net / prev.count : 0;
   const avgCover     = cur.covers  ? cur.net  / cur.covers  : 0;
   const prevAvgCover = prev.covers ? prev.net / prev.covers : 0;
+
+  // v4.6.25: service-period breakdown when shifts are configured.
+  const servicePeriods = useMemo(() => {
+    const shifts = locationConfig?.shifts || [];
+    const bds    = locationConfig?.businessDayStart || '00:00';
+    if (!shifts.length) return null;
+    const rows = shifts.map(s => ({ shift: s, net: 0, covers: 0, count: 0, tips: 0 }));
+    const idx = {};
+    rows.forEach((r, i) => { idx[r.shift.id || r.shift.name] = i; });
+    let unclassified = { net: 0, covers: 0, count: 0 };
+    (checks || []).filter(c => c.status !== 'voided' && c.closedAt).forEach(c => {
+      const s = classifyShift(c.closedAt, shifts, bds);
+      const net = (c.subtotal || 0) - ((c.discounts||[]).reduce((x,d)=>x+(d.amount||d.value||0),0)) - ((c.refunds||[]).reduce((x,r)=>x+(r.amount||0),0));
+      const cov = c.covers || 1;
+      const tip = c.tip || 0;
+      if (s) {
+        const i = idx[s.id || s.name];
+        rows[i].net += net; rows[i].covers += cov; rows[i].count += 1; rows[i].tips += tip;
+      } else {
+        unclassified.net += net; unclassified.covers += cov; unclassified.count += 1;
+      }
+    });
+    const totalClassified = rows.reduce((s, r) => s + r.net, 0);
+    return { rows, unclassified, total: totalClassified + unclassified.net };
+  }, [checks, locationConfig]);
 
   const onExport = () => {
     const rows = [
@@ -87,6 +116,35 @@ export default function SalesSummary({ checks, prevChecks, fmt, fmtN }) {
         <StatTile label="Avg check"  value={fmt(avgCheck)}     compare={pctDelta(avgCheck, prevAvgCheck)}/>
         <StatTile label="Tips"       value={fmt(cur.tips)}     compare={pctDelta(cur.tips, prev.tips)}       sub={cur.net > 0 ? `${((cur.tips/cur.net)*100).toFixed(1)}% of net` : null} color="var(--grn)"/>
       </div>
+
+      {servicePeriods && servicePeriods.rows.length > 0 && (
+        <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:'14px 16px', marginBottom:12 }}>
+          <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:10 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>By service period</div>
+            <div style={{ fontSize:11, color:'var(--t4)' }}>Configured in Location settings</div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(servicePeriods.rows.length, 4)},1fr)`, gap:10 }}>
+            {servicePeriods.rows.map(r => {
+              const share = servicePeriods.total > 0 ? (r.net / servicePeriods.total) * 100 : 0;
+              const avg   = r.count > 0 ? r.net / r.count : 0;
+              return (
+                <div key={r.shift.id || r.shift.name} style={{ padding:'12px 14px', background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:10 }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:4 }}>{r.shift.name}</div>
+                  <div style={{ fontSize:10, color:'var(--t4)', marginBottom:6, fontFamily:'var(--font-mono)' }}>{r.shift.start}–{r.shift.end}</div>
+                  <div style={{ fontSize:17, fontWeight:800, color:'var(--t1)', fontFamily:'var(--font-mono)' }}>{fmt(r.net)}</div>
+                  <div style={{ fontSize:11, color:'var(--t3)', marginTop:3 }}>{r.count} checks · {r.covers} covers</div>
+                  <div style={{ fontSize:11, color:'var(--t4)', marginTop:2 }}>avg {fmt(avg)} · {share.toFixed(0)}%</div>
+                </div>
+              );
+            })}
+          </div>
+          {servicePeriods.unclassified.count > 0 && (
+            <div style={{ fontSize:11, color:'var(--t4)', marginTop:10, paddingTop:8, borderTop:'1px solid var(--bdr)' }}>
+              {servicePeriods.unclassified.count} checks ({fmt(servicePeriods.unclassified.net)}) closed outside configured service periods
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:'14px 16px' }}>

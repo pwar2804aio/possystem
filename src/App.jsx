@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.25', date: '22 Apr 2026', label: 'Reports wave 8.1 \u2014 service periods baked into Daypart + Business summary; LocationSettings sharpened',
+    changes: [
+      'Daypart report: when locationConfig.shifts is defined, a Revenue by service period section now sits between the three headline tiles (busiest hour / busiest day / peak slot) and the hour \u00d7 day-of-week heatmap. Each configured service gets its own tile showing revenue, check count, covers, average check, and share of total. Overflow checks that fell outside any configured service are counted and flagged at the bottom of the section. When shifts are not configured, the report falls back cleanly to its original fixed-hour view so nothing changes for greenfield environments.',
+      'Business summary: a By service period row now sits between the four headline tiles (Net sales / Covers / Avg check / Tips) and the revenue breakdown ladder. Each service shows its net revenue (gross minus discounts and refunds for that window), check count, covers, average check, and percentage share of classified revenue. Same fallback behaviour \u2014 only renders when shifts are configured.',
+      'LocationSettings: dropdowns for service-period Start and End are now 30-minute increments (was 1 hour). Previously the only choices were 07:00 / 08:00 / etc., which meant restaurants like Peter\u2019s that want Breakfast to end at 11:00 had to default to 00:00 if they misread the dropdown \u2014 creating 17-hour "Breakfast" windows that swallowed every other service. Half-hour granularity matches how service periods are actually defined.',
+      'LocationSettings: a new "Use defaults (Breakfast / Lunch / Dinner)" button sits next to "+ Add shift" and one-shots a sensible baseline: Breakfast 07:00\u201311:00, Lunch 11:00\u201317:00, Dinner 17:00\u201323:00. Clicking replaces whatever was there so users who fumbled the first config (as Peter did tonight) can reset in one move.',
+      'LocationSettings: per-shift duration warning. Any shift longer than 12 hours gets a red border on both time dropdowns plus a hint underneath showing the computed duration in hours (e.g. "17h long \u2014 check start/end are correct"). Surfaces misconfiguration before it silently breaks reports.',
+      'Hint text under the service period section updated to reflect that shifts now DRIVE Shifts + Daypart + Business summary reports (was: "will be used to filter reports in a future update"). Removes misleading language that made the feature look unfinished.',
+      'Explicitly NOT changed: Shifts report (already rebuilt in Wave 8), Server scorecard / Product mix / Tips \u2014 these still honour service period filtering via the "Today\u2019s Breakfast" pill but don\u2019t yet have per-service breakdowns inside the report bodies. Deferred to Wave 9.',
+    ],
+  },
+  {
     version: '4.6.24', date: '22 Apr 2026', label: 'Reports wave 8 \u2014 scroll fix, business-day-aware periods, service-period grouping for Shifts',
     changes: [
       'Scroll fix: BOReports root (both catalog and detail views) now has flex:1 overflow:auto minHeight:0 so long reports scroll within the content pane instead of being clipped by the parent overflow:hidden on BackOfficeApp line 331. This was the blocker preventing Peter from seeing anything past the fold on Product mix, Menu engineering, Tables, etc.',
