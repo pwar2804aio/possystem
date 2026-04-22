@@ -559,100 +559,130 @@ export function KDSSurface() {
     const pendingByCourse = {};
     pendingItems.forEach(i => { const c=i.course??1; if(!pendingByCourse[c])pendingByCourse[c]=[]; pendingByCourse[c].push({...i,_origIdx:allItems.indexOf(i)}); });
 
+    // v4.6.14: larger qty badge + item name, amber mods (red reserved for card-level LATE state).
     const ItemRow = ({ item }) => (
-      <div style={{ display:'flex', alignItems:'flex-start', gap:8, paddingBottom:8, marginBottom:4, opacity:item._bumped?0.3:1, transition:'opacity .2s' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', gap:12, paddingBottom:10, opacity:item._bumped?0.3:1, transition:'opacity .2s' }}>
         {!isHeld && !isHistory && (
           <button onClick={()=>handleBumpItem(ticket.id, item._origIdx)}
             title="Bump this item"
-            style={{ width:22, height:22, borderRadius:6, border:`1.5px solid ${item._bumped?'var(--grn)':'var(--bdr2)'}`,
-              background:item._bumped?'var(--grn-d)':'transparent', cursor:'pointer', flexShrink:0, marginTop:2,
-              display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, color:item._bumped?'var(--grn)':'var(--t4)', fontWeight:900 }}>
+            style={{ width:26, height:26, borderRadius:7, border:`1.5px solid ${item._bumped?'var(--grn)':'var(--bdr2)'}`,
+              background:item._bumped?'var(--grn-d)':'transparent', cursor:'pointer', flexShrink:0, marginTop:3,
+              display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, color:item._bumped?'var(--grn)':'var(--t4)', fontWeight:900 }}>
             {item._bumped ? '✓' : ''}
           </button>
         )}
-        <div style={{ width:24, height:24, borderRadius:6, background:u.color+'22', border:`1.5px solid ${u.color}44`,
-          display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:item._bumped?'var(--t4)':u.color,
-          flexShrink:0, fontFamily:'var(--font-mono)', textDecoration:item._bumped?'line-through':'' }}>
+        <div style={{ width:32, height:32, borderRadius:8, background:'var(--bg3)', border:'1px solid var(--bdr2)',
+          display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:700,
+          color:item._bumped?'var(--t4)':'var(--t1)', flexShrink:0, fontFamily:'var(--font-mono)',
+          textDecoration:item._bumped?'line-through':'' }}>
           {item.qty}
         </div>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:item._bumped?'var(--t4)':'var(--t1)', lineHeight:1.3, textDecoration:item._bumped?'line-through':'' }}>{item.name}</div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:16, fontWeight:700, color:item._bumped?'var(--t4)':'var(--t1)', lineHeight:1.3, textDecoration:item._bumped?'line-through':'' }}>{item.name}</div>
           {(Array.isArray(item.mods)?item.mods:(item.mods?[item.mods]:[])).map((mod,mi)=>(
-            <div key={mi} style={{ fontSize:11, color:'var(--red)', fontWeight:600, marginTop:2, lineHeight:1.4 }}>{mod}</div>
+            <div key={mi} style={{ fontSize:13, color:'var(--acc)', fontWeight:600, marginTop:3, lineHeight:1.4 }}>{mod}</div>
           ))}
         </div>
       </div>
     );
 
-    return (
-      <div style={{ background:u.bg, border:`1.5px solid ${u.border}`, borderRadius:16, overflow:'hidden',
-        boxShadow:urg==='urgent'?`0 0 20px ${u.color}22`:'none', opacity:isHeld?0.9:1,
-        // v4.6.13: cap card height + make items scroll internally. Previously a ticket with
-        // enough items would grow past the viewport, pushing the bump/hold action row
-        // off-screen and effectively hiding the ticket's controls until the whole column
-        // was scrolled. Header + footer are flex-shrink:0 so they always stay on screen;
-        // only the items panel scrolls.
-        display:'flex', flexDirection:'column', maxHeight:'calc(100vh - 140px)' }}>
-        <div style={{ padding:'10px 14px 8px', borderBottom:`1px solid ${u.border}`, flexShrink:0 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-            <div style={{ fontSize:16, fontWeight:900, color:u.color, flex:1 }}>
-              {isHeld&&'⏸ '}{isHistory&&'📋 '}{ticket.table||'Walk-in'}
-            </div>
-            {!isHeld&&!isHistory&&(
-              <div style={{ padding:'5px 12px', borderRadius:20, background:urg==='urgent'?'var(--red-d)':urg==='warning'?'var(--acc-d)':'var(--grn-d)', border:`1px solid ${u.color}55`, display:'flex', alignItems:'center', gap:5 }}>
-                {urg==='urgent'&&<div style={{ width:6,height:6,borderRadius:'50%',background:'var(--red)',animation:'pulse 1s ease-in-out infinite' }}/>}
-                <span style={{ fontSize:13, fontWeight:800, color:u.color, fontFamily:'var(--font-mono)' }}>{fmt(liveMin)}</span>
-              </div>
-            )}
-            {isHeld&&<span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20, border:`1px solid ${HELD_STYLE.border}`, color:HELD_STYLE.color }}>ON HOLD</span>}
-            {isHistory&&ticket.bumpedAt&&<span style={{ fontSize:10, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>{new Date(ticket.bumpedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>}
-          </div>
-          <div style={{ fontSize:10, color:'var(--t4)', display:'flex', gap:10 }}>
-            {ticket.server&&<span>👤 {ticket.server}</span>}
-            {ticket.covers>1&&<span>👥 {ticket.covers}</span>}
-            <span style={{ fontSize:9 }}>{getStationLabel(ticket)}</span>
-          </div>
-        </div>
+    // v4.6.14: card refresh inspired by Fresh KDS. Bigger table label, dedicated
+    // ON TIME / CAUTION / LATE status pill with a larger mono timer, pill-style
+    // course headers instead of emoji, bigger item rows, and a dominant bump button.
+    // Dark palette preserved. Flex-col with the v4.6.13 height cap and internal items scroll.
+    const statusLabel = urg === 'urgent' ? 'LATE' : urg === 'warning' ? 'CAUTION' : 'ON TIME';
+    const statusBg    = urg === 'urgent' ? 'var(--red-d)' : urg === 'warning' ? 'var(--acc-d)' : 'var(--grn-d)';
+    const cardBorder  = urg === 'urgent' ? `1.5px solid ${u.color}55` : '1px solid var(--bdr)';
+    const firingTone  = { color:'var(--acc)', bg:'rgba(232,160,32,.12)', border:'rgba(232,160,32,.4)' };
+    const holdTone    = { color:'var(--t3)',  bg:'var(--bg3)',           border:'var(--bdr2)' };
+    const CourseBadge = ({ label, tone }) => (
+      <div style={{
+        display:'inline-flex', alignItems:'center', padding:'4px 9px', borderRadius:6,
+        background:tone.bg, border:`1px solid ${tone.border}`,
+        fontSize:10, fontWeight:800, color:tone.color, letterSpacing:'.08em', fontFamily:'var(--font-mono)',
+      }}>{label}</div>
+    );
 
-        <div style={{ padding:'10px 14px', flex:1, overflowY:'auto', minHeight:0 }}>
-          {Object.entries(firedByCourse).sort(([a],[b])=>a-b).map(([course,cItems])=>(
-            <div key={course} style={{ marginBottom:4 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
-                <span style={{ fontSize:11, fontWeight:800, color:u.color }}>🔥 {COURSE_LABEL[course]||`Course ${course}`}</span>
-              </div>
-              {cItems.map(item=><ItemRow key={item._origIdx} item={item}/>)}
+    return (
+      <div style={{ background:'var(--bg1)', border:cardBorder, borderRadius:14, overflow:'hidden',
+        boxShadow:urg==='urgent'?`0 0 24px ${u.color}33`:'none', opacity:isHeld?0.92:1,
+        display:'flex', flexDirection:'column', maxHeight:'calc(100vh - 140px)' }}>
+
+        <div style={{ padding:'14px 16px 12px', borderBottom:'1px solid var(--bdr)', flexShrink:0, display:'flex', alignItems:'flex-start', gap:12 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:22, fontWeight:800, color:'var(--t1)', letterSpacing:'-.01em', lineHeight:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              {ticket.table||'Walk-in'}
             </div>
-          ))}
-          {pendingItems.length>0&&(
-            <div style={{ marginTop:4, paddingTop:8, borderTop:`1px solid ${u.border}` }}>
-              {Object.entries(pendingByCourse).sort(([a],[b])=>a-b).map(([course,cItems])=>(
-                <div key={course} style={{ marginBottom:4 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
-                    <span style={{ fontSize:11, fontWeight:800, color:'var(--t3)' }}>⏳ {COURSE_LABEL[course]||`Course ${course}`}</span>
-                    <span style={{ fontSize:9, color:'var(--t4)', fontWeight:600 }}>PENDING FIRE</span>
-                  </div>
-                  {cItems.map(item=><ItemRow key={item._origIdx} item={item}/>)}
-                </div>
-              ))}
+            <div style={{ fontSize:11, color:'var(--t4)', marginTop:6, display:'flex', gap:12, fontFamily:'var(--font-mono)', flexWrap:'wrap' }}>
+              {ticket.server&&<span>{ticket.server}</span>}
+              {ticket.covers>1&&<span>{ticket.covers} cv</span>}
+              <span>{getStationLabel(ticket)}</span>
+            </div>
+          </div>
+          {!isHeld&&!isHistory&&(
+            <div style={{ padding:'6px 12px', borderRadius:10, background:statusBg, border:`1px solid ${u.color}55`,
+              display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2, flexShrink:0,
+              animation:urg==='urgent'?'pulse 1.4s ease-in-out infinite':'none' }}>
+              <span style={{ fontSize:10, fontWeight:800, color:u.color, fontFamily:'var(--font-mono)', letterSpacing:'.07em', lineHeight:1 }}>{statusLabel}</span>
+              <span style={{ fontSize:22, fontWeight:800, color:u.color, fontFamily:'var(--font-mono)', lineHeight:1.1 }}>{fmt(liveMin)}</span>
+            </div>
+          )}
+          {isHeld&&(
+            <div style={{ padding:'6px 12px', borderRadius:10, background:HELD_STYLE.bg, border:`1px solid ${HELD_STYLE.border}`, alignSelf:'flex-start' }}>
+              <span style={{ fontSize:10, fontWeight:800, color:HELD_STYLE.color, fontFamily:'var(--font-mono)', letterSpacing:'.07em' }}>ON HOLD</span>
+            </div>
+          )}
+          {isHistory&&(
+            <div style={{ padding:'6px 12px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--bdr)',
+              display:'flex', flexDirection:'column', alignItems:'flex-end', gap:2, alignSelf:'flex-start' }}>
+              <span style={{ fontSize:10, fontWeight:800, color:'var(--t3)', fontFamily:'var(--font-mono)', letterSpacing:'.07em', lineHeight:1 }}>BUMPED</span>
+              {ticket.bumpedAt&&<span style={{ fontSize:13, fontWeight:700, color:'var(--t2)', fontFamily:'var(--font-mono)', lineHeight:1.1 }}>{new Date(ticket.bumpedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>}
             </div>
           )}
         </div>
 
-        <div style={{ padding:'10px 14px', borderTop:`1px solid ${u.border}`, display:'flex', gap:6, flexShrink:0 }}>
+        <div style={{ padding:'12px 16px', flex:1, overflowY:'auto', minHeight:0 }}>
+          {Object.entries(firedByCourse).sort(([a],[b])=>a-b).map(([course,cItems], cIdx)=>{
+            const last = cIdx === Object.keys(firedByCourse).length-1 && pendingItems.length === 0;
+            return (
+              <div key={course} style={{ marginBottom: last ? 0 : 14 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                  <CourseBadge label={`${(COURSE_LABEL[course]||`COURSE ${course}`).toUpperCase()} — FIRING`} tone={firingTone}/>
+                  <div style={{ flex:1, height:1, background:'var(--bdr)' }}/>
+                </div>
+                {cItems.map(item=><ItemRow key={item._origIdx} item={item}/>)}
+              </div>
+            );
+          })}
+          {pendingItems.length>0 && Object.entries(pendingByCourse).sort(([a],[b])=>a-b).map(([course,cItems], cIdx)=>{
+            const last = cIdx === Object.keys(pendingByCourse).length-1;
+            return (
+              <div key={course} style={{ marginBottom: last ? 0 : 14 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                  <CourseBadge label={`${(COURSE_LABEL[course]||`COURSE ${course}`).toUpperCase()} — HOLD`} tone={holdTone}/>
+                  <div style={{ flex:1, height:1, background:'var(--bdr)' }}/>
+                </div>
+                {cItems.map(item=><ItemRow key={item._origIdx} item={item}/>)}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ padding:'12px 16px', borderTop:'1px solid var(--bdr)', display:'flex', gap:8, flexShrink:0 }}>
           {isHistory?(
-            <button onClick={()=>handleRecall(ticket.id)} style={{ flex:1, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:800 }}>↩ Recall to queue</button>
+            <button onClick={()=>handleRecall(ticket.id)} style={{ flex:1, height:44, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:14, fontWeight:800 }}>↩ Recall to queue</button>
           ):isHeld?(
             <>
-              <button onClick={()=>handleUnhold(ticket.id)} style={{ flex:2, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:HELD_STYLE.color, border:'none', color:'#fff', fontSize:13, fontWeight:800 }}>↩ Back to queue</button>
-              <button onClick={()=>handleBump(ticket.id)} style={{ flex:1, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t3)', fontSize:12, fontWeight:700 }}>Bump ✓</button>
+              <button onClick={()=>handleUnhold(ticket.id)} style={{ flex:3, height:44, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:HELD_STYLE.color, border:'none', color:'#fff', fontSize:14, fontWeight:800 }}>↩ Back to queue</button>
+              <button onClick={()=>handleBump(ticket.id)} style={{ flex:1, height:44, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t3)', fontSize:13, fontWeight:700 }}>Bump ✓</button>
             </>
           ):(
             <>
-              <button onClick={()=>handleBump(ticket.id)} style={{ flex:2, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--grn)', border:'none', color:'#fff', fontSize:13, fontWeight:800 }}
+              <button onClick={()=>handleBump(ticket.id)} style={{ flex:3, height:44, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--grn)', border:'none', color:'#052e16', fontSize:15, fontWeight:800 }}
                 onMouseEnter={e=>e.currentTarget.style.background='#16a34a'} onMouseLeave={e=>e.currentTarget.style.background='var(--grn)'}>
                 Bump ✓
               </button>
-              <button onClick={()=>handleHold(ticket.id)} title="Hold" style={{ width:38, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:HELD_STYLE.color, fontSize:17, fontWeight:700 }}>⏸</button>
+              <button onClick={()=>handleHold(ticket.id)} title="Hold" style={{ width:44, height:44, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr)', color:HELD_STYLE.color, fontSize:18, fontWeight:700 }}>⏸</button>
             </>
           )}
         </div>

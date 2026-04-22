@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.14', date: '22 Apr 2026', label: 'KDS card refresh — type scale, status pill, course pills, bigger hit targets',
+    changes: [
+      'Refresh: TicketCard visual overhaul inspired by Fresh KDS layout principles but on our own dark palette. Table label goes from 16px to 22px and sits as the primary hit on the card; the timer becomes a dedicated status pill (ON TIME green / CAUTION amber / LATE red) with a 22px mono time read-out stacked under the label.',
+      'Refresh: Course separators are now labelled pills (e.g. "COURSE 1 — FIRING" in amber, "COURSE 2 — HOLD" in neutral) with a trailing hairline divider, replacing the previous emoji-prefixed text headers. Consistent with the production-docket layout shipped in v4.6.9.',
+      'Refresh: Item rows have breathing room — qty badge from 24 to 32px, item name from 13 to 16px, mods from 11 to 13px in amber (red stays reserved for the card-level LATE state so nothing competes with it).',
+      'Refresh: Primary bump button from 38px to 44px tall and claims 3fr of the footer width; hold/recall take 1fr. Meets iOS/Android hit-target guidelines and reduces mis-taps during service.',
+      'Unchanged: all action logic (bump / hold / unhold / recall / per-item bump), held + history state handling, and the v4.6.13 flex-column height cap with internal items scroll.',
+    ],
+  },
+  {
     version: '4.6.13', date: '22 Apr 2026', label: 'KDS ticket cards cap their height and scroll items internally',
     changes: [
       'Fix: On the KDS, a ticket with enough items would grow taller than the viewport and push its own bump/hold action row off-screen, effectively hiding the ticket\'s controls until the whole column was scrolled. TicketCard now renders as a flex column with maxHeight: calc(100vh - 140px). The header (table label, time, meta) and footer (bump/hold buttons) are flex-shrink:0 so they always stay on screen; only the items-by-course body panel scrolls internally when the item count overflows. No behaviour change for short tickets.',
