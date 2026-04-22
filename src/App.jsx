@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.12', date: '22 Apr 2026', label: 'Deleted variants stay deleted — SyncBridge orphan check no longer resurrects archived items',
+    changes: [
+      'Fix: Deleting a variant (or any menu item) would reliably come back on the next refresh. Root cause in SyncBridge.jsx: the "sync local-only items" safety net built its remoteIds set from itemsRes.data, which is filtered to archived=false (db.js fetchMenuItems at line 56). So an archived item\'s id looked missing from remote, and if the config-push snapshot applied earlier in the boot flow was stale (had the item with archived=false), the orphan filter flagged it as local-only and re-uploaded it via upsertMenuItem — which writes archived: item.archived ?? false, resurrecting it in the DB. On the next hydration fetchMenuItems returned it again and the variant reappeared. Fix: do a second lightweight supabase query selecting just `id` with no archived filter, and use THAT set for the orphan comparison. Archived items now correctly look present in remote and never get re-uploaded as unarchived.',
+      'Scope of impact: this pattern affected any archived menu item whose local state was briefly out of sync with Supabase at boot — most commonly variants that were deleted between config-push events. Regular (parent) items were hit by the same bug but the symptom was less visible because they rarely exist without a parent.',
+    ],
+  },
+  {
     version: '4.6.11', date: '22 Apr 2026', label: 'Daily counts now reliably auto-86 — fixes qty, voids, bar rounds, variant parents',
     changes: [
       'Fix: decrementDailyCount now respects qty. Previously it decremented by 1 regardless of how many the user ordered in one tap, so qty-3 orders silently undercounted and the item could appear to stay in stock after actually being sold out. Signature is now (itemId, qty=1) and qty can be negative to restore.',

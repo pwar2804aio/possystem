@@ -166,11 +166,19 @@ export default function SyncBridge({ onSyncPulse }) {
           }));
 
           // Sync any local-only items that failed to save previously (e.g. before schema was ready)
-          // This ensures items created offline or before column fixes are never lost
+          // This ensures items created offline or before column fixes are never lost.
+          //
+          // v4.6.12 Bug: the remoteIds set MUST include archived rows as well, not just
+          // what itemsRes.data returns (which is filtered to archived=false). Otherwise an
+          // archived item whose local state briefly shows archived=false — e.g. right after
+          // hydration when a stale config snapshot predates the archive — looks like an
+          // "orphan" and gets re-uploaded with archived=false, resurrecting it in DB.
+          // Fetch a lightweight id-only list without the archived filter for the comparison.
           if (sb && locationId && itemsRes.data?.length) {
             try {
               const { upsertMenuItem } = await import('../lib/db.js');
-              const remoteIds = new Set(itemsRes.data.map(i => i.id));
+              const { data: allRows } = await sb.from('menu_items').select('id').eq('location_id', locationId);
+              const remoteIds = new Set((allRows || []).map(i => i.id));
               const localItems = useStore.getState().menuItems || [];
               const localOnly = localItems.filter(i =>
                 !remoteIds.has(i.id) && !i.archived && i.id && !i.id.startsWith('demo-')
