@@ -59,6 +59,20 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.15', date: '22 Apr 2026', label: 'Reports rebuild wave 1 — Sales summary, Exceptions, Payments, Daypart, plus period compare and CSV export on everything',
+    changes: [
+      'New: Sales summary report replaces the old Overview tab. Four headline tiles (Net sales / Covers / Avg check / Tips) each show a period-over-period compare chip — green when up, red when down, neutral when no prior data. A revenue breakdown ladder walks through gross → discounts → voids → refunds → net → tax → service → tips → total collected so the numbers actually reconcile. An exceptions snapshot panel on the right shows discount / void / refund totals with % of gross, one click away from the full audit view.',
+      'New: Exceptions report. Every void, discount and refund flattened into a single audit trail sorted by time, each entry showing type, ref, table, reason, staff member and approver (when captured). Filter chips for All / Voids / Discounts / Refunds. Below, a per-staff rollup table so you can spot whose register is leaking — three separate void/discount/refund columns with both amount and count per person.',
+      'New: Payments report. Revenue split across canonical buckets (Cash / Card / Apple Pay / Google Pay / Split / Other) with share % and check count, plus a cash reconciliation panel that tells the manager the exact expected drawer math at close: starting float + cash sales = what should be counted.',
+      'New: Daypart report replaces the one-dimensional Hourly view. A 7×24 heatmap of day-of-week × hour shows revenue intensity so you can see at a glance that Friday 19:00 is the peak and Tuesday 15:00 is the graveyard. Supplemented by three stat tiles (busiest hour / busiest day / peak slot) and a 24-bar hourly chart with now-hour highlight.',
+      'New: Period picker expanded from 4 options to 9 — Today, Yesterday, This week, Last week, This month, Last month, Last 7 days, Last 30 days, plus a Custom range with date inputs. Every period also computes the equivalent prior period (same length, immediately preceding) which is what the Sales summary compare chips are drawn against.',
+      'New: Global filter row. Server dropdown populated from the range data, order type dropdown populated from the range data. Filters apply across every tab (including the preserved legacy ones) and chain with the period — counts re-compute live.',
+      'New: CSV export button on each of the 4 new reports. BOM-prefixed UTF-8 so Excel opens it cleanly with £ signs intact; filename stamped with today\'s date.',
+      'Architecture: New reports live in src/backoffice/sections/reports/ — shared utilities (_filters.js, _csv.js, _charts.jsx) plus one file per report (SalesSummary, Exceptions, Payments, Daypart). BOReports.jsx became a shell that owns data fetching and global filters and passes filtered checks down to pure child components, which makes the coming multi-location compare view a straight pass of multi-location data instead of rewiring every report.',
+      'Preserved: Product mix, By server, Tax and Open orders tabs are untouched and still work with the new filter row. Wave 2 (v4.6.16) upgrades Product mix with modifiers + time-of-day, rebuilds By server as a full scorecard with tip % / discount rate / void rate, and adds Menu engineering, Tips and Order types reports. Wave 3 adds Tables, KDS performance, Z-report (printable) and PDF export. Wave 4 adds the multi-location picker and compare view against the user_profiles-linked location set.',
+    ],
+  },
+  {
     version: '4.6.14', date: '22 Apr 2026', label: 'KDS card refresh — type scale, status pill, course pills, bigger hit targets',
     changes: [
       'Refresh: TicketCard visual overhaul inspired by Fresh KDS layout principles but on our own dark palette. Table label goes from 16px to 22px and sits as the primary hit on the card; the timer becomes a dedicated status pill (ON TIME green / CAUTION amber / LATE red) with a 22px mono time read-out stacked under the label.',
