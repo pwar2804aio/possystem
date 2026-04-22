@@ -1,14 +1,13 @@
-// v4.6.15: Back Office Reports — rebuilt shell.
-// The shell owns:
-//   - period + custom range picker
-//   - server + order-type filter
-//   - range fetch (current period) + prev-range fetch (for compare chips)
-//   - tab routing between reports
-// Each report is a pure component that receives filtered checks and renders.
+// v4.6.16: Back Office Reports shell — catalog landing + report detail views.
 //
-// Wave 1 ships Sales summary / Exceptions / Payments / Daypart as new tabs.
-// Legacy Product mix / By server / Tax / Open orders are preserved inline
-// and will be upgraded in Wave 2 (Menu engineering, Server scorecard, Tax breakdown).
+// Architecture:
+//   - On mount, show the Catalog (grid of category cards with report links).
+//   - Clicking a report sets view = report id, which renders a detail page with:
+//       - Breadcrumb: "Reports / [category] / [report]"  + a "← Back to reports" link
+//       - Filter row: period, server, order type, custom range
+//       - The report component itself
+//   - State: view, period, customRange, serverFilter, orderTypeFilter
+//   - Data: rangeChecks (current period), prevChecks (previous period) — fetched on period change.
 
 import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store';
@@ -16,10 +15,12 @@ import { isMock, getLocationId } from '../../lib/supabase';
 import { fetchClosedChecksRange } from '../../lib/db';
 import { calculateOrderTax } from '../../lib/tax';
 import { PERIODS, getPeriodRange, periodLabel, applyFilters, uniqueServers, uniqueOrderTypes } from './reports/_filters';
+import Catalog, { CATEGORIES, REPORT_INDEX } from './reports/Catalog';
 import SalesSummary from './reports/SalesSummary';
 import Exceptions   from './reports/Exceptions';
 import Payments     from './reports/Payments';
 import Daypart      from './reports/Daypart';
+import Shifts       from './reports/Shifts';
 
 const fmt  = n => `£${(n || 0).toFixed(2)}`;
 const fmtN = n => (n || 0).toLocaleString();
@@ -27,35 +28,30 @@ const fmtN = n => (n || 0).toLocaleString();
 export default function BOReports() {
   const { tables, taxRates, closedChecks: storeChecks } = useStore();
 
-  const [view, setView]               = useState('summary');
+  const [view, setView]               = useState('catalog'); // 'catalog' or a report id
   const [period, setPeriod]           = useState('today');
-  const [customRange, setCustomRange] = useState({ from:null, to:null });
+  const [customRange, setCustomRange] = useState({ from: null, to: null });
   const [serverFilter, setServerFilter]       = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
-  const [locationFilter] = useState('all'); // Reserved for Wave 4 multi-location picker
 
   const [rangeChecks, setRangeChecks] = useState(null);
-  const [prevChecks, setPrevChecks]   = useState(null);
+  const [prevChecks,  setPrevChecks]  = useState(null);
   const [loadingRange, setLoadingRange] = useState(false);
 
   const range = useMemo(() => getPeriodRange(period, customRange), [period, customRange]);
 
-  // Derive active sessions for the Open orders tab
   const activeSessions = useMemo(() =>
     Object.fromEntries(tables.filter(t => t.session).map(t => [t.id, t.session]))
   , [tables]);
 
-  // Fetch current period + previous period in parallel (prev period powers compare chips)
   useEffect(() => {
     if (isMock) { setRangeChecks([]); setPrevChecks([]); return; }
     if (period === 'custom' && (!customRange.from || !customRange.to)) {
-      // Wait for the user to pick both ends before fetching
       setRangeChecks([]); setPrevChecks([]); return;
     }
     setLoadingRange(true);
     (async () => {
       try {
-        // Resolve location id from user_profiles → device config fallback
         let locId = await getLocationId().catch(() => null);
         if (!locId) {
           try {
@@ -65,7 +61,6 @@ export default function BOReports() {
           } catch {}
         }
         if (!locId) {
-          // No locId: fall back to local store (captures today's checks on this device only)
           const localSlice = (storeChecks || []).filter(c => c.closedAt && new Date(c.closedAt) >= range.from && new Date(c.closedAt) <= range.to);
           setRangeChecks(localSlice); setPrevChecks([]);
           setLoadingRange(false);
@@ -83,19 +78,17 @@ export default function BOReports() {
       }
       setLoadingRange(false);
     })();
-  }, [period, customRange.from, customRange.to, locationFilter]);
+  }, [period, customRange.from, customRange.to]);
 
   const allChecks = rangeChecks || [];
   const allPrev   = prevChecks  || [];
 
-  // Apply global filters (server + order type). Custom filters live per-report.
   const filtered     = useMemo(() => applyFilters(allChecks, { server: serverFilter, orderType: orderTypeFilter }), [allChecks, serverFilter, orderTypeFilter]);
   const filteredPrev = useMemo(() => applyFilters(allPrev,   { server: serverFilter, orderType: orderTypeFilter }), [allPrev,   serverFilter, orderTypeFilter]);
 
   const servers    = useMemo(() => uniqueServers(allChecks),    [allChecks]);
   const orderTypes = useMemo(() => uniqueOrderTypes(allChecks), [allChecks]);
 
-  // Open orders — unchanged logic from pre-4.6.15
   const openOrders = useMemo(() => (
     Object.entries(activeSessions || {})
       .filter(([, s]) => s?.items?.length > 0)
@@ -107,7 +100,6 @@ export default function BOReports() {
       .sort((a, b) => (a.openedAt || 0) - (b.openedAt || 0))
   ), [activeSessions, tables]);
 
-  // Legacy stats for Product mix + By server tabs. Wave 2 replaces these tabs.
   const legacyStats = useMemo(() => {
     const itemMap = {};
     filtered.forEach(c => {
@@ -131,25 +123,38 @@ export default function BOReports() {
     return { topItems, byServer, revenue };
   }, [filtered]);
 
-  const tabs = [
-    { id:'summary',    label:'Sales summary', icon:'📈', badge:'new' },
-    { id:'exceptions', label:'Exceptions',    icon:'🛡', badge:'new' },
-    { id:'payments',   label:'Payments',      icon:'💳', badge:'new' },
-    { id:'daypart',    label:'Daypart',       icon:'🕓', badge:'new' },
-    { id:'items',      label:'Product mix' },
-    { id:'servers',    label:'By server'   },
-    { id:'tax',        label:'Tax' },
-    { id:'open',       label:`Open orders${openOrders.length ? ` (${openOrders.length})` : ''}` },
-  ];
+  // Counts shown next to catalog links (e.g. "(3)" on Open orders)
+  const catalogCounts = useMemo(() => ({
+    open: openOrders.length || null,
+  }), [openOrders]);
 
+  const current = REPORT_INDEX[view];
+  const categoryForView = current ? CATEGORIES.find(c => c.id === current.category) : null;
   const needsCustomPick = period === 'custom' && (!customRange.from || !customRange.to);
 
+  // Catalog view
+  if (view === 'catalog') {
+    return (
+      <div style={{ padding:'20px 24px' }}>
+        <Catalog onOpen={setView} counts={catalogCounts}/>
+      </div>
+    );
+  }
+
+  // Detail view (filter row + the selected report)
   return (
-    <div style={{ padding:'20px 24px', maxWidth:1100 }}>
-      {/* Header */}
+    <div style={{ padding:'20px 24px', maxWidth: 1100 }}>
+      {/* Breadcrumb + back */}
+      <button onClick={() => setView('catalog')} style={{
+        border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit',
+        color:'var(--t3)', fontSize:12, padding:0, marginBottom:10,
+      }}>← Back to reports</button>
       <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:12 }}>
         <div>
-          <div style={{ fontSize:11, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', fontWeight:700 }}>Reports</div>
+          <div style={{ fontSize:11, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
+            {categoryForView && <><span>{categoryForView.icon}</span><span>{categoryForView.label}</span><span style={{ color:'var(--t4)' }}>/</span></>}
+            <span>{current?.label || view}</span>
+          </div>
           <div style={{ fontSize:22, fontWeight:800, color:'var(--t1)', marginTop:2, letterSpacing:'-.01em' }}>
             {PERIODS.find(p => p.id === period)?.label}
             <span style={{ color:'var(--t4)', fontWeight:400, fontSize:14, marginLeft:10 }}>{periodLabel(period, customRange, range)}</span>
@@ -197,35 +202,19 @@ export default function BOReports() {
         )}
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display:'flex', gap:0, borderBottom:'1px solid var(--bdr)', marginBottom:20, overflowX:'auto' }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setView(t.id)} style={{
-            padding:'8px 14px', cursor:'pointer', fontFamily:'inherit', border:'none', whiteSpace:'nowrap',
-            borderBottom:`2px solid ${view === t.id ? 'var(--acc)' : 'transparent'}`,
-            background:'transparent', color: view === t.id ? 'var(--acc)' : 'var(--t3)',
-            fontSize:12, fontWeight: view === t.id ? 700 : 400, marginBottom:-1,
-            display:'flex', alignItems:'center', gap:6,
-          }}>
-            {t.icon && <span style={{ fontSize:13 }}>{t.icon}</span>}
-            {t.label}
-            {t.badge && <span style={{ padding:'1px 6px', fontSize:9, fontWeight:800, background:'var(--acc)', color:'#0b0c10', borderRadius:4, letterSpacing:'.05em', textTransform:'uppercase' }}>{t.badge}</span>}
-          </button>
-        ))}
-      </div>
-
       {needsCustomPick ? (
         <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>
           Pick a start and end date to load the custom range.
         </div>
       ) : loadingRange ? (
-        <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>Loading …</div>
+        <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>Loading…</div>
       ) : (
         <>
           {view === 'summary'    && <SalesSummary checks={filtered} prevChecks={filteredPrev} fmt={fmt} fmtN={fmtN}/>}
           {view === 'exceptions' && <Exceptions   checks={filtered} fmt={fmt}/>}
           {view === 'payments'   && <Payments     checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'daypart'    && <Daypart      checks={filtered} fmt={fmt}/>}
+          {view === 'shifts'     && <Shifts       checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'items'      && <LegacyPMix   stats={legacyStats} fmt={fmt}/>}
           {view === 'servers'    && <LegacyServers stats={legacyStats} fmt={fmt}/>}
           {view === 'tax'        && <LegacyTax    checks={filtered} taxRates={taxRates} fmt={fmt}/>}
@@ -242,8 +231,7 @@ const tileSt   = { padding:'14px 16px', background:'var(--bg1)', border:'1px sol
 const lblSt    = { fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6 };
 
 // ------------------------------------------------------------------
-// Legacy views — preserved intact from pre-4.6.15. Wave 2 replaces
-// Product mix / By server / Tax with richer versions.
+// Legacy views — unchanged from v4.6.15, preserved until Wave 3 rebuilds.
 // ------------------------------------------------------------------
 
 function LegacyPMix({ stats, fmt }) {
@@ -404,7 +392,7 @@ function LegacyOpen({ openOrders, fmt }) {
   if (openOrders.length === 0) {
     return (
       <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>
-        <div style={{ fontSize:36, marginBottom:10 }}>⋚</div>
+        <div style={{ fontSize:36, marginBottom:10 }}>⬚</div>
         No open orders right now
       </div>
     );

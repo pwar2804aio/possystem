@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.16', date: '22 Apr 2026', label: 'Reports wave 2 — catalog landing page + Shifts report',
+    changes: [
+      'UX: Reports now open to a catalog landing page grouped by category (Sales / Exceptions & discounts / Fiscal / Orders / Location) instead of a long tab bar. Matches the reference design — each category card lists its reports with a one-line description; clicking a report opens it as a dedicated view with a breadcrumb and "← Back to reports" link. Scales cleanly as we add more reports in waves 3 and 4.',
+      'New: Shifts report under Sales reports. Rows are business-day shifts derived from closed-check timestamps — each day shows first check, last check, shift duration (first → last), checks, covers, revenue, tips and voids. Clicking a day expands to show per-server sessions with individual start/end times, duration, and stats per staff member. CSV export of the shift table included.',
+      'Note: Shift derivation uses closed-check timestamps because we do not yet capture clock-in/out events. When clock-in/out lands in staff management, this report switches to real session records with no UI change. Labour cost vs sales follows once staff hourly rates are captured.',
+      'Internal: reports/Catalog.jsx + reports/Shifts.jsx added; BOReports.jsx shell switched from tab bar to catalog + report router. The filter row (period, server, order type, custom range) now lives on each report detail page so it only appears when relevant. Legacy tabs (Product mix, Staff sales, Tax, Open orders) still render through the same shell and are linked from the catalog under their proper categories; they get upgraded in waves 3.',
+    ],
+  },
+  {
     version: '4.6.15', date: '22 Apr 2026', label: 'Reports rebuild wave 1 — Sales summary, Exceptions, Payments, Daypart, plus period compare and CSV export on everything',
     changes: [
       'New: Sales summary report replaces the old Overview tab. Four headline tiles (Net sales / Covers / Avg check / Tips) each show a period-over-period compare chip — green when up, red when down, neutral when no prior data. A revenue breakdown ladder walks through gross → discounts → voids → refunds → net → tax → service → tips → total collected so the numbers actually reconcile. An exceptions snapshot panel on the right shows discount / void / refund totals with % of gross, one click away from the full audit view.',
