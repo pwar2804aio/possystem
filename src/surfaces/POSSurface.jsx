@@ -244,9 +244,18 @@ export default function POSSurface() {
   };
 
   const handleSend = () => {
-    // Walk-in with no table — open the send modal to choose order type
+    // Walk-in with no table
     if (!activeTableId) {
       if (!items.length) { showToast('No items on order', 'error'); return; }
+      // v4.6.5 Bug 1: if user already picked takeaway/collection/delivery AND gave customer
+      // details, skip the SendWithoutTableModal — it was forcing them to re-pick the type
+      // and losing the original orderType (Bug 2 downstream).
+      const preSelected = (orderType === 'takeaway' || orderType === 'collection' || orderType === 'delivery');
+      if (preSelected && customer?.name) {
+        setShowCheckout(false);
+        sendToKitchen();
+        return;
+      }
       setShowSendModal(true);
       return;
     }
