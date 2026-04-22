@@ -13,7 +13,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store';
 import { isMock, getLocationId } from '../../lib/supabase';
 import { fetchClosedChecksRange, fetchKDSTicketsRange } from '../../lib/db';
-import { calculateOrderTax } from '../../lib/tax';
 import { PERIODS, getPeriodRange, periodLabel, applyFilters, uniqueServers, uniqueOrderTypes } from './reports/_filters';
 import Catalog, { CATEGORIES, REPORT_INDEX } from './reports/Catalog';
 import SalesSummary from './reports/SalesSummary';
@@ -113,28 +112,10 @@ export default function BOReports() {
       .sort((a, b) => (a.openedAt || 0) - (b.openedAt || 0))
   ), [activeSessions, tables]);
 
-  const legacyStats = useMemo(() => {
-    const itemMap = {};
-    filtered.forEach(c => {
-      (c.items || []).forEach(i => {
-        if (!itemMap[i.name]) itemMap[i.name] = { name:i.name, qty:0, rev:0 };
-        itemMap[i.name].qty += i.qty || 1;
-        itemMap[i.name].rev += (i.price || 0) * (i.qty || 1);
-      });
-    });
-    const topItems = Object.values(itemMap).sort((a, b) => b.rev - a.rev).slice(0, 50);
-    const serverMap = {};
-    filtered.forEach(c => {
-      const s = c.server || c.staff || 'Unknown';
-      if (!serverMap[s]) serverMap[s] = { name:s, checks:0, revenue:0, covers:0 };
-      serverMap[s].checks++;
-      serverMap[s].revenue += c.total || 0;
-      serverMap[s].covers  += c.covers || 1;
-    });
-    const byServer = Object.values(serverMap).sort((a, b) => b.revenue - a.revenue);
-    const revenue = filtered.reduce((s, c) => s + (c.total || 0), 0);
-    return { topItems, byServer, revenue };
-  }, [filtered]);
+  const totalRevenue = useMemo(
+    () => filtered.reduce((s, c) => s + (c.total || 0), 0),
+    [filtered]
+  );
 
   // Counts shown next to catalog links (e.g. "(3)" on Open orders)
   const catalogCounts = useMemo(() => ({
@@ -173,7 +154,7 @@ export default function BOReports() {
             <span style={{ color:'var(--t4)', fontWeight:400, fontSize:14, marginLeft:10 }}>{periodLabel(period, customRange, range)}</span>
           </div>
           <div style={{ fontSize:12, color:'var(--t3)', marginTop:4 }}>
-            {filtered.length} checks · {fmt(legacyStats.revenue)} revenue
+            {filtered.length} checks · {fmt(totalRevenue)} revenue
             {(serverFilter !== 'all' || orderTypeFilter !== 'all') && (
               <span style={{ color:'var(--acc)', marginLeft:6 }}>· filtered</span>
             )}
@@ -249,164 +230,6 @@ const selectSt = { padding:'6px 10px', borderRadius:8, background:'var(--bg3)', 
 const inputSt  = { padding:'5px 10px', borderRadius:8, background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t2)', fontSize:12, fontFamily:'inherit' };
 const tileSt   = { padding:'14px 16px', background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12 };
 const lblSt    = { fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6 };
-
-// ------------------------------------------------------------------
-// Legacy views — unchanged from v4.6.15, preserved until Wave 3 rebuilds.
-// ------------------------------------------------------------------
-
-function LegacyPMix({ stats, fmt }) {
-  if (stats.topItems.length === 0) {
-    return <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>No sales data yet</div>;
-  }
-  return (
-    <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, overflow:'hidden' }}>
-      <table style={{ width:'100%', borderCollapse:'collapse' }}>
-        <thead>
-          <tr style={{ borderBottom:'1px solid var(--bdr)', background:'var(--bg3)' }}>
-            {['#','Item','Qty sold','Revenue','Share'].map(h => (
-              <th key={h} style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', textAlign: h === 'Item' ? 'left' : 'right' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {stats.topItems.map((item, i) => {
-            const share = stats.revenue > 0 ? (item.rev / stats.revenue) * 100 : 0;
-            return (
-              <tr key={item.name} style={{ borderBottom:'1px solid var(--bdr)', background: i % 2 === 0 ? 'transparent' : 'var(--bg2)' }}>
-                <td style={{ padding:'9px 14px', fontSize:12, color:'var(--t4)', textAlign:'right', fontFamily:'var(--font-mono)' }}>{i + 1}</td>
-                <td style={{ padding:'9px 14px', fontSize:13, color:'var(--t1)', fontWeight:600 }}>{item.name}</td>
-                <td style={{ padding:'9px 14px', fontSize:12, color:'var(--t2)', textAlign:'right', fontFamily:'var(--font-mono)' }}>{item.qty}</td>
-                <td style={{ padding:'9px 14px', fontSize:13, fontWeight:700, color:'var(--acc)', textAlign:'right', fontFamily:'var(--font-mono)' }}>{fmt(item.rev)}</td>
-                <td style={{ padding:'9px 14px', textAlign:'right' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, justifyContent:'flex-end' }}>
-                    <div style={{ width:60, height:5, background:'var(--bg3)', borderRadius:3, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${share}%`, background:'var(--acc)', borderRadius:3 }}/>
-                    </div>
-                    <span style={{ fontSize:11, color:'var(--t4)', fontFamily:'var(--font-mono)', width:36, textAlign:'right' }}>{share.toFixed(0)}%</span>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function LegacyServers({ stats, fmt }) {
-  if (stats.byServer.length === 0) {
-    return <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>No server data yet</div>;
-  }
-  return (
-    <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, overflow:'hidden' }}>
-      <table style={{ width:'100%', borderCollapse:'collapse' }}>
-        <thead>
-          <tr style={{ borderBottom:'1px solid var(--bdr)', background:'var(--bg3)' }}>
-            {['Server','Checks','Covers','Revenue','Avg check'].map(h => (
-              <th key={h} style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', textAlign: h === 'Server' ? 'left' : 'right' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {stats.byServer.map((s, i) => (
-            <tr key={s.name} style={{ borderBottom:'1px solid var(--bdr)', background: i % 2 === 0 ? 'transparent' : 'var(--bg2)' }}>
-              <td style={{ padding:'9px 14px', fontSize:13, fontWeight:600, color:'var(--t1)' }}>{s.name}</td>
-              <td style={{ padding:'9px 14px', fontSize:12, color:'var(--t2)', textAlign:'right', fontFamily:'var(--font-mono)' }}>{s.checks}</td>
-              <td style={{ padding:'9px 14px', fontSize:12, color:'var(--t2)', textAlign:'right', fontFamily:'var(--font-mono)' }}>{s.covers}</td>
-              <td style={{ padding:'9px 14px', fontSize:13, fontWeight:700, color:'var(--acc)', textAlign:'right', fontFamily:'var(--font-mono)' }}>{fmt(s.revenue)}</td>
-              <td style={{ padding:'9px 14px', fontSize:12, color:'var(--t2)', textAlign:'right', fontFamily:'var(--font-mono)' }}>{fmt(s.checks > 0 ? s.revenue / s.checks : 0)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function LegacyTax({ checks, taxRates, fmt }) {
-  if (!taxRates?.length) {
-    return (
-      <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>
-        <div style={{ fontSize:36, marginBottom:10 }}>%</div>
-        No tax rates configured. Go to <strong style={{ color:'var(--t2)' }}>Tax &amp; VAT</strong> to set up rates.
-      </div>
-    );
-  }
-  const taxSummary = {};
-  let totalGross = 0, totalTax = 0, totalNet = 0;
-  checks.forEach(check => {
-    const orderType = check.orderType || 'dine-in';
-    const breakdown = calculateOrderTax(check.items || [], taxRates, orderType);
-    totalGross += breakdown.total;
-    totalTax   += breakdown.totalTax;
-    totalNet   += breakdown.subtotal;
-    breakdown.breakdown.forEach(b => {
-      const key = b.rate.id;
-      if (!taxSummary[key]) taxSummary[key] = { rate:b.rate, tax:0, net:0, gross:0, checks:0 };
-      taxSummary[key].tax   += b.tax;
-      taxSummary[key].net   += b.net;
-      taxSummary[key].gross += b.gross;
-      taxSummary[key].checks++;
-    });
-  });
-  const rows = Object.values(taxSummary).sort((a, b) => b.rate.rate - a.rate.rate);
-
-  const exportCSV = () => {
-    const lines = ['Rate,Code,Type,Net Sales,Tax,Gross Sales'];
-    rows.forEach(r => {
-      const pct = (r.rate.rate * 100).toFixed(1).replace('.0', '');
-      lines.push(`"${r.rate.name} (${pct}%)","${r.rate.code || ''}","${r.rate.type}","£${r.net.toFixed(2)}","£${r.tax.toFixed(2)}","£${r.gross.toFixed(2)}"`);
-    });
-    lines.push(`"Total","","","£${totalNet.toFixed(2)}","£${totalTax.toFixed(2)}","£${totalGross.toFixed(2)}"`);
-    const blob = new Blob([lines.join('\n')], { type:'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `tax-report-${new Date().toISOString().slice(0,10)}.csv`; a.click();
-  };
-
-  return (
-    <div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <div style={{ fontSize:13, color:'var(--t4)' }}>{checks.length} checks</div>
-        <button onClick={exportCSV} style={{ padding:'6px 14px', borderRadius:8, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Export CSV</button>
-      </div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
-        <div style={tileSt}><div style={lblSt}>Gross sales</div><div style={{ fontSize:22, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>{fmt(totalGross)}</div></div>
-        <div style={tileSt}><div style={lblSt}>Net sales</div>  <div style={{ fontSize:22, fontWeight:800, color:'var(--t1)',  fontFamily:'var(--font-mono)' }}>{fmt(totalNet)}</div></div>
-        <div style={tileSt}><div style={lblSt}>Total tax</div>  <div style={{ fontSize:22, fontWeight:800, color:'var(--red)', fontFamily:'var(--font-mono)' }}>{fmt(totalTax)}</div></div>
-      </div>
-      {rows.length === 0 ? (
-        <div style={{ textAlign:'center', padding:'32px 0', color:'var(--t4)', fontSize:13 }}>No tax data for this period.</div>
-      ) : (
-        <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, overflow:'hidden' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', padding:'10px 16px', background:'var(--bg3)', borderBottom:'1px solid var(--bdr)', fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.06em' }}>
-            <span>Rate</span><span style={{ textAlign:'right' }}>Net</span><span style={{ textAlign:'right' }}>Tax</span><span style={{ textAlign:'right' }}>Gross</span>
-          </div>
-          {rows.map(r => {
-            const pct = (r.rate.rate * 100).toFixed(1).replace('.0', '');
-            return (
-              <div key={r.rate.id} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', padding:'12px 16px', borderBottom:'1px solid var(--bdr)', alignItems:'center' }}>
-                <div>
-                  <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>{r.rate.name}</div>
-                  <div style={{ fontSize:11, color:'var(--t4)' }}>{pct}% · {r.rate.code} · {r.rate.type}</div>
-                </div>
-                <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', color:'var(--t2)' }}>{fmt(r.net)}</div>
-                <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', color:'var(--red)', fontWeight:600 }}>{fmt(r.tax)}</div>
-                <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', color:'var(--t1)', fontWeight:700 }}>{fmt(r.gross)}</div>
-              </div>
-            );
-          })}
-          <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', padding:'12px 16px', background:'var(--bg3)' }}>
-            <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)' }}>Total</div>
-            <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--t1)' }}>{fmt(totalNet)}</div>
-            <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--red)' }}>{fmt(totalTax)}</div>
-            <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--acc)' }}>{fmt(totalGross)}</div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function LegacyOpen({ openOrders, fmt }) {
   if (openOrders.length === 0) {

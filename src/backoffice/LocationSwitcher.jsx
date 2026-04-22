@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, isMock, platformSupabase, setResolvedLocationId } from '../lib/supabase';
+import { fetchAccessibleLocations } from '../lib/db';
 
 export default function LocationSwitcher({ onClose }) {
   const [items, setItems] = useState([]);
@@ -40,12 +41,20 @@ export default function LocationSwitcher({ onClose }) {
         }));
         setItems(grouped);
       } else {
-        // Regular user: just use their location_id from user_profiles — no extra lookup needed
-        const locId = profile?.location_id;
-        if (locId) {
+        // Regular user (v4.6.23): prefer the user_locations junction so a user
+        // linked to multiple sites sees all of them. Falls back internally to
+        // user_profiles.location_id for pre-v4.6.22 environments.
+        const accessible = await fetchAccessibleLocations();
+        const locs = (accessible.data || []).map(l => ({
+          id: l.id,
+          name: l.name || 'Location',
+          ops_location_id: l.id,
+          role: l.role,
+        }));
+        if (locs.length > 0) {
           setItems([{
-            company: { id: 'mine', name: 'Your location' },
-            locations: [{ id: locId, name: 'Location 1', ops_location_id: locId }],
+            company: { id: 'mine', name: locs.length > 1 ? 'Your locations' : 'Your location' },
+            locations: locs,
           }]);
         }
       }
@@ -114,7 +123,12 @@ export default function LocationSwitcher({ onClose }) {
                     onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.borderColor = 'var(--bdr)'; }}>
                     <div style={{ width:34, height:34, borderRadius:9, flexShrink:0, background:isCurrent ? 'var(--acc)' : 'var(--bg)', border:`1px solid ${isCurrent ? 'var(--acc-b)' : 'var(--bdr)'}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>📍</div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:14, fontWeight:700, color:isCurrent ? 'var(--acc)' : 'var(--t1)', marginBottom:2 }}>{loc.name}</div>
+                      <div style={{ fontSize:14, fontWeight:700, color:isCurrent ? 'var(--acc)' : 'var(--t1)', marginBottom:2, display:'flex', alignItems:'center', gap:8 }}>
+                        <span>{loc.name}</span>
+                        {loc.role && !isSuperAdmin && (
+                          <span style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:4, background:'var(--bg2)', color:'var(--t4)', border:'1px solid var(--bdr)', letterSpacing:'.05em', textTransform:'uppercase' }}>{loc.role}</span>
+                        )}
+                      </div>
                       {isSuperAdmin && <div style={{ fontSize:10, color:'var(--t4)', fontFamily:'var(--font-mono)' }}>{opsId?.slice(0,16)}…</div>}
                     </div>
                     {isCurrent && <span style={{ fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:20, background:'var(--acc)', color:'#fff', flexShrink:0 }}>Active</span>}

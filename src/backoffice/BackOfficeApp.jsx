@@ -269,8 +269,13 @@ export default function BackOfficeApp() {
               fontFamily:'inherit', background:'transparent',
               color:'var(--t3)', display:'flex', alignItems:'center', gap:8,
               marginBottom:6, transition:'all .1s',
-            }}>
-              <span>📍</span> Switch location
+            }}
+              title={orgCtx?.locationName ? `Currently at ${orgCtx.locationName}` : 'Switch location'}>
+              <span>📍</span>
+              <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {orgCtx?.locationName || 'Switch location'}
+              </span>
+              <span style={{ fontSize:10, color:'var(--t4)' }}>▾</span>
             </button>
           )}
           {authUser && !isMock && (
