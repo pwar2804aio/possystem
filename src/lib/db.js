@@ -243,6 +243,7 @@ export const insertClosedCheck = async (check, locationId = null) => {
     location_id:  locationId,
     ref:          check.ref,
     server:       check.server,
+    staff_id:     check.staffId   || null,   // v4.6.19 — FK to staff_members.id
     covers:       check.covers,
     order_type:   check.orderType,
     customer:     check.customer,
@@ -251,6 +252,7 @@ export const insertClosedCheck = async (check, locationId = null) => {
     subtotal:     check.subtotal,
     service:      check.service,
     tip:          check.tip,
+    tax_amount:   check.taxAmount != null ? check.taxAmount : null,  // v4.6.19 — stored explicitly
     total:        check.total,
     method:       check.method,
     closed_at:    check.closedAt ? new Date(check.closedAt).toISOString() : new Date().toISOString(),
@@ -279,9 +281,11 @@ export const fetchClosedChecks = async (locationId = null, limit = 500, sinceDat
   if (result.data) {
     result.data = result.data.map(c => ({
       id: c.id, ref: c.ref, server: c.server, covers: c.covers,
+      staffId: c.staff_id,
       orderType: c.order_type, customer: c.customer,
       items: c.items || [], discounts: c.discounts || [],
       subtotal: c.subtotal, service: c.service, tip: c.tip, total: c.total,
+      taxAmount: c.tax_amount,
       method: c.method,
       closedAt: c.closed_at ? new Date(c.closed_at).getTime() : null,
       status: c.status, refunds: c.refunds || [],
@@ -306,9 +310,11 @@ export const fetchClosedChecksRange = async (locationId = null, fromDate, toDate
   if (result.data) {
     result.data = result.data.map(c => ({
       id: c.id, ref: c.ref, server: c.server, covers: c.covers,
+      staffId: c.staff_id,
       orderType: c.order_type, customer: c.customer,
       items: c.items || [], discounts: c.discounts || [],
       subtotal: c.subtotal, service: c.service, tip: c.tip, total: c.total,
+      taxAmount: c.tax_amount,
       method: c.method,
       closedAt: c.closed_at ? new Date(c.closed_at).getTime() : null,
       status: c.status, refunds: c.refunds || [],

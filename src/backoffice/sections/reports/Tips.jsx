@@ -18,12 +18,16 @@ import { useStore } from '../../../store';
 import { StatTile, ExportBtn, EmptyState, HourBar, BarRow } from './_charts';
 import { toCsv, downloadCsv } from './_csv';
 
-// Aggregate checks to per-server tip stats + hours derivation
+// Aggregate checks to per-server tip stats + hours derivation.
+// Groups by server NAME (since that's the field that's always present on historical
+// rows). Also captures the first staffId seen for that server so pool role lookup
+// can prefer FK match (v4.6.19) and fall back to name match for legacy rows.
 function serverTips(checks) {
   const map = {};
   checks.filter(c => c.status !== 'voided').forEach(c => {
     const s = c.server || c.staff || 'Unknown';
-    if (!map[s]) map[s] = { server: s, tipsCash: 0, tipsCard: 0, tipCount: 0, revenue: 0, checkCount: 0, byDay: {} };
+    if (!map[s]) map[s] = { server: s, staffId: c.staffId || null, tipsCash: 0, tipsCard: 0, tipCount: 0, revenue: 0, checkCount: 0, byDay: {} };
+    if (!map[s].staffId && c.staffId) map[s].staffId = c.staffId;
     const tip = c.tip || 0;
     const isCash = (c.method || '').toLowerCase() === 'cash';
     if (isCash) map[s].tipsCash += tip;
@@ -65,11 +69,15 @@ export default function Tips({ checks, fmt, fmtN }) {
 
   const servers = useMemo(() => serverTips(checks), [checks]);
 
-  // Role lookup by name (best-effort — name match against staffMembers)
-  const roleByName = useMemo(() => {
-    const m = {};
-    staffMembers.forEach(s => { if (s.name) m[s.name] = s.role; });
-    return m;
+  // Role lookup: prefer staff_id FK match (v4.6.19), fall back to name match
+  // for legacy checks closed before the schema hardening.
+  const { roleById, roleByName } = useMemo(() => {
+    const byId = {}, byName = {};
+    staffMembers.forEach(s => {
+      if (s.id)   byId[s.id]     = s.role;
+      if (s.name) byName[s.name] = s.role;
+    });
+    return { roleById: byId, roleByName: byName };
   }, [staffMembers]);
 
   // Totals + hourly distribution
@@ -106,7 +114,7 @@ export default function Tips({ checks, fmt, fmtN }) {
     // Default: each person keeps their own tips
     const rows = servers.map(r => ({
       server: r.server,
-      role: roleByName[r.server] || 'Unknown',
+      role: (r.staffId && roleById[r.staffId]) || roleByName[r.server] || 'Unknown',
       hoursMs: r.hoursMs,
       gross: r.tips,
       contribution: 0,
@@ -151,7 +159,7 @@ export default function Tips({ checks, fmt, fmtN }) {
     }
 
     return { rows, pool: rows.reduce((s, r) => s + r.contribution, 0) };
-  }, [servers, roleByName, mode, tipoutPct, byHours, serverRoles, supportRoles]);
+  }, [servers, roleById, roleByName, mode, tipoutPct, byHours, serverRoles, supportRoles]);
 
   const onExport = () => {
     const csv = toCsv(distribution.rows, [

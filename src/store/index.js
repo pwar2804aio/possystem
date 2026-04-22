@@ -1754,6 +1754,7 @@ export const useStore = create((set, get) => ({
       tableId,
       tableLabel: table.label,
       server:     session.server || staff?.name || 'Staff',
+      staffId:    staff?.id || null,                          // v4.6.19
       covers:     session.covers || 1,
       orderType:  'dine-in',
       items:      session.items.filter(i => !i.voided).map(i => ({ ...i })),
@@ -1762,6 +1763,7 @@ export const useStore = create((set, get) => ({
       service:    (session.subtotal || 0) * 0.125,
       tip:        paymentInfo.tip || 0,
       total:      paymentInfo.grand || session.total || 0,
+      taxAmount:  taxBreakdown?.totalTax != null ? taxBreakdown.totalTax : null,  // v4.6.19
       method:     paymentInfo.method || 'card',
       closedAt:   Date.now(),
       status:     'paid',
@@ -1775,11 +1777,13 @@ export const useStore = create((set, get) => ({
 
   // Direct record insertion — used by bar tabs and other ad-hoc payment flows
   recordWalkInClosedCheck: (record) => {
+    const { staff } = get();
     const fullRecord = {
       id: `chk-${Date.now()}`,
       closedAt: Date.now(),
       status: 'paid',
       refunds: [],
+      staffId: record.staffId || staff?.id || null,   // v4.6.19
       ...record,
     };
     set(s => ({ closedChecks: [fullRecord, ...s.closedChecks] }));
@@ -1789,8 +1793,13 @@ export const useStore = create((set, get) => ({
 
   recordWalkInClosed: (walkInOrder, orderType, customer, paymentInfo = {}) => {
     if (!walkInOrder?.items?.length) return;
-    const { staff } = get();
+    const { staff, taxRates } = get();
     const subtotal = walkInOrder.items.reduce((s, i) => s + i.price * i.qty, 0);
+    // v4.6.19 — compute tax at close so tax_amount can be stored with the row
+    let taxBreakdown = null;
+    if (taxRates?.length) {
+      try { taxBreakdown = calculateOrderTax(walkInOrder.items.filter(i=>!i.voided), taxRates, orderType); } catch {}
+    }
     // If the walk-in was reopened from orderQueue (OrdersHub openOrder) it already
     // has a ref (e.g. '#6720'). Reuse it so the closed check matches what the user
     // sees and so we can remove the stale queue entry below. Only generate a new
@@ -1802,6 +1811,7 @@ export const useStore = create((set, get) => ({
       tableId: null,
       tableLabel: null,
       server: staff?.name || 'Staff',
+      staffId: staff?.id || null,                                              // v4.6.19
       covers: 1,
       orderType,
       customer,
@@ -1811,6 +1821,7 @@ export const useStore = create((set, get) => ({
       service: 0,
       tip: paymentInfo.tip || 0,
       total: paymentInfo.grand || subtotal,
+      taxAmount: taxBreakdown?.totalTax != null ? taxBreakdown.totalTax : null, // v4.6.19
       method: paymentInfo.method || 'card',
       closedAt: Date.now(),
       status: 'paid',

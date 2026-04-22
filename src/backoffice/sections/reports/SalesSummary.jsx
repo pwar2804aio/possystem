@@ -10,16 +10,20 @@ import { pctDelta } from './_filters';
 import { toCsv, downloadCsv } from './_csv';
 
 // Compute the headline statistics from a list of closed checks.
-// Tax is derived from (total - subtotal - service - tip) since we don't store it
-// directly on the check. This matches what customers actually paid in tax.
+// Tax prefers the stored tax_amount column (v4.6.19) when present, and falls back
+// to the derived (total - subtotal - service - tip) formula for pre-migration rows
+// or rows closed without taxRates configured.
 export function computeSalesStats(checks) {
-  let gross=0, discounts=0, refunds=0, voids=0, service=0, tips=0, taxDerived=0, total=0, covers=0, count=0;
+  let gross=0, discounts=0, refunds=0, voids=0, service=0, tips=0, taxTotal=0, total=0, covers=0, count=0;
+  let taxStored=0, taxDerived=0;  // diagnostic split
   (checks||[]).forEach(c => {
     const sub = c.subtotal || 0;
     const tip = c.tip || 0;
     const svc = c.service || 0;
     const tot = c.total || 0;
-    const tax = Math.max(0, tot - sub - svc - tip);
+    let tax;
+    if (c.taxAmount != null) { tax = c.taxAmount; taxStored += tax; }
+    else                     { tax = Math.max(0, tot - sub - svc - tip); taxDerived += tax; }
     const dDiscounts = (c.discounts||[]).reduce((s,d) => s + (d.amount || d.value || 0), 0);
     const dRefunds   = (c.refunds  ||[]).reduce((s,r) => s + (r.amount || 0), 0);
     gross      += sub;
@@ -28,12 +32,12 @@ export function computeSalesStats(checks) {
     if (c.status === 'voided') voids += tot;
     service    += svc;
     tips       += tip;
-    taxDerived += tax;
+    taxTotal   += tax;
     total      += tot;
     if (c.status !== 'voided') { covers += c.covers || 1; count += 1; }
   });
   const net = gross - discounts - voids - refunds;
-  return { gross, discounts, voids, refunds, service, tips, tax: taxDerived, total, covers, count, net };
+  return { gross, discounts, voids, refunds, service, tips, tax: taxTotal, taxStored, taxDerived, total, covers, count, net };
 }
 
 export default function SalesSummary({ checks, prevChecks, fmt, fmtN }) {
@@ -51,7 +55,7 @@ export default function SalesSummary({ checks, prevChecks, fmt, fmtN }) {
       { metric:'Voids',             current: cur.voids,     previous: prev.voids     },
       { metric:'Refunds',           current: cur.refunds,   previous: prev.refunds   },
       { metric:'Net sales',         current: cur.net,       previous: prev.net       },
-      { metric:'Tax (derived)',     current: cur.tax,       previous: prev.tax       },
+      { metric:'Tax',                current: cur.tax,       previous: prev.tax       },
       { metric:'Service',           current: cur.service,   previous: prev.service   },
       { metric:'Tips',              current: cur.tips,      previous: prev.tips      },
       { metric:'Total collected',   current: cur.total,     previous: prev.total     },

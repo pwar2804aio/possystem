@@ -59,6 +59,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.19', date: '22 Apr 2026', label: 'Schema hardening — tax_amount + staff_id on closed_checks',
+    changes: [
+      'DEPLOY STEP REQUIRED: Run supabase/migrations/20260422_reports_schema_hardening.sql in the Supabase SQL editor BEFORE this version goes to production. The migration is additive (ADD COLUMN IF NOT EXISTS) and safe to run multiple times. If the SQL is not run first, new check writes will fail because INSERT references columns that do not yet exist.',
+      'DB: Two new columns on closed_checks. tax_amount numeric(10,2) stores the tax explicitly at close time, replacing the fragile total - subtotal - service - tip derivation. staff_id uuid FK to staff_members(id) replaces the server-name-string lookup which broke on renames and typos.',
+      'DB: Two new indexes for common report queries. idx_closed_checks_staff_id (partial, non-null) speeds tip pool rollups. idx_closed_checks_location_closed_at (location_id, closed_at DESC) speeds the primary fetchClosedChecksRange query path.',
+      'Writer: src/lib/db.js insertClosedCheck now populates tax_amount and staff_id on every new row. Historical rows stay NULL; reports fall back cleanly.',
+      'Store: all three close paths updated to supply the new fields. recordClosedCheck (dine-in) reads taxAmount from taxBreakdown.totalTax. recordWalkInClosed (walk-in / takeaway / bar) now computes taxBreakdown at close time so tax_amount can be stored for non-table orders too. recordWalkInClosedCheck (pass-through) falls back to current staff id if the caller did not supply one.',
+      'Reader: src/lib/db.js fetchClosedChecks + fetchClosedChecksRange map tax_amount and staff_id back into camelCase taxAmount and staffId so reports can use them directly.',
+      'Reports: SalesSummary prefers the stored tax amount per check, falling back to the derivation for NULL rows. The ladder label Tax (derived) is now Tax. Tips & pooling prefers staff_id FK match over staff-name match for role lookup, which means the tip pool no longer mis-classifies a server if two staff have the same first name or if a name has been edited.',
+      'Roadmap documented in the migration file (not executed): staff_members.hourly_rate for labor cost reports, menu_items.cost for real contribution margin in Menu engineering, shift_sessions table for real clock-in/out, tip_pool_rules table for persisted pool config, user_locations junction for Wave 6 multi-location picker.',
+    ],
+  },
+  {
     version: '4.6.18', date: '22 Apr 2026', label: 'Reports wave 4 — Server scorecard, Tips + pooling (US market), Order types trend, new Staff category',
     changes: [
       'New: Staff reports category in the catalog. Houses Server scorecard, Tips & pooling, and Shifts (moved from Sales). Sales reports now focuses on sales-shape reports: Business summary, Product mix, Menu engineering, Order types (new), Daypart.',
