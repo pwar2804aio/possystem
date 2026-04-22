@@ -586,8 +586,14 @@ export function KDSSurface() {
 
     return (
       <div style={{ background:u.bg, border:`1.5px solid ${u.border}`, borderRadius:16, overflow:'hidden',
-        boxShadow:urg==='urgent'?`0 0 20px ${u.color}22`:'none', opacity:isHeld?0.9:1 }}>
-        <div style={{ padding:'10px 14px 8px', borderBottom:`1px solid ${u.border}` }}>
+        boxShadow:urg==='urgent'?`0 0 20px ${u.color}22`:'none', opacity:isHeld?0.9:1,
+        // v4.6.13: cap card height + make items scroll internally. Previously a ticket with
+        // enough items would grow past the viewport, pushing the bump/hold action row
+        // off-screen and effectively hiding the ticket's controls until the whole column
+        // was scrolled. Header + footer are flex-shrink:0 so they always stay on screen;
+        // only the items panel scrolls.
+        display:'flex', flexDirection:'column', maxHeight:'calc(100vh - 140px)' }}>
+        <div style={{ padding:'10px 14px 8px', borderBottom:`1px solid ${u.border}`, flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
             <div style={{ fontSize:16, fontWeight:900, color:u.color, flex:1 }}>
               {isHeld&&'⏸ '}{isHistory&&'📋 '}{ticket.table||'Walk-in'}
@@ -608,7 +614,7 @@ export function KDSSurface() {
           </div>
         </div>
 
-        <div style={{ padding:'10px 14px' }}>
+        <div style={{ padding:'10px 14px', flex:1, overflowY:'auto', minHeight:0 }}>
           {Object.entries(firedByCourse).sort(([a],[b])=>a-b).map(([course,cItems])=>(
             <div key={course} style={{ marginBottom:4 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6, paddingBottom:4, borderBottom:`1px solid ${u.border}` }}>
@@ -632,7 +638,7 @@ export function KDSSurface() {
           )}
         </div>
 
-        <div style={{ padding:'10px 14px', borderTop:`1px solid ${u.border}`, display:'flex', gap:6 }}>
+        <div style={{ padding:'10px 14px', borderTop:`1px solid ${u.border}`, display:'flex', gap:6, flexShrink:0 }}>
           {isHistory?(
             <button onClick={()=>handleRecall(ticket.id)} style={{ flex:1, height:38, borderRadius:10, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:13, fontWeight:800 }}>↩ Recall to queue</button>
           ):isHeld?(

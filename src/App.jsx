@@ -59,6 +59,12 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.13', date: '22 Apr 2026', label: 'KDS ticket cards cap their height and scroll items internally',
+    changes: [
+      'Fix: On the KDS, a ticket with enough items would grow taller than the viewport and push its own bump/hold action row off-screen, effectively hiding the ticket\'s controls until the whole column was scrolled. TicketCard now renders as a flex column with maxHeight: calc(100vh - 140px). The header (table label, time, meta) and footer (bump/hold buttons) are flex-shrink:0 so they always stay on screen; only the items-by-course body panel scrolls internally when the item count overflows. No behaviour change for short tickets.',
+    ],
+  },
+  {
     version: '4.6.12', date: '22 Apr 2026', label: 'Deleted variants stay deleted — SyncBridge orphan check no longer resurrects archived items',
     changes: [
       'Fix: Deleting a variant (or any menu item) would reliably come back on the next refresh. Root cause in SyncBridge.jsx: the "sync local-only items" safety net built its remoteIds set from itemsRes.data, which is filtered to archived=false (db.js fetchMenuItems at line 56). So an archived item\'s id looked missing from remote, and if the config-push snapshot applied earlier in the boot flow was stale (had the item with archived=false), the orphan filter flagged it as local-only and re-uploaded it via upsertMenuItem — which writes archived: item.archived ?? false, resurrecting it in the DB. On the next hydration fetchMenuItems returned it again and the variant reappeared. Fix: do a second lightweight supabase query selecting just `id` with no archived filter, and use THAT set for the orphan comparison. Archived items now correctly look present in remote and never get re-uploaded as unarchived.',
