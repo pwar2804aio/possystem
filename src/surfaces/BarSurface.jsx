@@ -41,7 +41,7 @@ function OpenTabModal({ onConfirm, onCancel }) {
   const [preAmt, setPreAmt]       = useState('50');
   const [note, setNote]           = useState('');
   const barSeats = ['B1','B2','B3','B4'];
-  const openTables = tables.filter(t=>t.status==='open'||t.status==='available');
+  const openTables = tables.filter(t=>t.section==='bar' && (t.status==='open'||t.status==='available'));
 
   return (
     <div className="modal-back">

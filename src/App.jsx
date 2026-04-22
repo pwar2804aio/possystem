@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.6', date: '22 Apr 2026', label: 'Bar tab flow + floor plan drag persistence',
+    changes: [
+      'Fix: Bar tab name input in OrderTypeModal tab_pick step was rendering at 0px wide (invisible). v4.6.3 added width:auto+minWidth:0 to the INPUT, but the Open button next to it still had width:100% from the sendBtn helper, claiming the full flex-basis and leaving no space for the input to grow into. Override width:auto and flexShrink:0 on the button at OrderTypeModal.jsx:324 so it sizes to its content (~80px) and the input gets the remaining flex room.',
+      'Fix: OpenTabModal in BarSurface was listing every table in the \"Link to table\" dropdown regardless of floor-plan section. Filter at BarSurface.jsx:44 now scopes to tables where section===\"bar\" AND status is open/available, matching the intent that a bar tab should only link to bar-section tables.',
+      'Fix: Dragging a table in the Floor Plan Builder was corrupting every other field on the DB row. updateTableLayout called upsertFloorTable({id,...patch}) with just the changed fields (e.g. {x,y} from a drag), and upsertFloorTable defaults any unspecified column (w/h→80, shape→rect, section→null, label→undefined, max_covers→4) before upserting. Result: every mousemove wiped label/size/shape/section on the DB. After a refresh hydration read the corrupted rows and every table came back as an 80×80 unlabelled rect with no section — visually stacked and overlapping. Fix at store/index.js:713 reads the freshly-merged table from state and upserts the full object so unchanged columns stay unchanged.',
+    ],
+  },
+  {
     version: '4.6.5', date: '22 Apr 2026', label: 'Cross-device sync for walk-ins + bar tabs, print routing on every send path, floor plan actually persists',
     changes: [
       'Fix (Bug 1): POS Takeaway > Send no longer opens the choose-order-type modal a second time. handleSend in POSSurface now detects that orderType is already takeaway/collection/delivery AND customer details are filled, and calls sendToKitchen() directly. Previously the unconditional setShowSendModal(true) forced the user through OrderTypeModal again.',

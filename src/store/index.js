@@ -710,7 +710,14 @@ export const useStore = create((set, get) => ({
   // Tables state already exists in `tables` — floor plan builder just edits positions
   updateTableLayout: (id, patch) => {
     set(s => ({ tables: s.tables.map(t => t.id===id ? { ...t, ...patch } : t) }));
-    upsertFloorTable({ id, ...patch });
+    // v4.6.6 Bug: must upsert the FULL merged table, not { id, ...patch }. upsertFloorTable
+    // builds a row from scratch and defaults every column that isn't passed in
+    // (w/h→80, shape→'rect', section→null, label→undefined, max_covers→4, ...). Passing a
+    // partial patch like {x,y} from a drag wiped label/size/shape/section on every mousemove,
+    // so after a refresh every table came back as an 80×80 unlabelled rect with no section —
+    // visually stacked/overlapping. Read the freshly-merged table and upsert the full object.
+    const full = useStore.getState().tables.find(t => t.id === id);
+    if (full) upsertFloorTable(full);
   },
   addTableToLayout: (table) => {
     const newTable = { id:`t-${Date.now()}`, status:'available', session:null, ...table };

@@ -321,7 +321,7 @@ export default function OrderTypeModal({ items, onClose, onComplete }) {
                   <input ref={nameRef} style={{ ...inp, flex: 1, width: 'auto', minWidth: 0 }} value={form.tabName} onChange={e => setField('tabName', e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && form.tabName.trim() && confirmNewTab()}
                     placeholder="Tab name (e.g. John, Table 5 bar)" autoFocus />
-                  <button onClick={confirmNewTab} disabled={!form.tabName.trim()} style={{ ...sendBtn('#a855f7'), padding: '10px 16px', opacity: form.tabName.trim() ? 1 : .4 }}>
+                  <button onClick={confirmNewTab} disabled={!form.tabName.trim()} style={{ ...sendBtn('#a855f7'), padding: '10px 16px', width: 'auto', flexShrink: 0, opacity: form.tabName.trim() ? 1 : .4 }}>
                     Open →
                   </button>
                 </div>
