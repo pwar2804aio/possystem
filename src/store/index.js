@@ -1571,9 +1571,14 @@ export const useStore = create((set, get) => ({
     if (!walkInOrder?.items?.length) return;
     const { staff } = get();
     const subtotal = walkInOrder.items.reduce((s, i) => s + i.price * i.qty, 0);
+    // If the walk-in was reopened from orderQueue (OrdersHub openOrder) it already
+    // has a ref (e.g. '#6720'). Reuse it so the closed check matches what the user
+    // sees and so we can remove the stale queue entry below. Only generate a new
+    // random ref for genuinely-new walk-ins.
+    const existingRef = walkInOrder.ref || null;
     const record = {
       id: `chk-${Date.now()}`,
-      ref: `#${Math.floor(1000 + Math.random() * 9000)}`,
+      ref: existingRef || `#${Math.floor(1000 + Math.random() * 9000)}`,
       tableId: null,
       tableLabel: null,
       server: staff?.name || 'Staff',
@@ -1591,7 +1596,14 @@ export const useStore = create((set, get) => ({
       status: 'paid',
       refunds: [],
     };
-    set(s => ({ closedChecks: [record, ...s.closedChecks] }));
+    // Single set: append to closedChecks AND, if this came from the queue, drop
+    // the stale entry so the order stops showing as open. Previously only the
+    // closedCheck was written — queue entry persisted, so 'cash off' left the
+    // order visible in Orders and re-cashing produced duplicate closed checks.
+    set(s => ({
+      closedChecks: [record, ...s.closedChecks],
+      orderQueue: existingRef ? s.orderQueue.filter(o => o.ref !== existingRef) : s.orderQueue,
+    }));
     insertClosedCheck(record);
     return record;
   },
