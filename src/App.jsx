@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.9', date: '22 Apr 2026', label: 'Printed dockets now group by course (FIRING/HOLD) mirroring KDS layout',
+    changes: [
+      'Change: Initial Send now prints ALL courses on the physical docket, separated by course with FIRING/HOLD headers, mirroring the KDS layout. Supersedes v4.6.8 which held courses 2+ back entirely — clarified spec is that the docket should show every course up-front so kitchen can mise-en-place, with a separate marker docket firing each held course when the time comes. Reverts the items.filter(i=>i.fired) at both sendToKitchen branches in store/index.js.',
+      'Change: buildKitchenTicket in printer.js now groups items by i.course, sorts courses ascending, and emits a centred "COURSE N -- FIRING" or "COURSE N -- HOLD" header + divider before each course\'s items. FIRING/HOLD is derived from item.fired (set via FIRED_ON_SEND in createKdsTickets). Dropped the old single-course fontB header since per-course headers subsume it.',
+      'Unchanged from v4.6.8: fireCourse still dispatches a "FIRE COURSE N" marker docket to every centre that has items in the newly-fired course, via routePrintJob({type:"fire-marker"}) → printService.printFireCourseTicket → buildFireCourseTicket.',
+    ],
+  },
+  {
     version: '4.6.8', date: '22 Apr 2026', label: 'Printed dockets respect course rules: held courses stay held; fire prints a marker',
     changes: [
       'Fix: Initial Send now only prints FIRED items on the physical docket. createKdsTickets already flags courses 0+1 as fired on send and leaves 2+ as held, but the print dispatch was passing every item regardless — held courses were printing on the initial docket as if they had fired. Filter at both table and walk-in sendToKitchen branches (store/index.js:1220 and :1259) now passes items.filter(i=>i.fired) to routePrintJob so the printed docket matches the KDS view.',

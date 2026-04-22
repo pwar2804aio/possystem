@@ -1217,19 +1217,18 @@ export const useStore = create((set, get) => ({
         return centre?.printer?.name || centre?.name || { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' }[centreId] || 'Kitchen';
       };
       newTickets.forEach(t => {
-        // v4.6.8: only send FIRED items to the printer. Unfired held courses (2+)
-        // stay on the KDS as held and wait for an explicit fireCourse() call which
-        // then emits a minimal marker docket. Previously the printer got every
-        // item regardless of course, making held courses indistinguishable on paper.
-        const firedItems = t.items.filter(i => i.fired);
-        if (firedItems.length) get().routePrintJob({
+        // v4.6.9: print ALL items — the docket mirrors the KDS, grouping by course
+        // with FIRING/HOLD headers (see buildKitchenTicket). A later fireCourse()
+        // emits a separate "FIRE COURSE N" marker docket. Revert of the v4.6.8
+        // fired-only filter.
+        if (t.items.length) get().routePrintJob({
           centreId: t.centreId,
           printerName: getCentrePrinter(t.centreId),
           tableLabel: t.table,
           server: t.server,
           covers: t.covers,
           course: t.firedCourses?.[0] ?? 1,
-          items: firedItems,
+          items: t.items,
           type: 'kitchen',
         });
       });
@@ -1261,16 +1260,15 @@ export const useStore = create((set, get) => ({
         return centre?.printer?.name || centre?.name || { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' }[centreId] || 'Kitchen';
       };
       newTickets.forEach(t => {
-        // v4.6.8: only send FIRED items to the printer (see comment at the table branch).
-        const firedItems = t.items.filter(i => i.fired);
-        if (firedItems.length) get().routePrintJob({
+        // v4.6.9: print ALL items (see comment at the table branch).
+        if (t.items.length) get().routePrintJob({
           centreId: t.centreId,
           printerName: getCentrePrinter(t.centreId),
           tableLabel: t.table,
           server: t.server,
           covers: t.covers,
           course: t.firedCourses?.[0] ?? 1,
-          items: firedItems,
+          items: t.items,
           type: 'kitchen',
         });
       });

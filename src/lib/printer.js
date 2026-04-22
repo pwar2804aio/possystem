@@ -244,24 +244,48 @@ export function buildKitchenTicket({ table, server, covers, course, centreName, 
   b.normal();
   if(server) b.fontB().line(`Server: ${server}`).fontA();
   if(covers>1) b.fontB().line(`Covers: ${covers}`).fontA();
-  if(course) b.fontB().bold(true).line(`COURSE ${course}`).bold(false).fontA();
+  // v4.6.9: no more single-course header line. Per-course headers below handle it
+  // so multi-course tickets are unambiguous and single-course tickets still get a
+  // labelled FIRING/HOLD banner.
   b.divider().bold(true).lf();
 
-  (items||[]).forEach(item=>{
-    b.doubleBoth();
-    const qty=item.qty>1?`${item.qty}x `:'';
-    b.text(qty+(item.name||'').toUpperCase().substring(0,22)).lf();
-    b.normal();
-    if(item.seat) b.fontB().line(`  Seat ${item.seat}`).fontA();
-    // Each mod/instruction on its own red line
-    const modLines = Array.isArray(item.mods) ? item.mods : (item.mods ? item.mods.split(' · ') : []);
-    modLines.forEach(m => {
-      const text = (typeof m === 'string' ? m : (m.label||'')).trim();
-      if (!text) return;
-      b.red().bold(true).line(`  ${text}`).bold(false).black();
+  // v4.6.9: group items by course with FIRING/HOLD headers, mirroring the KDS layout.
+  // Peter's spec: every course prints on the initial docket, separated like the KDS
+  // groups them; a later fireCourse() call emits a separate minimal "FIRE COURSE N"
+  // marker docket (see buildFireCourseTicket). item.fired is set in createKdsTickets
+  // from FIRED_ON_SEND so every item in the same course has a consistent flag.
+  const byCourse = {};
+  (items||[]).forEach(i => {
+    const c = i.course ?? 1;
+    if (!byCourse[c]) byCourse[c] = [];
+    byCourse[c].push(i);
+  });
+  const courseNums = Object.keys(byCourse).map(Number).sort((a,b)=>a-b);
+
+  courseNums.forEach((courseN, idx) => {
+    const courseItems = byCourse[courseN];
+    const isFired = courseItems.some(i => i.fired);
+    if (idx > 0) b.lf();
+    b.normal().bold(true)
+     .center().line(`COURSE ${courseN} -- ${isFired ? 'FIRING' : 'HOLD'}`)
+     .left().bold(false).divider();
+
+    courseItems.forEach(item=>{
+      b.doubleBoth();
+      const qty=item.qty>1?`${item.qty}x `:'';
+      b.text(qty+(item.name||'').toUpperCase().substring(0,22)).lf();
+      b.normal();
+      if(item.seat) b.fontB().line(`  Seat ${item.seat}`).fontA();
+      // Each mod/instruction on its own red line
+      const modLines = Array.isArray(item.mods) ? item.mods : (item.mods ? item.mods.split(' · ') : []);
+      modLines.forEach(m => {
+        const text = (typeof m === 'string' ? m : (m.label||'')).trim();
+        if (!text) return;
+        b.red().bold(true).line(`  ${text}`).bold(false).black();
+      });
+      if(item.notes) b.red().bold(true).underline(true).line(`  ${item.notes}`).bold(false).underline(false).black();
+      b.lf();
     });
-    if(item.notes) b.red().bold(true).underline(true).line(`  ${item.notes}`).bold(false).underline(false).black();
-    b.lf();
   });
 
   b.divider('=').lf(3).cut();
