@@ -12,7 +12,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store';
 import { isMock, getLocationId } from '../../lib/supabase';
-import { fetchClosedChecksRange } from '../../lib/db';
+import { fetchClosedChecksRange, fetchKDSTicketsRange } from '../../lib/db';
 import { calculateOrderTax } from '../../lib/tax';
 import { PERIODS, getPeriodRange, periodLabel, applyFilters, uniqueServers, uniqueOrderTypes } from './reports/_filters';
 import Catalog, { CATEGORIES, REPORT_INDEX } from './reports/Catalog';
@@ -26,6 +26,8 @@ import MenuEngineering from './reports/MenuEngineering';
 import Servers      from './reports/Servers';
 import Tips         from './reports/Tips';
 import OrderTypes   from './reports/OrderTypes';
+import Tables       from './reports/Tables';
+import KDSPerformance from './reports/KDSPerformance';
 
 const fmt  = n => `£${(n || 0).toFixed(2)}`;
 const fmtN = n => (n || 0).toLocaleString();
@@ -41,6 +43,7 @@ export default function BOReports() {
 
   const [rangeChecks, setRangeChecks] = useState(null);
   const [prevChecks,  setPrevChecks]  = useState(null);
+  const [kdsTickets,  setKdsTickets]  = useState(null);
   const [loadingRange, setLoadingRange] = useState(false);
 
   const range = useMemo(() => getPeriodRange(period, customRange), [period, customRange]);
@@ -50,9 +53,9 @@ export default function BOReports() {
   , [tables]);
 
   useEffect(() => {
-    if (isMock) { setRangeChecks([]); setPrevChecks([]); return; }
+    if (isMock) { setRangeChecks([]); setPrevChecks([]); setKdsTickets([]); return; }
     if (period === 'custom' && (!customRange.from || !customRange.to)) {
-      setRangeChecks([]); setPrevChecks([]); return;
+      setRangeChecks([]); setPrevChecks([]); setKdsTickets([]); return;
     }
     setLoadingRange(true);
     (async () => {
@@ -67,19 +70,21 @@ export default function BOReports() {
         }
         if (!locId) {
           const localSlice = (storeChecks || []).filter(c => c.closedAt && new Date(c.closedAt) >= range.from && new Date(c.closedAt) <= range.to);
-          setRangeChecks(localSlice); setPrevChecks([]);
+          setRangeChecks(localSlice); setPrevChecks([]); setKdsTickets([]);
           setLoadingRange(false);
           return;
         }
-        const [cur, prev] = await Promise.all([
+        const [cur, prev, kds] = await Promise.all([
           fetchClosedChecksRange(locId, range.from,     range.to,     5000),
           fetchClosedChecksRange(locId, range.prevFrom, range.prevTo, 5000),
+          fetchKDSTicketsRange  (locId, range.from,     range.to,     2000),
         ]);
         setRangeChecks(cur.data  || []);
         setPrevChecks (prev.data || []);
+        setKdsTickets (kds.data  || []);
       } catch (err) {
         console.error('[BOReports] fetch failed', err);
-        setRangeChecks([]); setPrevChecks([]);
+        setRangeChecks([]); setPrevChecks([]); setKdsTickets([]);
       }
       setLoadingRange(false);
     })();
@@ -225,6 +230,8 @@ export default function BOReports() {
           {view === 'servers'     && <Servers      checks={filtered} prevChecks={filteredPrev} fmt={fmt} fmtN={fmtN}/>}
           {view === 'tips'        && <Tips         checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'order_types' && <OrderTypes   checks={filtered} prevChecks={filteredPrev} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'tables'      && <Tables       checks={filtered} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'kds_perf'    && <KDSPerformance kdsTickets={kdsTickets || []} fmt={fmt} fmtN={fmtN}/>}
           {view === 'tax'        && <LegacyTax    checks={filtered} taxRates={taxRates} fmt={fmt}/>}
           {view === 'open'       && <LegacyOpen   openOrders={openOrders} fmt={fmt}/>}
         </>

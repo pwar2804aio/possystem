@@ -40,16 +40,24 @@ export const CATEGORIES = [
   },
   {
     id: 'orders', label: 'Order reports', icon: '📦',
-    description: 'Live floor and order activity.',
+    description: 'Live floor and order activity, per-table performance.',
     reports: [
-      { id:'open', label:'Open orders', desc:'Tables still on the floor, not yet paid' },
+      { id:'open',   label:'Open orders', desc:'Tables still on the floor, not yet paid' },
+      { id:'tables', label:'Tables',      desc:'Revenue, turns, covers and avg check by table', badge:'new' },
+    ],
+  },
+  {
+    id: 'kitchen', label: 'Kitchen reports', icon: '👨‍🍳',
+    description: 'KDS bump times, station throughput and kitchen pressure.',
+    reports: [
+      { id:'kds_perf', label:'KDS performance', desc:'Avg / p50 / p90 bump time by station and by hour', badge:'new' },
     ],
   },
   {
     id: 'location', label: 'Location reports', icon: '📍',
     description: 'Consolidated data across multiple locations.',
     reports: [],
-    comingSoon: 'Multi-location compare ships in v4.6.18 once the location picker is wired to user_profiles.',
+    comingSoon: 'Multi-location compare ships when user_locations junction table lands.',
   },
 ];
 

@@ -219,6 +219,37 @@ export const bumpKDSTicket = async (id) => {
   return supabase.from('kds_tickets').update({ status: 'bumped', bumped_at: new Date().toISOString() }).eq('id', id);
 };
 
+// v4.6.20 — historical fetch for the KDS performance report. Returns both
+// pending and bumped tickets so we can compute bump time (bumped_at - sent_at).
+export const fetchKDSTicketsRange = async (locationId = null, fromDate, toDate, limit = 2000) => {
+  if (isMock) return { data: null, error: null };
+  let query = supabase
+    .from('kds_tickets')
+    .select('*')
+    .eq('location_id', locationId)
+    .order('sent_at', { ascending: false })
+    .limit(limit);
+  if (fromDate) query = query.gte('sent_at', fromDate.toISOString());
+  if (toDate)   query = query.lte('sent_at', toDate.toISOString());
+  const result = await query;
+  if (result.data) {
+    result.data = result.data.map(t => ({
+      id: t.id,
+      tableLabel: t.table_label,
+      tableId: t.table_id,
+      server: t.server,
+      covers: t.covers,
+      centreId: t.centre_id,
+      items: t.items || [],
+      status: t.status,
+      firedCourses: t.fired_courses || [],
+      sentAt:   t.sent_at   ? new Date(t.sent_at).getTime()   : null,
+      bumpedAt: t.bumped_at ? new Date(t.bumped_at).getTime() : null,
+    }));
+  }
+  return result;
+};
+
 // ── Closed checks ─────────────────────────────────────────────────────────────
 export const insertClosedCheck = async (check, locationId = null) => {
   if (isMock) return { data: null, error: null };

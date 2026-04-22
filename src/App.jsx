@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.20', date: '22 Apr 2026', label: 'Reports wave 5a — Tables performance + KDS performance + Kitchen category',
+    changes: [
+      'New: Tables report under Order reports. Aggregates closed_checks by tableId / tableLabel, excludes walk-ins and voids. Shows tables used, total turns (with avg per table), total covers (with avg per turn), revenue tile; top-12 tables bar chart by revenue; sortable table with rank, turns, covers, revenue, avg check, avg cover. CSV export.',
+      'New: KDS performance report under a new Kitchen reports category. Fetches kds_tickets for the range and computes bump time per ticket (bumped_at - sent_at). Headline tiles: tickets bumped, avg bump time with p50 underneath, p90 with p99 underneath (red above 15 min), open-right-now count. Per-hour chart shows avg bump time with now-hour highlighted. By-station table shows tickets, avg, p50, p90, and a volume bar; p90 over 15 min flagged red as a kitchen pressure signal.',
+      'New DB fetcher: fetchKDSTicketsRange in src/lib/db.js. Returns both pending and bumped tickets across any date window (previous fetchKDSTickets only returned pending). Maps snake_case kds_tickets columns to camelCase for reports (centreId, sentAt, bumpedAt, etc).',
+      'Shell: BOReports.jsx now fetches KDS tickets alongside closed_checks on range change. Promise.all guarantees all three fetches settle together; errors set all three states to empty array so reports show the no-data empty state cleanly.',
+      'Catalog: Orders category renamed to Order reports and now holds Open orders + Tables (new). New Kitchen reports category (chef-hat icon) holds KDS performance. Staff, Sales, Fiscal, Exceptions, Location unchanged. Total category count now 7.',
+      'Data note: true table turn time (seat-to-close duration) needs a seated_at timestamp column on closed_checks — on the schema roadmap. Current turn count is still useful for spotting under-used vs over-used tables.',
+    ],
+  },
+  {
     version: '4.6.19', date: '22 Apr 2026', label: 'Schema hardening — tax_amount + staff_id on closed_checks',
     changes: [
       'DEPLOY STEP REQUIRED: Run supabase/migrations/20260422_reports_schema_hardening.sql in the Supabase SQL editor BEFORE this version goes to production. The migration is additive (ADD COLUMN IF NOT EXISTS) and safe to run multiple times. If the SQL is not run first, new check writes will fail because INSERT references columns that do not yet exist.',
