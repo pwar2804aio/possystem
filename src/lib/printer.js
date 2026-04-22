@@ -268,6 +268,26 @@ export function buildKitchenTicket({ table, server, covers, course, centreName, 
   return b.toBytes();
 }
 
+export function buildFireCourseTicket({ table, courseNum, centreName, sentAt }) {
+  const b = new EscPosBuilder(42);
+  const time = new Date(sentAt||Date.now()).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+
+  b.init().center().bold(true).doubleBoth().text(centreName||'Kitchen').lf()
+   .normal().center().line(time).divider('=');
+
+  if (table) {
+    // Same non-table-label heuristic as buildKitchenTicket — "Takeaway · Sarah" prints as-is,
+    // bare "T7" gets "TABLE " prefix.
+    const isNonTableLabel = / · /.test(table) || /^(takeaway|collection|delivery|counter)$/i.test(table);
+    b.center().bold(true).doubleBoth().line(isNonTableLabel ? table : `TABLE ${table}`).normal();
+  }
+
+  b.lf().center().bold(true).doubleBoth().line(`FIRE COURSE ${courseNum}`).normal();
+
+  b.divider('=').lf(3).cut();
+  return b.toBytes();
+}
+
 export function buildTestPage() {
   const b = new EscPosBuilder(42);
   b.init()
@@ -632,6 +652,19 @@ class PrintService {
         idempotencyKey: opts.idempotencyKey,
         metadata: { tableLabel: ticketData.table, server: ticketData.server, covers: ticketData.covers, course: ticketData.course, centreName: ticketData.centreName },
         label: `Kitchen ticket — ${ticketData.table || 'Walk-in'} (${ticketData.centreName || 'kitchen'})`,
+      });
+    }
+    return { ok: false, error: 'No kitchen printer configured' };
+  }
+
+  async printFireCourseTicket(ticketData, printerId = null, opts = {}) {
+    const printer = this._printerForRole('kitchen', printerId);
+    if (printer?.address) {
+      const bytes = buildFireCourseTicket(ticketData);
+      return this._submitJob(printer, 'kitchen', bytes, {
+        idempotencyKey: opts.idempotencyKey,
+        metadata: { tableLabel: ticketData.table, courseNum: ticketData.courseNum, centreName: ticketData.centreName, type: 'fire-marker' },
+        label: `Fire course ${ticketData.courseNum} — ${ticketData.table || 'Walk-in'} (${ticketData.centreName || 'kitchen'})`,
       });
     }
     return { ok: false, error: 'No kitchen printer configured' };

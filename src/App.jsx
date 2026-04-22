@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.8', date: '22 Apr 2026', label: 'Printed dockets respect course rules: held courses stay held; fire prints a marker',
+    changes: [
+      'Fix: Initial Send now only prints FIRED items on the physical docket. createKdsTickets already flags courses 0+1 as fired on send and leaves 2+ as held, but the print dispatch was passing every item regardless — held courses were printing on the initial docket as if they had fired. Filter at both table and walk-in sendToKitchen branches (store/index.js:1220 and :1259) now passes items.filter(i=>i.fired) to routePrintJob so the printed docket matches the KDS view.',
+      'Feature: fireCourse now emits a minimal "FIRE COURSE N" marker docket to every production centre that has items in the newly-fired course. New buildFireCourseTicket in printer.js prints centre name, time, table label, and the course number — no items, no mods. New printService.printFireCourseTicket mirrors printKitchenTicket for transport/retry. routePrintJob branches on job.type===\"fire-marker\" to pick the right ticket builder and idempotency key. Courses 0+1 are skipped (already printed on send). Bar-tab rounds are unaffected — they have no course flow.',
+    ],
+  },
+  {
     version: '4.6.7', date: '22 Apr 2026', label: 'Allergens off production dockets by default + per-centre opt-in toggle',
     changes: [
       'Change: Allergens are no longer printed on physical production dockets by default. createKdsTickets continues to bake the ⚠ ALLERGEN line into each item\'s mods so the KDS screen still shows them to kitchen staff; routePrintJob in store/index.js now strips any mod line starting with ⚠ before handing items to printKitchenTicket, unless the destination centre has opted in via printAllergens=true.',

@@ -1217,14 +1217,19 @@ export const useStore = create((set, get) => ({
         return centre?.printer?.name || centre?.name || { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' }[centreId] || 'Kitchen';
       };
       newTickets.forEach(t => {
-        if (t.items.length) get().routePrintJob({
+        // v4.6.8: only send FIRED items to the printer. Unfired held courses (2+)
+        // stay on the KDS as held and wait for an explicit fireCourse() call which
+        // then emits a minimal marker docket. Previously the printer got every
+        // item regardless of course, making held courses indistinguishable on paper.
+        const firedItems = t.items.filter(i => i.fired);
+        if (firedItems.length) get().routePrintJob({
           centreId: t.centreId,
           printerName: getCentrePrinter(t.centreId),
           tableLabel: t.table,
           server: t.server,
           covers: t.covers,
           course: t.firedCourses?.[0] ?? 1,
-          items: t.items,
+          items: firedItems,
           type: 'kitchen',
         });
       });
@@ -1256,14 +1261,16 @@ export const useStore = create((set, get) => ({
         return centre?.printer?.name || centre?.name || { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' }[centreId] || 'Kitchen';
       };
       newTickets.forEach(t => {
-        if (t.items.length) get().routePrintJob({
+        // v4.6.8: only send FIRED items to the printer (see comment at the table branch).
+        const firedItems = t.items.filter(i => i.fired);
+        if (firedItems.length) get().routePrintJob({
           centreId: t.centreId,
           printerName: getCentrePrinter(t.centreId),
           tableLabel: t.table,
           server: t.server,
           covers: t.covers,
           course: t.firedCourses?.[0] ?? 1,
-          items: t.items,
+          items: firedItems,
           type: 'kitchen',
         });
       });
@@ -1351,6 +1358,27 @@ export const useStore = create((set, get) => ({
       } catch (e) { console.warn('fireCourse Supabase update failed', e); }
     });
 
+    // v4.6.8: print a minimal "FIRE COURSE N" marker docket to each centre that
+    // has items in the newly-fired course. Courses 0+1 already printed on initial
+    // send, so skip those. Guard against double-fire by checking firedCourses
+    // from the PRE-patch session above (already updated in our set() above — we use
+    // kdsTickets snapshot to determine which centres to notify).
+    if (courseNum > 1) {
+      const tableLabel = table?.label || activeTableId;
+      const centresInCourse = new Set();
+      (get().kdsTickets || []).forEach(tk => {
+        if (tk.table !== tableLabel) return;
+        if ((tk.items || []).some(i => i.course === courseNum)) centresInCourse.add(tk.centreId);
+      });
+      centresInCourse.forEach(centreId => {
+        get().routePrintJob({
+          centreId,
+          tableLabel,
+          course: courseNum,
+          type: 'fire-marker',
+        });
+      });
+    }
     get().showToast('Course ' + courseNum + ' fired to kitchen', 'success');
   },
 
@@ -1912,8 +1940,13 @@ export const useStore = create((set, get) => ({
       return;
     }
 
-    // Stable idempotency key so replays don't double-print this same ticket
-    const idempotencyKey = `kitchen-${job.tableLabel || 'walkin'}-${job.centreId}-${job.course || 0}-${basePrintJob.sentAt}`;
+    // v4.6.8: Fire-marker jobs take a dedicated idempotency key and a different
+    // ticket builder — otherwise treated identically by the rest of this function
+    // (status tracking, retries, health updates, error handling all reuse the same path).
+    const isFireMarker = job.type === 'fire-marker';
+    const idempotencyKey = isFireMarker
+      ? `fire-${job.tableLabel || 'walkin'}-${job.centreId}-${job.course || 0}-${basePrintJob.sentAt}`
+      : `kitchen-${job.tableLabel || 'walkin'}-${job.centreId}-${job.course || 0}-${basePrintJob.sentAt}`;
 
     // Local UI job marker — reflects Supabase-side state via realtime subs
     set(s => ({ printJobs: [{ ...basePrintJob, status: 'sending', printerId, attempts: 0 }, ...s.printJobs.slice(0, 49)] }));
@@ -1933,15 +1966,22 @@ export const useStore = create((set, get) => ({
             }) : it.mods,
           }));
 
-      const result = await printService.printKitchenTicket({
-        table: job.tableLabel || '',
-        server: job.server || '',
-        covers: job.covers || 0,
-        course: job.course || null,
-        centreName: centre?.name || job.printerName || 'Kitchen',
-        items: printItems,
-        sentAt: basePrintJob.sentAt,
-      }, printerId, { idempotencyKey });
+      const result = isFireMarker
+        ? await printService.printFireCourseTicket({
+            table: job.tableLabel || '',
+            courseNum: job.course,
+            centreName: centre?.name || job.printerName || 'Kitchen',
+            sentAt: basePrintJob.sentAt,
+          }, printerId, { idempotencyKey })
+        : await printService.printKitchenTicket({
+            table: job.tableLabel || '',
+            server: job.server || '',
+            covers: job.covers || 0,
+            course: job.course || null,
+            centreName: centre?.name || job.printerName || 'Kitchen',
+            items: printItems,
+            sentAt: basePrintJob.sentAt,
+          }, printerId, { idempotencyKey });
 
       // Any outcome here is "first attempt done". PrintRetrier handles persistent retries.
       if (result?.ok) {
