@@ -384,7 +384,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                         </div>
                         {item.mods?.filter(m=>m.label).map((m,i)=>(
                           <div key={i} style={{ fontSize:11, color:'var(--t3)', marginTop:1 }}>
-                            {m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}
+                            {m.label}
                             {m.price>0&&<span style={{ color:'var(--acc)', marginLeft:6, fontFamily:'var(--font-mono)' }}>+£{m.price.toFixed(2)}</span>}
                           </div>
                         ))}

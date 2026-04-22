@@ -1235,7 +1235,7 @@ function OrderItem({
             </div>
             {item.mods?.filter(m => !m._instruction).map((m,i)=>(
               <div key={i} style={{fontSize:11,color:'var(--t3)',marginTop:1,display:'flex',justifyContent:'space-between'}}>
-                <span>{m.groupLabel?`${m.groupLabel}: ${m.label}`:m.label}</span>
+                <span>{m.label}</span>
                 {m.price>0&&<span style={{color:'var(--acc)',fontFamily:'var(--font-mono)'}}>+£{m.price.toFixed(2)}</span>}
               </div>
             ))}

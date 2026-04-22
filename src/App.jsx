@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.10', date: '22 Apr 2026', label: 'Hide modifier group name everywhere — POS, checkout, KDS, production dockets',
+    changes: [
+      'Change: Modifier lines no longer show the "Group: " prefix. Previously a modifier like Peppercorn picked from the Sauce group rendered as "Sauce: Peppercorn"; now it renders as just "Peppercorn" — on the POS order list, in the CheckoutModal review, on the KDS ticket, and on the physical kitchen docket. Receipt output was already showing m.label without the prefix so no change there.',
+      'Scope: four display sites patched — POSSurface.jsx:1238 (POS cart), CheckoutModal.jsx:387 (checkout review), store/index.js:1194 (createKdsTickets, which feeds both KDS and production dockets), and store/index.js:1597 (addRoundToTab, bar rounds). The mod object itself keeps groupLabel on it — set by BarSurface.jsx:677 — as metadata in case any future flow needs it.',
+    ],
+  },
+  {
     version: '4.6.9', date: '22 Apr 2026', label: 'Printed dockets now group by course (FIRING/HOLD) mirroring KDS layout',
     changes: [
       'Change: Initial Send now prints ALL courses on the physical docket, separated by course with FIRING/HOLD headers, mirroring the KDS layout. Supersedes v4.6.8 which held courses 2+ back entirely — clarified spec is that the docket should show every course up-front so kitchen can mise-en-place, with a separate marker docket firing each held course when the time comes. Reverts the items.filter(i=>i.fired) at both sendToKitchen branches in store/index.js.',

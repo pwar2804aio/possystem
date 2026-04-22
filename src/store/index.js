@@ -1190,9 +1190,11 @@ export const useStore = create((set, get) => ({
           items: centreItems.map(i => ({
             qty: i.qty, name: i.kitchenName || i.menu_name || i.menuName || i.name,
             mods: [
-              ...(i.mods?.filter(m => !m._instruction).map(m =>
-                m.groupLabel ? `${m.groupLabel}: ${m.name || m.label}` : (m.name || m.label)
-              ).filter(Boolean) || []),
+              // v4.6.10: drop the `${groupLabel}: ` prefix on mods shown on KDS and
+              // production dockets. Kitchens care about the modifier itself, not which
+              // picker group it came from. The groupLabel field stays on the source mod
+              // object (BarSurface.jsx:677) as metadata in case we need it later.
+              ...(i.mods?.filter(m => !m._instruction).map(m => m.name || m.label).filter(Boolean) || []),
               ...(i.mods?.filter(m => m._instruction).map(m => m.label).filter(Boolean) || []),
               ...(i.allergens?.length ? [`⚠ ${i.allergens.map(a=>a.toUpperCase()).join(' · ')}`] : []),
               ...(i.notes ? [`📝 ${i.notes}`] : []),
@@ -1594,7 +1596,7 @@ export const useStore = create((set, get) => ({
           qty: i.qty,
           name: i.kitchenName || i.menu_name || i.menuName || i.name,
           mods: [
-            ...(i.mods?.filter(m => !m._instruction).map(m => m.groupLabel ? `${m.groupLabel}: ${m.name || m.label}` : (m.name || m.label)).filter(Boolean) || []),
+            ...(i.mods?.filter(m => !m._instruction).map(m => m.name || m.label).filter(Boolean) || []),  // v4.6.10: no groupLabel prefix on bar-round tickets either
             ...(i.mods?.filter(m => m._instruction).map(m => m.label).filter(Boolean) || []),
             ...(i.notes ? [`📝 ${i.notes}`] : []),
             ...(note ? [`📝 ${note}`] : []),
