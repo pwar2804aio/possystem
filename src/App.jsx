@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.18', date: '22 Apr 2026', label: 'Reports wave 4 — Server scorecard, Tips + pooling (US market), Order types trend, new Staff category',
+    changes: [
+      'New: Staff reports category in the catalog. Houses Server scorecard, Tips & pooling, and Shifts (moved from Sales). Sales reports now focuses on sales-shape reports: Business summary, Product mix, Menu engineering, Order types (new), Daypart.',
+      'New: Server scorecard report replaces the legacy By server table. Full per-server performance: rank, hours (derived first-check-to-last-check summed across days), checks, covers, tips, revenue with compare chip vs previous period, avg check, avg cover, tip % (tips ÷ net), discount % and void % (as events per 100 check events; highlighted red above 5% as a soft flag). Every column sortable; CSV export includes all metrics.',
+      'New: Tips & pooling report — the US market ask. Three headline tiles (total tips, card vs cash split, peak tip hour) plus per-server tips table with card/cash breakdown and a visual split bar. Tips-by-hour chart across the period. Tip pool calculator embedded at the top with three modes: None (raw tips), Server tip-out (tipping roles contribute X% of their tips to a pool for support roles — configurable rate slider 0–15%, checkbox-toggled contributing and receiving roles, hours-weighted or equal distribution), Shared pool (all tips pooled and distributed by hours worked or equally). Roles resolve from the Staff manager\'s staffMembers list by name match. CSV export is payroll-ready with gross, contribution, received, and net payout per person.',
+      'New: Order types report. Channel mix (dine-in / takeaway / delivery / bar / counter) with three tiles (total, dominant channel, fastest-growing vs previous period), a stacked bar chart auto-switching between by-hour (single-day range) and by-day (longer range), and a per-channel table with checks, revenue, avg check, share %, and compare chip vs previous period.',
+      'Catalog: Staff category added. Servers moved from Sales → Staff. New tab icons: 📈 Sales, 🛡 Exceptions, 👥 Staff, 💰 Fiscal, 📦 Orders, 📍 Location.',
+      'Tip pool data note: roles come from Staff manager (Manager / Server / Bartender / Cashier / Kitchen) matched on staff name. Unmatched server names show role "Unknown" and are excluded from contribution and receipt by default. Full rule persistence + Xero/QuickBooks payroll export follow in a later wave once we add a Tip pool rules settings page.',
+      'Internal: reports/Servers.jsx + Tips.jsx + OrderTypes.jsx added. BOReports.jsx routes all three and preserves LegacyTax + LegacyOpen (Wave 5 rebuilds those). LegacyPMix + LegacyServers now dead code, pending cleanup.',
+    ],
+  },
+  {
     version: '4.6.17', date: '22 Apr 2026', label: 'Reports wave 3 — Product mix rebuild (items / categories / modifiers / 86\'d) + Menu engineering 2×2',
     changes: [
       'New: Product mix report replaces the legacy single-table version with four sub-tabs. Items: top 100 rows with qty, revenue, share %, and a time-of-day stacked bar per item (morning / lunch / afternoon / dinner / late) so you can see which items sell when. Categories: groups by category id from the cart item, shows unique items per category, total qty, revenue and share — category label pulled from menuCategories. Modifiers: every modifier flattened from item.mods across the period, shown with times used, revenue contributed, and attach rate (modifier uses ÷ total items sold — surfaces natural upsell candidates).',

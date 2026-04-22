@@ -5,14 +5,22 @@
 export const CATEGORIES = [
   {
     id: 'sales', label: 'Sales reports', icon: '📈',
-    description: 'Net and gross sales, products, staff and shift performance.',
+    description: 'Net and gross sales, products, performance by channel and time.',
     reports: [
-      { id:'summary',   label:'Business summary', desc:'Period stats with compare chips + net/gross ladder' },
-      { id:'items',     label:'Product mix',      desc:'Items, categories, modifiers and 86\'d — with time of day', badge:'new' },
-      { id:'menu_eng',  label:'Menu engineering', desc:'Stars / Plow Horses / Puzzles / Dogs 2×2 matrix', badge:'new' },
-      { id:'shifts',    label:'Shifts',           desc:'Business-day shifts with per-server sessions' },
-      { id:'servers',   label:'Staff sales',      desc:'Revenue, covers and avg check by server' },
-      { id:'daypart',   label:'Daypart',          desc:'Hour × day-of-week revenue heatmap' },
+      { id:'summary',     label:'Business summary', desc:'Period stats with compare chips + net/gross ladder' },
+      { id:'items',       label:'Product mix',      desc:'Items, categories, modifiers and 86\'d — with time of day' },
+      { id:'menu_eng',    label:'Menu engineering', desc:'Stars / Plow Horses / Puzzles / Dogs 2×2 matrix' },
+      { id:'order_types', label:'Order types',      desc:'Channel mix over time with period compare', badge:'new' },
+      { id:'daypart',     label:'Daypart',          desc:'Hour × day-of-week revenue heatmap' },
+    ],
+  },
+  {
+    id: 'staff', label: 'Staff reports', icon: '👥',
+    description: 'Per-server performance, shifts and tip pooling.',
+    reports: [
+      { id:'servers', label:'Server scorecard', desc:'Full perf — tip %, discount rate, void rate, peer rank', badge:'new' },
+      { id:'tips',    label:'Tips & pooling',   desc:'Per-server tips + configurable tip-pool calculator', badge:'new' },
+      { id:'shifts',  label:'Shifts',           desc:'Business-day shifts with per-server sessions' },
     ],
   },
   {

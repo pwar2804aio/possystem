@@ -23,6 +23,9 @@ import Daypart      from './reports/Daypart';
 import Shifts       from './reports/Shifts';
 import ProductMix   from './reports/ProductMix';
 import MenuEngineering from './reports/MenuEngineering';
+import Servers      from './reports/Servers';
+import Tips         from './reports/Tips';
+import OrderTypes   from './reports/OrderTypes';
 
 const fmt  = n => `£${(n || 0).toFixed(2)}`;
 const fmtN = n => (n || 0).toLocaleString();
@@ -216,10 +219,12 @@ export default function BOReports() {
           {view === 'exceptions' && <Exceptions   checks={filtered} fmt={fmt}/>}
           {view === 'payments'   && <Payments     checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'daypart'    && <Daypart      checks={filtered} fmt={fmt}/>}
-          {view === 'shifts'     && <Shifts       checks={filtered} fmt={fmt} fmtN={fmtN}/>}
-          {view === 'items'      && <ProductMix   checks={filtered} fmt={fmt} fmtN={fmtN}/>}
-          {view === 'menu_eng'   && <MenuEngineering checks={filtered} fmt={fmt} fmtN={fmtN}/>}
-          {view === 'servers'    && <LegacyServers stats={legacyStats} fmt={fmt}/>}
+          {view === 'shifts'      && <Shifts       checks={filtered} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'items'       && <ProductMix   checks={filtered} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'menu_eng'    && <MenuEngineering checks={filtered} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'servers'     && <Servers      checks={filtered} prevChecks={filteredPrev} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'tips'        && <Tips         checks={filtered} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'order_types' && <OrderTypes   checks={filtered} prevChecks={filteredPrev} fmt={fmt} fmtN={fmtN}/>}
           {view === 'tax'        && <LegacyTax    checks={filtered} taxRates={taxRates} fmt={fmt}/>}
           {view === 'open'       && <LegacyOpen   openOrders={openOrders} fmt={fmt}/>}
         </>
