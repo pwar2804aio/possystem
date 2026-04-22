@@ -196,7 +196,7 @@ export default function PrintRouting() {
   const [showAdd, setShowAdd] = useState(false);
   const [editCentre, setEditCentre] = useState(null);
   const [kdsDevices, setKdsDevices] = useState([]);
-  const [form, setForm] = useState({ name:'', icon:'🔥', type:'kitchen', printerId:'', kdsDeviceId:'' });
+  const [form, setForm] = useState({ name:'', icon:'🔥', type:'kitchen', printerId:'', kdsDeviceId:'', printAllergens:false });
   const [printers, setPrinters] = useState(() => { try { return JSON.parse(localStorage.getItem('rpos-printers')||'[]'); } catch { return []; } });
   const [_loaded, setLoaded] = useState(false);
 
@@ -248,12 +248,13 @@ export default function PrintRouting() {
       printerId: form.printerId || null,
       printer: form.printerId ? printers.find(p => p.id === form.printerId) || null : null,
       kdsDeviceId: form.kdsDeviceId || null,
+      printAllergens: form.printAllergens === true,
     };
     setData(d => ({ ...d, centres:[...d.centres, centre] }));
     setRouting(r => ({ ...r, [centre.id]: emptyRouting() }));
     setSelected(centre.id);
     setShowAdd(false);
-    setForm({ name:'', icon:'🔥', type:'kitchen', printerId:'', kdsDeviceId:'' });
+    setForm({ name:'', icon:'🔥', type:'kitchen', printerId:'', kdsDeviceId:'', printAllergens:false });
   };
 
   const saveCentre = () => {
@@ -262,6 +263,7 @@ export default function PrintRouting() {
       printerId: form.printerId || null,
       printer: form.printerId ? printers.find(p => p.id === form.printerId) || null : null,
       kdsDeviceId: form.kdsDeviceId || null,
+      printAllergens: form.printAllergens === true,
     } : c) }));
     setEditCentre(null);
   };
@@ -277,7 +279,8 @@ export default function PrintRouting() {
     setEditCentre(c);
     setForm({ name:c.name, icon:c.icon, type:c.type,
       printerId: c.printerId || '',
-      kdsDeviceId: c.kdsDeviceId||'' });
+      kdsDeviceId: c.kdsDeviceId||'',
+      printAllergens: c.printAllergens === true });
     setShowAdd(false);
   };
 
@@ -343,6 +346,30 @@ export default function PrintRouting() {
         </>
       )}
 
+      <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', marginBottom:10 }}>🎟 Docket options</div>
+      <div style={{ marginBottom:14, padding:'10px 12px', background:'var(--bg3)', border:'1px solid var(--bdr)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+        <div style={{ minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>Print allergens on docket</div>
+          <div style={{ fontSize:11, color:'var(--t3)', marginTop:2 }}>
+            Off by default. KDS screen always shows allergens regardless of this setting.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={()=>f('printAllergens', !form.printAllergens)}
+          style={{
+            width:42, height:24, borderRadius:12, cursor:'pointer', border:'none',
+            background: form.printAllergens ? 'var(--acc)' : 'var(--bg5)',
+            position:'relative', transition:'background .15s', flexShrink:0,
+          }}>
+          <div style={{
+            width:18, height:18, borderRadius:'50%', background:'#fff',
+            position:'absolute', top:3, left: form.printAllergens ? 21 : 3,
+            transition:'left .15s',
+          }}/>
+        </button>
+      </div>
+
       <div style={{ display:'flex', gap:8 }}>
         <button onClick={onSave} style={{ ...S.btn, ...S.btnPrimary }}>{editCentre ? 'Save changes' : 'Add center →'}</button>
         <button onClick={onCancel} style={{ ...S.btn, ...S.btnGhost }}>Cancel</button>
@@ -386,7 +413,7 @@ export default function PrintRouting() {
         </div>
 
         <div style={{ padding:12, borderTop:'1px solid var(--bdr)', flexShrink:0 }}>
-          <button onClick={()=>{ setShowAdd(true); setSelected(null); setEditCentre(null); setForm({name:'',icon:'🔥',type:'kitchen',printerId:'',kdsDeviceId:''}); }}
+          <button onClick={()=>{ setShowAdd(true); setSelected(null); setEditCentre(null); setForm({name:'',icon:'🔥',type:'kitchen',printerId:'',kdsDeviceId:'',printAllergens:false}); }}
             style={{ ...S.btn, ...S.btnPrimary, width:'100%' }}>
             + Add production center
           </button>

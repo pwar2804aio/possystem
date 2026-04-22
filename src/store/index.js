@@ -1919,13 +1919,27 @@ export const useStore = create((set, get) => ({
     set(s => ({ printJobs: [{ ...basePrintJob, status: 'sending', printerId, attempts: 0 }, ...s.printJobs.slice(0, 49)] }));
 
     try {
+      // v4.6.7: strip allergen mod lines from printed docket unless the centre
+      // has opted in via printAllergens=true. KDS still shows the full mods list
+      // (see createKdsTickets) so kitchen staff retain the safety info on-screen.
+      // Allergen lines are stamped with a leading '⚠' in createKdsTickets; filter on that.
+      const printItems = centre?.printAllergens
+        ? (job.items || [])
+        : (job.items || []).map(it => ({
+            ...it,
+            mods: Array.isArray(it.mods) ? it.mods.filter(m => {
+              const text = typeof m === 'string' ? m : (m?.label || '');
+              return !text.startsWith('⚠');
+            }) : it.mods,
+          }));
+
       const result = await printService.printKitchenTicket({
         table: job.tableLabel || '',
         server: job.server || '',
         covers: job.covers || 0,
         course: job.course || null,
         centreName: centre?.name || job.printerName || 'Kitchen',
-        items: job.items || [],
+        items: printItems,
         sentAt: basePrintJob.sentAt,
       }, printerId, { idempotencyKey });
 

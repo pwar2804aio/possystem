@@ -59,6 +59,13 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.7', date: '22 Apr 2026', label: 'Allergens off production dockets by default + per-centre opt-in toggle',
+    changes: [
+      'Change: Allergens are no longer printed on physical production dockets by default. createKdsTickets continues to bake the ⚠ ALLERGEN line into each item\'s mods so the KDS screen still shows them to kitchen staff; routePrintJob in store/index.js now strips any mod line starting with ⚠ before handing items to printKitchenTicket, unless the destination centre has opted in via printAllergens=true.',
+      'Feature: New "Print allergens on docket" toggle in Back Office → Print Routing → centre form (add and edit). Stored on the centre object as printAllergens:boolean, persisted to print_routing in Supabase alongside the rest of the centre config. Defaults to false for both new and existing centres (existing centres have undefined, which is read as false).',
+    ],
+  },
+  {
     version: '4.6.6', date: '22 Apr 2026', label: 'Bar tab flow + floor plan drag persistence',
     changes: [
       'Fix: Bar tab name input in OrderTypeModal tab_pick step was rendering at 0px wide (invisible). v4.6.3 added width:auto+minWidth:0 to the INPUT, but the Open button next to it still had width:100% from the sendBtn helper, claiming the full flex-basis and leaving no space for the input to grow into. Override width:auto and flexShrink:0 on the button at OrderTypeModal.jsx:324 so it sizes to its content (~80px) and the input gets the remaining flex room.',
