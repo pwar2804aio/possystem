@@ -13,7 +13,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store';
 import { isMock, getLocationId } from '../../lib/supabase';
 import { fetchClosedChecksRange, fetchKDSTicketsRange } from '../../lib/db';
-import { PERIODS, getPeriodRange, periodLabel, applyFilters, uniqueServers, uniqueOrderTypes } from './reports/_filters';
+import { PERIODS, buildPeriods, getPeriodRange, periodLabel, applyFilters, uniqueServers, uniqueOrderTypes } from './reports/_filters';
+import { getLocationConfig } from '../../lib/locationTime';
 import Catalog, { CATEGORIES, REPORT_INDEX } from './reports/Catalog';
 import SalesSummary from './reports/SalesSummary';
 import Exceptions   from './reports/Exceptions';
@@ -40,15 +41,24 @@ export default function BOReports() {
   const [view, setView]               = useState('catalog'); // 'catalog' or a report id
   const [period, setPeriod]           = useState('today');
   const [customRange, setCustomRange] = useState({ from: null, to: null });
+  const [locationConfig, setLocationConfig] = useState(null);  // v4.6.24
   const [serverFilter, setServerFilter]       = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
+
+  // v4.6.24: Load location timezone + businessDayStart + service periods so reports
+  // can honour real business-day boundaries and service-period grouping.
+  useEffect(() => {
+    let alive = true;
+    getLocationConfig().then(cfg => { if (alive) setLocationConfig(cfg); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const [rangeChecks, setRangeChecks] = useState(null);
   const [prevChecks,  setPrevChecks]  = useState(null);
   const [kdsTickets,  setKdsTickets]  = useState(null);
   const [loadingRange, setLoadingRange] = useState(false);
 
-  const range = useMemo(() => getPeriodRange(period, customRange), [period, customRange]);
+  const range = useMemo(() => getPeriodRange(period, customRange, locationConfig), [period, customRange, locationConfig]);
 
   const activeSessions = useMemo(() =>
     Object.fromEntries(tables.filter(t => t.session).map(t => [t.id, t.session]))
@@ -129,7 +139,7 @@ export default function BOReports() {
   // Catalog view
   if (view === 'catalog') {
     return (
-      <div style={{ padding:'20px 24px' }}>
+      <div style={{ padding:'20px 24px', flex:1, overflow:'auto', minHeight:0 }}>
         <Catalog onOpen={setView} counts={catalogCounts}/>
       </div>
     );
@@ -137,7 +147,7 @@ export default function BOReports() {
 
   // Detail view (filter row + the selected report)
   return (
-    <div style={{ padding:'20px 24px', maxWidth: 1100 }}>
+    <div style={{ padding:'20px 24px', maxWidth:1100, flex:1, overflow:'auto', minHeight:0, width:'100%', boxSizing:'border-box' }}>
       {/* Breadcrumb + back */}
       <button onClick={() => setView('catalog')} style={{
         border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit',
@@ -150,7 +160,7 @@ export default function BOReports() {
             <span>{current?.label || view}</span>
           </div>
           <div style={{ fontSize:22, fontWeight:800, color:'var(--t1)', marginTop:2, letterSpacing:'-.01em' }}>
-            {PERIODS.find(p => p.id === period)?.label}
+            {buildPeriods(locationConfig).find(p => p.id === period)?.label}
             <span style={{ color:'var(--t4)', fontWeight:400, fontSize:14, marginLeft:10 }}>{periodLabel(period, customRange, range)}</span>
           </div>
           <div style={{ fontSize:12, color:'var(--t3)', marginTop:4 }}>
@@ -165,7 +175,7 @@ export default function BOReports() {
       {/* Filter row */}
       <div style={{ display:'flex', gap:10, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ display:'flex', gap:4, background:'var(--bg3)', padding:3, borderRadius:10, flexWrap:'wrap' }}>
-          {PERIODS.map(p => (
+          {buildPeriods(locationConfig).map(p => (
             <button key={p.id} onClick={() => setPeriod(p.id)} style={{
               padding:'5px 12px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', border:'none',
               background: period === p.id ? 'var(--bg1)' : 'transparent',
@@ -208,7 +218,7 @@ export default function BOReports() {
           {view === 'exceptions' && <Exceptions   checks={filtered} fmt={fmt}/>}
           {view === 'payments'   && <Payments     checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'daypart'    && <Daypart      checks={filtered} fmt={fmt}/>}
-          {view === 'shifts'      && <Shifts       checks={filtered} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'shifts'      && <Shifts       checks={filtered} fmt={fmt} fmtN={fmtN} locationConfig={locationConfig}/>}
           {view === 'items'       && <ProductMix   checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'menu_eng'    && <MenuEngineering checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'servers'     && <Servers      checks={filtered} prevChecks={filteredPrev} fmt={fmt} fmtN={fmtN}/>}

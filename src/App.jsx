@@ -59,7 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
-    version: '4.6.23', date: '22 Apr 2026', label: 'Reports wave 7 + sprint wrap — location picker uses user_locations junction, dead legacy code removed',
+    version: '4.6.24', date: '22 Apr 2026', label: 'Reports wave 8 \u2014 scroll fix, business-day-aware periods, service-period grouping for Shifts',
+    changes: [
+      'Scroll fix: BOReports root (both catalog and detail views) now has flex:1 overflow:auto minHeight:0 so long reports scroll within the content pane instead of being clipped by the parent overflow:hidden on BackOfficeApp line 331. This was the blocker preventing Peter from seeing anything past the fold on Product mix, Menu engineering, Tables, etc.',
+      'Business-day-aware periods: getPeriodRange now accepts a locationConfig param with { businessDayStart, shifts, timezone } and honours businessDayStart for Today / Yesterday / This week / This month etc. A check closed at 02:00 Thursday with a 04:00 business day start belongs to Wednesday\u2019s reporting day. Backward compatible \u2014 when config is absent or businessDayStart is 00:00, behaviour matches the old midnight-to-midnight semantics.',
+      'Service-period pills: new buildPeriods(locationConfig) helper adds one filter pill per configured service period (from locations.shifts in LocationSettings). If Peter has Breakfast / Lunch / Dinner defined, three extra pills appear at the start of the filter row: "Today\u2019s Breakfast", "Today\u2019s Lunch", "Today\u2019s Dinner". Clicking a service pill narrows the range to today\u2019s instance of that service window. Overnight services (end < start, e.g. late bar 22:00-02:00) wrap correctly.',
+      'Shifts report rebuild: when locationConfig.shifts is defined, the Shifts report now groups by (business-day \u00d7 service-period) instead of the old first-check-to-last-check derivation. One row per service shows revenue, covers, checks, avg check, tips, and a chip row of servers who worked that service. Unclassified checks (fell outside any configured service) are flagged with a count at the top. CSV export reflects the service grouping. When no services are configured, falls through to the original day-based DayBasedShifts.',
+      'classifyShift(timestamp, shifts, businessDayStart) helper exported from _filters.js for other reports to use later (Daypart, Server scorecard, Tips pool could all key off service periods in a future pass).',
+      'Custom date filter is already present (pill labeled "Custom" reveals two date inputs) \u2014 no change needed, but now more discoverable because the filter row auto-grows with service-period pills, drawing attention to the whole row.',
+    ],
+  },
+  {
+    version: '4.6.23', date: '22 Apr 2026', label: 'Reports wave 7 + sprint wrap \u2014 location picker uses user_locations junction, dead legacy code removed',
     changes: [
       'Wave 7: LocationSwitcher now reads the user_locations junction (v4.6.22) via fetchAccessibleLocations instead of only user_profiles.location_id. Regular users who have multiple sites linked (via user_locations rows) now see ALL of them in the picker grouped under "Your locations", each with a role badge (owner / manager / staff / viewer). Pre-v4.6.22 environments fall back cleanly to the single-location path — same file works in both.',
       'Wave 7: The Switch location button in the BO sidebar now shows the CURRENT location name instead of a generic "Switch location" label. Falls back to "Switch location" if the name has not loaded yet. Tooltip shows "Currently at <name>" so the user can confirm without clicking. Little chevron (▾) indicates it is a dropdown-style action.',
