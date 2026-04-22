@@ -78,7 +78,11 @@ export default function ItemInfoModal({ item, is86, onToggle86, onClose, onAddTo
   const recipe = ITEM_RECIPES[item.id];
   const count  = dailyCounts[item.id];
 
-  const fromPrice = item.type==='variants'
+  // v4.6.5 follow-up: long-press passes the bare menu item (no .variants array —
+  // that decoration only happens inside openFlow for normal taps), so for a variant-parent
+  // item with type='variants' the old code crashed with "Cannot read properties of undefined (reading 'map')"
+  // before the component could even render. Guard the min() and fall back to item.price.
+  const fromPrice = (item.type==='variants' && item.variants?.length)
     ? Math.min(...item.variants.map(v=>v.price))
     : item.price;
 
