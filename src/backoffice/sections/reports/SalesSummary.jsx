@@ -1,7 +1,7 @@
 // v4.6.15: Sales Summary report.
 // Replaces the legacy "Overview" tab.
 // Shows: 4 headline tiles with period-over-period compare chips,
-// a revenue breakdown ladder (gross \u2192 discounts/voids/refunds \u2192 net \u2192 tax/service/tips \u2192 total),
+// a revenue breakdown ladder (gross → discounts/voids/refunds → net → tax/service/tips → total),
 // and an exceptions snapshot for quick visibility.
 
 import { useMemo } from 'react';
@@ -70,7 +70,7 @@ export default function SalesSummary({ checks, prevChecks, fmt, fmtN }) {
   };
 
   if (cur.count === 0 && cur.voids === 0) {
-    return <EmptyState icon="\uD83D\uDCCA" message="No sales in this period. Try widening the date range."/>;
+    return <EmptyState icon="📊" message="No sales in this period. Try widening the date range."/>;
   }
 
   return (
@@ -144,7 +144,7 @@ function ExceptionsSnapshot({ cur, fmt }) {
         </div>
       ))}
       <div style={{ marginTop:10, padding:'9px 12px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--t4)', lineHeight:1.6 }}>
-        \u24D8 Open the <strong style={{ color:'var(--t2)' }}>Exceptions</strong> tab to audit every event by server, time and approval.
+        ⓘ Open the <strong style={{ color:'var(--t2)' }}>Exceptions</strong> tab to audit every event by server, time and approval.
       </div>
     </div>
   );

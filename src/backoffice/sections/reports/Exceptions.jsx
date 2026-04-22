@@ -15,21 +15,21 @@ function flattenEvents(checks) {
     if (c.status === 'voided') {
       events.push({
         type:'void', amount: c.total || 0, ts: c.closedAt, ref: c.ref || c.id,
-        server: c.server || '\u2014', tableLabel: c.tableLabel || c.customer || '\u2014',
+        server: c.server || '—', tableLabel: c.tableLabel || c.customer || '—',
         reason: c.voidReason || null, approvedBy: c.voidedBy || null,
       });
     }
     (c.discounts||[]).forEach(d => {
       events.push({
         type:'discount', amount: d.amount || d.value || 0, ts: c.closedAt, ref: c.ref || c.id,
-        server: c.server || '\u2014', tableLabel: c.tableLabel || c.customer || '\u2014',
+        server: c.server || '—', tableLabel: c.tableLabel || c.customer || '—',
         reason: d.name || d.reason || 'Discount', approvedBy: d.appliedBy || d.by || null,
       });
     });
     (c.refunds||[]).forEach(r => {
       events.push({
         type:'refund', amount: r.amount || 0, ts: r.at || c.closedAt, ref: c.ref || c.id,
-        server: c.server || '\u2014', tableLabel: c.tableLabel || c.customer || '\u2014',
+        server: c.server || '—', tableLabel: c.tableLabel || c.customer || '—',
         reason: r.reason || 'Refund', approvedBy: r.by || null,
       });
     });
@@ -90,7 +90,7 @@ export default function Exceptions({ checks, fmt }) {
   };
 
   if (events.length === 0) {
-    return <EmptyState icon="\uD83D\uDEE1" message="No exceptions in this period. Clean shift."/>;
+    return <EmptyState icon="🛡" message="No exceptions in this period. Clean shift."/>;
   }
 
   return (
@@ -117,7 +117,7 @@ export default function Exceptions({ checks, fmt }) {
 
       <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, overflow:'hidden', marginBottom:18 }}>
         <div style={{ ...headerRow }}>
-          <span>Type</span><span>Time</span><span>Ref \u00B7 Table</span><span>Reason</span><span>Staff / Approved</span>
+          <span>Type</span><span>Time</span><span>Ref · Table</span><span>Reason</span><span>Staff / Approved</span>
           <span style={{ textAlign:'right' }}>Amount</span>
         </div>
         {displayed.length === 0 ? (
@@ -127,17 +127,17 @@ export default function Exceptions({ checks, fmt }) {
           return (
             <div key={i} style={{ ...dataRow }}>
               <span style={{ padding:'3px 7px', background:st.bg, border:`1px solid ${st.color}55`, borderRadius:5, fontSize:10, fontWeight:800, color:st.color, fontFamily:'var(--font-mono)', textAlign:'center', alignSelf:'center' }}>{st.label}</span>
-              <span style={{ color:'var(--t3)', fontFamily:'var(--font-mono)', fontSize:11 }}>{e.ts ? new Date(e.ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '\u2014'}</span>
-              <span style={{ color:'var(--t2)' }}>{e.ref} \u00B7 <span style={{ color:'var(--t3)' }}>{e.tableLabel}</span></span>
-              <span style={{ color:'var(--t2)' }}>{e.reason || '\u2014'}</span>
-              <span style={{ color:'var(--t3)', fontSize:11 }}>{e.server}{e.approvedBy ? ` \u00B7 by ${e.approvedBy}` : ''}</span>
+              <span style={{ color:'var(--t3)', fontFamily:'var(--font-mono)', fontSize:11 }}>{e.ts ? new Date(e.ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '—'}</span>
+              <span style={{ color:'var(--t2)' }}>{e.ref} · <span style={{ color:'var(--t3)' }}>{e.tableLabel}</span></span>
+              <span style={{ color:'var(--t2)' }}>{e.reason || '—'}</span>
+              <span style={{ color:'var(--t3)', fontSize:11 }}>{e.server}{e.approvedBy ? ` · by ${e.approvedBy}` : ''}</span>
               <span style={{ textAlign:'right', fontFamily:'var(--font-mono)', fontWeight:700, color:st.color }}>{fmt(e.amount)}</span>
             </div>
           );
         })}
         {displayed.length > 200 && (
           <div style={{ padding:'10px 16px', fontSize:11, color:'var(--t4)', textAlign:'center' }}>
-            Showing first 200 of {displayed.length} \u2014 export CSV for the full list.
+            Showing first 200 of {displayed.length} — export CSV for the full list.
           </div>
         )}
       </div>
@@ -155,9 +155,9 @@ export default function Exceptions({ checks, fmt }) {
           {byServer.map(s => (
             <div key={s.server} style={{ display:'grid', gridTemplateColumns:'1.3fr 1fr 1fr 1fr 1fr', padding:'10px 16px', borderBottom:'1px solid var(--bdr)', fontSize:12, alignItems:'center' }}>
               <span style={{ color:'var(--t1)', fontWeight:600 }}>{s.server}</span>
-              <span style={{ textAlign:'right', color:'var(--red)', fontFamily:'var(--font-mono)', fontWeight:600 }}>{fmt(s.voids)}<span style={{ color:'var(--t4)', marginLeft:6, fontSize:10 }}>\u00D7{s.voidCount}</span></span>
-              <span style={{ textAlign:'right', color:'var(--acc)', fontFamily:'var(--font-mono)', fontWeight:600 }}>{fmt(s.discounts)}<span style={{ color:'var(--t4)', marginLeft:6, fontSize:10 }}>\u00D7{s.discCount}</span></span>
-              <span style={{ textAlign:'right', color:'#a78bfa', fontFamily:'var(--font-mono)', fontWeight:600 }}>{fmt(s.refunds)}<span style={{ color:'var(--t4)', marginLeft:6, fontSize:10 }}>\u00D7{s.refundCount}</span></span>
+              <span style={{ textAlign:'right', color:'var(--red)', fontFamily:'var(--font-mono)', fontWeight:600 }}>{fmt(s.voids)}<span style={{ color:'var(--t4)', marginLeft:6, fontSize:10 }}>×{s.voidCount}</span></span>
+              <span style={{ textAlign:'right', color:'var(--acc)', fontFamily:'var(--font-mono)', fontWeight:600 }}>{fmt(s.discounts)}<span style={{ color:'var(--t4)', marginLeft:6, fontSize:10 }}>×{s.discCount}</span></span>
+              <span style={{ textAlign:'right', color:'#a78bfa', fontFamily:'var(--font-mono)', fontWeight:600 }}>{fmt(s.refunds)}<span style={{ color:'var(--t4)', marginLeft:6, fontSize:10 }}>×{s.refundCount}</span></span>
               <span style={{ textAlign:'right', color:'var(--t1)', fontFamily:'var(--font-mono)', fontWeight:800 }}>{fmt(s.voids + s.discounts + s.refunds)}</span>
             </div>
           ))}

@@ -1,7 +1,7 @@
 // v4.6.15: Daypart report.
-// Replaces the legacy one-dimensional Hourly view with a 7\u00D724 heatmap
-// (day of week \u00D7 hour) plus an hourly bar chart across all days combined.
-// Drives staffing decisions \u2014 "Friday 7pm is our peak, we need more cover".
+// Replaces the legacy one-dimensional Hourly view with a 7×24 heatmap
+// (day of week × hour) plus an hourly bar chart across all days combined.
+// Drives staffing decisions — "Friday 7pm is our peak, we need more cover".
 
 import { useMemo } from 'react';
 import { StatTile, ExportBtn, EmptyState, Heatmap, HourBar } from './_charts';
@@ -49,7 +49,7 @@ export default function Daypart({ checks, fmt }) {
   };
 
   if (totalRev === 0) {
-    return <EmptyState icon="\uD83D\uDD53" message="No sales in this period to chart."/>;
+    return <EmptyState icon="🕓" message="No sales in this period to chart."/>;
   }
 
   return (
@@ -57,19 +57,19 @@ export default function Daypart({ checks, fmt }) {
       <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:12 }}><ExportBtn onClick={onExport}/></div>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:18 }}>
-        <StatTile label="Busiest hour"  value={peakHour >= 0 ? `${peakHour}:00` : '\u2014'}        sub={fmt(Math.max(...byHour))} color="var(--acc)"/>
-        <StatTile label="Busiest day"   value={DOW_LABELS[peakDow] || '\u2014'}                     sub={fmt(Math.max(...byDow))}/>
+        <StatTile label="Busiest hour"  value={peakHour >= 0 ? `${peakHour}:00` : '—'}        sub={fmt(Math.max(...byHour))} color="var(--acc)"/>
+        <StatTile label="Busiest day"   value={DOW_LABELS[peakDow] || '—'}                     sub={fmt(Math.max(...byDow))}/>
         <StatTile label="Peak slot"     value={`${DOW_LABELS[peakCell.dow]} ${peakCell.h}:00`}      sub={fmt(peakCell.value)}/>
       </div>
 
       <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:'16px', marginBottom:14 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:16 }}>Revenue \u00B7 hour \u00D7 day of week</div>
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:16 }}>Revenue · hour × day of week</div>
         <Heatmap grid={grid} formatCell={v => fmt(v)}/>
       </div>
 
       <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:12, padding:'16px' }}>
         <div style={{ fontSize:11, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:16 }}>Revenue by hour (all days combined)</div>
-        <HourBar values={byHour} maxLabel={v => `\u00A3${Math.round(v)}`} nowHour={nowHour}/>
+        <HourBar values={byHour} maxLabel={v => `£${Math.round(v)}`} nowHour={nowHour}/>
       </div>
     </div>
   );

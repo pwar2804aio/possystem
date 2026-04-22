@@ -20,11 +20,11 @@ function bucket(method) {
 }
 
 const METHOD_STYLE = {
-  'cash':       { color:'var(--grn)', label:'Cash',          icon:'\uD83D\uDCB5' },
-  'card':       { color:'#3b82f6',    label:'Card',          icon:'\uD83D\uDCB3' },
-  'apple-pay':  { color:'#a1a1aa',    label:'Apple Pay',     icon:'\uF8FF'       },
+  'cash':       { color:'var(--grn)', label:'Cash',          icon:'💵' },
+  'card':       { color:'#3b82f6',    label:'Card',          icon:'💳' },
+  'apple-pay':  { color:'#a1a1aa',    label:'Apple Pay',     icon:''       },
   'google-pay': { color:'#4ade80',    label:'Google Pay',    icon:'G'            },
-  'split':      { color:'var(--acc)', label:'Split payment', icon:'\u2398'       },
+  'split':      { color:'var(--acc)', label:'Split payment', icon:'⎘'       },
   'other':      { color:'var(--t3)',  label:'Other',         icon:'?'            },
 };
 
@@ -60,7 +60,7 @@ export default function Payments({ checks, fmt, fmtN }) {
   };
 
   if (breakdown.total === 0) {
-    return <EmptyState icon="\uD83D\uDCB3" message="No payments recorded in this period."/>;
+    return <EmptyState icon="💳" message="No payments recorded in this period."/>;
   }
 
   return (
@@ -82,11 +82,11 @@ export default function Payments({ checks, fmt, fmtN }) {
             return (
               <BarRow
                 key={r.method}
-                label={`${st.icon} ${st.label} \u00B7 ${r.count} checks`}
+                label={`${st.icon} ${st.label} · ${r.count} checks`}
                 value={r.revenue}
                 max={breakdown.total}
                 color={st.color}
-                format={v => `${fmt(v)} \u00B7 ${pct.toFixed(0)}%`}
+                format={v => `${fmt(v)} · ${pct.toFixed(0)}%`}
               />
             );
           })}
@@ -104,7 +104,7 @@ export default function Payments({ checks, fmt, fmtN }) {
               <div style={{ marginTop:10, padding:'10px 12px', background:'var(--bg3)', border:'1px dashed var(--bdr)', borderRadius:8, fontSize:11, color:'var(--t4)', lineHeight:1.7 }}>
                 <strong style={{ color:'var(--t2)' }}>End-of-day check:</strong><br/>
                 Expected in drawer = <span style={{ color:'var(--t1)' }}>starting float + {fmt(cashRevenue)}</span><br/>
-                Count the drawer at close and subtract starting float. The remainder should match cash sales above \u2014 any gap is variance.
+                Count the drawer at close and subtract starting float. The remainder should match cash sales above — any gap is variance.
               </div>
             </div>
           )}

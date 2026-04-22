@@ -1,4 +1,4 @@
-// v4.6.15: Back Office Reports \u2014 rebuilt shell.
+// v4.6.15: Back Office Reports — rebuilt shell.
 // The shell owns:
 //   - period + custom range picker
 //   - server + order-type filter
@@ -21,7 +21,7 @@ import Exceptions   from './reports/Exceptions';
 import Payments     from './reports/Payments';
 import Daypart      from './reports/Daypart';
 
-const fmt  = n => `\u00A3${(n || 0).toFixed(2)}`;
+const fmt  = n => `£${(n || 0).toFixed(2)}`;
 const fmtN = n => (n || 0).toLocaleString();
 
 export default function BOReports() {
@@ -55,7 +55,7 @@ export default function BOReports() {
     setLoadingRange(true);
     (async () => {
       try {
-        // Resolve location id from user_profiles \u2192 device config fallback
+        // Resolve location id from user_profiles → device config fallback
         let locId = await getLocationId().catch(() => null);
         if (!locId) {
           try {
@@ -95,7 +95,7 @@ export default function BOReports() {
   const servers    = useMemo(() => uniqueServers(allChecks),    [allChecks]);
   const orderTypes = useMemo(() => uniqueOrderTypes(allChecks), [allChecks]);
 
-  // Open orders \u2014 unchanged logic from pre-4.6.15
+  // Open orders — unchanged logic from pre-4.6.15
   const openOrders = useMemo(() => (
     Object.entries(activeSessions || {})
       .filter(([, s]) => s?.items?.length > 0)
@@ -132,10 +132,10 @@ export default function BOReports() {
   }, [filtered]);
 
   const tabs = [
-    { id:'summary',    label:'Sales summary', icon:'\uD83D\uDCC8', badge:'new' },
-    { id:'exceptions', label:'Exceptions',    icon:'\uD83D\uDEE1', badge:'new' },
-    { id:'payments',   label:'Payments',      icon:'\uD83D\uDCB3', badge:'new' },
-    { id:'daypart',    label:'Daypart',       icon:'\uD83D\uDD53', badge:'new' },
+    { id:'summary',    label:'Sales summary', icon:'📈', badge:'new' },
+    { id:'exceptions', label:'Exceptions',    icon:'🛡', badge:'new' },
+    { id:'payments',   label:'Payments',      icon:'💳', badge:'new' },
+    { id:'daypart',    label:'Daypart',       icon:'🕓', badge:'new' },
     { id:'items',      label:'Product mix' },
     { id:'servers',    label:'By server'   },
     { id:'tax',        label:'Tax' },
@@ -155,9 +155,9 @@ export default function BOReports() {
             <span style={{ color:'var(--t4)', fontWeight:400, fontSize:14, marginLeft:10 }}>{periodLabel(period, customRange, range)}</span>
           </div>
           <div style={{ fontSize:12, color:'var(--t3)', marginTop:4 }}>
-            {filtered.length} checks \u00B7 {fmt(legacyStats.revenue)} revenue
+            {filtered.length} checks · {fmt(legacyStats.revenue)} revenue
             {(serverFilter !== 'all' || orderTypeFilter !== 'all') && (
-              <span style={{ color:'var(--acc)', marginLeft:6 }}>\u00B7 filtered</span>
+              <span style={{ color:'var(--acc)', marginLeft:6 }}>· filtered</span>
             )}
           </div>
         </div>
@@ -179,7 +179,7 @@ export default function BOReports() {
         {period === 'custom' && (
           <>
             <input type="date" value={customRange.from || ''} onChange={e => setCustomRange(r => ({ ...r, from: e.target.value }))} style={inputSt}/>
-            <span style={{ color:'var(--t4)' }}>\u2192</span>
+            <span style={{ color:'var(--t4)' }}>→</span>
             <input type="date" value={customRange.to   || ''} onChange={e => setCustomRange(r => ({ ...r, to:   e.target.value }))} style={inputSt}/>
           </>
         )}
@@ -219,7 +219,7 @@ export default function BOReports() {
           Pick a start and end date to load the custom range.
         </div>
       ) : loadingRange ? (
-        <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>Loading \u2026</div>
+        <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>Loading …</div>
       ) : (
         <>
           {view === 'summary'    && <SalesSummary checks={filtered} prevChecks={filteredPrev} fmt={fmt} fmtN={fmtN}/>}
@@ -242,7 +242,7 @@ const tileSt   = { padding:'14px 16px', background:'var(--bg1)', border:'1px sol
 const lblSt    = { fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6 };
 
 // ------------------------------------------------------------------
-// Legacy views \u2014 preserved intact from pre-4.6.15. Wave 2 replaces
+// Legacy views — preserved intact from pre-4.6.15. Wave 2 replaces
 // Product mix / By server / Tax with richer versions.
 // ------------------------------------------------------------------
 
@@ -348,9 +348,9 @@ function LegacyTax({ checks, taxRates, fmt }) {
     const lines = ['Rate,Code,Type,Net Sales,Tax,Gross Sales'];
     rows.forEach(r => {
       const pct = (r.rate.rate * 100).toFixed(1).replace('.0', '');
-      lines.push(`"${r.rate.name} (${pct}%)","${r.rate.code || ''}","${r.rate.type}","\u00A3${r.net.toFixed(2)}","\u00A3${r.tax.toFixed(2)}","\u00A3${r.gross.toFixed(2)}"`);
+      lines.push(`"${r.rate.name} (${pct}%)","${r.rate.code || ''}","${r.rate.type}","£${r.net.toFixed(2)}","£${r.tax.toFixed(2)}","£${r.gross.toFixed(2)}"`);
     });
-    lines.push(`"Total","","","\u00A3${totalNet.toFixed(2)}","\u00A3${totalTax.toFixed(2)}","\u00A3${totalGross.toFixed(2)}"`);
+    lines.push(`"Total","","","£${totalNet.toFixed(2)}","£${totalTax.toFixed(2)}","£${totalGross.toFixed(2)}"`);
     const blob = new Blob([lines.join('\n')], { type:'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = `tax-report-${new Date().toISOString().slice(0,10)}.csv`; a.click();
@@ -380,7 +380,7 @@ function LegacyTax({ checks, taxRates, fmt }) {
               <div key={r.rate.id} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', padding:'12px 16px', borderBottom:'1px solid var(--bdr)', alignItems:'center' }}>
                 <div>
                   <div style={{ fontSize:13, fontWeight:600, color:'var(--t1)' }}>{r.rate.name}</div>
-                  <div style={{ fontSize:11, color:'var(--t4)' }}>{pct}% \u00B7 {r.rate.code} \u00B7 {r.rate.type}</div>
+                  <div style={{ fontSize:11, color:'var(--t4)' }}>{pct}% · {r.rate.code} · {r.rate.type}</div>
                 </div>
                 <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', color:'var(--t2)' }}>{fmt(r.net)}</div>
                 <div style={{ textAlign:'right', fontSize:13, fontFamily:'var(--font-mono)', color:'var(--red)', fontWeight:600 }}>{fmt(r.tax)}</div>
@@ -404,7 +404,7 @@ function LegacyOpen({ openOrders, fmt }) {
   if (openOrders.length === 0) {
     return (
       <div style={{ textAlign:'center', padding:'48px 0', color:'var(--t4)', fontSize:13 }}>
-        <div style={{ fontSize:36, marginBottom:10 }}>\u22DA</div>
+        <div style={{ fontSize:36, marginBottom:10 }}>⋚</div>
         No open orders right now
       </div>
     );
@@ -416,7 +416,7 @@ function LegacyOpen({ openOrders, fmt }) {
           <div style={{ width:40, height:40, borderRadius:10, background:'var(--acc-d)', border:'1px solid var(--acc-b)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, color:'var(--acc)', flexShrink:0 }}>{o.tableLabel}</div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:13, fontWeight:700, color:'var(--t1)', marginBottom:2 }}>Table {o.tableLabel}</div>
-            <div style={{ fontSize:11, color:'var(--t4)' }}>{o.itemCount} item{o.itemCount !== 1 ? 's' : ''} \u00B7 {o.covers} cover{o.covers !== 1 ? 's' : ''}</div>
+            <div style={{ fontSize:11, color:'var(--t4)' }}>{o.itemCount} item{o.itemCount !== 1 ? 's' : ''} · {o.covers} cover{o.covers !== 1 ? 's' : ''}</div>
           </div>
           <div style={{ textAlign:'right' }}>
             <div style={{ fontSize:15, fontWeight:800, color:'var(--acc)', fontFamily:'var(--font-mono)' }}>{fmt(o.subtotal)}</div>
@@ -425,7 +425,7 @@ function LegacyOpen({ openOrders, fmt }) {
         </div>
       ))}
       <div style={{ marginTop:8, padding:'10px 14px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--bdr)', fontSize:12, color:'var(--t4)' }}>
-        \u24D8 Open orders are excluded from revenue figures until payment is taken.
+        ⓘ Open orders are excluded from revenue figures until payment is taken.
       </div>
     </div>
   );
