@@ -264,3 +264,52 @@ button { font-family: inherit; }
 @keyframes slideRight { from { transform:translateX(-100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
 @keyframes slideDown { from { transform:translateY(-100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
 @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+
+/* v4.6.21 — Print styles for Z-report and any other printable report
+   When window.print() is triggered from the Z-report, only #zreport-print-area
+   is visible. Sunmi 80mm thermal paper is 80x297mm; the @page rule below sets
+   that so the receipt prints without margins when the user picks the Sunmi
+   printer. If the user picks a normal printer ("Save as PDF", A4), the same
+   narrow column centres in the middle of the page.
+*/
+@media print {
+  @page {
+    size: 80mm 297mm;
+    margin: 3mm;
+  }
+  /* Hide the entire app shell */
+  body > *:not(#root),
+  .z-no-print,
+  header, nav, aside,
+  [class*="topbar"], [class*="sidebar"], [class*="filter"] {
+    display: none !important;
+  }
+  /* Hide everything inside root except the ancestor chain of the print area */
+  #root *:not(#zreport-print-area *):not(:has(#zreport-print-area)) {
+    visibility: hidden;
+  }
+  #zreport-print-area, #zreport-print-area * {
+    visibility: visible !important;
+  }
+  #zreport-print-area {
+    position: absolute !important;
+    left: 0; top: 0;
+    max-width: 74mm !important;
+    width: 74mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    font-size: 10pt !important;
+    line-height: 1.35 !important;
+    page-break-inside: avoid;
+  }
+  #zreport-print-area * {
+    background: transparent !important;
+    color: #000 !important;
+    border-color: #000 !important;
+  }
+}

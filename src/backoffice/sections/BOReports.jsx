@@ -28,6 +28,8 @@ import Tips         from './reports/Tips';
 import OrderTypes   from './reports/OrderTypes';
 import Tables       from './reports/Tables';
 import KDSPerformance from './reports/KDSPerformance';
+import ZReport      from './reports/ZReport';
+import Tax          from './reports/Tax';
 
 const fmt  = n => `£${(n || 0).toFixed(2)}`;
 const fmtN = n => (n || 0).toLocaleString();
@@ -232,7 +234,8 @@ export default function BOReports() {
           {view === 'order_types' && <OrderTypes   checks={filtered} prevChecks={filteredPrev} fmt={fmt} fmtN={fmtN}/>}
           {view === 'tables'      && <Tables       checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'kds_perf'    && <KDSPerformance kdsTickets={kdsTickets || []} fmt={fmt} fmtN={fmtN}/>}
-          {view === 'tax'        && <LegacyTax    checks={filtered} taxRates={taxRates} fmt={fmt}/>}
+          {view === 'zreport'     && <ZReport      checks={filtered} periodLabelText={periodLabel(period, customRange, range)} rangeFrom={range.from} rangeTo={range.to} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'tax'        && <Tax          checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'open'       && <LegacyOpen   openOrders={openOrders} fmt={fmt}/>}
         </>
       )}

@@ -32,10 +32,11 @@ export const CATEGORIES = [
   },
   {
     id: 'fiscal', label: 'Fiscal reports', icon: '💰',
-    description: 'Tax summaries and cash reconciliation for filing and close-of-day.',
+    description: 'Tax summaries, cash reconciliation and end-of-day close.',
     reports: [
-      { id:'tax',      label:'Tax summary',     desc:'Rate breakdown for VAT / sales tax returns' },
-      { id:'payments', label:'Payments & cash', desc:'Method breakdown + drawer reconciliation' },
+      { id:'zreport',  label:'Z-report',         desc:'Printable end-of-day snapshot — thermal 80mm or PDF', badge:'new' },
+      { id:'tax',      label:'Tax summary',      desc:'Per-rate + per-order-type breakdown, reuses POS tax engine', badge:'updated' },
+      { id:'payments', label:'Payments & cash',  desc:'Method breakdown + drawer reconciliation' },
     ],
   },
   {

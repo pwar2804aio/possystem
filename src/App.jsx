@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.21', date: '22 Apr 2026', label: 'Reports wave 5b — Z-report (printable) + Tax rebuild + print styles',
+    changes: [
+      'New: Z-report under Fiscal reports. Receipt-styled single column preview on screen, mono font, 80mm-thermal-friendly layout. Shows header (Z number + printed-at timestamp), sales ladder (gross, discounts, voids, refunds, net), tax breakdown (pulls per-rate split via calculateOrderTax reusing the POS engine), service + tips, grand total, payment methods breakdown, order types breakdown, cash drawer reconciliation helper with counted/variance blanks for handwritten entry, and manager signature block at the bottom.',
+      'New: print styles in src/styles/globals.css. A @media print block with @page size 80mm 297mm hides the entire app chrome and shows only the #zreport-print-area with monochrome ink. The user clicks Print / Save PDF and their browser print dialog opens — pick the Sunmi thermal printer for 80mm receipt paper, or pick Save as PDF for archival. Same code path for both outputs.',
+      'Rebuilt: Tax summary report replaces LegacyTax. Uses calculateOrderTax on each check so breakdowns match what the POS charged at the till — correctly handles inclusive vs exclusive rates and per-order-type tax overrides (zero-rated takeaway etc). Four tiles: total tax, net of tax, effective tax rate (tax÷net), and variance (stored vs re-derived — red if above 0.50 as a diagnostic flag for inclusive-tax rounding). Two tables: by rate (net/tax/gross/lines per rate with rate % and inclusive/exclusive type), and by order type (net/tax/gross per channel). Both tables have their own CSV export.',
+      'Z-report integration note: Z number is read from shift.zNumber if present, otherwise shows em dash. Auto-incrementing sequence lands when we add a z_reports audit table (schema roadmap). Cash drawer variance stays handwritten for now; digital counting flow is a separate close-of-day feature.',
+      'Catalog: Fiscal reports now has Z-report (new) + Tax summary (updated badge) + Payments & cash. Still 7 categories overall.',
+      'Internal: reports/ZReport.jsx + reports/Tax.jsx added. BOReports.jsx routes zreport and swaps LegacyTax for Tax. LegacyTax is now dead code pending cleanup. LegacyOpen still active (replaced when Wave 6 ships).',
+    ],
+  },
+  {
     version: '4.6.20', date: '22 Apr 2026', label: 'Reports wave 5a — Tables performance + KDS performance + Kitchen category',
     changes: [
       'New: Tables report under Order reports. Aggregates closed_checks by tableId / tableLabel, excludes walk-ins and voids. Shows tables used, total turns (with avg per table), total covers (with avg per turn), revenue tile; top-12 tables bar chart by revenue; sortable table with rank, turns, covers, revenue, avg check, avg cover. CSV export.',
