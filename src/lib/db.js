@@ -119,7 +119,25 @@ export const upsertFloorTable = async (table, locationId = null) => {
   if (isMock) return { data: null, error: null };
   if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
   if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
-  const result = await supabase.from('floor_tables').upsert({ ...table, location_id: locationId });
+  // v4.6.5 Bug 6: floor_tables columns are (id, location_id, label, x, y, w, h, shape,
+  // max_covers, section, sort_order). Client state carries camelCase (maxCovers) plus
+  // runtime-only fields (status, session, firedCourses, sentAt, reservation). PostgREST
+  // rejects unknown columns, so every add/update was silently failing and the floor plan
+  // never persisted (B8 was a pre-existing row). Pick only real columns and rename.
+  const row = {
+    id: table.id,
+    location_id: locationId,
+    label: table.label,
+    x: table.x ?? 0,
+    y: table.y ?? 0,
+    w: table.w ?? 80,
+    h: table.h ?? 80,
+    shape: table.shape ?? 'rect',
+    max_covers: table.max_covers ?? table.maxCovers ?? 4,
+    section: table.section ?? null,
+    sort_order: table.sort_order ?? table.sortOrder ?? 0,
+  };
+  const result = await supabase.from('floor_tables').upsert(row, { onConflict: 'id' });
   if (result.error) console.error('[DB] floor_tables upsert failed:', result.error.message, 'table:', table.id, 'location:', locationId);
   return result;
 };
