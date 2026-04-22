@@ -17,6 +17,26 @@ import { loadLocationBranding, mergeBrandingIntoLocation, invalidateBrandingCach
 // ─── ESC/POS builder ──────────────────────────────────────────────────────────
 const ESC = 0x1b, GS = 0x1d, LF = 0x0a;
 
+// v4.6.5 follow-up: transliterate common Unicode punctuation to ASCII so em
+// dashes, curly quotes, bullets, middle dots, emoji etc. don't print as '?'.
+// Anything still outside Latin-1 after this falls back to '?' in text().
+function _t(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[\u00B7\u2022]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/\u2122/g, '(TM)')
+    .replace(/\u00A9/g, '(c)')
+    .replace(/\u00AE/g, '(R)')
+    .replace(/\u00B0/g, ' deg')
+    .replace(/\u20AC/g, 'EUR')
+    .replace(/[\uD800-\uDFFF]/g, '');
+}
+
 class EscPosBuilder {
   constructor(charWidth = 42) { this.bytes = []; this.charWidth = charWidth; }
 
@@ -50,7 +70,7 @@ class EscPosBuilder {
   red()              { return this._push([ESC,0x72,0x01]); }  // ESC r 1 = red ink
   black()            { return this._push([ESC,0x72,0x00]); }  // ESC r 0 = black ink
 
-  text(str) { return this._push((str||'').replace(/[^\x00-\xff]/g,'?')); }
+  text(str) { return this._push(_t(str||'').replace(/[^\x00-\xff]/g,'?')); }
   line(str='') { return this.text(str).lf(); }
   divider(c='-') { return this.line(c.repeat(this.charWidth)); }
 
@@ -211,8 +231,15 @@ export function buildKitchenTicket({ table, server, covers, course, centreName, 
   // full charWidth (42) which overflows when doubleBoth is active: spaces print
   // double-wide too, so 42 cols of padded content becomes ~50 physical cols and wraps.
   // Result looked like the table number was right-aligned and on two lines.
-  if(table) b.center().line(`TABLE ${table}`).left();
-  else b.center().line('WALK-IN').left();
+  if(table) {
+    // v4.6.5 follow-up: only prepend "TABLE" for actual table labels. Non-table
+    // labels are composed as "Takeaway . Sarah" / "Bar . Maria" etc and are
+    // self-describing — printing "TABLE Takeaway . Sarah" looked absurd.
+    const isNonTableLabel = / . /.test(table) || /^(takeaway|collection|delivery|counter)$/i.test(table);
+    b.center().line(isNonTableLabel ? table : `TABLE ${table}`).left();
+  } else {
+    b.center().line('WALK-IN').left();
+  }
 
   b.normal();
   if(server) b.fontB().line(`Server: ${server}`).fontA();

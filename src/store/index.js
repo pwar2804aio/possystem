@@ -1267,7 +1267,7 @@ export const useStore = create((set, get) => ({
         customer: customer ? { ...customer } : { name: customer?.name || label },
         items: order.items.filter(i => !i.voided),
         total: order.items.reduce((s, i) => s + i.price * i.qty, 0),
-        status: 'received', createdAt: order.createdAt || Date.now(), sentAt: Date.now(),
+        status: 'prep', createdAt: order.createdAt || Date.now(), sentAt: Date.now(),
         collectionTime: customer?.collectionTime, isASAP: customer?.isASAP, staff: staff?.name,
       };
       const alreadyQueued = get().orderQueue.find(o => o.ref === ref);
