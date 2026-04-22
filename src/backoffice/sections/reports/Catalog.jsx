@@ -56,9 +56,10 @@ export const CATEGORIES = [
   },
   {
     id: 'location', label: 'Location reports', icon: '📍',
-    description: 'Consolidated data across multiple locations.',
-    reports: [],
-    comingSoon: 'Multi-location compare ships when user_locations junction table lands.',
+    description: 'Consolidated data and compare views across multiple sites.',
+    reports: [
+      { id:'location_compare', label:'Location compare', desc:'Side-by-side performance across every site you manage, with outlier alerts', badge:'new' },
+    ],
   },
 ];
 

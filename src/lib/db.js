@@ -440,3 +440,75 @@ export const loadQuickScreenIds = async (locationId = null) => {
   const { data } = await supabase.from('locations').select('quick_screen_ids').eq('id', locationId).single();
   return data?.quick_screen_ids || [];
 };
+
+// ── Multi-location (v4.6.22) ──────────────────────────────────────────────────
+// Returns every location the currently-authenticated user has access to.
+// Prefers the new user_locations junction; falls back to user_profiles.location_id
+// for pre-migration environments so nothing breaks if the SQL isn't run yet.
+export const fetchAccessibleLocations = async () => {
+  if (isMock) {
+    return { data: [{ id: 'loc-demo', name: 'Demo Location', role: 'manager' }], error: null };
+  }
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return { data: [], error: new Error('No authenticated user') };
+
+  // Try the junction table first (v4.6.22+)
+  const junction = await supabase
+    .from('user_locations')
+    .select('role, location_id, locations(id, name, timezone)')
+    .eq('user_id', userId);
+
+  if (!junction.error && junction.data?.length) {
+    return {
+      data: junction.data
+        .filter(r => r.locations)
+        .map(r => ({
+          id: r.locations.id,
+          name: r.locations.name,
+          timezone: r.locations.timezone,
+          role: r.role,
+        })),
+      error: null,
+    };
+  }
+
+  // Fallback for pre-v4.6.22 schemas OR users not yet seeded: read single
+  // location from user_profiles.
+  const profile = await supabase
+    .from('user_profiles')
+    .select('location_id, locations(id, name, timezone)')
+    .eq('id', userId)
+    .single();
+
+  if (profile.data?.locations) {
+    return {
+      data: [{
+        id: profile.data.locations.id,
+        name: profile.data.locations.name,
+        timezone: profile.data.locations.timezone,
+        role: 'manager',
+      }],
+      error: null,
+    };
+  }
+  return { data: [], error: null };
+};
+
+// Fetch closed checks across multiple locations in parallel. Each row is tagged
+// with its source locationId so the Location compare report can group by site.
+export const fetchClosedChecksMultiRange = async (locationIds = [], fromDate, toDate, limit = 2000) => {
+  if (!locationIds?.length) return { data: [], error: null };
+  if (isMock) return { data: [], error: null };
+  try {
+    const results = await Promise.all(locationIds.map(id =>
+      fetchClosedChecksRange(id, fromDate, toDate, limit).then(r => ({
+        id,
+        checks: (r.data || []).map(c => ({ ...c, locationId: id })),
+      }))
+    ));
+    return { data: results.flatMap(r => r.checks), error: null };
+  } catch (err) {
+    return { data: [], error: err };
+  }
+};
