@@ -180,7 +180,27 @@ export default function OrdersHub() {
   const openOrder = (o) => {
     if (o._kind === 'table') { setActiveTableId(o.tableId); setSurface('tables'); }
     else if (o._kind === 'tab') { setSurface('bar'); }
-    else { setSurface('pos'); }
+    else {
+      // Walk-in / takeaway / delivery / counter order — load it back into the
+      // walk-in slot so the POS actually shows the items. Previously this branch
+      // only called setSurface('pos') which left walkInOrder null, so the POS
+      // rendered an empty cart every time.
+      useStore.setState({
+        walkInOrder: {
+          id: `ORD-${(o.ref||'').replace('#','')}`,
+          ref: o.ref,
+          items: o.items || [],
+          sentAt: o.sentAt,
+          total: o.total,
+          isASAP: o.isASAP,
+          collectionTime: o.collectionTime,
+        },
+        customer: o.customer || null,
+        orderType: o.type || 'dine-in',
+        activeTableId: null,
+      });
+      setSurface('pos');
+    }
   };
 
   const showingSections = filter === 'all' && !search && !myOrders;
