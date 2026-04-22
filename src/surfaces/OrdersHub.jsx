@@ -196,7 +196,11 @@ export default function OrdersHub() {
           collectionTime: o.collectionTime,
         },
         customer: o.customer || null,
-        orderType: o.type || 'dine-in',
+        // v4.6.5 follow-up Bug 2 real root cause: the orderQueue-to-list transform at
+        // OrdersHub line 113-125 doesn't include `type` on the outer object — the original
+        // entry is stashed under _raw. Read from _raw.type first so reopened takeaways don't
+        // fall through to the 'dine-in' default.
+        orderType: o._raw?.type || o.type || 'dine-in',
         activeTableId: null,
       });
       setSurface('pos');

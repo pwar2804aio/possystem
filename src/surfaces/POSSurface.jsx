@@ -252,8 +252,15 @@ export default function POSSurface() {
       // and losing the original orderType (Bug 2 downstream).
       const preSelected = (orderType === 'takeaway' || orderType === 'collection' || orderType === 'delivery');
       if (preSelected && customer?.name) {
+        const name = customer.name;
+        const type = orderType;
         setShowCheckout(false);
         sendToKitchen();
+        // v4.6.5 follow-up: clear the POS after send, matching every OrderTypeModal branch
+        // (counter/takeaway/collection/delivery/dine-in/bar). Without this, items stay in
+        // the checkout and the user has no visual cue that the send fired.
+        clearWalkIn();
+        showToast(`${name} — ${type} sent`, 'success');
         return;
       }
       setShowSendModal(true);
