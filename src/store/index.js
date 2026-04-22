@@ -966,8 +966,8 @@ export const useStore = create((set, get) => ({
       status: 'pending',
     };
 
-    // Decrement daily count if set
-    if (item.id) get().decrementDailyCount(item.id);
+    // Decrement daily count if set (respects qty per v4.6.11)
+    if (item.id) get().decrementDailyCount(item.id, qty);
 
     if (activeTableId) {
       // Add to the table's session
@@ -1008,6 +1008,15 @@ export const useStore = create((set, get) => ({
 
   removeItem: (itemUid) => {
     const { activeTableId } = get();
+    // v4.6.11: restore daily count for the removed item (only if it was never sent —
+    // sent items can't be removed via this path, only voided). Look up before mutation.
+    const sourceItems = activeTableId
+      ? (get().tables.find(t => t.id === activeTableId)?.session?.items || [])
+      : (get().walkInOrder?.items || []);
+    const removed = sourceItems.find(i => i.uid === itemUid);
+    if (removed && !removed.voided && removed.status !== 'sent') {
+      get().decrementDailyCount(removed.itemId, -(removed.qty || 1));
+    }
     if (activeTableId) {
       set(s=>({ tables:s.tables.map(t=>{
         if(t.id!==activeTableId||!t.session)return t;
@@ -1022,6 +1031,22 @@ export const useStore = create((set, get) => ({
 
   updateItemQty: (itemUid, delta) => {
     const { activeTableId } = get();
+    // v4.6.11: compute actual qty change first so we can adjust inventory.
+    // The clamp can swallow a portion of delta (e.g. qty=1, delta=-1 → newQty=1,
+    // actual change = 0) so we rely on the observed change, not the requested delta.
+    const sourceItems = activeTableId
+      ? (get().tables.find(t => t.id === activeTableId)?.session?.items || [])
+      : (get().walkInOrder?.items || []);
+    const target = sourceItems.find(i => i.uid === itemUid);
+    let actualChange = 0;
+    if (target && !target.voided) {
+      const newQty = Math.max(1, target.qty + delta);
+      actualChange = newQty - target.qty;
+      if (actualChange !== 0) {
+        get().decrementDailyCount(target.itemId, actualChange);
+      }
+    }
+
     const applyQty = items => {
       const item = items.find(i => i.uid === itemUid);
       if (!item || item.voided) return items;
@@ -1504,17 +1529,48 @@ export const useStore = create((set, get) => ({
       dailyCounts: { ...s.dailyCounts, [itemId]: undefined },
     }));
   },
-  decrementDailyCount: (itemId) => {
+  decrementDailyCount: (itemId, qty = 1) => {
+    // v4.6.11: single source of truth for daily-count adjustments.
+    // qty > 0: item consumed (remaining goes down, auto-86 when crossing to 0)
+    // qty < 0: item returned (remaining goes back up, capped at par — no auto un-86)
+    // Propagates to parent menu item if the child's parent also has a count set
+    // (supports tracking stock on a variant-parent like "House Wine" when children
+    // like "House Wine 175ml" are what actually get ordered).
+    if (!itemId || !qty) return;
+    const state = get();
+    const menuItems = state.menuItems || [];
+    const item = menuItems.find(m => m.id === itemId);
+    const parentId = (item?.parentId || item?.parent_id) || null;
+
+    const ids = [];
+    if (state.dailyCounts[itemId]) ids.push(itemId);
+    if (parentId && state.dailyCounts[parentId]) ids.push(parentId);
+    if (!ids.length) return;
+
     set(s => {
-      const current = s.dailyCounts[itemId];
-      if (!current || current.remaining <= 0) return s;
-      const remaining = current.remaining - 1;
-      const newCounts = { ...s.dailyCounts, [itemId]: { ...current, remaining } };
-      if (remaining <= 0) {
-        get().showToast(`Sold out — auto 86'd`, 'warning');
-        return { dailyCounts: newCounts, eightySixIds: [...s.eightySixIds, itemId] };
+      const newCounts = { ...s.dailyCounts };
+      const newEightySix = [...s.eightySixIds];
+      const soldOutNames = [];
+
+      ids.forEach(id => {
+        const cur = newCounts[id];
+        if (!cur) return;
+        const newRem = Math.max(0, Math.min(cur.par, cur.remaining - qty));
+        newCounts[id] = { ...cur, remaining: newRem };
+
+        // Auto-86 on the transition from positive to zero. Repeated decrements at
+        // 0 don't re-trigger the toast. Restores (qty<0) never un-86 automatically —
+        // that's setDailyCount's job so manual toggle86's aren't clobbered.
+        if (cur.remaining > 0 && newRem <= 0) {
+          if (!newEightySix.includes(id)) newEightySix.push(id);
+          soldOutNames.push(menuItems.find(mi => mi.id === id)?.name || id);
+        }
+      });
+
+      if (soldOutNames.length) {
+        setTimeout(() => get().showToast(`${soldOutNames[0]} sold out — auto 86'd`, 'warning'), 0);
       }
-      return { dailyCounts: newCounts };
+      return { dailyCounts: newCounts, eightySixIds: newEightySix };
     });
   },
 
@@ -1529,6 +1585,12 @@ export const useStore = create((set, get) => ({
   setActiveTab: id => set({ activeTabId:id }),
   addRoundToTab: (tabId, items, note='') => {
     const round = { id:uid(), sentAt:Date.now(), items:items.map(i=>({...i})), subtotal:items.reduce((s,i)=>s+i.price*i.qty,0), note };
+    // v4.6.11: bar rounds deplete daily counts too — previously a bar tab could
+    // sell an item past its stock with no auto-86 triggered.
+    (items || []).forEach(i => {
+      const id = i.itemId || i.id;
+      if (id) get().decrementDailyCount(id, i.qty || 1);
+    });
     set(s=>({ tabs:s.tabs.map(t=>{ if(t.id!==tabId)return t; const rounds=[...t.rounds,round]; return{...t,rounds,status:'running',total:rounds.reduce((s,r)=>s+r.subtotal,0)}; }) }));
     // v4.6.5 Bug 5: bar tab rounds never hit production centres. Now mirrors sendToKitchen
     // so each round fires KDS tickets + print jobs for every centre its items touch.
@@ -1798,6 +1860,11 @@ export const useStore = create((set, get) => ({
     const item  = table?.session?.items?.find(i => i.uid === itemUid);
     if (!item) return;
 
+    // v4.6.11: restore daily count — the voided item is not being consumed.
+    if (item.itemId && !item.voided) {
+      get().decrementDailyCount(item.itemId, -(item.qty || 1));
+    }
+
     // Mark item as voided (keep visible with strikethrough)
     set(s => ({
       tables: s.tables.map(t => {
@@ -1822,6 +1889,11 @@ export const useStore = create((set, get) => ({
     const table  = tables.find(t => t.id === tableId);
     const session = table?.session;
     if (!session) return;
+
+    // v4.6.11: restore daily count for every non-voided item before we void the check.
+    (session.items || []).forEach(i => {
+      if (i.itemId && !i.voided) get().decrementDailyCount(i.itemId, -(i.qty || 1));
+    });
 
     const totalValue = session.items.reduce((s,i) => s+i.price*i.qty, 0);
     set(s => ({

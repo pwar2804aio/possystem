@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.11', date: '22 Apr 2026', label: 'Daily counts now reliably auto-86 — fixes qty, voids, bar rounds, variant parents',
+    changes: [
+      'Fix: decrementDailyCount now respects qty. Previously it decremented by 1 regardless of how many the user ordered in one tap, so qty-3 orders silently undercounted and the item could appear to stay in stock after actually being sold out. Signature is now (itemId, qty=1) and qty can be negative to restore.',
+      'Fix: Bar tab rounds now deplete inventory. addRoundToTab was adding items to the tab without ever calling decrementDailyCount, so drinks sold via the bar tab flow didn\'t count toward par and couldn\'t auto-86.',
+      'Fix: The +/- qty buttons on the POS cart now adjust inventory by the actual qty change. Previously they mutated item.qty locally without touching the count — 5 ribeyes at 1x that got bumped to 2x looked like 5 more were sold on the KDS side but inventory said 5 still available.',
+      'Fix: removing an unsent item from the order now restores its daily count. Previously the decrement was permanent even if the guest changed their mind before Send.',
+      'Fix: voidItem and voidCheck restore daily count for every non-voided item being voided. Voids mean the food isn\'t being consumed — inventory should reflect that.',
+      'Feature: variant-parent propagation. If the user tracks a daily count on a parent menu item (e.g. "House Wine") and a variant child is sold (e.g. "House Wine 175ml"), both the child count (if set) and the parent count now decrement. On cross-to-zero, both get auto-86\'d.',
+      'Note on un-86: auto-un-86 only happens when a user explicitly sets a new daily count via setDailyCount. Restoring count via void/remove does NOT auto-un-86 — preserves manual toggle86 decisions made by staff.',
+    ],
+  },
+  {
     version: '4.6.10', date: '22 Apr 2026', label: 'Hide modifier group name everywhere — POS, checkout, KDS, production dockets',
     changes: [
       'Change: Modifier lines no longer show the "Group: " prefix. Previously a modifier like Peppercorn picked from the Sauce group rendered as "Sauce: Peppercorn"; now it renders as just "Peppercorn" — on the POS order list, in the CheckoutModal review, on the KDS ticket, and on the physical kitchen docket. Receipt output was already showing m.label without the prefix so no change there.',
