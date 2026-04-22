@@ -1265,7 +1265,15 @@ export const useStore = create((set, get) => ({
       const queueEntry = {
         ref, type: orderType,
         customer: customer ? { ...customer } : { name: customer?.name || label },
-        items: order.items.filter(i => !i.voided),
+        // v4.6.5 follow-up: align with dine-in visual semantics. Table sessions persist
+        // the fired+sent mutation on their items until payment, so reopening a table shows
+        // them green. Walk-ins had the same mutation applied to walkInOrder but clearWalkIn()
+        // wipes it immediately — and the queueEntry (the only persistent record OrdersHub can
+        // rehydrate from) was capturing items pre-mutation, so reopens rendered them as
+        // pending (not green). Apply the same mutation here so reopens show them sent/green.
+        items: order.items.filter(i => !i.voided).map(i =>
+          [0, 1].includes(i.course ?? 1) ? { ...i, fired: true, status: 'sent' } : i
+        ),
         total: order.items.reduce((s, i) => s + i.price * i.qty, 0),
         status: 'prep', createdAt: order.createdAt || Date.now(), sentAt: Date.now(),
         collectionTime: customer?.collectionTime, isASAP: customer?.isASAP, staff: staff?.name,
