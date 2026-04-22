@@ -9,6 +9,7 @@
  */
 
 import { supabase, isMock, LOCATION_ID } from './supabase';
+import { applyQueueRealtimeEvent, applyTabRealtimeEvent } from '../sync/QueueSync';
 
 let channels = [];
 
@@ -206,7 +207,25 @@ export function startRealtime(store, locationId = LOCATION_ID) {
     })
     .subscribe();
 
-  channels = [kdsChannel, e86Channel, configChannel, taxChannel, sessionsChannel, checksChannel];
+  // ── v4.6.5 Bug 4: Walk-in / takeaway / delivery orders — cross-device sync ──
+  const queueChannel = supabase
+    .channel(`order_queue:${locationId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'order_queue', filter: `location_id=eq.${locationId}` }, (payload) => {
+      if (payload.eventType === 'DELETE' && payload.old?.location_id && payload.old.location_id !== locationId) return;
+      applyQueueRealtimeEvent(payload);
+    })
+    .subscribe();
+
+  // ── v4.6.5 Bug 4: Bar tabs — cross-device sync ──────────────────────────────
+  const tabsChannel = supabase
+    .channel(`bar_tabs:${locationId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bar_tabs', filter: `location_id=eq.${locationId}` }, (payload) => {
+      if (payload.eventType === 'DELETE' && payload.old?.location_id && payload.old.location_id !== locationId) return;
+      applyTabRealtimeEvent(payload);
+    })
+    .subscribe();
+
+  channels = [kdsChannel, e86Channel, configChannel, taxChannel, sessionsChannel, checksChannel, queueChannel, tabsChannel];
 
   return () => {
     channels.forEach(ch => supabase.removeChannel(ch));

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase, isMock, getLocationId } from '../lib/supabase';
 import { calculateOrderTax } from '../lib/tax';
 import { resolveServiceCharge } from '../lib/serviceCharge';
-import { upsertMenuItem, upsertFloorTable, insertKDSTicket, insertClosedCheck, toggle86DB } from '../lib/db';
+import { upsertMenuItem, upsertFloorTable, deleteFloorTable, insertKDSTicket, insertClosedCheck, toggle86DB } from '../lib/db';
 import { printService } from '../lib/printer';
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
@@ -717,9 +717,11 @@ export const useStore = create((set, get) => ({
     set(s => ({ tables: [...s.tables, newTable] }));
     upsertFloorTable(newTable);
   },
-  removeTableFromLayout: (id) => set(s => ({
-    tables: s.tables.filter(t => t.id!==id && t.parentId!==id)
-  })),
+  removeTableFromLayout: (id) => {
+    set(s => ({ tables: s.tables.filter(t => t.id!==id && t.parentId!==id) }));
+    // v4.6.5 Bug 6: previously removed from local state only, so it re-appeared on every boot.
+    deleteFloorTable(id).catch(e => console.warn('[removeTableFromLayout] DB delete failed:', e?.message || e));
+  },
 
   // ── Tables (source of truth for all orders) ──────────
   tables: isMock ? buildInitialTables() : [],
@@ -1238,6 +1240,26 @@ export const useStore = create((set, get) => ({
       const pendingItems = order.items.filter(i => i.status === 'pending' && !i.voided);
       const label = customer?.name ? `${orderType.charAt(0).toUpperCase()+orderType.slice(1)} · ${customer.name}` : orderType;
       const newTickets = createKdsTickets(pendingItems, label, staff?.name || 'Server', 1);
+      // v4.6.5 Bug 3: walk-in / takeaway / collection / delivery orders must ALSO route
+      // print jobs to each production centre. Previously only the table branch did this,
+      // so non-table orders only hit the KDS screen and silently skipped every printer.
+      const printConfig = getRoutingConfig();
+      const getCentrePrinter = (centreId) => {
+        const centre = printConfig.centres?.find(c => c.id === centreId);
+        return centre?.printer?.name || centre?.name || { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' }[centreId] || 'Kitchen';
+      };
+      newTickets.forEach(t => {
+        if (t.items.length) get().routePrintJob({
+          centreId: t.centreId,
+          printerName: getCentrePrinter(t.centreId),
+          tableLabel: t.table,
+          server: t.server,
+          covers: t.covers,
+          course: t.firedCourses?.[0] ?? 1,
+          items: t.items,
+          type: 'kitchen',
+        });
+      });
       // Always add walk-in orders to queue so they appear in Orders Hub
       const ref = order.ref || `#${++_orderNum}`;
       const queueEntry = {
@@ -1465,6 +1487,99 @@ export const useStore = create((set, get) => ({
   addRoundToTab: (tabId, items, note='') => {
     const round = { id:uid(), sentAt:Date.now(), items:items.map(i=>({...i})), subtotal:items.reduce((s,i)=>s+i.price*i.qty,0), note };
     set(s=>({ tabs:s.tabs.map(t=>{ if(t.id!==tabId)return t; const rounds=[...t.rounds,round]; return{...t,rounds,status:'running',total:rounds.reduce((s,r)=>s+r.subtotal,0)}; }) }));
+    // v4.6.5 Bug 5: bar tab rounds never hit production centres. Now mirrors sendToKitchen
+    // so each round fires KDS tickets + print jobs for every centre its items touch.
+    try {
+      const state = get();
+      const tab = state.tabs.find(t => t.id === tabId) || { name: 'Bar tab' };
+      const staffName = state.staff?.name || 'Server';
+      const label = `Bar · ${tab.name || tabId}`;
+      const getRoutingConfig = () => {
+        try {
+          const stored = state.printRouting;
+          if (stored?.centres?.length) return stored;
+          return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres: [], routing: {} };
+        } catch { return { centres: [], routing: {} }; }
+      };
+      const routingConfig = getRoutingConfig();
+      const centres = routingConfig.centres || [];
+      const routing = routingConfig.routing || {};
+      const parentMap = (() => {
+        try {
+          const snap = JSON.parse(localStorage.getItem('rpos-config-snapshot') || '{}');
+          const cats = snap.menuCategories || state.menuCategories || [];
+          const m = {}; cats.forEach(c => { m[c.id] = c.parentId || null; }); return m;
+        } catch { return {}; }
+      })();
+      const catOrAncestor = (catId, set, depth=0) => {
+        if (!catId || depth > 5) return false;
+        if (set.has(catId)) return true;
+        return catOrAncestor(parentMap[catId], set, depth + 1);
+      };
+      const allMenuItems = state.menuItems || [];
+      const centresForItem = (item) => {
+        if (!centres.length) return [];
+        const mi = allMenuItems.find(i => i.id === (item.itemId || item.id));
+        const itemCat = item.cat || item.cats?.[0] || mi?.cat || mi?.cats?.[0] || null;
+        const parentCat = (mi?.parentId ? allMenuItems.find(i => i.id === mi.parentId)?.cat : null) || null;
+        const matched = [];
+        centres.forEach(c => {
+          const r = routing[c.id];
+          if (!r?.assignedCategories?.length) return;
+          if (r.excludedItems?.includes(item.id) || r.excludedItems?.includes(item.itemId)) return;
+          const set = new Set(r.assignedCategories);
+          if ((itemCat && catOrAncestor(itemCat, set)) || (parentCat && catOrAncestor(parentCat, set))) matched.push(c.id);
+        });
+        return matched;
+      };
+      const byCentre = {};
+      items.forEach(it => {
+        if (it.voided) return;
+        centresForItem(it).forEach(cid => {
+          if (!byCentre[cid]) byCentre[cid] = [];
+          byCentre[cid].push(it);
+        });
+      });
+      const getCentrePrinter = (cid) => {
+        const c = centres.find(x => x.id === cid);
+        return c?.printer?.name || c?.name || { pc1:'Hot kitchen', pc2:'Cold section', pc3:'Pizza oven', pc4:'Bar', pc5:'Expo / pass' }[cid] || 'Kitchen';
+      };
+      const newTickets = Object.entries(byCentre).map(([centreId, centreItems]) => ({
+        id: `kds-${Date.now()}-${centreId}-${Math.random().toString(36).slice(2,6)}`,
+        table: label, server: staffName, covers: 1, centreId,
+        sentAt: Date.now(), minutes: 0,
+        firedCourses: [0, 1], allCourses: [1],
+        items: centreItems.map(i => ({
+          qty: i.qty,
+          name: i.kitchenName || i.menu_name || i.menuName || i.name,
+          mods: [
+            ...(i.mods?.filter(m => !m._instruction).map(m => m.groupLabel ? `${m.groupLabel}: ${m.name || m.label}` : (m.name || m.label)).filter(Boolean) || []),
+            ...(i.mods?.filter(m => m._instruction).map(m => m.label).filter(Boolean) || []),
+            ...(i.notes ? [`📝 ${i.notes}`] : []),
+            ...(note ? [`📝 ${note}`] : []),
+          ],
+          course: i.course ?? 1,
+          fired: true,
+          centreId, uid: i.uid,
+        })),
+      }));
+      if (newTickets.length) {
+        set(s => ({ kdsTickets: [...s.kdsTickets, ...newTickets] }));
+        newTickets.forEach(t => {
+          insertKDSTicket(t);
+          if (t.items.length) state.routePrintJob?.({
+            centreId: t.centreId,
+            printerName: getCentrePrinter(t.centreId),
+            tableLabel: t.table,
+            server: t.server,
+            covers: t.covers,
+            course: 1,
+            items: t.items,
+            type: 'kitchen',
+          });
+        });
+      }
+    } catch (e) { console.warn('[addRoundToTab] KDS/print dispatch failed:', e?.message || e); }
     return round;
   },
   updateTabNote: (tabId,note) => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,note}:t) })),

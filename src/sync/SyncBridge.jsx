@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { subscribeToSessions, scheduleFlush, teardown as teardownSessions } from './SessionSync';
+import { loadQueues, scheduleQueueFlush, teardownQueueSync } from './QueueSync';
 import { initOfflineQueue } from './OfflineQueue';
 import { isMock, supabase } from '../lib/supabase';
 import { startSessionReconciler, stopSessionReconciler } from './SessionReconciler';
@@ -132,7 +133,17 @@ export default function SyncBridge({ onSyncPulse }) {
             // Build tables with sessions already applied — never flash as empty
             const tables = floorRes.data.tables.map(t => {
               const session = sessionMap[t.id] || null;
-              return { ...t, status: session ? 'occupied' : 'available', session, firedCourses: session?.firedCourses || [], sentAt: session?.sentAt || null };
+              // v4.6.5 Bug 6: floor_tables uses snake_case (max_covers, sort_order) but every
+              // TablesSurface read expects camelCase (maxCovers). Rename on hydration.
+              return {
+                ...t,
+                maxCovers: t.max_covers ?? t.maxCovers ?? 4,
+                sortOrder: t.sort_order ?? t.sortOrder ?? 0,
+                status: session ? 'occupied' : 'available',
+                session,
+                firedCourses: session?.firedCourses || [],
+                sentAt: session?.sentAt || null,
+              };
             });
             patch.tables = tables;
           }
@@ -349,6 +360,16 @@ export default function SyncBridge({ onSyncPulse }) {
       if (meaningful) scheduleFlush();
     }) : () => {};
 
+    // v4.6.5 Bug 4: Write walk-in orderQueue and bar tabs to Supabase too, so they
+    // sync across devices the same way table sessions already do.
+    const unsubQueues = !isMock ? useStore.subscribe((state, prev) => {
+      if (state.orderQueue !== prev.orderQueue || state.tabs !== prev.tabs) {
+        scheduleQueueFlush();
+      }
+    }) : () => {};
+
+    if (!isMock) loadQueues();
+
     const unsub = useStore.subscribe((state, prev) => {
       if (isApplyingRef.current) return;
       const changed = {};
@@ -387,7 +408,7 @@ export default function SyncBridge({ onSyncPulse }) {
       }, 80);
     });
 
-    return () => { clearTimeout(timer); channelInstance?.close(); channelInstance = null; unsub(); unsubSessions(); stopSessionReconciler(); if (!isMock) teardownSessions(); };
+    return () => { clearTimeout(timer); channelInstance?.close(); channelInstance = null; unsub(); unsubSessions(); unsubQueues(); stopSessionReconciler(); if (!isMock) { teardownSessions(); teardownQueueSync(); } };
   }, []);
 
   return null;
