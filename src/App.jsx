@@ -59,6 +59,33 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.5', date: '22 Apr 2026', label: 'Cross-device sync for walk-ins + bar tabs, print routing on every send path, floor plan actually persists',
+    changes: [
+      'Fix (Bug 1): POS Takeaway > Send no longer opens the choose-order-type modal a second time. handleSend in POSSurface now detects that orderType is already takeaway/collection/delivery AND customer details are filled, and calls sendToKitchen() directly. Previously the unconditional setShowSendModal(true) forced the user through OrderTypeModal again.',
+      'Fix (Bug 2): Reopening a queued takeaway/collection/delivery order no longer defaults to dine-in. This was a downstream symptom of Bug 1 — when the send modal forced a re-pick, the queueEntry.type written was whatever the user clicked in the modal, not the type they originally set. With Bug 1 fixed, orderType flows cleanly from initial pick to queueEntry to OrdersHub.openOrder.',
+      'Fix (Bug 3): Walk-in / takeaway / collection / delivery orders now route print jobs to every production centre their items touch. Previously the walk-in branch of sendToKitchen created KDS tickets but did NOT call routePrintJob — only the table branch did. A takeaway order with food + drinks would show on the KDS but kitchen and bar printers stayed silent.',
+      'Fix (Bug 4): Walk-in orderQueue and bar tabs now sync between devices. Previously SyncBridge put them in SHARED_KEYS but that only uses BroadcastChannel (same browser) and localStorage (same device). active_sessions handled table orders but nothing handled the rest. New QueueSync.js mirrors SessionSync for state.orderQueue + state.tabs, new migration creates order_queue + bar_tabs tables with REPLICA IDENTITY FULL and realtime publication, realtime.js subscribes to INSERT/UPDATE/DELETE events, SyncBridge boot-loads existing rows and hooks up write-on-change. REQUIRES running migrations/2026-04-22-order-queue-bar-tabs-sync.sql on Ops Supabase (already done as part of this release).',
+      'Fix (Bug 5): Bar tab rounds now fire KDS tickets and print jobs per production centre. Previously addRoundToTab only appended to local tab state — no KDS ticket, no printer dispatch. Bartenders were pouring drinks the kitchen never saw. addRoundToTab now mirrors sendToKitchen: looks up routing config, buckets items by centre, creates KDS tickets, inserts to Supabase, and calls routePrintJob per centre.',
+      'Fix (Bug 6a): Floor plan saves actually persist now. upsertFloorTable was spreading the whole table object including runtime-only fields (status, session, firedCourses) AND camelCase maxCovers — but the floor_tables column is max_covers. PostgREST rejects payloads with unknown columns so every add/update was silently failing. B8 persisted only because it was seeded directly. Rewrote upsertFloorTable to project only real columns and rename maxCovers to max_covers.',
+      'Fix (Bug 6b): removeTableFromLayout now deletes the row from Supabase. Previously it filtered local state only, so deleted tables reappeared on every boot when SyncBridge re-hydrated.',
+      'Fix (Bug 6c): SyncBridge hydration now maps max_covers to maxCovers (and sort_order to sortOrder) when loading floor_tables into the tables array. TablesSurface reads table.maxCovers in 10+ places; without the mapping the UI was reading undefined even when the rows were correctly persisted.',
+      'Chore: missing changelog entries for v4.6.3 and v4.6.4 backfilled below.',
+    ],
+  },
+  {
+    version: '4.6.4', date: '21 Apr 2026', label: 'Cash-off reopened queued order: reuse ref, drop queue entry',
+    changes: [
+      'Fix: recordWalkInClosed in store/index.js was generating a new random ref whenever it saw a walk-in being cashed off, and was not removing the corresponding entry from orderQueue. Cashing off a reopened queued order (e.g. #6720 from OrdersHub) created a DIFFERENT closed_check with a random ref AND left the original queue entry intact. Re-cashing made another duplicate each time. Fix at index.js:1571 reuses walkInOrder.ref when it exists and removes the matching ref from orderQueue inside the same set() call, so closedChecks append and orderQueue filter happen atomically.',
+    ],
+  },
+  {
+    version: '4.6.3', date: '21 Apr 2026', label: 'Open on queued walk-in loaded items; bar-tab name input visible',
+    changes: [
+      'Fix: OrdersHub.openOrder else-branch (non-table, non-tab: walk-in / takeaway / delivery / counter) was only calling setSurface(\"pos\") — it never populated walkInOrder, customer, or orderType. The POS rendered an empty cart every time even though the queued order had items. Now calls useStore.setState() with the queued data before navigating. Diagnosis used the React-fiber store inspection trick: traversing document.getElementById(\"root\")[__reactContainer$] found the live Zustand state and showed walkInOrder:null, orderQueue intact with items — proving the bug was in the Open handler not the data.',
+      'Fix: Bar tab name input in OrderTypeModal tab_pick step was collapsing to ~26px square next to Open button. Root cause: the base inp style has width:100%, and when merged with flex:1 for that specific input, width:100% fought flex sizing and the browser collapsed to padding-width. Added width:auto, minWidth:0 to the inline style override at OrderTypeModal.jsx:321 so flex can size it freely.',
+    ],
+  },
+  {
     version: '4.6.2', date: '21 Apr 2026', label: 'Kitchen docket TABLE line: centered + single line (was right-aligned + wrapped)',
     changes: [
       'Fix: buildKitchenTicket rendered the “TABLE X” line using centeredLine() which builds its padding from spaces to reach the full 42-column paper width. That works fine in normal character size, but the kitchen docket runs the TABLE line in doubleBoth() mode — every character (including the padding spaces) prints at double physical width. 42 logical cols of padded content became ~50 physical cols on 80 mm paper, overflowing the right edge and wrapping to a second line, so the table number looked shoved-right and broken across two rows.',
