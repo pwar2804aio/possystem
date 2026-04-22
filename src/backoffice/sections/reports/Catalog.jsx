@@ -7,11 +7,12 @@ export const CATEGORIES = [
     id: 'sales', label: 'Sales reports', icon: '📈',
     description: 'Net and gross sales, products, staff and shift performance.',
     reports: [
-      { id:'summary',  label:'Business summary', desc:'Period stats with compare chips + net/gross ladder' },
-      { id:'items',    label:'Product mix',      desc:'Items ranked by qty sold and revenue' },
-      { id:'shifts',   label:'Shifts',           desc:'Business-day shifts with per-server sessions', badge:'new' },
-      { id:'servers',  label:'Staff sales',      desc:'Revenue, covers and avg check by server' },
-      { id:'daypart',  label:'Daypart',          desc:'Hour × day-of-week revenue heatmap' },
+      { id:'summary',   label:'Business summary', desc:'Period stats with compare chips + net/gross ladder' },
+      { id:'items',     label:'Product mix',      desc:'Items, categories, modifiers and 86\'d — with time of day', badge:'new' },
+      { id:'menu_eng',  label:'Menu engineering', desc:'Stars / Plow Horses / Puzzles / Dogs 2×2 matrix', badge:'new' },
+      { id:'shifts',    label:'Shifts',           desc:'Business-day shifts with per-server sessions' },
+      { id:'servers',   label:'Staff sales',      desc:'Revenue, covers and avg check by server' },
+      { id:'daypart',   label:'Daypart',          desc:'Hour × day-of-week revenue heatmap' },
     ],
   },
   {

@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.17', date: '22 Apr 2026', label: 'Reports wave 3 — Product mix rebuild (items / categories / modifiers / 86\'d) + Menu engineering 2×2',
+    changes: [
+      'New: Product mix report replaces the legacy single-table version with four sub-tabs. Items: top 100 rows with qty, revenue, share %, and a time-of-day stacked bar per item (morning / lunch / afternoon / dinner / late) so you can see which items sell when. Categories: groups by category id from the cart item, shows unique items per category, total qty, revenue and share — category label pulled from menuCategories. Modifiers: every modifier flattened from item.mods across the period, shown with times used, revenue contributed, and attach rate (modifier uses ÷ total items sold — surfaces natural upsell candidates).',
+      'New: 86\'d sub-tab under Product mix. Two sections: (1) currently 86\'d items pulled from the live eightySixIds store, tagged with their category, and (2) dormant items — menu items that are still active but had zero sales in the selected period. Dormant list is capped to 100 for scroll sanity; CSV export has the full set. Candidates for repricing, repositioning or cutting.',
+      'New: Menu engineering report under Sales reports. Classic Kasavana–Smith 2×2: x-axis popularity (units sold), y-axis contribution (average price per unit as a proxy until item cost is captured on menu_items). Medians split items into Stars / Plow Horses / Puzzles / Dogs. Output includes a full SVG scatter chart with each item as a dot sized by √revenue (keeps a couple of huge sellers from dominating), tooltips on hover, and four quadrant tables below listing the top 12 items in each with action text (Stars: promote, Plow Horses: reengineer pricing, Puzzles: reposition, Dogs: cut).',
+      'UX: Every sub-tab in Product mix has its own CSV export. Menu engineering exports all items with their quadrant classification in one CSV for analysis in a spreadsheet.',
+      'Catalog update: Sales reports card now lists Business summary, Product mix (now new), Menu engineering (new), Shifts, Staff sales, Daypart — in that order. Both Product mix and Menu engineering show the NEW badge.',
+      'Data model note: Menu engineering\'s y-axis switches from avg price to real contribution margin (price − cost) as soon as cost lands on menu_items. Rest of the report is unchanged when that happens.',
+      'Internal: reports/ProductMix.jsx (14kB) and reports/MenuEngineering.jsx (11kB) added. BOReports.jsx routes items → ProductMix and menu_eng → MenuEngineering. LegacyPMix function left in place as dead code pending cleanup.',
+    ],
+  },
+  {
     version: '4.6.16', date: '22 Apr 2026', label: 'Reports wave 2 — catalog landing page + Shifts report',
     changes: [
       'UX: Reports now open to a catalog landing page grouped by category (Sales / Exceptions & discounts / Fiscal / Orders / Location) instead of a long tab bar. Matches the reference design — each category card lists its reports with a one-line description; clicking a report opens it as a dedicated view with a breadcrumb and "← Back to reports" link. Scales cleanly as we add more reports in waves 3 and 4.',
