@@ -44,7 +44,8 @@ function OpenTabModal({ onConfirm, onCancel }) {
   const busySeatIds = new Set((tabs||[]).filter(t=>t.status!=='closed'&&t.tableId).map(t=>t.tableId));
   const barSeats = (tables||[]).filter(t=>t.section==='bar').map(t=>({
     id: t.id, label: t.label || String(t.id).toUpperCase(), busy: busySeatIds.has(t.id),
-  }));
+  })).sort((a,b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
+  // ^ natural sort so B1, B2, ..., B10 display in expected order (not B1, B10, B2).
   const openTables = tables.filter(t=>t.section==='bar' && (t.status==='open'||t.status==='available'));
 
   return (
