@@ -1513,10 +1513,26 @@ export const useStore = create((set, get) => ({
   // ── Daily counts / par levels ──────────────────────────────────────────────
   dailyCounts: {},
   setDailyCount: (itemId, count) => {
-    const n = parseInt(count);
-    if (!n || n <= 0) return;
+    // v4.6.27: setting count to 0 now means '86 this item immediately'. Previously
+    // the function bailed early on 0, which silently ignored the user. Invalid input
+    // (NaN, negative, empty string) still noops so UI text clearing doesn't nuke state.
+    const raw = typeof count === 'string' ? count.trim() : count;
+    if (raw === '' || raw === null || raw === undefined) return;
+    const n = parseInt(raw, 10);
+    if (Number.isNaN(n) || n < 0) return;
+
+    if (n === 0) {
+      // 86 the item and clear any existing daily count so next sale is blocked.
+      set(s => ({
+        dailyCounts: Object.fromEntries(Object.entries(s.dailyCounts).filter(([k]) => k !== itemId)),
+        eightySixIds: s.eightySixIds.includes(itemId) ? s.eightySixIds : [...s.eightySixIds, itemId],
+      }));
+      return;
+    }
+
     set(s => {
-      // Un-86 if previously auto-86'd from count
+      // Un-86 if previously auto-86'd from count (or manually 86'd — a positive par
+      // means the operator is restocking, so it's safe to un-86 as before)
       const was86 = s.eightySixIds.includes(itemId);
       return {
         dailyCounts: { ...s.dailyCounts, [itemId]: { par: n, remaining: n } },
