@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.31', date: '23 Apr 2026', label: 'Petty cash ledger page (part 2 of 2)',
+    changes: [
+      'New back-office section: Petty cash. Analytics group, between End of day and Tax & VAT. Lists every cash drawer event with a running balance. Cash sales are captured automatically from 4.6.30; manual entries (float, drop, expense, adjustment) can be added from a modal on this page.',
+      'Each entry shows type, amount (signed), reason, staff, timestamp, and optional ref + note. Running balance at the top is the signed sum of entries in the current filter. Entries can be filtered by date (today, last 7 days, all time) and by type.',
+      'A manual Open drawer button on the page pulses the printer for a no-money drawer open, logged as drawer_open (neutral, does not affect balance). Useful for makeup change or cash swaps during service.',
+      'Sign convention: cash_sale +amount, float +amount, adjustment +amount, drop -amount, expense -amount, drawer_open 0. The running total is always the float plus sales minus drops and expenses since the filter start.',
+      'Still coming: (1) Open drawer button in the POS header itself so front-of-house staff do not need to leave the till surface. (2) Manager/admin permission gate on drawer opens. (3) EOD cash reconciliation report comparing declared drawer to ledger balance.',
+    ],
+  },
+  {
     version: '4.6.30', date: '23 Apr 2026', label: 'Cash drawer — auto-fire on cash payment + petty cash ledger (part 1 of 2)',
     changes: [
       'Printer config gains a Cash drawer attached toggle. Back Office > Printers > edit any printer — new section under Used for. Persists in the printers.meta jsonb column so it survives Push to POS and cross-device sync.',

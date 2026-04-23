@@ -22,6 +22,7 @@ import NetworkStatus from './sections/NetworkStatus';
 import LocationSettings from './sections/LocationSettings';
 import ReceiptBranding from './sections/ReceiptBranding';
 import TaxManager from './sections/TaxManager';
+import PettyCash from './sections/PettyCash';
 
 const NAV = [
   { id:'overview',   label:'Overview',        icon:'◈',  group:'Dashboard' },
@@ -35,6 +36,7 @@ const NAV = [
   { id:'printing',   label:'Production printing',   icon:'🖨',  group:'Configuration' },
   { id:'reports',    label:'Reports',           icon:'📊',  group:'Analytics' },
   { id:'eod',        label:'End of day',        icon:'🔒',  group:'Analytics' },
+  { id:'pettycash',  label:'Petty cash',        icon:'\u{1F4B0}', group:'Analytics' },
   { id:'tax',        label:'Tax & VAT',          icon:'%',   group:'Analytics' },
   { id:'ai',         label:'AI Assistant',      icon:'✦',   group:'Analytics' },
   { id:'network',    label:'Network & Sync',     icon:'📡',  group:'Analytics' },
@@ -340,6 +342,7 @@ export default function BackOfficeApp() {
           {section === 'printing'   && <PrintRouting />}
           {section === 'reports'    && <BOReports />}
           {section === 'eod'        && <EODClose />}
+          {section === 'pettycash'  && <PettyCash />}
           {section === 'admin'       && <CompanyAdmin />}
           {section === 'ai'         && <AIAssistantSection />}
           {section === 'network'     && <NetworkStatus />}
