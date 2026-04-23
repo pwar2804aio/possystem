@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.28', date: '23 Apr 2026', label: 'Combine tables + fire kitchen alert on move/combine',
+    changes: [
+      'Table move modal now supports combining two occupied tables as well as transferring to an empty one. Open table > header menu > Move / Combine (renamed from Transfer table). Empty destinations show green, occupied destinations show amber. Picking an empty table still transfers as before; picking an occupied table combines the two sessions onto the destinations check (items appended, covers summed, subtotal/total recomputed). The source table is freed in both cases.',
+      'Kitchen alert on move or combine. If the source table had any items already sent to the kitchen, a transfer-notice docket is fired to every production centre that saw any of those items. The docket prints the source table, destination table, server, and the list of items now at the new location. Uses a new buildTransferNoticeTicket in lib/printer.js and a new printTransferNoticeTicket method on printService, following the same pattern as the fire-course marker. Routing uses the existing routePrintJob pipeline with type=transfer-notice, so it respects the same idempotency keys, retry logic and offline queue.',
+      'Previously the transferTable store action silently required the destination to be empty, and if you passed an occupied destination it overwrote that tables session wholesale, losing every item on it. It also produced no kitchen alert. Both of those are now fixed. transferTable returns normally for empty destinations and handles combine for occupied destinations.',
+      'No behaviour change for edit covers. No change to the child table split flow (that still uses splitTableCheck).',
+    ],
+  },
+  {
     version: '4.6.27', date: '23 Apr 2026', label: 'Stop tables losing data: safe merge for cross-tab/cross-device broadcast sync',
     changes: [
       'Root cause of spontaneous data loss on tables: SyncBridge was doing useStore.setState(msg.data) when it received a broadcast from another tab or device. That replaced the whole tables array with the senders view, which wiped out items the local operator had added but not yet broadcast. The invariants doc literally said the receiver should only apply non-layout fields from broadcasts — but that was never actually implemented. Now implemented.',

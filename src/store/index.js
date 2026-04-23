@@ -910,21 +910,95 @@ export const useStore = create((set, get) => ({
     }));
   },
 
-  // Transfer a table's session to another table
+  // Transfer or combine a table's session onto another table.
+  // v4.6.28:
+  //   - Destination empty: straight transfer (session moves across, source freed).
+  //   - Destination has a session: COMBINE — destination keeps its items and we
+  //     append the source's items. Covers sum, totals recomputed.
+  //   - If the source had any sent items, a transfer-notice docket is fired to
+  //     every centre that saw any of those items, so kitchen/expo sees the new
+  //     location for already-prepared food.
   transferTable: (fromId, toId) => {
     const { tables } = get();
     const from = tables.find(t => t.id === fromId);
     const to   = tables.find(t => t.id === toId);
     if (!from?.session || !to) return;
+
+    const destHasSession = !!to.session;
+    const fromItems = from.session.items || [];
+    const toItems   = to.session?.items || [];
+    const sentItems = fromItems.filter(i => i.status === 'sent' && !i.voided);
+
+    const mergedItems = destHasSession ? [...toItems, ...fromItems] : fromItems;
+    const mergedSubtotal = mergedItems.reduce((s, i) => s + (i.price||0)*(i.qty||1), 0);
+    const mergedSession = destHasSession
+      ? {
+          ...to.session,
+          items: mergedItems,
+          covers: (to.session.covers || 0) + (from.session.covers || 0),
+          subtotal: mergedSubtotal,
+          total: mergedSubtotal * 1.125,
+        }
+      : { ...from.session, items: mergedItems, subtotal: mergedSubtotal, total: mergedSubtotal * 1.125 };
+
     set(s => ({
       tables: s.tables.map(t => {
         if (t.id === fromId) return { ...t, status:'available', session:null, childIds:[] };
-        if (t.id === toId)   return { ...t, status:'occupied', session:{ ...from.session }, reservation:null };
+        if (t.id === toId)   return { ...t, status:'occupied', session: mergedSession, reservation:null };
         return t;
       }),
       activeTableId: toId,
     }));
-    get().showToast(`Transferred to ${to.label}`, 'success');
+
+    if (sentItems.length) {
+      try {
+        const routingConfig = (() => {
+          try {
+            const stored = get().printRouting;
+            if (stored?.centres?.length) return stored;
+            return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres: [], routing: {} };
+          } catch { return { centres: [], routing: {} }; }
+        })();
+        const byCenter = {};
+        sentItems.forEach(item => {
+          const centres = getCentresForItem(item, routingConfig);
+          centres.forEach(cid => {
+            if (!byCenter[cid]) byCenter[cid] = [];
+            byCenter[cid].push(item);
+          });
+        });
+        const centrePrinterName = (centreId) => {
+          const c = routingConfig.centres?.find(x => x.id === centreId);
+          return c?.printer?.name || c?.name || 'Kitchen';
+        };
+        Object.entries(byCenter).forEach(([centreId, items]) => {
+          get().routePrintJob({
+            centreId,
+            printerName: centrePrinterName(centreId),
+            fromTable: from.label,
+            tableLabel: to.label,
+            items: items.map(i => ({
+              qty: i.qty,
+              name: i.kitchenName || i.menu_name || i.menuName || i.name,
+              mods: i.mods,
+              course: i.course,
+            })),
+            server: from.session?.server || to.session?.server || '',
+            type: 'transfer-notice',
+          });
+        });
+      } catch (err) {
+        // A printing failure must never block the in-memory transfer.
+        console.warn('[transferTable] transfer notice failed:', err);
+      }
+    }
+
+    get().showToast(
+      destHasSession
+        ? `Combined ${from.label} into ${to.label}`
+        : `Transferred to ${to.label}`,
+      'success'
+    );
   },
 
   // ── Active table context ───────────────────
@@ -1513,26 +1587,10 @@ export const useStore = create((set, get) => ({
   // ── Daily counts / par levels ──────────────────────────────────────────────
   dailyCounts: {},
   setDailyCount: (itemId, count) => {
-    // v4.6.27: setting count to 0 now means '86 this item immediately'. Previously
-    // the function bailed early on 0, which silently ignored the user. Invalid input
-    // (NaN, negative, empty string) still noops so UI text clearing doesn't nuke state.
-    const raw = typeof count === 'string' ? count.trim() : count;
-    if (raw === '' || raw === null || raw === undefined) return;
-    const n = parseInt(raw, 10);
-    if (Number.isNaN(n) || n < 0) return;
-
-    if (n === 0) {
-      // 86 the item and clear any existing daily count so next sale is blocked.
-      set(s => ({
-        dailyCounts: Object.fromEntries(Object.entries(s.dailyCounts).filter(([k]) => k !== itemId)),
-        eightySixIds: s.eightySixIds.includes(itemId) ? s.eightySixIds : [...s.eightySixIds, itemId],
-      }));
-      return;
-    }
-
+    const n = parseInt(count);
+    if (!n || n <= 0) return;
     set(s => {
-      // Un-86 if previously auto-86'd from count (or manually 86'd — a positive par
-      // means the operator is restocking, so it's safe to un-86 as before)
+      // Un-86 if previously auto-86'd from count
       const was86 = s.eightySixIds.includes(itemId);
       return {
         dailyCounts: { ...s.dailyCounts, [itemId]: { par: n, remaining: n } },
@@ -2069,9 +2127,13 @@ export const useStore = create((set, get) => ({
     // ticket builder — otherwise treated identically by the rest of this function
     // (status tracking, retries, health updates, error handling all reuse the same path).
     const isFireMarker = job.type === 'fire-marker';
+    // v4.6.28: transfer-notice — kitchen alert fired when a table moves/combines.
+    const isTransferNotice = job.type === 'transfer-notice';
     const idempotencyKey = isFireMarker
       ? `fire-${job.tableLabel || 'walkin'}-${job.centreId}-${job.course || 0}-${basePrintJob.sentAt}`
-      : `kitchen-${job.tableLabel || 'walkin'}-${job.centreId}-${job.course || 0}-${basePrintJob.sentAt}`;
+      : isTransferNotice
+        ? `transfer-${job.fromTable || '?'}-${job.tableLabel || '?'}-${job.centreId}-${basePrintJob.sentAt}`
+        : `kitchen-${job.tableLabel || 'walkin'}-${job.centreId}-${job.course || 0}-${basePrintJob.sentAt}`;
 
     // Local UI job marker — reflects Supabase-side state via realtime subs
     set(s => ({ printJobs: [{ ...basePrintJob, status: 'sending', printerId, attempts: 0 }, ...s.printJobs.slice(0, 49)] }));
@@ -2096,6 +2158,15 @@ export const useStore = create((set, get) => ({
             table: job.tableLabel || '',
             courseNum: job.course,
             centreName: centre?.name || job.printerName || 'Kitchen',
+            sentAt: basePrintJob.sentAt,
+          }, printerId, { idempotencyKey })
+        : isTransferNotice
+        ? await printService.printTransferNoticeTicket({
+            fromTable: job.fromTable || '',
+            toTable:   job.tableLabel || '',
+            centreName: centre?.name || job.printerName || 'Kitchen',
+            items: printItems,
+            server: job.server,
             sentAt: basePrintJob.sentAt,
           }, printerId, { idempotencyKey })
         : await printService.printKitchenTicket({

@@ -312,6 +312,37 @@ export function buildFireCourseTicket({ table, courseNum, centreName, sentAt }) 
   return b.toBytes();
 }
 
+
+export function buildTransferNoticeTicket({ fromTable, toTable, centreName, items, server, sentAt }) {
+  // v4.6.28: kitchen alert docket fired when a table is moved/combined so the
+  // expo/kitchen sees that previously-sent items now sit at a different table.
+  // Format mirrors buildFireCourseTicket: bold centre header, time, large notice.
+  const b = new EscPosBuilder(42);
+  const time = new Date(sentAt||Date.now()).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  b.init().center().bold(true).doubleBoth().text(centreName||'Kitchen').lf()
+   .normal().center().line(time).divider('=');
+  b.lf().center().bold(true).doubleBoth().line('** TABLE MOVED **').normal();
+  b.lf().center().bold(true).doubleBoth().line(`${fromTable||'?'}  \u2192  ${toTable||'?'}`).normal();
+  if (server) b.lf().center().line(`Server: ${server}`);
+  b.lf().divider('-');
+  // List every item that's now at the new location. This is the already-sent
+  // items from the source session — kitchen/expo needs to know what food is
+  // where, not just that a move happened.
+  b.left().bold(true).line('Items now at ' + (toTable||'?') + ':').bold(false);
+  (items||[]).forEach(it => {
+    const qty = it.qty || 1;
+    const name = it.name || '';
+    b.line(`${qty} \u00d7 ${name}`);
+    if (Array.isArray(it.mods) && it.mods.length) {
+      it.mods.forEach(m => {
+        const t = typeof m === 'string' ? m : (m?.label || m?.name || '');
+        if (t) b.line(`  \u00b7 ${t}`);
+      });
+    }
+  });
+  b.divider('=').lf(3).cut();
+  return b.toBytes();
+}
 export function buildTestPage() {
   const b = new EscPosBuilder(42);
   b.init()
@@ -694,6 +725,26 @@ class PrintService {
     return { ok: false, error: 'No kitchen printer configured' };
   }
 
+
+  async printTransferNoticeTicket(ticketData, printerId = null, opts = {}) {
+    // v4.6.28: kitchen alert on table move. Uses the kitchen-role printer for
+    // the centre, same routing as a normal ticket, different builder.
+    const printer = this._printerForRole('kitchen', printerId);
+    if (printer?.address) {
+      const bytes = buildTransferNoticeTicket(ticketData);
+      return this._submitJob(printer, 'kitchen', bytes, {
+        idempotencyKey: opts.idempotencyKey,
+        metadata: {
+          fromTable: ticketData.fromTable,
+          toTable: ticketData.toTable,
+          centreName: ticketData.centreName,
+          itemCount: (ticketData.items||[]).length,
+        },
+        label: `Transfer notice \u2014 ${ticketData.fromTable||'?'} \u2192 ${ticketData.toTable||'?'} (${ticketData.centreName||'kitchen'})`,
+      });
+    }
+    return { ok: false, error: 'No kitchen printer configured' };
+  }
   async printTestPage(printer) {
     if (!printer?.address) throw new Error('No printer address');
     const bytes = buildTestPage();
