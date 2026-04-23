@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.33', date: '23 Apr 2026', label: 'POS hydrates printers from Supabase on mount (fixes cash drawer not recognised)',
+    changes: [
+      'Peter reported: set up Cash drawer attached on a printer in Back Office, saved fine, but POS says drawer is not configured on this printer. Cause: the POS devices local rpos-printers cache is only ever populated when the user is on the Printers screen in the back office in that same browser. A cross-device install (Sunmi terminal here, laptop for back office) never refreshes its own printer list, so any meta flag added later (roles change, cash drawer, etc) is invisible to the POS.',
+      'Fix: useSupabaseInit now hydrates printers from Supabase on app mount, identical to how it hydrates menu items, floor plan, 86 list, KDS tickets, closed checks, and tax rates. Fetched rows are shaped to match the existing rpos-printers schema (id, name, model, connectionType, address, port, paperWidth, roles, location, status, addedAt, cashDrawerAttached) and written to localStorage. Fires rpos-printers-updated event so any live subscribers pick up the new list.',
+      'What this means for you: on the next reload of any POS device (or automatic on Sunmi restart) the printer list will include the cashDrawerAttached flag. Mid-session changes in back office still need the POS to reload, unless you Push to POS which triggers a fresh hydration.',
+      'One-off quickfix already applied to your current POS tabs localStorage in-band — the drawer should work there right now without waiting for the 4.6.33 deploy.',
+    ],
+  },
+  {
     version: '4.6.32', date: '23 Apr 2026', label: 'Cash drawer — POS button, permission gate, EOD reconciliation',
     changes: [
       'POS header now has a 🔓 Drawer button for manual cash-drawer pulses. Visible in both the active-table header (next to the ← Floor back-button) and the no-table header (top-right above the order-type strip). Only rendered for staff whose role grants the openDrawer permission — Manager, Bartender, Cashier by default; Server/Kitchen are hidden.',

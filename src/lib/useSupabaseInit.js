@@ -81,6 +81,42 @@ export default function useSupabaseInit() {
       // Resolve location ID (needed for tax rates + config push)
       const locId = await getLocationId().catch(() => null);
 
+      // v4.6.33: hydrate printers from Supabase so POS devices see back-office
+      // changes (including the cashDrawerAttached flag) on app load. Previously
+      // the POS only ever saw printers if it was the same browser as the back
+      // office — a cross-device install (Sunmi terminal + separate laptop for
+      // back office) would never hydrate its own rpos-printers cache.
+      if (locId && supabase) {
+        try {
+          const { data: prows } = await supabase
+            .from('printers')
+            .select('*')
+            .eq('location_id', locId);
+          if (Array.isArray(prows)) {
+            const shaped = prows.map(r => ({
+              id: r.id,
+              name: r.name,
+              model: r.meta?.model || 'sunmi-nt311',
+              connectionType: r.connection || 'network',
+              address: r.ip || '',
+              port: r.port ?? 9100,
+              paperWidth: r.paper_width ?? 80,
+              roles: Array.isArray(r.meta?.roles) ? r.meta.roles : ['receipt'],
+              location: r.meta?.location || '',
+              status: r.meta?.status || 'unknown',
+              addedAt: r.meta?.addedAt || Date.now(),
+              cashDrawerAttached: !!r.meta?.cashDrawerAttached,
+            }));
+            localStorage.setItem('rpos-printers', JSON.stringify(shaped));
+            // Fire the same event the back-office PrinterRegistry dispatches so
+            // any subscribed code picks up the new list.
+            window.dispatchEvent(new Event('rpos-printers-updated'));
+          }
+        } catch (err) {
+          console.warn('[useSupabaseInit] printers hydration failed:', err?.message || err);
+        }
+      }
+
       // Tax rates for this location
       if (locId && supabase) {
         const { data: rates } = await supabase
