@@ -52,7 +52,7 @@ const PAPER = [
   { id:58, label:'58mm' },
 ];
 
-const EMPTY = { name:'', model:'sunmi-nt311', connectionType:'network', address:'', paperWidth:80, roles:['receipt'], location:'' };
+const EMPTY = { name:'', model:'sunmi-nt311', connectionType:'network', address:'', paperWidth:80, roles:['receipt'], location:'', cashDrawerAttached:false };
 
 function loadPrinters() {
   try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; }
@@ -64,7 +64,7 @@ async function loadPrintersFromDB() {
     if (!locationId) return loadPrinters();
     const { data } = await supabase.from('printers').select('*').eq('location_id', locationId).order('created_at');
     if (data) {
-      const list = data.map(r => ({ id:r.id, name:r.name, model:r.meta?.model||'generic', connectionType:r.connection, address:r.ip, port:r.port||9100, paperWidth:r.paper_width||80, roles:r.meta?.roles||['receipt'], location:r.meta?.location||'', status:r.meta?.status||'unknown', addedAt:r.meta?.addedAt||Date.now() }));
+      const list = data.map(r => ({ id:r.id, name:r.name, model:r.meta?.model||'generic', connectionType:r.connection, address:r.ip, port:r.port||9100, paperWidth:r.paper_width||80, roles:r.meta?.roles||['receipt'], location:r.meta?.location||'', status:r.meta?.status||'unknown', addedAt:r.meta?.addedAt||Date.now(), cashDrawerAttached:!!r.meta?.cashDrawerAttached }));
       localStorage.setItem('rpos-printers', JSON.stringify(list)); // keep local cache for POS
       return list;
     }
@@ -76,7 +76,7 @@ async function savePrinterToDB(printer) {
   try {
     const locationId = await getLocationId();
     if (!locationId) return;
-    await supabase.from('printers').upsert({ id:printer.id, location_id:locationId, name:printer.name, type:'escpos', connection:printer.connectionType, ip:printer.address||null, port:printer.port||9100, paper_width:printer.paperWidth||80, meta:{ model:printer.model, roles:printer.roles, location:printer.location, status:printer.status, addedAt:printer.addedAt }, updated_at:new Date().toISOString() });
+    await supabase.from('printers').upsert({ id:printer.id, location_id:locationId, name:printer.name, type:'escpos', connection:printer.connectionType, ip:printer.address||null, port:printer.port||9100, paper_width:printer.paperWidth||80, meta:{ model:printer.model, roles:printer.roles, location:printer.location, status:printer.status, addedAt:printer.addedAt, cashDrawerAttached:!!printer.cashDrawerAttached }, updated_at:new Date().toISOString() });
   } catch(e) { console.warn('printer save failed', e); }
 }
 async function deletePrinterFromDB(id) {
@@ -235,6 +235,21 @@ function PrinterForm({ initial, onSave, onCancel }) {
             );
           })}
         </div>
+      </div>
+
+      {/* v4.6.30: Cash drawer. When ticked, cash payments that route through
+          a printer with this flag will automatically pulse the drawer open. */}
+      <div style={{ marginBottom:20 }}>
+        <label style={S.label}>Cash drawer</label>
+        <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', padding:'10px 12px', borderRadius:8, background:'var(--bg3)', border:`1.5px solid ${form.cashDrawerAttached?'var(--acc)':'var(--bdr)'}` }}>
+          <input type="checkbox" checked={!!form.cashDrawerAttached} onChange={e => f('cashDrawerAttached', e.target.checked)} style={{ width:18, height:18, accentColor:'var(--acc)', cursor:'pointer' }}/>
+          <div>
+            <div style={{ fontSize:13, fontWeight:700, color: form.cashDrawerAttached ? 'var(--acc)' : 'var(--t2)' }}>Cash drawer is wired to this printer</div>
+            <div style={{ fontSize:11, color:'var(--t4)', marginTop:2 }}>
+              Ejects the drawer on every cash payment (ESC p pulse). You can also pulse it manually from the POS.
+            </div>
+          </div>
+        </label>
       </div>
 
       <div style={{ display:'flex', gap:8 }}>

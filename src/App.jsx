@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.30', date: '23 Apr 2026', label: 'Cash drawer — auto-fire on cash payment + petty cash ledger (part 1 of 2)',
+    changes: [
+      'Printer config gains a Cash drawer attached toggle. Back Office > Printers > edit any printer — new section under Used for. Persists in the printers.meta jsonb column so it survives Push to POS and cross-device sync.',
+      'lib/printer.js openCashDrawer now prefers a printer explicitly flagged as cashDrawerAttached. If none is flagged, falls back to the receipt-role printer (prior behaviour). Pulses the drawer with the standard ESC p command (0x1B 0x70 0x00 0x19 0x19). Added two helper methods: _allPrinters reads the cached printer list from localStorage, _printerById does an id-keyed lookup.',
+      'Store gains a pettyCashEntries slice backed by localStorage via OPERATIONAL_KEYS, so it persists locally and syncs cross-device via BroadcastChannel. Shape per entry: id, timestamp, type, amount, reason, note, staff, staffId, ref. Types: cash_sale, drawer_open, float, drop, expense, adjustment.',
+      'Store gains openCashDrawer({ reason, amount, type, ref, note }) which triggers the printer pulse AND appends a petty cash entry. Print failure is swallowed so a missing/offline drawer printer never blocks a payment.',
+      'All three close-check paths now auto-fire the drawer on cash payments: recordClosedCheck (dine-in), recordWalkInClosedCheck (bar tabs / ad-hoc), recordWalkInClosed (walk-in / takeaway / collection / delivery). Non-cash methods (card, other) are unchanged.',
+      'Coming in 4.6.31: (1) Open drawer button on POS header (manager/admin), (2) Back office Petty Cash section with ledger view and manual entry form (float, drop, expense), (3) EOD cash reconciliation report.',
+    ],
+  },
+  {
     version: '4.6.29', date: '23 Apr 2026', label: 'Scheduled collections fire 30 mins before pickup',
     changes: [
       'Click & collect and takeaway orders with a non-ASAP collection time no longer hit the kitchen the moment you press Send. They now enter the queue with status scheduled and scheduledFireAt set to 30 minutes before the collection time. A background tick running on the existing SyncBridge 60s periodic timer checks the queue and fires any order whose fire time has been reached.',

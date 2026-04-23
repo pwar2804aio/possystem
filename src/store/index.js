@@ -1930,6 +1930,52 @@ export const useStore = create((set, get) => ({
       ]},
   ] }),
 
+  // ── Petty cash + cash drawer (v4.6.30) ────────
+  pettyCashEntries: [],
+
+  // Append a petty cash log entry. Shape:
+  //   { id, timestamp, type, amount, reason?, note?, staff?, ref? }
+  // type is one of:
+  //   'cash_sale'       — auto-logged by recordClosedCheck etc when method==='cash'
+  //   'drawer_open'     — manual drawer pulse from POS (no money change)
+  //   'float'           — cash float added at start of shift
+  //   'drop'            — cash removed to safe / deposit
+  //   'expense'         — cash paid out for supplies etc
+  //   'adjustment'      — manual reconciliation tweak
+  addPettyCashEntry: (entry) => {
+    const full = {
+      id: `pc-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+      timestamp: Date.now(),
+      type: 'drawer_open',
+      amount: 0,
+      ...entry,
+    };
+    set(s => ({ pettyCashEntries: [full, ...(s.pettyCashEntries || [])] }));
+    return full;
+  },
+
+  // Running balance = sum of signed amounts. Positive for sales/floats,
+  // negative for drops/expenses.
+  getPettyCashBalance: () => {
+    const SIGN = { cash_sale: +1, float: +1, adjustment: +1, drop: -1, expense: -1, drawer_open: 0 };
+    return (get().pettyCashEntries || []).reduce((s, e) => s + (SIGN[e.type] ?? 0) * (Number(e.amount) || 0), 0);
+  },
+
+  // Pulse the cash drawer via the printer (if a cash-drawer-attached printer
+  // is configured) AND log to the petty cash ledger. Swallow print failures —
+  // the drawer pulse is best-effort and should never block a payment flow.
+  openCashDrawer: ({ reason = 'Manual open', amount = 0, type = 'drawer_open', ref = null, note = '' } = {}) => {
+    try {
+      printService?.openCashDrawer?.()?.catch?.(err => console.warn('[openCashDrawer] pulse failed:', err?.message || err));
+    } catch (err) { console.warn('[openCashDrawer] pulse threw:', err); }
+    const { staff } = get();
+    return get().addPettyCashEntry({
+      type, amount, reason, ref, note,
+      staff: staff?.name || 'Unknown',
+      staffId: staff?.id || null,
+    });
+  },
+
   // ── Closed check history ──────────────────
   closedChecks: isMock ? [
     { id:'cc1', ref:'#1042', tableId:'t1', tableLabel:'T1', server:'Sarah', covers:2, orderType:'dine-in', customer:null,
@@ -1985,6 +2031,15 @@ export const useStore = create((set, get) => ({
     };
     set(s => ({ closedChecks: [record, ...s.closedChecks] }));
     insertClosedCheck(record);
+    // v4.6.30: fire cash drawer + log petty cash entry for cash sales.
+    if (record.method === 'cash') {
+      get().openCashDrawer({
+        type: 'cash_sale',
+        amount: Number(record.total) || 0,
+        reason: `Cash sale · ${record.tableLabel || record.ref || ''}`.trim(),
+        ref: record.ref,
+      });
+    }
     return record;
   },
 
@@ -2001,6 +2056,15 @@ export const useStore = create((set, get) => ({
     };
     set(s => ({ closedChecks: [fullRecord, ...s.closedChecks] }));
     insertClosedCheck(fullRecord).catch(()=>{});
+    // v4.6.30: cash drawer auto-fire on cash payment
+    if (fullRecord.method === 'cash') {
+      get().openCashDrawer({
+        type: 'cash_sale',
+        amount: Number(fullRecord.total) || 0,
+        reason: `Cash sale · ${fullRecord.tableLabel || fullRecord.ref || 'Bar tab'}`.trim(),
+        ref: fullRecord.ref,
+      });
+    }
     return fullRecord;
   },
 
@@ -2048,6 +2112,15 @@ export const useStore = create((set, get) => ({
       closedChecks: [record, ...s.closedChecks],
       orderQueue: existingRef ? s.orderQueue.filter(o => o.ref !== existingRef) : s.orderQueue,
     }));
+    // v4.6.30: cash drawer auto-fire on cash payment
+    if (record.method === 'cash') {
+      get().openCashDrawer({
+        type: 'cash_sale',
+        amount: Number(record.total) || 0,
+        reason: `Cash sale · ${customer?.name || record.ref || orderType}`.trim(),
+        ref: record.ref,
+      });
+    }
     insertClosedCheck(record);
     return record;
   },

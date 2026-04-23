@@ -478,6 +478,15 @@ class PrintService {
     return this._printers.find(p => p.roles?.includes(role)) || this._printers[0] || null;
   }
 
+  // v4.6.30: lightweight printer lookup helpers used by openCashDrawer.
+  _allPrinters() {
+    try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]') || []; }
+    catch { return []; }
+  }
+  _printerById(id) {
+    return this._allPrinters().find(p => p?.id === id) || null;
+  }
+
   // v4.3.0 — DURABLE-FIRST SUBMIT
   // Always inserts a print_jobs row before attempting to dispatch. If the app
   // crashes mid-dispatch, the row survives and the PrintRetrier picks it up.
@@ -754,8 +763,18 @@ class PrintService {
   }
 
   async openCashDrawer(printerId = null) {
-    const printer = this._printerForRole('receipt', printerId);
-    if (!printer?.address) throw new Error('No printer configured');
+    // v4.6.30: prefer a printer explicitly flagged as cashDrawerAttached in the
+    // back-office Printers section. Fall back to the receipt-role printer if
+    // none is flagged — preserves prior behaviour for existing installs.
+    let printer = null;
+    if (printerId) {
+      printer = this._printerById ? this._printerById(printerId) : this._printerForRole('receipt', printerId);
+    } else {
+      const all = this._allPrinters ? this._allPrinters() : [];
+      printer = all.find(p => p?.cashDrawerAttached && p?.address)
+             || this._printerForRole('receipt', null);
+    }
+    if (!printer?.address) throw new Error('No printer with cash drawer configured');
     const b = new EscPosBuilder();
     b.init().cashDrawer();
     return this._submitJob(printer, 'cash_drawer', b.toBytes());

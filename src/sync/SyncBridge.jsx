@@ -18,6 +18,7 @@ export const TAB_ID       = Math.random().toString(36).slice(2, 10);
 const OPERATIONAL_KEYS = [
   'kdsTickets', 'eightySixIds', 'dailyCounts',
   'closedChecks', 'orderQueue', 'tabs', 'printJobs',
+  'pettyCashEntries', // v4.6.30
 ];
 
 // Table status/session sync (operational part only — layout comes via CONFIG_PUSH)
