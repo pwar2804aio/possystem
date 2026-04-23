@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.26', date: '23 Apr 2026', label: 'Bar tab seat picker sourced from floor plan',
+    changes: [
+      'The bar tab creation modal Bar seat picker is no longer a hardcoded B1-B4 list. It now derives from the live tables state filtered by section=bar, so it stays in sync with the floor plan. If the plan has B1/B2/B3 only, those three show; if it has eight bar seats, all eight show.',
+      'Seats already attached to an open bar tab render disabled with reduced opacity and a tooltip so you cannot double-book the same seat.',
+      'When a seat is selected and the tab is created, the real tableId now flows through to the store, so the seat tile on the floor plan flips to occupied and the existing open-tab-opens-table flow actually works. Previously seatId was a free-form string with no link to a real table.',
+      'The separate Link to table dropdown still takes precedence if used, preserving the legacy roaming-at-a-named-table flow.',
+      'If the floor plan has no bar-section tables, the picker shows a Roaming only hint instead of an empty row.',
+      'Implementation note: OpenTabModal now pulls both tables and tabs from useStore() in a single destructure. Previous hotfix attempt to add props collided with the existing store destructure and broke the build.',
+    ],
+  },
+  {
     version: '4.6.25', date: '22 Apr 2026', label: 'Reports wave 8.1 \u2014 service periods baked into Daypart + Business summary; LocationSettings sharpened',
     changes: [
       'Daypart report: when locationConfig.shifts is defined, a Revenue by service period section now sits between the three headline tiles (busiest hour / busiest day / peak slot) and the hour \u00d7 day-of-week heatmap. Each configured service gets its own tile showing revenue, check count, covers, average check, and share of total. Overflow checks that fell outside any configured service are counted and flagged at the bottom of the section. When shifts are not configured, the report falls back cleanly to its original fixed-hour view so nothing changes for greenfield environments.',

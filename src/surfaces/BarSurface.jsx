@@ -33,14 +33,18 @@ function timeOpen(date) {
 
 // ─── Open Tab Modal ──────────────────────────────────────────────────────────
 function OpenTabModal({ onConfirm, onCancel }) {
-  const { tables } = useStore();
+  const { tables, tabs } = useStore();
   const [name, setName]           = useState('');
   const [seatId, setSeatId]       = useState('');
   const [linked, setLinked]       = useState('');   // table id
   const [preAuth, setPreAuth]     = useState(true);
   const [preAmt, setPreAmt]       = useState('50');
   const [note, setNote]           = useState('');
-  const barSeats = ['B1','B2','B3','B4'];
+  // v4.6.26: derive bar seats from floor plan. Each seat is { id, label, busy }.
+  const busySeatIds = new Set((tabs||[]).filter(t=>t.status!=='closed'&&t.tableId).map(t=>t.tableId));
+  const barSeats = (tables||[]).filter(t=>t.section==='bar').map(t=>({
+    id: t.id, label: t.label || String(t.id).toUpperCase(), busy: busySeatIds.has(t.id),
+  }));
   const openTables = tables.filter(t=>t.section==='bar' && (t.status==='open'||t.status==='available'));
 
   return (
@@ -60,13 +64,19 @@ function OpenTabModal({ onConfirm, onCancel }) {
           <div>
             <label style={labelStyle}>Bar seat (optional)</label>
             <div style={{ display:'flex', gap:6 }}>
+              {barSeats.length===0 && (
+                <div style={{ flex:1, padding:'8px 4px', borderRadius:8, background:'var(--bg3)', color:'var(--t4)', fontSize:11, fontStyle:'italic', textAlign:'center' }}>
+                  No bar seats on your floor plan. Roaming only.
+                </div>
+              )}
               {barSeats.map(s=>(
-                <button key={s} onClick={()=>setSeatId(s===seatId?'':s)} style={{
-                  flex:1, padding:'8px 4px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
-                  border:`1.5px solid ${seatId===s?'var(--acc)':'var(--bdr)'}`,
-                  background:seatId===s?'var(--acc-d)':'var(--bg3)',
-                  color:seatId===s?'var(--acc)':'var(--t2)', fontSize:13, fontWeight:700,
-                }}>{s}</button>
+                <button key={s.id} disabled={s.busy} onClick={()=>setSeatId(s.id===seatId?'':s.id)} style={{
+                  flex:1, padding:'8px 4px', borderRadius:8, cursor:s.busy?'not-allowed':'pointer', fontFamily:'inherit',
+                  border:`1.5px solid ${seatId===s.id?'var(--acc)':'var(--bdr)'}`,
+                  background:seatId===s.id?'var(--acc-d)':'var(--bg3)',
+                  color:seatId===s.id?'var(--acc)':(s.busy?'var(--t4)':'var(--t2)'), fontSize:13, fontWeight:700,
+                  opacity:s.busy?0.5:1,
+                }} title={s.busy?'Seat already has an open tab':''}>{s.label}{s.busy?' \u00B7':''}</button>
               ))}
               <button onClick={()=>setSeatId('')} style={{
                 flex:1.5, padding:'8px 4px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
@@ -125,7 +135,13 @@ function OpenTabModal({ onConfirm, onCancel }) {
           <button className="btn btn-ghost" style={{ flex:1 }} onClick={onCancel}>Cancel</button>
           <button className="btn btn-acc" style={{ flex:2, height:46 }}
             disabled={!name.trim()}
-            onClick={() => onConfirm({ name, seatId:seatId||null, tableId:linked||null, preAuth, preAuthAmount:parseInt(preAmt)||50, note })}>
+            onClick={() => {
+              // v4.6.26: seatId state holds table id. Resolve to { label, tableId }.
+              const seat = barSeats.find(s=>s.id===seatId);
+              const displayLabel = seat ? seat.label : (seatId || null);
+              const resolvedTableId = linked || (seat ? seat.id : null);
+              onConfirm({ name, seatId:displayLabel, tableId:resolvedTableId, preAuth, preAuthAmount:parseInt(preAmt)||50, note });
+            }}>
             Open tab →
           </button>
         </div>
