@@ -5,6 +5,9 @@ import { loadQueues, scheduleQueueFlush, teardownQueueSync } from './QueueSync';
 import { initOfflineQueue } from './OfflineQueue';
 import { isMock, supabase } from '../lib/supabase';
 import { startSessionReconciler, stopSessionReconciler } from './SessionReconciler';
+// v4.6.27: static import per ADR-008. Dynamic imports inside callbacks silently
+// fail in production bundles and have caused multiple data-loss bugs.
+import { reconcilePendingChecks, onReconnect, periodicSync } from './DataSafe.js';
 import { getShowItemImages } from '../lib/locationTime';
 
 export const CHANNEL_NAME = 'rpos-sync';
@@ -246,7 +249,7 @@ export default function SyncBridge({ onSyncPulse }) {
           // Reconcile any pending checks that didn't make it to Supabase
           // (e.g. payment taken while offline, page reloaded before sync)
           try {
-            const { reconcilePendingChecks } = await import('./DataSafe.js');
+            // v4.6.27: static import above (ADR-008)
             await reconcilePendingChecks();
           } catch {}
 
@@ -292,7 +295,7 @@ export default function SyncBridge({ onSyncPulse }) {
     if (!isMock) {
       window.addEventListener('online', async () => {
         try {
-          const { onReconnect } = await import('./DataSafe.js');
+          // v4.6.27: static import above (ADR-008)
           await onReconnect();
         } catch {}
       });
@@ -302,7 +305,7 @@ export default function SyncBridge({ onSyncPulse }) {
     if (!isMock) {
       const periodicTimer = setInterval(async () => {
         try {
-          const { periodicSync } = await import('./DataSafe.js');
+          // v4.6.27: static import above (ADR-008)
           await periodicSync();
         } catch {}
       }, 60_000);
@@ -315,13 +318,49 @@ export default function SyncBridge({ onSyncPulse }) {
 
     channelInstance = new BroadcastChannel(CHANNEL_NAME);
 
+    // v4.6.27: Safe merge for incoming broadcast data. Previously this was a blind
+    // useStore.setState(msg.data), which replaced the whole `tables` array with the
+    // sender's view — wiping items the local operator was actively adding. Now:
+    //   - The currently-edited table (activeTableId) is protected: its session is
+    //     never overwritten from a broadcast. Local edits always win for it.
+    //   - For other tables we merge per-row, keeping the sender's operational state
+    //     (status, session, covers, reservation) but the receiver's layout fields
+    //     (x/y/w/h/label/section/shape). Layout only changes via CONFIG_PUSH.
+    //   - Tables the receiver has but the sender doesn't are preserved (can't shrink
+    //     the floor plan via a stale broadcast).
+    const LAYOUT_FIELDS = ['x','y','w','h','label','section','shape','seats','area'];
+    function mergeTablesSafely(localTables, incomingTables, activeId) {
+      if (!Array.isArray(incomingTables)) return localTables;
+      const byId = new Map(incomingTables.map(t => [t.id, t]));
+      const merged = (localTables || []).map(local => {
+        if (local.id === activeId) return local;
+        const incoming = byId.get(local.id);
+        if (!incoming) return local;
+        const keepLocalLayout = {};
+        for (const f of LAYOUT_FIELDS) if (f in local) keepLocalLayout[f] = local[f];
+        return { ...incoming, ...keepLocalLayout };
+      });
+      const localIds = new Set((localTables || []).map(t => t.id));
+      for (const t of incomingTables) if (!localIds.has(t.id)) merged.push(t);
+      return merged;
+    }
+    function safeApplyIncoming(data) {
+      if (!data || typeof data !== 'object') return;
+      const cur = useStore.getState();
+      const patch = { ...data };
+      if ('tables' in patch) {
+        patch.tables = mergeTablesSafely(cur.tables, patch.tables, cur.activeTableId);
+      }
+      useStore.setState(patch);
+    }
+
     channelInstance.onmessage = ({ data: msg }) => {
       if (msg.from === TAB_ID) return;
 
       if (msg.type === 'STATE_UPDATE') {
         // Real-time operational sync
         isApplyingRef.current = true;
-        useStore.setState(msg.data);
+        safeApplyIncoming(msg.data); // v4.6.27: protects activeTableId + layout
         isApplyingRef.current = false;
         onSyncPulse?.();
       }
@@ -337,7 +376,7 @@ export default function SyncBridge({ onSyncPulse }) {
       }
       if (msg.type === 'PONG') {
         isApplyingRef.current = true;
-        useStore.setState(msg.data);
+        safeApplyIncoming(msg.data); // v4.6.27: protects activeTableId + layout
         isApplyingRef.current = false;
       }
     };

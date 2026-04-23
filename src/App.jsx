@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.27', date: '23 Apr 2026', label: 'Stop tables losing data: safe merge for cross-tab/cross-device broadcast sync',
+    changes: [
+      'Root cause of spontaneous data loss on tables: SyncBridge was doing useStore.setState(msg.data) when it received a broadcast from another tab or device. That replaced the whole tables array with the senders view, which wiped out items the local operator had added but not yet broadcast. The invariants doc literally said the receiver should only apply non-layout fields from broadcasts — but that was never actually implemented. Now implemented.',
+      'New mergeTablesSafely() merges tables row-by-row on receive. The table currently in focus (activeTableId) is never overwritten from a broadcast — local edits always win for the table the operator is working on. For other tables, the senders operational fields (status, session, covers, reservation) apply, while layout fields (x, y, w, h, label, section, shape, seats, area) are preserved from the local copy since those only legitimately change via a back office Push to POS. Tables the receiver has but the sender does not are kept, so a stale broadcast cannot shrink the floor plan.',
+      'Replaced three dynamic await import("./DataSafe.js") calls with a single static top-level import, per ADR-008. The DECISIONS doc explicitly warned that dynamic imports inside callbacks silently fail in the production bundle, and that this had caused multiple data-loss bugs before. The three calls were: reconcilePendingChecks on boot, onReconnect on the online event, and periodicSync on an interval. All three reach DataSafe — the triple-write safety net for critical writes like closed checks and session writes — so if they had been failing silently in production that was a serious durability hole. Now statically imported at the top of SyncBridge.jsx, guaranteed to resolve.',
+      'Expected downstream fixes for symptoms you were seeing: (1) NaN covers on open table — was caused by a stale broadcast arriving with a different session shape and overwriting covers with undefined; (2) tables not responding to click with no seat options — was caused by activeTableId being clobbered mid-interaction by a broadcast; (3) tables list missing unstarted tables on order send — was caused by receiving a stale tables array that only contained already-persisted sessions; (4) items added to tables vanishing — was caused by another tabs broadcast overwriting in-progress local edits. All four traced back to the same unsafe setState and should be fixed by this change.',
+      'No change to how writes go out: the sender still only broadcasts changed keys, still debounces at 80ms, still guards against feedback loops via isApplyingRef. The fix is entirely on the receive side.',
+    ],
+  },
+  {
     version: '4.6.26', date: '23 Apr 2026', label: 'Bar tab seat picker sourced from floor plan',
     changes: [
       'The bar tab creation modal Bar seat picker is no longer a hardcoded B1-B4 list. It now derives from the live tables state filtered by section=bar, so it stays in sync with the floor plan. If the plan has B1/B2/B3 only, those three show; if it has eight bar seats, all eight show.',
