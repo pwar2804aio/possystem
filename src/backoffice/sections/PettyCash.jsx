@@ -28,9 +28,13 @@ const fmtTime = (ts) => new Date(ts).toLocaleString('en-GB', {
 
 export default function PettyCash() {
   const entries = useStore(s => s.pettyCashEntries) || [];
+  const staff = useStore(s => s.staff);
+  // v4.6.32: gate the action buttons on the openDrawer permission so servers
+  // without permission don't see live buttons they can't use. The store
+  // also enforces this (see openCashDrawer).
+  const canOpenDrawer = Array.isArray(staff?.permissions) && staff.permissions.includes('openDrawer');
   const addEntry = useStore(s => s.addPettyCashEntry);
   const openDrawer = useStore(s => s.openCashDrawer);
-  const staff = useStore(s => s.staff);
 
   const [showAdd, setShowAdd] = useState(false);
   const [filterType, setFilterType] = useState('all');
@@ -70,7 +74,9 @@ export default function PettyCash() {
         </div>
         <div style={{ display:'flex', gap:8 }}>
           <button onClick={handleManualPulse}
-            style={{ padding:'10px 18px', borderRadius:10, background:'var(--bg3)', border:'1.5px solid var(--bdr2)', color:'var(--t1)', fontWeight:700, fontFamily:'inherit', cursor:'pointer', fontSize:13 }}>
+            disabled={!canOpenDrawer}
+            title={canOpenDrawer ? 'Pulse the cash drawer now' : 'Open-drawer permission required'}
+            style={{ padding:'10px 18px', borderRadius:10, background:'var(--bg3)', border:'1.5px solid var(--bdr2)', color: canOpenDrawer ? 'var(--t1)' : 'var(--t4)', fontWeight:700, fontFamily:'inherit', cursor: canOpenDrawer ? 'pointer' : 'not-allowed', fontSize:13, opacity: canOpenDrawer ? 1 : 0.5 }}>
             🔓 Open drawer
           </button>
           <button onClick={() => setShowAdd(true)}

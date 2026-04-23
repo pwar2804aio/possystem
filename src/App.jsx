@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.32', date: '23 Apr 2026', label: 'Cash drawer — POS button, permission gate, EOD reconciliation',
+    changes: [
+      'POS header now has a 🔓 Drawer button for manual cash-drawer pulses. Visible in both the active-table header (next to the ← Floor back-button) and the no-table header (top-right above the order-type strip). Only rendered for staff whose role grants the openDrawer permission — Manager, Bartender, Cashier by default; Server/Kitchen are hidden.',
+      'Permission gate on openCashDrawer store action. Manual opens check staff.permissions.includes("openDrawer"); if not granted the drawer does not pulse and a toast surfaces the problem. A new force:true flag bypasses the check — used only by the automatic cash-sale firing paths, where the sale authorisation already covers the drawer open.',
+      'Petty Cash page buttons now disable + grey-out when the current staff lacks openDrawer. The store check is the real defence; UI change is just polish to avoid showing a button that only fails with a toast.',
+      'End of Day cash reconciliation now includes the petty cash ledger: Extra floats added +, Cash drops −, Cash expenses −, Adjustments ±. Expected in drawer = Opening float + Cash sales + Extra floats − Drops − Expenses + Adjustments. Previously the formula ignored every mid-service drop/expense and the variance was always wrong by the net ledger movement.',
+      'Z-read now captures the variance. If the counted drawer differs from the computed expected by ≥ 1p, an adjustment petty cash entry is written with amount = |variance|, reason showing drawer over/short, and a note recording float, counted, and expected for audit. The ledger carries forward so tomorrows opening balance is reconciled against yesterdays declared close, not the naive cash-sales-only total.',
+      'Three gaps from 4.6.30 (auto-fire), 4.6.31 (ledger page), 4.6.32 (this) are now closed. The only remaining follow-ups are (1) printed Z-report including the petty cash breakdown, (2) backdating / editing a past petty cash entry, (3) multi-drawer support.',
+    ],
+  },
+  {
     version: '4.6.31', date: '23 Apr 2026', label: 'Petty cash ledger page (part 2 of 2)',
     changes: [
       'New back-office section: Petty cash. Analytics group, between End of day and Tax & VAT. Lists every cash drawer event with a running balance. Cash sales are captured automatically from 4.6.30; manual entries (float, drop, expense, adjustment) can be added from a modal on this page.',

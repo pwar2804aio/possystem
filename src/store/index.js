@@ -1964,11 +1964,22 @@ export const useStore = create((set, get) => ({
   // Pulse the cash drawer via the printer (if a cash-drawer-attached printer
   // is configured) AND log to the petty cash ledger. Swallow print failures —
   // the drawer pulse is best-effort and should never block a payment flow.
-  openCashDrawer: ({ reason = 'Manual open', amount = 0, type = 'drawer_open', ref = null, note = '' } = {}) => {
+  openCashDrawer: ({ reason = 'Manual open', amount = 0, type = 'drawer_open', ref = null, note = '', force = false } = {}) => {
+    // v4.6.32: permission gate. 'force' is passed by the automatic cash-sale
+    // firing path — no permission check needed there (the sale itself was
+    // already authorised). Manual opens from the POS or the petty cash page
+    // must have the 'openDrawer' staff permission.
+    const { staff } = get();
+    if (!force) {
+      const allowed = Array.isArray(staff?.permissions) && staff.permissions.includes('openDrawer');
+      if (!allowed) {
+        get().showToast?.('No permission — drawer open requires manager override', 'error');
+        return null;
+      }
+    }
     try {
       printService?.openCashDrawer?.()?.catch?.(err => console.warn('[openCashDrawer] pulse failed:', err?.message || err));
     } catch (err) { console.warn('[openCashDrawer] pulse threw:', err); }
-    const { staff } = get();
     return get().addPettyCashEntry({
       type, amount, reason, ref, note,
       staff: staff?.name || 'Unknown',
@@ -2033,11 +2044,13 @@ export const useStore = create((set, get) => ({
     insertClosedCheck(record);
     // v4.6.30: fire cash drawer + log petty cash entry for cash sales.
     if (record.method === 'cash') {
+      // v4.6.32: force=true — cash sale itself is the authorisation.
       get().openCashDrawer({
         type: 'cash_sale',
         amount: Number(record.total) || 0,
         reason: `Cash sale · ${record.tableLabel || record.ref || ''}`.trim(),
         ref: record.ref,
+        force: true,
       });
     }
     return record;
@@ -2058,11 +2071,13 @@ export const useStore = create((set, get) => ({
     insertClosedCheck(fullRecord).catch(()=>{});
     // v4.6.30: cash drawer auto-fire on cash payment
     if (fullRecord.method === 'cash') {
+      // v4.6.32: force=true — cash sale itself is the authorisation.
       get().openCashDrawer({
         type: 'cash_sale',
         amount: Number(fullRecord.total) || 0,
         reason: `Cash sale · ${fullRecord.tableLabel || fullRecord.ref || 'Bar tab'}`.trim(),
         ref: fullRecord.ref,
+        force: true,
       });
     }
     return fullRecord;
@@ -2114,11 +2129,13 @@ export const useStore = create((set, get) => ({
     }));
     // v4.6.30: cash drawer auto-fire on cash payment
     if (record.method === 'cash') {
+      // v4.6.32: force=true — cash sale itself is the authorisation.
       get().openCashDrawer({
         type: 'cash_sale',
         amount: Number(record.total) || 0,
         reason: `Cash sale · ${customer?.name || record.ref || orderType}`.trim(),
         ref: record.ref,
+        force: true,
       });
     }
     insertClosedCheck(record);

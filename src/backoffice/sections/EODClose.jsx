@@ -20,6 +20,9 @@ const inp = { background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderR
 
 export default function EODClose() {
   const { closedChecks, orderQueue, shift, showToast } = useStore();
+  // v4.6.32: pull petty cash ledger for drawer reconciliation
+  const pettyCashEntries = useStore(s => s.pettyCashEntries) || [];
+  const addPettyCashEntry = useStore(s => s.addPettyCashEntry);
   const [counts, setCounts]   = useState(Object.fromEntries(DENOMS.map(d=>[d.value,0])));
   const [float, setFloat]     = useState('200.00');
   const [zDone, setZDone]     = useState(false);
@@ -39,8 +42,25 @@ export default function EODClose() {
     return { revenue, cash, card, tips, refunds, covers, checks:checks.length, takeaway };
   }, [closedChecks, orderQueue]);
 
+  // v4.6.32: today's petty cash ledger activity (excluding cash_sale which is
+  // already covered by today.cash, and drawer_open which is neutral).
+  const pcToday = useMemo(() => {
+    const sod = new Date(); sod.setHours(0,0,0,0);
+    const items = (pettyCashEntries || []).filter(e => (e.timestamp || 0) >= sod.getTime());
+    const sumOf = (type) => items.filter(e => e.type === type).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    return {
+      floats:      sumOf('float'),
+      drops:       sumOf('drop'),
+      expenses:    sumOf('expense'),
+      adjustments: sumOf('adjustment'),
+      items,
+    };
+  }, [pettyCashEntries]);
+
   const cashInDrawer  = DENOMS.reduce((s,d)=>s+(counts[d.value]||0)*d.value, 0);
-  const expectedCash  = today.cash + parseFloat(float||0);
+  // v4.6.32: expected = opening float + cash sales + mid-service floats
+  //                   − cash drops − cash expenses + manual adjustments
+  const expectedCash  = parseFloat(float||0) + today.cash + pcToday.floats - pcToday.drops - pcToday.expenses + pcToday.adjustments;
   const variance      = cashInDrawer - expectedCash;
   const floatAmt      = parseFloat(float||0);
 
@@ -50,9 +70,28 @@ export default function EODClose() {
   const setCount = (val, n) => setCounts(c=>({...c,[val]:Math.max(0,parseInt(n)||0)}));
 
   const doZRead = () => {
+    // v4.6.32: if the counted drawer differs from expected, write an
+    // 'adjustment' petty cash entry so the ledger carries the variance
+    // forward. Sign of adjustment = sign of variance (drawer over expected
+    // → positive, short → negative).
+    if (Math.abs(variance) >= 0.01 && typeof addPettyCashEntry === 'function') {
+      addPettyCashEntry({
+        type: 'adjustment',
+        amount: Math.abs(variance),
+        reason: variance > 0
+          ? `Z-read variance · drawer over by ${fmt(Math.abs(variance))}`
+          : `Z-read variance · drawer short by ${fmt(Math.abs(variance))}`,
+        note: `Float £${parseFloat(float||0).toFixed(2)} · counted £${cashInDrawer.toFixed(2)} · expected £${expectedCash.toFixed(2)}`,
+      });
+    }
     setStep('done');
     setZDone(true);
-    showToast('Z-read complete — till cleared', 'success');
+    showToast(
+      Math.abs(variance) < 0.01
+        ? 'Z-read complete — till cleared, drawer balanced'
+        : `Z-read complete — variance ${fmtS(variance)} logged to petty cash`,
+      Math.abs(variance) < 0.01 ? 'success' : 'warning'
+    );
   };
 
   return (
@@ -171,12 +210,16 @@ export default function EODClose() {
             {[
               ['Opening float',      fmt(floatAmt)],
               ['Cash sales today',   fmt(today.cash)],
+              ['Extra floats (+)',   pcToday.floats      > 0 ? fmt(pcToday.floats)      : '—'],
+              ['Cash drops (−)',     pcToday.drops       > 0 ? fmt(pcToday.drops)       : '—'],
+              ['Cash expenses (−)',  pcToday.expenses    > 0 ? fmt(pcToday.expenses)    : '—'],
+              ['Adjustments',        pcToday.adjustments !== 0 ? fmtS(pcToday.adjustments) : '—'],
               ['Expected in drawer', fmt(expectedCash)],
               ['Counted cash',       fmt(cashInDrawer)],
               ['Variance',           Math.abs(variance)<0.01 ? '✓ Balanced' : fmtS(variance)],
               ['Banking (drawer − new float)', cashInDrawer>floatAmt ? fmt(cashInDrawer-floatAmt) : '—'],
             ].map(([label, value], i) => (
-              <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'9px 14px', borderBottom:i<5?'1px solid var(--bdr)':'none', background:i%2===0?'transparent':'var(--bg2)' }}>
+              <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'9px 14px', borderBottom:i<9?'1px solid var(--bdr)':'none', background:i%2===0?'transparent':'var(--bg2)' }}>
                 <span style={{ fontSize:12, color:'var(--t3)' }}>{label}</span>
                 <span style={{ fontSize:13, fontWeight:700, color:label==='Variance'?(Math.abs(variance)<0.01?'var(--grn)':variance>0?'var(--acc)':'var(--red)'):'var(--t1)', fontFamily:'var(--font-mono)' }}>{value}</span>
               </div>
