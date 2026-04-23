@@ -1580,6 +1580,17 @@ export const useStore = create((set, get) => ({
   openTab: ({ name, seatId=null, tableId=null, preAuth=false, preAuthAmount=50, note='' }) => {
     const tab = { id:`tab-${Date.now()}`, ref:`TAB-${_tabNum++}`, name:name.trim(), seatId, tableId, openedBy:get().staff?.name||'Staff', openedAt:Date.now(), status:'open', preAuth, preAuthAmount, rounds:[], note, total:0 };
     set(s=>({ tabs:[tab,...s.tabs], activeTabId:tab.id }));
+    // v4.6.26: when a bar tab is linked to a real table, flip that table on
+    // the floor plan to 'occupied' so it renders correctly. Only do this if
+    // the table is currently 'available' — don't stomp an active dine-in
+    // session or a reservation.
+    if (tableId) {
+      const st = get();
+      const tbl = (st.tables||[]).find(t => t.id === tableId);
+      if (tbl && tbl.status === 'available') {
+        get()._updateTable(tableId, { status: 'occupied' });
+      }
+    }
     return tab;
   },
   setActiveTab: id => set({ activeTabId:id }),
@@ -1689,7 +1700,22 @@ export const useStore = create((set, get) => ({
   },
   updateTabNote: (tabId,note) => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,note}:t) })),
   updateTabStatus: (tabId,status) => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status}:t) })),
-  closeTab: tabId => set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status:'closed'}:t), activeTabId:s.activeTabId===tabId?null:s.activeTabId })),
+  closeTab: tabId => {
+    const st = get();
+    const closing = st.tabs.find(t => t.id === tabId);
+    set(s=>({ tabs:s.tabs.map(t=>t.id===tabId?{...t,status:'closed'}:t), activeTabId:s.activeTabId===tabId?null:s.activeTabId }));
+    // v4.6.26: release the floor-plan table if this was a bar tab linked to
+    // one, and no other open bar tab is still on it.
+    if (closing && closing.tableId) {
+      const remaining = get().tabs.some(t => t.tableId === closing.tableId && t.status !== 'closed' && t.id !== tabId);
+      if (!remaining) {
+        const tbl = (get().tables||[]).find(t => t.id === closing.tableId);
+        if (tbl && tbl.status === 'occupied') {
+          get()._updateTable(closing.tableId, { status: 'available' });
+        }
+      }
+    }
+  },
   voidTabRound: (tabId,roundId) => set(s=>({ tabs:s.tabs.map(t=>{ if(t.id!==tabId)return t; const rounds=t.rounds.filter(r=>r.id!==roundId); return{...t,rounds,total:rounds.reduce((s,r)=>s+r.subtotal,0)}; }) })),
   seedTabs: () => set({ tabs:[
     { id:'t-demo1', ref:'TAB-001', name:'Maria G.', seatId:'B1', tableId:null, openedBy:'Maria', openedAt:Date.now()-22*60000, status:'running', preAuth:false, preAuthAmount:0, note:'Birthday drinks', total:29.8,
