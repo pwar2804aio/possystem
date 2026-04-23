@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.29', date: '23 Apr 2026', label: 'Scheduled collections fire 30 mins before pickup',
+    changes: [
+      'Click & collect and takeaway orders with a non-ASAP collection time no longer hit the kitchen the moment you press Send. They now enter the queue with status scheduled and scheduledFireAt set to 30 minutes before the collection time. A background tick running on the existing SyncBridge 60s periodic timer checks the queue and fires any order whose fire time has been reached.',
+      'If the collection time is less than 30 minutes away when Send is pressed, the order fires immediately. If ASAP is ticked or no collection time is set, behaviour is unchanged from before. The only change to the immediate-fire path is a new optional bypassSchedule flag on sendToKitchen that fireScheduledOrder uses to reuse the same code path without re-deferring.',
+      'fireScheduledOrder reconstructs walkInOrder and customer from the stored queue entry, calls sendToKitchen({ bypassSchedule: true }) so KDS tickets and print jobs run exactly as a live order would, then restores the POS context. The queue entry is updated in place (status scheduled → prep, sentAt = now) via the existing alreadyQueued branch in sendToKitchen, so no duplicate queue rows.',
+      'Toast on scheduling shows the customer name, their collection time, and when the kitchen will fire — e.g. Sarah — collection 19:00, kitchen fires 18:30. Normal Order sent toast still fires for ASAP / immediate orders.',
+    ],
+  },
+  {
     version: '4.6.28', date: '23 Apr 2026', label: 'Combine tables + fire kitchen alert on move/combine',
     changes: [
       'Table move modal now supports combining two occupied tables as well as transferring to an empty one. Open table > header menu > Move / Combine (renamed from Transfer table). Empty destinations show green, occupied destinations show amber. Picking an empty table still transfers as before; picking an occupied table combines the two sessions onto the destinations check (items appended, covers summed, subtotal/total recomputed). The source table is freed in both cases.',

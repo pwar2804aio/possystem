@@ -308,6 +308,12 @@ export default function SyncBridge({ onSyncPulse }) {
           // v4.6.27: static import above (ADR-008)
           await periodicSync();
         } catch {}
+        try {
+          // v4.6.29: fire any scheduled collection orders whose fire time
+          // has been reached. Piggy-backs on the existing 60s cadence so we
+          // don't spin up a second timer.
+          useStore.getState().tickScheduledOrders?.();
+        } catch {}
       }, 60_000);
       // Store timer for cleanup
       window._rposPeriodicTimer = periodicTimer;

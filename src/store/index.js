@@ -1202,7 +1202,7 @@ export const useStore = create((set, get) => ({
 
   // ── SEND TO KITCHEN ────────────────────────
   // Fires courses 0+1, marks table occupied, updates totals
-  sendToKitchen: () => {
+  sendToKitchen: ({ bypassSchedule = false } = {}) => {
     const { activeTableId, staff, orderType, customer, addToQueue, tables } = get();
 
     // Get routing config — prefer store value (pushed from back office), fall back to localStorage
@@ -1349,6 +1349,65 @@ export const useStore = create((set, get) => ({
     } else {
       const order = get().walkInOrder;
       if (!order?.items?.length) return;
+
+      // v4.6.29: scheduled-collection deferral. If the customer set a
+      // non-ASAP collection time that's more than 30 minutes away, skip
+      // the kitchen send entirely and stash the order as status=scheduled
+      // with a scheduledFireAt timestamp. A background tick
+      // (tickScheduledOrders → fireScheduledOrder) runs the print + KDS
+      // path 30 minutes before the collection time.
+      const _parseCollectionTimeToMs = (timeStr) => {
+        if (!timeStr || typeof timeStr !== 'string') return null;
+        const [h, m] = timeStr.split(':').map(Number);
+        if (Number.isNaN(h) || Number.isNaN(m)) return null;
+        const d = new Date();
+        d.setHours(h, m, 0, 0);
+        // If that time has already passed today, assume tomorrow
+        // (handles overnight pre-orders).
+        if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
+        return d.getTime();
+      };
+      if (!bypassSchedule && customer?.collectionTime && !customer?.isASAP) {
+        const collectAt = _parseCollectionTimeToMs(customer.collectionTime);
+        const LEAD_MS = 30 * 60 * 1000;
+        if (collectAt && collectAt - Date.now() > LEAD_MS) {
+          const scheduledFireAt = collectAt - LEAD_MS;
+          const pendingItems = order.items.filter(i => i.status === 'pending' && !i.voided);
+          if (!pendingItems.length) return;
+          const label = customer?.name
+            ? `${orderType.charAt(0).toUpperCase()+orderType.slice(1)} · ${customer.name}`
+            : orderType;
+          const ref = order.ref || `#${++_orderNum}`;
+          const scheduledEntry = {
+            ref, type: orderType,
+            customer: { ...customer },
+            // Keep items as pending — nothing has hit the kitchen yet.
+            items: pendingItems.map(i => ({ ...i })),
+            total: pendingItems.reduce((s, i) => s + i.price * i.qty, 0),
+            status: 'scheduled',
+            scheduledFireAt,
+            createdAt: order.createdAt || Date.now(),
+            collectionTime: customer.collectionTime,
+            isASAP: false,
+            staff: staff?.name,
+            label,
+          };
+          const alreadyQueued = get().orderQueue.find(o => o.ref === ref);
+          if (alreadyQueued) {
+            set(s => ({ orderQueue: s.orderQueue.map(o => o.ref === ref ? { ...o, ...scheduledEntry } : o) }));
+          } else {
+            addToQueue(scheduledEntry);
+          }
+          const fireTime = new Date(scheduledFireAt).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+          get().showToast(
+            customer?.name
+              ? `${customer.name} — collection ${customer.collectionTime}, kitchen fires ${fireTime}`
+              : `Scheduled — kitchen fires at ${fireTime}`,
+            'success'
+          );
+          return;
+        }
+      }
       const pendingItems = order.items.filter(i => i.status === 'pending' && !i.voided);
       const label = customer?.name ? `${orderType.charAt(0).toUpperCase()+orderType.slice(1)} · ${customer.name}` : orderType;
       const newTickets = createKdsTickets(pendingItems, label, staff?.name || 'Server', 1);
@@ -1404,6 +1463,60 @@ export const useStore = create((set, get) => ({
       newTickets.forEach(t => insertKDSTicket(t));
       get().showToast(customer?.name ? `Order sent — ${customer.name}` : 'Sent to kitchen', 'success');
     }
+  },
+
+  // v4.6.29: fires a previously-scheduled collection order through the normal
+  // sendToKitchen path. Reconstructs walkInOrder/customer/orderType from the
+  // stored queue entry, runs sendToKitchen with bypassSchedule=true so it
+  // doesn't re-queue as scheduled, then restores the POS context.
+  fireScheduledOrder: (ref) => {
+    const { orderQueue } = get();
+    const entry = orderQueue.find(o => o.ref === ref);
+    if (!entry || entry.status !== 'scheduled') return;
+
+    const reconstructed = {
+      id: `ORD-scheduled-${Date.now()}`,
+      ref: entry.ref,
+      items: (entry.items || []).map(i => ({ ...i, status: 'pending', fired: false })),
+      subtotal: entry.total || 0,
+      total: entry.total || 0,
+      createdAt: entry.createdAt || Date.now(),
+    };
+    const prev = {
+      walkInOrder: get().walkInOrder,
+      customer:    get().customer,
+      orderType:   get().orderType,
+    };
+    set({
+      walkInOrder: reconstructed,
+      customer: entry.customer,
+      orderType: entry.type || 'collection',
+    });
+    try {
+      // bypassSchedule=true: this order is already at/past its fire time,
+      // don't let the scheduler re-defer it.
+      get().sendToKitchen({ bypassSchedule: true });
+    } finally {
+      // Restore prior POS context. orderQueue mutations persist because
+      // sendToKitchen matched the ref via alreadyQueued and merged into the
+      // existing entry (flipping status scheduled → prep, setting sentAt).
+      set(prev);
+    }
+  },
+
+  // v4.6.29: iterate orderQueue for any scheduled orders whose
+  // scheduledFireAt is in the past and fire them. Called on an interval
+  // from SyncBridge (every 60s).
+  tickScheduledOrders: () => {
+    const { orderQueue } = get();
+    const now = Date.now();
+    const due = orderQueue.filter(o => o.status === 'scheduled' && (o.scheduledFireAt || 0) <= now);
+    if (!due.length) return;
+    due.forEach(o => {
+      try { get().fireScheduledOrder(o.ref); } catch (err) {
+        console.warn('[tickScheduledOrders] failed to fire', o.ref, err);
+      }
+    });
   },
 
   fireCourse: (courseNum) => {
