@@ -1,6 +1,7 @@
 import { useCompact } from '../lib/useCompact';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import DrawerCashModal from '../components/DrawerCashModal';
+import POSLockOverlay from '../components/POSLockOverlay';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
@@ -1540,7 +1541,10 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
           );
         })}
       </div>
-      {/* v4.6.49: role-aware sign-in gate. When the POS has a drawer bound
+            {/* v4.6.51: portal-based lock overlay, self-contained */}
+      <POSLockOverlay />
+
+{/* v4.6.49: role-aware sign-in gate. When the POS has a drawer bound
           and it's not in a usable state (idle/closed), lock the whole POS.
           Manager/Admin or staff with cashup permission → shown the cash-in
           modal. Other roles → shown a read-only "ask a manager" screen

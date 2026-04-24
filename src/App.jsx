@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.51', date: '24 Apr 2026', label: 'POS lock overlay as a standalone Portal component',
+    changes: [
+      'Rewrote the POS sign-in gate as a self-contained component, POSLockOverlay, rendered via React createPortal into document.body. Fixes whatever was preventing the previous in-line gate from showing on the running bundle — renders above every existing style context, not dependent on the component tree\'s CSS.',
+      'Subscribes directly to cashDrawers + staff via useStore so any state change triggers re-render. No shared destructured references with POSSurface.',
+      '15-second interval polls cashDrawers and currentDrawerSession from Supabase. Manager cashes up from back office → within 15s this POS picks up drawer.status = idle → lock appears.',
+      'Role-aware: Manager / Admin / cashup permission → DrawerCashModal (can cash in). Server / Cashier without cashup → read-only screen with drawer name, explanation, and a Sign out button.',
+      'Console logs state on every render so we can verify the component is alive on the live bundle: "[POSLockOverlay] { deviceId, drawerName, status, staffRole, needsLock }". Open console to confirm.',
+    ],
+  },
+  {
     version: '4.6.50', date: '24 Apr 2026', label: 'Cash button shows whenever a drawer is bound (status-agnostic)',
     changes: [
       'Peter: assigned Cash Drawer 1 to a POS but the Cash button was still hidden in Checkout even though the drawer shows on the header. Root cause: v4.6.47 added a status === open requirement on top of the drawer-bound check. Since the drawer was idle (never cashed in), Cash got hidden. Confusing — operator sees a drawer on the POS but no way to take cash.',
