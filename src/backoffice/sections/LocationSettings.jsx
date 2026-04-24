@@ -61,19 +61,21 @@ export default function LocationSettings() {
 
   const [timezone, setTimezone]     = useState('Europe/London');
   const [bizDayStart, setBizDayStart] = useState('06:00');
+  const [collectionLeadMin, setCollectionLeadMin] = useState(30);
   const [shifts, setShifts]         = useState([]);
   const [showItemImages, setShowItemImages] = useState(false);
   const [loadingImageSetting, setLoadingImageSetting] = useState(true);
 
   useEffect(() => {
     if (!platformSupabase) { setLoading(false); return; }
-    platformSupabase.from('locations').select('id, name, timezone, business_day_start, shifts').limit(1).single()
+    platformSupabase.from('locations').select('id, name, timezone, business_day_start, shifts, collection_lead_minutes').limit(1).single()
       .then(({ data }) => {
         if (data) {
           setLocation(data);
           setTimezone(data.timezone || 'Europe/London');
           setBizDayStart(data.business_day_start || '06:00');
           setShifts(data.shifts || []);
+          setCollectionLeadMin(typeof data.collection_lead_minutes === 'number' ? data.collection_lead_minutes : 30);
         }
         setLoading(false);
       })
@@ -102,7 +104,7 @@ export default function LocationSettings() {
     setSaving(true); setError(''); setSaved(false);
     const { error: err } = await platformSupabase
       .from('locations')
-      .update({ timezone, business_day_start: bizDayStart, shifts })
+      .update({ timezone, business_day_start: bizDayStart, shifts, collection_lead_minutes: collectionLeadMin })
       .eq('id', location.id);
 
     // Save show_item_images to ops DB
@@ -164,6 +166,24 @@ export default function LocationSettings() {
         <div style={{ fontSize:11, color:'var(--t4)', marginTop:6 }}>
           Today's reporting period: <strong style={{ color:'var(--t2)' }}>{bizDayStart} — {bizDayStart} tomorrow</strong>
         </div>
+
+      {/* v4.6.60: Collection lead time */}
+      <div style={S.card}>
+        <div style={S.h2}>🕐 Collection lead time</div>
+        <div style={S.desc}>
+          When a customer schedules a collection time, the kitchen ticket fires this many minutes before the collection time.
+          Set to <strong>30</strong> for a normal kitchen. Set to <strong>0</strong> to fire immediately on send.
+        </div>
+        <label style={S.label}>Fire to kitchen N minutes before collection</label>
+        <select style={{ ...S.select, maxWidth:160 }} value={collectionLeadMin} onChange={e => setCollectionLeadMin(parseInt(e.target.value, 10) || 0)}>
+          {Array.from({ length: 25 }, (_, i) => i * 5).map(m => (
+            <option key={m} value={m}>{m === 0 ? 'Fire immediately' : `${m} minutes`}</option>
+          ))}
+        </select>
+        <div style={{ fontSize:11, color:'var(--t4)', marginTop:6 }}>
+          Example: customer collects at <strong style={{ color:'var(--t2)' }}>19:00</strong>, lead time <strong style={{ color:'var(--t2)' }}>{collectionLeadMin} min</strong> → kitchen fires at <strong style={{ color:'var(--t2)' }}>{collectionLeadMin === 0 ? '19:00 (immediately)' : (() => { const d = new Date(); d.setHours(19, 0, 0, 0); d.setMinutes(d.getMinutes() - collectionLeadMin); return d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }); })()}</strong>.
+        </div>
+      </div>
       </div>
 
       {/* Shifts */}

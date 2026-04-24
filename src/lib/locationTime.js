@@ -21,7 +21,7 @@ export async function getLocationConfig() {
     try {
       const { data } = await platformSupabase
         .from('locations')
-        .select('timezone, business_day_start, shifts')
+        .select('timezone, business_day_start, shifts, collection_lead_minutes')
         .limit(1)
         .single();
       if (data) {
@@ -29,6 +29,7 @@ export async function getLocationConfig() {
           timezone: data.timezone || 'Europe/London',
           businessDayStart: data.business_day_start || '06:00',
           shifts: data.shifts || [],
+          collectionLeadMinutes: typeof data.collection_lead_minutes === 'number' ? data.collection_lead_minutes : 30,
         };
         return _locationConfig;
       }

@@ -1383,7 +1383,9 @@ export const useStore = create((set, get) => ({
       };
       if (!bypassSchedule && customer?.collectionTime && !customer?.isASAP) {
         const collectAt = _parseCollectionTimeToMs(customer.collectionTime);
-        const LEAD_MS = 30 * 60 * 1000;
+        // v4.6.60: lead time configurable via Location settings (default 30min, 5-min increments)
+      const _leadMin = (typeof get().locationConfig?.collectionLeadMinutes === 'number') ? get().locationConfig.collectionLeadMinutes : 30;
+      const LEAD_MS = _leadMin * 60 * 1000;
         if (collectAt && collectAt - Date.now() > LEAD_MS) {
           const scheduledFireAt = collectAt - LEAD_MS;
           const pendingItems = order.items.filter(i => i.status === 'pending' && !i.voided);

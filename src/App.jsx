@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.60', date: '24 Apr 2026', label: 'Configurable collection lead time (5-min increments)',
+    changes: [
+      'Back office Location settings now has a Collection lead time card. Pick how many minutes before a scheduled collection the kitchen ticket should fire — 0 (fire immediately) up to 120 minutes in 5-minute increments. Default 30 (matches the previous hardcoded value).',
+      'Live preview shows what time the kitchen will fire for a sample 19:00 collection, so the manager can sanity-check before saving.',
+      'Migration applied to Platform DB: locations table gets collection_lead_minutes integer default 30. Existing rows keep their 30-min behaviour automatically.',
+      'sendToKitchen now reads locationConfig.collectionLeadMinutes from the store. The hardcoded LEAD_MS = 30 * 60 * 1000 is gone — replaced by (config?.collectionLeadMinutes ?? 30) * 60 * 1000. locationTime.js getLocationConfig() pulls the column on initial load.',
+      'Behaviour unchanged at 30 mins. Set to 0 for kitchens that want orders fired the moment the cashier sends them. Set higher (60, 90) for slower-prep kitchens or specialist orders.',
+    ],
+  },
+  {
     version: '4.6.59', date: '24 Apr 2026', label: 'Orders Hub fills full screen width',
     changes: [
       'Peter: Orders tab content was constrained to ~720px on the left side of the POS, leaving the entire right half of the screen empty. Root cause: OrdersHub root div had display:flex with flexDirection:column and height:100%, but no width or flex grow. Inside a flex parent that means the element only takes the width of its content (the responsive grid filled until cards started wrapping at 720-ish px and stayed there).',
