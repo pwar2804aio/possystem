@@ -2441,45 +2441,18 @@ export const useStore = create((set, get) => ({
       if (current) {
         const openedMs = new Date(current.openedAt).getTime();
         if (openedMs < businessDayStartMs) {
-          // v4.6.43: shift has run past the business-day boundary. Before we
-          // close the shift, force-close any drawers that are still open —
-          // nobody cashed them up, we don't know the physical cash count, so
-          // we honestly log declared=null variance=null and note it.
-          try {
-            await get().loadCashDrawers?.();
-            const openDrawers = (get().cashDrawers || []).filter(d => d.status && d.status !== 'idle');
-            for (const d of openDrawers) {
-              // Find + close the drawer's open session
-              const { data: sess } = await supabase
-                .from('drawer_sessions').select('*')
-                .eq('drawer_id', d.id)
-                .in('status', ['open', 'counting'])
-                .order('cash_in_at', { ascending: false })
-                .limit(1);
-              const row = sess?.[0];
-              if (row) {
-                await supabase.from('drawer_sessions').update({
-                  cash_out_at: new Date(businessDayStartMs).toISOString(),
-                  cash_out_by_staff_id: null,
-                  declared_cash: null,
-                  expected_cash: null,
-                  variance: null,
-                  status: 'closed',
-                  notes: [row.notes, 'Auto-closed at business day boundary — not physically counted'].filter(Boolean).join(' · '),
-                }).eq('id', row.id);
-              }
-              await get().updateCashDrawer?.(d.id, {
-                status: 'idle', currentFloat: 0, openedAt: null, openedByStaffId: null,
-              });
-            }
-            if (openDrawers.length > 0) {
-              console.warn(`[reconcileShiftOnMount] auto-closed ${openDrawers.length} drawer(s) with unknown variance`);
-            }
-          } catch (err) {
-            console.warn('[reconcileShiftOnMount] drawer force-close failed:', err?.message || err);
+          // v4.6.45: shift has crossed the business-day boundary. We close the
+          // shift itself (so reports roll over) but LEAVE drawers in whatever
+          // state they were in — no fabricated close events, no null-variance
+          // rows. A POS with a still-open drawer will refuse to start new cash
+          // trading until a manager cashes it up from the back office. Open
+          // orders carry over untouched.
+          await get().loadCashDrawers?.();
+          const stillOpen = (get().cashDrawers || []).filter(d => d.status && d.status !== 'idle');
+          if (stillOpen.length > 0) {
+            console.warn(`[reconcileShiftOnMount] shift auto-closed with ${stillOpen.length} drawer(s) still open — they need manual cash-up before new trading`);
           }
-          // Now close the shift itself
-          await get().closeShift?.({ auto: true, notes: 'Auto-closed at business day boundary' });
+          await get().closeShift?.({ auto: true, notes: stillOpen.length > 0 ? `Auto-closed at business day boundary — ${stillOpen.length} drawer(s) still open, need manual cash-up` : 'Auto-closed at business day boundary' });
           await get().openShift?.();
         }
       } else {

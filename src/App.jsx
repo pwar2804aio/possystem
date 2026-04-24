@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.45', date: '24 Apr 2026', label: 'Close day — redesigned EOD flow with per-drawer breakdown',
+    changes: [
+      'Rewrote End of day from scratch as Close day. Three clean states: no shift open (nothing to do), drawers still open (blocking, shows which drawers need cash up), and all drawers cashed up (full review + close button). Dropped the legacy denomination counter that was mentioning opening float at the wrong step — opening float is a cash-in concept, not an end-of-day concept.',
+      'Per-drawer card shows opening float, cash sales, drops, expenses, expected, declared, and variance colour-coded. Expand any card to see the full denomination breakdown aggregated from drawer_sessions.denominations (the jsonb we capture at cash-up) plus the notes field and who counted + when.',
+      'Day totals pulled from closed_checks scoped to the shift: revenue, cash, card, other methods, tax, tips, checks, covers. Cash summary block shows total expected vs total declared with net variance across every drawer. Payment methods table with count, revenue, and tips per method.',
+      'Close button only appears when every drawer is idle. Confirms with a count + revenue summary. Writes the z_report jsonb (shape: shiftId, openedAt, closedAt, totals, drawers[], paymentMethods[], totalExpected, totalDeclared, netVariance, generatedAt) to shifts and flips the shift to closed.',
+      'Changed auto-close behaviour at business-day boundary. Previously force-closed open drawers with null variance; now it just closes the shift and leaves drawers in whatever state they were in. A POS whose drawer is still open will refuse new cash trading until a manager cashes it up from the back office. No fabricated close events, no null-variance rows in reports — audit trail stays honest.',
+      'Nav entry renamed from End of day to Close day. File still EODClose.jsx to avoid breaking imports.',
+    ],
+  },
+  {
     version: '4.6.44', date: '24 Apr 2026', label: 'Fix regression — Pay with no details / no table no longer fires kitchen',
     changes: [
       'Peter: walk-ups paying at the counter without adding customer details / table stopped firing the kitchen send. Order stays on the POS after pressing Pay > Cash > Complete. Worked fine before a recent change.',

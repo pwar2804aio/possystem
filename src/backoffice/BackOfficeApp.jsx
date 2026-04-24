@@ -39,7 +39,7 @@ const NAV = [
   { id:'printing',   label:'Production printing',   icon:'🖨',  group:'Configuration' },
   { id:'reports',    label:'Reports',           icon:'📊',  group:'Analytics' },
   { id:'shift',      label:'Shift',             icon:'⏱', group:'Analytics' },
-  { id:'eod',        label:'End of day',        icon:'🔒',  group:'Analytics' },
+  { id:'eod',        label:'Close day',        icon:'🔒',  group:'Analytics' },
   { id:'pettycash',  label:'Petty cash',        icon:'\u{1F4B0}', group:'Analytics' },
   { id:'tax',        label:'Tax & VAT',          icon:'%',   group:'Analytics' },
   { id:'ai',         label:'AI Assistant',      icon:'✦',   group:'Analytics' },
