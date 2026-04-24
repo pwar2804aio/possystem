@@ -177,11 +177,10 @@ export default function CashDrawers() {
                   ) : (
                     <button onClick={async (e) => {
                       e.stopPropagation();
-                      const allowed = Array.isArray(staff?.permissions) && staff.permissions.includes('cashup');
-                      if (!allowed && staff?.role !== 'Manager' && staff?.role !== 'Admin') {
-                        useStore.getState().showToast?.('Cashup permission required', 'error');
-                        return;
-                      }
+                      // v4.6.41: back office is already auth-gated by Supabase Auth as
+                      // the business owner. The staff object is the POS PIN-login user,
+                      // which is empty in office mode. Skip the POS permission check
+                      // here — it's enforced on the POS side of this same modal.
                       const exp = typeof computeExpectedCash === 'function' ? await computeExpectedCash(d.id) : 0;
                       setCashActionDrawer({ drawer: d, mode: 'out', expected: exp });
                     }}

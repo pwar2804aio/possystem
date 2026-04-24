@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.41', date: '24 Apr 2026', label: 'Back-office Cash up button actually opens the modal',
+    changes: [
+      'Peter tested v4.6.40 and found the Cash up button did nothing on click. Root cause: the button guarded on staff.permissions.includes("cashup") OR staff.role === Manager/Admin, but in back-office mode the staff object (which comes from POS PIN login) is empty. Both checks failed silently, the function returned before ever setting the modal state, no error, no feedback.',
+      'Fix: back office already gates page access via Supabase Auth (you must sign in as the business owner to reach these pages). The POS PIN-based staff permission check doesn\'t apply there. Removed the check from the back-office Cash Drawers pages Cash up button. The same check stays on the POS-side button — that\'s where the PIN-login roles matter.',
+      'Single-file commit (src/backoffice/sections/CashDrawers.jsx). No schema changes, no store changes. Back-office Cash in button was already working because it had no permission gate.',
+    ],
+  },
+  {
     version: '4.6.40', date: '24 Apr 2026', label: 'Cash drawer lifecycle — cash in / cash up / POS sign-in gate',
     changes: [
       'Drawer state machine: idle -> cash in -> open -> cash up -> idle. Every cycle writes a drawer_sessions row that captures opening float, closing count, expected cash, variance, and per-denomination breakdown. Every cash_movement in that session links back via session_id so at cash-up we can compute expected cash exactly from the sessions movements — not from a running tally that could drift.',
