@@ -61,6 +61,7 @@ export default function POSSurface() {
     location,
   } = useStore();
 
+  // BUILD_TEST_1777051985417
   // v4.6.48: cash drawer workflow state. Rebuilt for robustness.
   const [showDrawerMenu, setShowDrawerMenu] = useState(false);
   const [showCashIn, setShowCashIn]         = useState(false);
