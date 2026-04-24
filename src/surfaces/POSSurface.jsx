@@ -61,9 +61,10 @@ export default function POSSurface() {
     location,
   } = useStore();
 
-  // v4.6.40: cash drawer workflow state
+  // v4.6.48: cash drawer workflow state. Rebuilt for robustness.
   const [showDrawerMenu, setShowDrawerMenu] = useState(false);
-  const [showCashOut, setShowCashOut] = useState(false);
+  const [showCashIn, setShowCashIn]         = useState(false);
+  const [showCashOut, setShowCashOut]       = useState(false);
   const [expectedForCashOut, setExpectedForCashOut] = useState(0);
   useEffect(() => {
     if (typeof loadCurrentDrawerSession === 'function') loadCurrentDrawerSession();
@@ -1528,8 +1529,10 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
           );
         })}
       </div>
-      {/* v4.6.40: cash drawer sign-in gate (can't be dismissed — LOCKED) */}
-      {_needsCashIn && staff && (
+      {/* v4.6.48: sign-in gate. When the POS has a cash drawer bound and
+          it's not in a usable state, block the POS. No drawer bound = no
+          gate (POS trades card-only). */}
+      {_myDrw && _myDrw.status !== 'open' && _myDrw.status !== 'counting' && staff && !showCashIn && (
         <DrawerCashModal
           mode="in"
           drawer={_myDrw}
@@ -1537,12 +1540,28 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
           onComplete={async ({ amount, denominations }) => {
             await cashInDrawer?.(_myDrw.id, { openingFloat: amount, denominations });
             await loadCurrentDrawerSession?.();
+            if (typeof useStore.getState().loadCashDrawers === 'function') await useStore.getState().loadCashDrawers();
+          }}
+        />
+      )}
+      {/* Explicit cash-in flow from the drawer menu (always dismissable). */}
+      {showCashIn && _myDrw && (
+        <DrawerCashModal
+          mode="in"
+          drawer={_myDrw}
+          locked={false}
+          onClose={() => setShowCashIn(false)}
+          onComplete={async ({ amount, denominations }) => {
+            await cashInDrawer?.(_myDrw.id, { openingFloat: amount, denominations });
+            await loadCurrentDrawerSession?.();
+            if (typeof useStore.getState().loadCashDrawers === 'function') await useStore.getState().loadCashDrawers();
+            setShowCashIn(false);
           }}
         />
       )}
 
       {/* v4.6.40: drawer action sheet — opens from the 🔓 Drawer button */}
-      {showDrawerMenu && _myDrw && !_needsCashIn && (
+      {showDrawerMenu && _myDrw && (
         <div className="modal-back" onClick={e => e.target === e.currentTarget && setShowDrawerMenu(false)}>
           <div style={{
             background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:20,
@@ -1554,30 +1573,45 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
               {' · '}Float: <b style={{color:'var(--t1)', fontFamily:'var(--font-mono)'}}>£{Number(_myDrw.currentFloat || 0).toFixed(2)}</b>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              <button
-                onClick={() => {
-                  setShowDrawerMenu(false);
-                  openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 });
-                }}
-                style={{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t1)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'left' }}>
-                🔓 Open drawer (pulse)
-                <div style={{ fontSize:11, color:'var(--t3)', fontWeight:500, marginTop:2 }}>Pops the drawer open. Logged as a drawer_open event.</div>
-              </button>
-              <button
-                onClick={async () => {
-                  if (!_canCashup) { useStore.getState().showToast?.('Cashup permission required', 'error'); return; }
-                  setShowDrawerMenu(false);
-                  const exp = typeof computeExpectedCash === 'function' ? await computeExpectedCash(_myDrw.id) : 0;
-                  setExpectedForCashOut(exp);
-                  setShowCashOut(true);
-                }}
-                disabled={!_canCashup}
-                style={{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--red-b)', background: _canCashup ? 'var(--red-d)' : 'var(--bg3)', color: _canCashup ? 'var(--red)' : 'var(--t4)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor: _canCashup ? 'pointer' : 'not-allowed', textAlign:'left' }}>
-                💰 Cash up drawer
-                <div style={{ fontSize:11, color: _canCashup ? 'var(--red)' : 'var(--t4)', fontWeight:500, marginTop:2, opacity:.8 }}>
-                  {_canCashup ? 'Count cash, declare variance, close this drawer.' : 'Manager / cashup permission required.'}
+              {/* v4.6.48: status-aware actions */}
+              {(!_myDrw.status || _myDrw.status === 'idle') && (
+                <button
+                  onClick={() => { setShowDrawerMenu(false); setShowCashIn(true); }}
+                  style={{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--grn-b)', background:'var(--grn-d)', color:'var(--grn)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'left' }}>
+                  Cash in drawer
+                  <div style={{ fontSize:11, color:'var(--grn)', fontWeight:500, marginTop:2, opacity:.8 }}>Declare opening float. Drawer opens for trading.</div>
+                </button>
+              )}
+              {_myDrw.status === 'open' && (
+                <>
+                  <button
+                    onClick={() => { setShowDrawerMenu(false); openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 }); }}
+                    style={{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t1)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'left' }}>
+                    Open drawer (pulse)
+                    <div style={{ fontSize:11, color:'var(--t3)', fontWeight:500, marginTop:2 }}>Pops the drawer open. Logged as a drawer_open event.</div>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!_canCashup) { useStore.getState().showToast?.('Cashup permission required', 'error'); return; }
+                      setShowDrawerMenu(false);
+                      const exp = typeof computeExpectedCash === 'function' ? await computeExpectedCash(_myDrw.id) : 0;
+                      setExpectedForCashOut(exp);
+                      setShowCashOut(true);
+                    }}
+                    disabled={!_canCashup}
+                    style={{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--red-b)', background: _canCashup ? 'var(--red-d)' : 'var(--bg3)', color: _canCashup ? 'var(--red)' : 'var(--t4)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor: _canCashup ? 'pointer' : 'not-allowed', textAlign:'left' }}>
+                    Cash up drawer
+                    <div style={{ fontSize:11, color: _canCashup ? 'var(--red)' : 'var(--t4)', fontWeight:500, marginTop:2, opacity:.8 }}>
+                      {_canCashup ? 'Count cash, declare variance, close this drawer.' : 'Manager / cashup permission required.'}
+                    </div>
+                  </button>
+                </>
+              )}
+              {_myDrw.status === 'counting' && (
+                <div style={{ padding:'12px 14px', borderRadius:10, background:'rgba(232,160,32,.12)', border:'1px solid var(--amb,#e8a020)', color:'var(--amb,#e8a020)', fontSize:13, fontWeight:600 }}>
+                  Cash-up in progress. Finish the count from Back Office > Cash drawers.
                 </div>
-              </button>
+              )}
             </div>
             <button onClick={() => setShowDrawerMenu(false)}
               style={{ marginTop:14, width:'100%', padding:'9px', borderRadius:8, background:'transparent', border:'1px solid var(--bdr)', color:'var(--t3)', fontFamily:'inherit', fontWeight:600, fontSize:12, cursor:'pointer' }}>

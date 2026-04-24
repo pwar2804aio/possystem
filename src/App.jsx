@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.48', date: '24 Apr 2026', label: 'POS sign-in gate rebuilt + cash-in from POS',
+    changes: [
+      'Sign-in gate rebuilt. Now triggers on any POS where the bound drawer is not open and not counting (idle, missing, whatever) — regardless of the old _needsCashIn flag. Modal is locked=true so the operator cannot dismiss it. Non-drawer POSes (myDrawer() returns null) skip the gate entirely. Back office sessions without staff signed in also skip (gate still requires the staff object).',
+      'Added explicit Cash in drawer option to the POS drawer menu for drawers in idle status. So even if the sign-in gate somehow misfires, the operator can open the cash-in modal from the header drawer button. The cash-in modal is the same shared DrawerCashModal used in back office — same denomination counter, same quick-total option.',
+      'Drawer menu is now status-aware. Idle → only Cash in. Open → Pulse + Cash up. Counting → read-only message pointing back to Back Office. Prevents the UI from offering actions that wouldn\'t make sense given the drawer\'s current state.',
+      'On successful cash-in (both gate and explicit), the store does a loadCurrentDrawerSession + loadCashDrawers reload so the POS immediately transitions from locked/idle to open without a page refresh.',
+    ],
+  },
+  {
     version: '4.6.47', date: '24 Apr 2026', label: 'Cash payment button only appears when drawer is open on this terminal',
     changes: [
       'Cash button in CheckoutModal now only shows when the POS has a cash drawer bound to it AND that drawer is currently open (status = open). POSes with no drawer configured (e.g. kitchen handhelds, kiosks, dev terminals) no longer offer cash as a payment method — card-only.',
