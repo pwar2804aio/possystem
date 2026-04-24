@@ -2024,9 +2024,16 @@ export const useStore = create((set, get) => ({
 
   // Find the drawer assigned to the current POS device. Returns null if none.
   // Used by openCashDrawer and cash-sale auto-fire to route to the right drawer.
+  // v4.6.38: match against the physical device id (from rpos-device.id uuid)
+  // NOT the profile id. Profiles are shared templates; drawers bind strictly
+  // to individual terminals.
   myDrawer: () => {
-    const { cashDrawers, deviceConfig } = get();
-    const deviceId = deviceConfig?.profileId || deviceConfig?.deviceId;
+    const { cashDrawers } = get();
+    let deviceId = null;
+    try {
+      const dev = JSON.parse(localStorage.getItem('rpos-device') || '{}');
+      deviceId = dev?.id || null;
+    } catch { deviceId = null; }
     if (!deviceId) return null;
     return (cashDrawers || []).find(d => d.deviceId === deviceId) || null;
   },

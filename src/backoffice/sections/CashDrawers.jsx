@@ -25,8 +25,45 @@ const STATUS_META = {
 
 export default function CashDrawers() {
   const cashDrawers  = useStore(s => s.cashDrawers) || [];
-  const printers     = useStore(s => s.printers)    || [];
-  const deviceProfiles = useStore(s => s.deviceProfiles) || [];
+  // v4.6.38: printers live in localStorage ('rpos-printers'), updated by the
+  // back-office PrinterRegistry. Listen for 'rpos-printers-updated' + 'storage'
+  // so the dropdown refreshes when a printer is added from another screen.
+  const [printers, setPrinters] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; }
+  });
+  // v4.6.38: devices fetched from Supabase — drawers bind to an actual physical
+  // terminal (device.id uuid), not to a profile template. Profiles are shared
+  // across terminals, so binding to profile would not be strict 1:1.
+  const [devices, setDevices] = useState([]);
+  useEffect(() => {
+    const reloadPrinters = () => {
+      try { setPrinters(JSON.parse(localStorage.getItem('rpos-printers') || '[]')); } catch {}
+    };
+    window.addEventListener('rpos-printers-updated', reloadPrinters);
+    window.addEventListener('storage', reloadPrinters);
+    return () => {
+      window.removeEventListener('rpos-printers-updated', reloadPrinters);
+      window.removeEventListener('storage', reloadPrinters);
+    };
+  }, []);
+  useEffect(() => {
+    (async () => {
+      if (isMock || !supabase) return;
+      try {
+        const locId = await getLocationId();
+        if (!locId) return;
+        const { data } = await supabase
+          .from('devices')
+          .select('id, name, profile_id, type, last_seen, status')
+          .eq('location_id', locId)
+          .eq('status', 'active')
+          .order('last_seen', { ascending: false });
+        if (Array.isArray(data)) setDevices(data);
+      } catch (err) {
+        console.warn('[CashDrawers] devices load failed:', err?.message || err);
+      }
+    })();
+  }, []);
   const createCashDrawer = useStore(s => s.createCashDrawer);
   const updateCashDrawer = useStore(s => s.updateCashDrawer);
   const deleteCashDrawer = useStore(s => s.deleteCashDrawer);
@@ -75,9 +112,8 @@ export default function CashDrawers() {
     loadCashDrawers?.();
   };
 
-  // Which devices + printers are already taken so we can warn on reassign
+  // Which devices are already taken by another drawer so we can disable them in the dropdown
   const takenDevices = new Set(cashDrawers.filter(d => d.id !== form.id && d.deviceId).map(d => d.deviceId));
-  const takenPrinters = new Set(); // printers can be shared across drawers (unusual but allowed)
 
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
@@ -166,15 +202,19 @@ export default function CashDrawers() {
             </Field>
 
             {/* Device */}
-            <Field label="POS device (manages this drawer)" hint="Strict — only this device can ring cash into this drawer. Leave blank to allow assignment at runtime. Each device can only own one drawer.">
+            <Field label="POS terminal (manages this drawer)" hint="Strict — only this physical terminal (matched by its paired device ID) can ring cash into this drawer. Each device can only own one drawer.">
               <select value={form.deviceId} onChange={e => setForm(f => ({ ...f, deviceId: e.target.value }))}
                 style={inputStyle}>
                 <option value="">— Unassigned (any device) —</option>
-                {deviceProfiles.map(dp => {
-                  const taken = takenDevices.has(dp.id);
+                {devices.length === 0 && (
+                  <option disabled value="">— No paired devices found —</option>
+                )}
+                {devices.map(d => {
+                  const taken = takenDevices.has(d.id);
+                  const lastSeen = d.last_seen ? new Date(d.last_seen).toLocaleDateString('en-GB', { day:'2-digit', month:'short' }) : '—';
                   return (
-                    <option key={dp.id} value={dp.id} disabled={taken}>
-                      {dp.name || dp.id}{taken ? ' (already assigned)' : ''}
+                    <option key={d.id} value={d.id} disabled={taken}>
+                      {d.name || d.id.slice(0, 8)} (last seen {lastSeen}){taken ? ' · already assigned' : ''}
                     </option>
                   );
                 })}

@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.38', date: '23 Apr 2026', label: 'Fix Cash drawer dropdowns (printer + device populate correctly)',
+    changes: [
+      'Peter reported: dropdowns for printer and POS device were empty in the Cash drawers section. Two issues — (1) the component was reading printers and deviceProfiles from the Zustand store, but neither is a store slice: printers live in rpos-printers localStorage (populated by PrinterRegistry from Supabase), device profiles live in rpos-device-profiles localStorage. Both reads returned undefined. (2) Drawers should bind to actual paired devices, not profile templates — profiles are shared across terminals so binding to profile would not be strict 1:1.',
+      'CashDrawers.jsx now reads printers from localStorage with an rpos-printers-updated listener so the dropdown refreshes live. Devices are fetched directly from the Supabase devices table filtered to the current location + active status. Each option shows device name and last-seen date so you can tell terminals apart.',
+      'myDrawer() resolver now matches drawer.deviceId against rpos-device.id (the paired terminals UUID), not deviceConfig.profileId as before. This makes the strict 1:1 binding actually strict — two terminals using the same Main profile will no longer both think the same drawer is theirs.',
+      'If you had already created drawers in v4.6.35-37 bound to profile ids, theyll stop resolving at POS side until you edit them and pick the real device instead. The back office list still shows them; just reassign the POS terminal in the dropdown.',
+    ],
+  },
+  {
     version: '4.6.37', date: '23 Apr 2026', label: 'Shift lifecycle — auto-open at app mount, manager-gated close (Phase 2)',
     changes: [
       'Shifts are now runtime entities. A shift opens automatically at app mount if none exists; auto-closes when the business_day_start boundary is crossed and reopens a fresh one. Manual open available via the Shift page if ever needed.',
