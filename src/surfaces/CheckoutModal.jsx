@@ -270,7 +270,12 @@ function CashTransaction({ grand, onComplete, onBack }) {
 // ─── Main checkout modal ──────────────────────────────────────────────────────
 export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
   const compact = useCompact();
-  const { taxRates, deviceConfig } = useStore();
+  const { taxRates, deviceConfig, myDrawer } = useStore();
+  // v4.6.47: resolve the drawer bound to this POS terminal. If the POS has
+  // no drawer configured OR the bound drawer isn't currently open, cash
+  // payments shouldn't be offered — operator has nowhere to put the cash.
+  const _drawer = typeof myDrawer === 'function' ? myDrawer() : null;
+  const _canTakeCash = !!_drawer && _drawer.status === 'open';
   const [screen, setScreen] = useState('review');
   const [namesOnly, setNamesOnly] = useState(false);
   const [tipAmt, setTipAmt] = useState(0);
@@ -494,7 +499,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                   {!skipTip && <div style={{ fontSize:10, color:'var(--card-sub)', opacity:.7, marginTop:-2 }}>Tip step included</div>}
                 </button>
 
-                <button onClick={()=>setScreen('cash')} style={{
+                {_canTakeCash && <button onClick={()=>setScreen('cash')} style={{
                   flex:1, padding:compact?'12px 10px':'22px 14px', borderRadius:compact?12:18, cursor:'pointer', fontFamily:'inherit',
                   background:'var(--cash-bg)', border:`1.5px solid var(--cash-border)`,
                   display:'flex', flexDirection:'column', alignItems:'center', gap:8,
@@ -506,7 +511,7 @@ export default function CheckoutModal({ items, subtotal, service, total, orderTy
                   <div style={{ fontSize:compact?13:17, fontWeight:800, color:'var(--cash-text)' }}>Cash</div>
                   <div style={{ fontSize:11, color:'var(--cash-sub)' }}>Change calculated</div>
                   <div style={{ fontSize:10, color:'var(--cash-sub)', opacity:.7, marginTop:-2 }}>Instant, no tip prompt</div>
-                </button>
+                </button>}
               </div>
 
               {/* Split — secondary */}

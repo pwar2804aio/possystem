@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.47', date: '24 Apr 2026', label: 'Cash payment button only appears when drawer is open on this terminal',
+    changes: [
+      'Cash button in CheckoutModal now only shows when the POS has a cash drawer bound to it AND that drawer is currently open (status = open). POSes with no drawer configured (e.g. kitchen handhelds, kiosks, dev terminals) no longer offer cash as a payment method — card-only.',
+      'POSes that DO have a drawer bound but haven\'t cashed it in yet also hide the cash button. This is belt-and-braces — the sign-in gate (v4.6.48 next) is meant to block the whole POS before any sale can happen, but this way even if the gate somehow missed, a cashier couldn\'t accidentally ring a cash sale with nowhere to put the money.',
+      'Card button becomes full-width when cash is hidden (natural flex behaviour, no layout tweaks needed). Split check stays as-is since it splits across payment methods and the modal handles missing-cash correctly per-guest.',
+      'Single-file commit to CheckoutModal.jsx. Uses the existing myDrawer() store getter — no schema, no store changes.',
+    ],
+  },
+  {
     version: '4.6.46', date: '24 Apr 2026', label: 'Fix Close day button — closeShift permission gate now allows back-office',
     changes: [
       'Peter tested v4.6.45 Close day and the red Close day button did nothing. Root cause: finaliseShift delegates to closeShift, and closeShift had its own older permission gate that checked staff.role === Manager/Admin OR cashup/eod permission. In back-office mode the staff object is empty (staff is PIN-login, not Supabase Auth), so both checks failed and closeShift returned null silently. Same bug class as the earlier Cash Up button issue.',
