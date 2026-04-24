@@ -1202,7 +1202,11 @@ export const useStore = create((set, get) => ({
 
   // ── SEND TO KITCHEN ────────────────────────
   // Fires courses 0+1, marks table occupied, updates totals
-  sendToKitchen: ({ bypassSchedule = false } = {}) => {
+  sendToKitchen: (opts) => {
+    // v4.6.44: tolerate any arg shape. POSSurface legacy callers pass
+    // sendToKitchen(null) or sendToKitchen(tableId) as positional args.
+    // Destructuring `null` throws; this internal default doesn't.
+    const bypassSchedule = (opts && typeof opts === 'object') ? !!opts.bypassSchedule : false;
     const { activeTableId, staff, orderType, customer, addToQueue, tables } = get();
 
     // Get routing config — prefer store value (pushed from back office), fall back to localStorage

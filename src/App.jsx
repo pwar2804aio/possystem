@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.44', date: '24 Apr 2026', label: 'Fix regression — Pay with no details / no table no longer fires kitchen',
+    changes: [
+      'Peter: walk-ups paying at the counter without adding customer details / table stopped firing the kitchen send. Order stays on the POS after pressing Pay > Cash > Complete. Worked fine before a recent change.',
+      'Root cause: v4.6.29 changed the sendToKitchen signature from () => {} to ({ bypassSchedule = false } = {}) => {} so fireScheduledOrder could pass a bypass flag. The default = {} only triggers when the caller passes undefined — calling sendToKitchen(null) with an explicit null still destructures null and throws "Cannot read properties of null (reading bypassSchedule)". POSSurface has several pre-existing call sites that pass positional args: sendToKitchen(activeTableId) and sendToKitchen(null). The null path is what walk-up payments hit because there\'s no table.',
+      'The throw was caught by handlePayComplete\'s try/catch for state mutation, printed "State mutation failed — continuing to print", but by continuing to print without actually doing sendToKitchen or closing the check, the order just sat there.',
+      'Fix: rewrote the sendToKitchen signature to tolerate any arg shape. Now `(opts) => { const bypassSchedule = (opts && typeof opts === "object") ? !!opts.bypassSchedule : false; ... }`. String, null, undefined, tableId — all accepted, bypass only set when an actual options object with the flag is passed.',
+      'No behaviour change for callers that were already passing the options object correctly (fireScheduledOrder via bypassSchedule: true). No behaviour change for the original zero-arg callers.',
+    ],
+  },
+  {
     version: '4.6.43', date: '24 Apr 2026', label: 'Location-wide End of Day Z-read',
     changes: [
       'Rewrote Back Office > End of day as a shift-scoped, location-wide Z-read. Aggregates every drawer session + every closed check for the current open shift into one consolidated report, then closes the shift. Replaces the previous single-drawer denomination counter flow — that counter logic is now owned by the per-drawer cash up modal on the Cash Drawers page and on the POS.',
