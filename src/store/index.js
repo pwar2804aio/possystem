@@ -1592,10 +1592,62 @@ export const useStore = create((set, get) => ({
     if (courseNum > 1) {
       const tableLabel = table?.label || activeTableId;
       const centresInCourse = new Set();
+      // Primary: read from in-memory kdsTickets (still populated if KDS hasn't bumped it)
       (get().kdsTickets || []).forEach(tk => {
         if (tk.table !== tableLabel) return;
         if ((tk.items || []).some(i => i.course === courseNum)) centresInCourse.add(tk.centreId);
       });
+      // v4.6.58: fallback — derive centres directly from the table session items + routing.
+      // kdsTickets gets cleared once dishes are bumped from KDS, so by the time staff hits
+      // Fire course on a later course there may be no ticket left to read centres from.
+      // The session items are still there and still carry their categories, so we can
+      // route them ourselves using the SAME routing config used at send time.
+      if (centresInCourse.size === 0) {
+        try {
+          const routingConfig = (() => {
+            try {
+              const snap = JSON.parse(localStorage.getItem('rpos-config-snapshot') || '{}')?.printRouting;
+              if (snap?.centres?.length) return snap;
+              return JSON.parse(localStorage.getItem('rpos-print-routing') || 'null') || { centres: [], routing: {} };
+            } catch { return { centres: [], routing: {} }; }
+          })();
+          const { centres = [], routing = {} } = routingConfig;
+          // Local copy of the centre-resolution logic. Same behaviour as the inline one
+          // used inside sendToKitchen, just reused here.
+          const menu = get().menuItems || [];
+          const menuById = new Map(menu.map(m => [m.id, m]));
+          const parentMap = new Map(menu.filter(m => m.parentId).map(m => [m.id, m.parentId]));
+          const catOrAncestorMatches = (cat, assignedSet, pm) => {
+            let cur = cat; let depth = 0;
+            while (cur && depth < 10) {
+              if (assignedSet.has(cur)) return true;
+              cur = pm.get(cur) || null;
+              depth++;
+            }
+            return false;
+          };
+          const courseItems = (table?.session?.items || []).filter(i => i.course === courseNum && i.status !== 'voided');
+          courseItems.forEach(item => {
+            const full = menuById.get(item.id) || menuById.get(item.itemId) || item;
+            const cat = full.cat || full.category;
+            const parentCat = full.parentId ? (menuById.get(full.parentId)?.cat || menuById.get(full.parentId)?.category) : null;
+            centres.forEach(centre => {
+              const r = routing?.[centre.id];
+              if (!r?.assignedCategories?.length) return;
+              if (r.excludedItems?.includes(item.id) || r.excludedItems?.includes(item.itemId)) return;
+              const assignedSet = new Set(r.assignedCategories);
+              const matches = (cat && catOrAncestorMatches(cat, assignedSet, parentMap))
+                           || (parentCat && catOrAncestorMatches(parentCat, assignedSet, parentMap));
+              if (matches) centresInCourse.add(centre.id);
+            });
+          });
+          if (centresInCourse.size > 0) {
+            console.log('[fireCourse] derived centres from session items:', [...centresInCourse]);
+          }
+        } catch (err) {
+          console.warn('[fireCourse] fallback centre derivation failed:', err?.message || err);
+        }
+      }
       centresInCourse.forEach(centreId => {
         get().routePrintJob({
           centreId,

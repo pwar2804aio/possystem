@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.58', date: '24 Apr 2026', label: 'Fix Fire course not printing the fire ticket',
+    changes: [
+      'Peter: Fire course button shows the toast ("Course 2 fired to kitchen") but no FIRE COURSE marker docket actually prints. Root cause: the centre-resolution loop reads from the in-memory kdsTickets array. Once KDS bumps the original ticket (which happens during normal kitchen flow), kdsTickets has nothing for that table — so no centres get added to centresInCourse — so no fire-marker print jobs fire. The toast still shows because it runs unconditionally.',
+      'Fix: when kdsTickets has nothing for the active table, fall back to deriving centres directly from the table session items + routing config. Same logic as the original sendToKitchen path uses (catOrAncestorMatches walking the category ancestor chain through parentMap, plus excludedItems honouring). Reads routing from rpos-config-snapshot or rpos-print-routing localStorage — whichever is freshest. Adds a console log [fireCourse] derived centres from session items so we can verify in production.',
+      'Primary path unchanged — if kdsTickets still has the table\'s tickets, that\'s used as before. The fallback only kicks in when the array is empty for that table.',
+      'Single file commit (store/index.js). No schema, no UI changes. printService.printFireCourseTicket and the buildFireCourseTicket builder were already in place from v4.6.8 — just needed to actually reach them.',
+    ],
+  },
+  {
     version: '4.6.57', date: '24 Apr 2026', label: 'Floor plan auto-fit zoom + manual zoom controls',
     changes: [
       'Floor plan canvas now auto-zooms to fit whatever viewport size the POS is running on. Big restaurants with sprawling layouts no longer overflow off-screen on smaller tablets — the whole plan shrinks to fit. Small layouts on big screens stop at 100% so tables stay a sensible size.',
