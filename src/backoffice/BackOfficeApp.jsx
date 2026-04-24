@@ -15,6 +15,7 @@ import PrinterRegistry from './sections/PrinterRegistry';
 import CashDrawers from './sections/CashDrawers';
 import BOReports from './sections/BOReports';
 import EODClose from './sections/EODClose';
+import Shift from './sections/Shift';
 import Inventory from './sections/Inventory';
 import SupabaseSetup from '../lib/SupabaseSetup';
 import CompanyAdmin from './sections/CompanyAdmin';
@@ -37,6 +38,7 @@ const NAV = [
   { id:'staff',      label:'Staff & access',  icon:'👥',  group:'Configuration' },
   { id:'printing',   label:'Production printing',   icon:'🖨',  group:'Configuration' },
   { id:'reports',    label:'Reports',           icon:'📊',  group:'Analytics' },
+  { id:'shift',      label:'Shift',             icon:'⏱', group:'Analytics' },
   { id:'eod',        label:'End of day',        icon:'🔒',  group:'Analytics' },
   { id:'pettycash',  label:'Petty cash',        icon:'\u{1F4B0}', group:'Analytics' },
   { id:'tax',        label:'Tax & VAT',          icon:'%',   group:'Analytics' },
@@ -344,6 +346,7 @@ export default function BackOfficeApp() {
           {section === 'staff'      && <StaffManager />}
           {section === 'printing'   && <PrintRouting />}
           {section === 'reports'    && <BOReports />}
+          {section === 'shift'      && <Shift />}
           {section === 'eod'        && <EODClose />}
           {section === 'pettycash'  && <PettyCash />}
           {section === 'admin'       && <CompanyAdmin />}

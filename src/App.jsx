@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.37', date: '23 Apr 2026', label: 'Shift lifecycle — auto-open at app mount, manager-gated close (Phase 2)',
+    changes: [
+      'Shifts are now runtime entities. A shift opens automatically at app mount if none exists; auto-closes when the business_day_start boundary is crossed and reopens a fresh one. Manual open available via the Shift page if ever needed.',
+      'New Back Office > Analytics > Shift section. Shows the current open shift (opened at, running duration, live revenue/cash/card/checks totals, per-drawer status grid) + history of the last 30 shifts with their open/close times and duration. Red Close shift button is disabled unless you are a manager/admin (or have cashup/eod permission) AND every drawer is idle.',
+      'Every closed_check and cash_movement written while a shift is open now carries that shifts id. Enables per-shift reporting (revenue by shift, tips by shift, variance by shift) in the future reports phase. db.js insertClosedCheck now writes drawer_id + shift_id alongside staff_id.',
+      'Store gains currentShift state plus openShift, closeShift, loadCurrentShift, loadShiftHistory, reconcileShiftOnMount actions. reconcileShiftOnMount runs from useSupabaseInit and handles all auto-open/auto-close logic — nothing needs to be clicked to start a shift under normal operation.',
+      'Close gated: only Manager or Admin role (or staff with cashup/eod permission) can close a shift manually. Auto-close uses an internal path that bypasses the permission check. Close is blocked at the store level if any drawer is still open or counting — the EOD close flow flips drawers back to idle.',
+      'Shifts use a partial unique index on Supabase (location_id) where status=open, so race conditions between devices booting simultaneously converge to a single shift. If two devices try to open at the same instant, one wins the insert; the other catches the 23505 duplicate-key error, reloads, and uses the winners shift.',
+      'Phases 1+2 complete. Pausing here as agreed before tackling Phase 3 (safe management) and Phase 4 (per-drawer EOD + aggregated shift Z-read).',
+    ],
+  },
+  {
     version: '4.6.36', date: '23 Apr 2026', label: 'POS routes cash to the right drawer; petty cash goes per-drawer (Phase 1b)',
     changes: [
       'POS cash-drawer button now shows the name of the drawer bound to this device (e.g. 🔓 Bar, 🔓 Counter). If no drawer is bound the label stays generic and the button hints at Back Office > Devices > Cash drawers in its tooltip. Both the active-table header and the no-table header updated.',

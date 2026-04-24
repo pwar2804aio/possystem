@@ -124,6 +124,15 @@ export default function useSupabaseInit() {
         console.warn('[useSupabaseInit] cashDrawers hydration failed:', err?.message || err);
       }
 
+      // v4.6.37: reconcile shift lifecycle. Creates/auto-closes as needed
+      // so every subsequent cash sale + movement carries a shift_id.
+      try {
+        await useStore.getState().reconcileShiftOnMount?.();
+        await useStore.getState().loadShiftHistory?.();
+      } catch (err) {
+        console.warn('[useSupabaseInit] shift reconcile failed:', err?.message || err);
+      }
+
       // Tax rates for this location
       if (locId && supabase) {
         const { data: rates } = await supabase

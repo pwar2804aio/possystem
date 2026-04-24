@@ -286,6 +286,8 @@ export const insertClosedCheck = async (check, locationId = null) => {
     tax_amount:   check.taxAmount != null ? check.taxAmount : null,  // v4.6.19 — stored explicitly
     total:        check.total,
     method:       check.method,
+    drawer_id:    check.drawerId || null,   // v4.6.37
+    shift_id:     check.shiftId  || null,   // v4.6.37
     closed_at:    check.closedAt ? new Date(check.closedAt).toISOString() : new Date().toISOString(),
     status:       check.status || 'paid',
     refunds:      check.refunds || [],

@@ -2031,6 +2031,175 @@ export const useStore = create((set, get) => ({
     return (cashDrawers || []).find(d => d.deviceId === deviceId) || null;
   },
 
+  // ── Shifts (v4.6.37) ────────────────────────────────────────────
+  // The shift is the reporting window: opened by a manager (or auto
+  // on first boot of the business day), closed when all drawers are
+  // cashed up. Every closed_check and cash_movement written while a
+  // shift is open stamps its shift_id. At most one shift is open per
+  // location (DB-enforced with a partial unique index).
+  currentShift: null,
+  shiftHistory: [],
+
+  loadCurrentShift: async () => {
+    if (isMock || !supabase) return null;
+    try {
+      const locId = await getLocationId();
+      if (!locId) return null;
+      const { data } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('location_id', locId)
+        .eq('status', 'open')
+        .order('opened_at', { ascending: false })
+        .limit(1);
+      const row = data?.[0] || null;
+      if (row) {
+        set({ currentShift: {
+          id: row.id, locationId: row.location_id,
+          openedAt: row.opened_at, openedByStaffId: row.opened_by_staff_id,
+          closedAt: row.closed_at, closedByStaffId: row.closed_by_staff_id,
+          status: row.status, notes: row.notes, zReport: row.z_report,
+        } });
+      } else {
+        set({ currentShift: null });
+      }
+      return row;
+    } catch (err) {
+      console.warn('[loadCurrentShift] failed:', err?.message || err);
+      return null;
+    }
+  },
+
+  loadShiftHistory: async (limit = 30) => {
+    if (isMock || !supabase) return;
+    try {
+      const locId = await getLocationId();
+      if (!locId) return;
+      const { data } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('location_id', locId)
+        .order('opened_at', { ascending: false })
+        .limit(limit);
+      if (Array.isArray(data)) set({ shiftHistory: data });
+    } catch (err) {
+      console.warn('[loadShiftHistory] failed:', err?.message || err);
+    }
+  },
+
+  openShift: async (staffId = null) => {
+    // If one is already open, just return it (idempotent).
+    if (get().currentShift?.status === 'open') return get().currentShift;
+    if (isMock || !supabase) return null;
+    try {
+      const locId = await getLocationId();
+      if (!locId) return null;
+      const row = {
+        id: `shift-${Date.now()}`,
+        location_id: locId,
+        opened_at: new Date().toISOString(),
+        opened_by_staff_id: staffId || get().staff?.id || null,
+        status: 'open',
+      };
+      const { data, error } = await supabase.from('shifts').insert(row).select().single();
+      if (error) {
+        // Unique constraint means another device beat us — reload and use theirs
+        if (error.code === '23505') {
+          await get().loadCurrentShift?.();
+          return get().currentShift;
+        }
+        throw error;
+      }
+      set({ currentShift: {
+        id: data.id, locationId: data.location_id,
+        openedAt: data.opened_at, openedByStaffId: data.opened_by_staff_id,
+        status: 'open',
+      } });
+      get().showToast?.(`Shift opened`, 'success');
+      return get().currentShift;
+    } catch (err) {
+      console.warn('[openShift] failed:', err?.message || err);
+      return null;
+    }
+  },
+
+  closeShift: async ({ auto = false, notes = '', zReport = null } = {}) => {
+    const current = get().currentShift;
+    if (!current || current.status !== 'open') {
+      get().showToast?.('No open shift to close', 'error');
+      return null;
+    }
+    // Permission gate — manual close requires admin or manager role (or cashup perm)
+    if (!auto) {
+      const { staff } = get();
+      const role = staff?.role;
+      const hasPerm = Array.isArray(staff?.permissions) && (staff.permissions.includes('cashup') || staff.permissions.includes('eod'));
+      if (role !== 'Manager' && role !== 'Admin' && !hasPerm) {
+        get().showToast?.('Only manager/admin can close a shift', 'error');
+        return null;
+      }
+      // Block close if any drawer is still in open/counting state
+      const openDrawer = (get().cashDrawers || []).find(d => d.status && d.status !== 'idle');
+      if (openDrawer) {
+        get().showToast?.(`Cannot close shift — ${openDrawer.name} is still ${openDrawer.status}`, 'error');
+        return null;
+      }
+    }
+    if (isMock || !supabase) return null;
+    try {
+      const patch = {
+        status: auto ? 'auto_closed' : 'closed',
+        closed_at: new Date().toISOString(),
+        closed_by_staff_id: get().staff?.id || null,
+        notes: notes || null,
+        z_report: zReport || null,
+      };
+      const { error } = await supabase.from('shifts').update(patch).eq('id', current.id);
+      if (error) throw error;
+      set({ currentShift: null });
+      await get().loadShiftHistory?.();
+      get().showToast?.(auto ? 'Shift auto-closed at business day start' : 'Shift closed', 'success');
+      return true;
+    } catch (err) {
+      console.warn('[closeShift] failed:', err?.message || err);
+      get().showToast?.(`Shift close failed: ${err?.message}`, 'error');
+      return null;
+    }
+  },
+
+  // Auto-open/close logic — run on app mount from useSupabaseInit.
+  // If no shift is open: open one with opened_at = max(now, businessDayStart).
+  // If the current shift's opened_at is older than today's businessDayStart,
+  // auto-close the old one and open a fresh one.
+  reconcileShiftOnMount: async () => {
+    if (isMock) return;
+    try {
+      await get().loadCurrentShift?.();
+      const current = get().currentShift;
+      const { locationConfig } = get();
+      // Parse businessDayStart (HH:MM) into today's boundary
+      const bdStart = locationConfig?.businessDayStart || '06:00';
+      const [hh, mm] = bdStart.split(':').map(Number);
+      const today = new Date(); today.setHours(hh || 0, mm || 0, 0, 0);
+      if (Date.now() < today.getTime()) today.setDate(today.getDate() - 1);
+      const businessDayStartMs = today.getTime();
+
+      if (current) {
+        const openedMs = new Date(current.openedAt).getTime();
+        if (openedMs < businessDayStartMs) {
+          // Shift has run past a business day boundary — auto-close + reopen
+          await get().closeShift?.({ auto: true, notes: 'Auto-closed at business day boundary' });
+          await get().openShift?.();
+        }
+      } else {
+        // No open shift — open one automatically so cash sales can happen
+        await get().openShift?.();
+      }
+    } catch (err) {
+      console.warn('[reconcileShiftOnMount] failed:', err?.message || err);
+    }
+  },
+
   // ── Petty cash + cash drawer (v4.6.30) ────────
   pettyCashEntries: [],
 
@@ -2279,6 +2448,8 @@ export const useStore = create((set, get) => ({
       total: paymentInfo.grand || subtotal,
       taxAmount: taxBreakdown?.totalTax != null ? taxBreakdown.totalTax : null, // v4.6.19
       method: paymentInfo.method || 'card',
+      drawerId: get().myDrawer?.()?.id || null,                                   // v4.6.37
+      shiftId:  get().currentShift?.id || null,                                   // v4.6.37
       closedAt: Date.now(),
       status: 'paid',
       refunds: [],
