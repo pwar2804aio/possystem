@@ -210,7 +210,7 @@ export default function OrdersHub() {
   const showingSections = filter === 'all' && !search && !myOrders;
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:'var(--bg)' }}>
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', width:'100%', flex:1, minWidth:0, overflow:'hidden', background:'var(--bg)' }}>
 
       {/* ── Top bar ────────────────────────────────────────────────── */}
       <div style={{ padding:'10px 16px 0', borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>

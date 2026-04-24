@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.59', date: '24 Apr 2026', label: 'Orders Hub fills full screen width',
+    changes: [
+      'Peter: Orders tab content was constrained to ~720px on the left side of the POS, leaving the entire right half of the screen empty. Root cause: OrdersHub root div had display:flex with flexDirection:column and height:100%, but no width or flex grow. Inside a flex parent that means the element only takes the width of its content (the responsive grid filled until cards started wrapping at 720-ish px and stayed there).',
+      'Fix: added width:100%, flex:1, minWidth:0 to the OrdersHub root div. Now the surface fills the available horizontal space and the existing auto-fill grid (repeat(auto-fill, minmax(280px, 1fr))) automatically expands to show 4-5 cards per row on a typical landscape POS screen instead of just 2.',
+      'Single-line change. No layout rework needed because the inner grids were already responsive — they just couldn\'t grow because the parent wouldn\'t let them.',
+    ],
+  },
+  {
     version: '4.6.58', date: '24 Apr 2026', label: 'Fix Fire course not printing the fire ticket',
     changes: [
       'Peter: Fire course button shows the toast ("Course 2 fired to kitchen") but no FIRE COURSE marker docket actually prints. Root cause: the centre-resolution loop reads from the in-memory kdsTickets array. Once KDS bumps the original ticket (which happens during normal kitchen flow), kdsTickets has nothing for that table — so no centres get added to centresInCourse — so no fire-marker print jobs fire. The toast still shows because it runs unconditionally.',
