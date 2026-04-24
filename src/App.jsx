@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.35', date: '23 Apr 2026', label: 'Cash drawers as first-class entities (Phase 1 of Drawers+Shifts)',
+    changes: [
+      'First piece of the multi-drawer + shift expansion. Cash drawers are now first-class entities in their own right, not just a boolean flag on a printer.',
+      'Back Office > Devices > new Cash drawers section. List your drawers, give each one a name (Bar, Counter, Upstairs), assign a printer that physically ejects it, and optionally bind it strictly to one POS device so only that device can ring cash into it. Left panel shows status (idle/open/counting) and current float; right panel is the editor.',
+      'Supabase schema: new cash_drawers, shifts, and cash_movements tables. closed_checks gets drawer_id and shift_id columns. RLS via user_locations, matching the pattern used by tax_rates and printers. Migration ran cleanly against Ops DB.',
+      'Store gains cashDrawers slice with loadCashDrawers, createCashDrawer, updateCashDrawer, deleteCashDrawer actions and a myDrawer() getter that resolves the current POS devices assigned drawer. All persist dual-write (Zustand immediate, Supabase durable). useSupabaseInit hydrates drawers on app mount alongside menu items, floor plan, printers, etc.',
+      'Drawers defined in this commit do not yet do anything at runtime. Thats Phase 1b (v4.6.36): POS cash-sale routing, petty cash per-drawer, and the 🔓 Drawer button showing the active drawers name. Shift lifecycle (auto open/close at business day start) lands in Phase 2 (v4.6.37).',
+      'Legacy cashDrawerAttached flag on printers stays working. On first use of v4.6.36 if no drawers have been created, a synthetic Drawer 1 will be spun up bound to the flagged printer so existing installs are not forced to migrate manually.',
+    ],
+  },
+  {
     version: '4.6.34', date: '23 Apr 2026', label: 'Fix Cash drawer failed: No printer with cash drawer configured',
     changes: [
       'Root cause of the POS toast "Cash drawer failed: No printer with cash drawer configured" even when the printer had the flag set and localStorage was correct: the store had TWO openCashDrawer actions declared under the same key. The first one (added in v4.6.30 with permission gate, force bypass, and petty cash logging) was being silently overridden by a legacy one further down the object literal that took printerId as the first positional arg and called printService.openCashDrawer directly.',

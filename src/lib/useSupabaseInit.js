@@ -117,6 +117,13 @@ export default function useSupabaseInit() {
         }
       }
 
+      // v4.6.35: hydrate cash drawers from Supabase
+      try {
+        await useStore.getState().loadCashDrawers?.();
+      } catch (err) {
+        console.warn('[useSupabaseInit] cashDrawers hydration failed:', err?.message || err);
+      }
+
       // Tax rates for this location
       if (locId && supabase) {
         const { data: rates } = await supabase

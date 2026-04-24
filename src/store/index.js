@@ -1930,6 +1930,107 @@ export const useStore = create((set, get) => ({
       ]},
   ] }),
 
+  // ── Cash drawers (v4.6.35) ──────────────────────────────────────
+  // First-class drawer entities. Each drawer has a printer that ejects it
+  // and (optionally) a POS device strictly assigned to it. Persisted in
+  // Supabase cash_drawers; hydrated on mount via useSupabaseInit.
+  cashDrawers: [],
+
+  loadCashDrawers: async () => {
+    if (isMock || !supabase) return;
+    try {
+      const locId = await getLocationId();
+      if (!locId) return;
+      const { data } = await supabase
+        .from('cash_drawers')
+        .select('*')
+        .eq('location_id', locId)
+        .order('created_at', { ascending: true });
+      if (Array.isArray(data)) {
+        set({ cashDrawers: data.map(r => ({
+          id: r.id, name: r.name,
+          printerId: r.printer_id, deviceId: r.device_id,
+          status: r.status || 'idle',
+          currentFloat: Number(r.current_float) || 0,
+          openedAt: r.opened_at, openedByStaffId: r.opened_by_staff_id,
+        })) });
+      }
+    } catch (err) {
+      console.warn('[loadCashDrawers] failed:', err?.message || err);
+    }
+  },
+
+  createCashDrawer: async (drawer) => {
+    const locId = await getLocationId();
+    if (!locId) { get().showToast?.('No location selected', 'error'); return null; }
+    const row = {
+      id: drawer.id || `drw-${Date.now()}`,
+      location_id: locId,
+      name: drawer.name,
+      printer_id: drawer.printerId || null,
+      device_id: drawer.deviceId || null,
+      status: 'idle',
+      current_float: 0,
+    };
+    // Optimistic local insert
+    set(s => ({ cashDrawers: [...(s.cashDrawers||[]), {
+      id: row.id, name: row.name, printerId: row.printer_id, deviceId: row.device_id,
+      status: 'idle', currentFloat: 0, openedAt: null, openedByStaffId: null,
+    }] }));
+    if (!isMock && supabase) {
+      try {
+        const { error } = await supabase.from('cash_drawers').insert(row);
+        if (error) throw error;
+        get().showToast?.(`Drawer "${row.name}" created`, 'success');
+      } catch (err) {
+        console.warn('[createCashDrawer] failed:', err?.message || err);
+        get().showToast?.(`Save failed: ${err?.message || 'unknown error'}`, 'error');
+      }
+    }
+    return row.id;
+  },
+
+  updateCashDrawer: async (id, patch) => {
+    // Optimistic local update
+    set(s => ({ cashDrawers: (s.cashDrawers||[]).map(d => d.id === id ? { ...d, ...patch } : d) }));
+    if (!isMock && supabase) {
+      try {
+        const row = {};
+        if ('name' in patch)          row.name = patch.name;
+        if ('printerId' in patch)     row.printer_id = patch.printerId;
+        if ('deviceId' in patch)      row.device_id = patch.deviceId;
+        if ('status' in patch)        row.status = patch.status;
+        if ('currentFloat' in patch)  row.current_float = patch.currentFloat;
+        if ('openedAt' in patch)      row.opened_at = patch.openedAt;
+        if ('openedByStaffId' in patch) row.opened_by_staff_id = patch.openedByStaffId;
+        row.updated_at = new Date().toISOString();
+        await supabase.from('cash_drawers').update(row).eq('id', id);
+      } catch (err) {
+        console.warn('[updateCashDrawer] failed:', err?.message || err);
+      }
+    }
+  },
+
+  deleteCashDrawer: async (id) => {
+    set(s => ({ cashDrawers: (s.cashDrawers||[]).filter(d => d.id !== id) }));
+    if (!isMock && supabase) {
+      try {
+        await supabase.from('cash_drawers').delete().eq('id', id);
+      } catch (err) {
+        console.warn('[deleteCashDrawer] failed:', err?.message || err);
+      }
+    }
+  },
+
+  // Find the drawer assigned to the current POS device. Returns null if none.
+  // Used by openCashDrawer and cash-sale auto-fire to route to the right drawer.
+  myDrawer: () => {
+    const { cashDrawers, deviceConfig } = get();
+    const deviceId = deviceConfig?.profileId || deviceConfig?.deviceId;
+    if (!deviceId) return null;
+    return (cashDrawers || []).find(d => d.deviceId === deviceId) || null;
+  },
+
   // ── Petty cash + cash drawer (v4.6.30) ────────
   pettyCashEntries: [],
 
