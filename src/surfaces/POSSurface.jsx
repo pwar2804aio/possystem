@@ -63,11 +63,14 @@ export default function POSSurface() {
   } = useStore();
 
   // BUILD_TEST_1777051985417
-  // v4.6.48: cash drawer workflow state. Rebuilt for robustness.
+  // v4.6.54: drawer workflow state (menu + cash actions + recent activity)
   const [showDrawerMenu, setShowDrawerMenu] = useState(false);
   const [showCashIn, setShowCashIn]         = useState(false);
   const [showCashOut, setShowCashOut]       = useState(false);
   const [expectedForCashOut, setExpectedForCashOut] = useState(0);
+  const [cashAction, setCashAction] = useState(null);
+  const [cashActionAmount, setCashActionAmount] = useState('');
+  const [cashActionReason, setCashActionReason] = useState('');
   useEffect(() => {
     if (typeof loadCurrentDrawerSession === 'function') loadCurrentDrawerSession();
     // v4.6.52: periodic poll
@@ -466,6 +469,177 @@ export default function POSSurface() {
               </button>
             </div>
           </div>
+        );
+      })()}
+
+      {/* v4.6.54: drawer menu (POSSurface main return) */}
+      {showDrawerMenu && (() => {
+        let _mDevId = null;
+        try { _mDevId = JSON.parse(localStorage.getItem('rpos-device') || '{}')?.id || null; } catch {}
+        const _mDrw = Array.isArray(cashDrawers) ? cashDrawers.find(d => d.deviceId === _mDevId) || null : null;
+        if (!_mDrw) return null;
+        const _mCan = staff?.role === 'Manager' || staff?.role === 'Admin' || (Array.isArray(staff?.permissions) && staff.permissions.includes('cashup'));
+        const _mStatus = _mDrw.status || 'idle';
+        const _float = Number(_mDrw.currentFloat || 0);
+        const _entries = (useStore.getState().pettyCashEntries || []).filter(e => e.drawerId === _mDrw.id).slice(0, 6);
+        const _SIGN = { cash_sale: +1, float_in: +1, adjustment: +1, downlift_from_safe: +1, cash_drop: -1, drop: -1, expense: -1, uplift_to_safe: -1, drawer_open: 0 };
+        const _TYPE_LABEL = { cash_sale: 'Cash sale', float_in: 'Pay in', expense: 'Pay out', cash_drop: 'Cash drop', drop: 'Cash drop', drawer_open: 'Drawer opened', adjustment: 'Adjustment', uplift_to_safe: 'To safe', downlift_from_safe: 'From safe' };
+        const requirePerm = () => {
+          if (_mCan) return true;
+          useStore.getState().showToast?.('Cashup permission required', 'error');
+          return false;
+        };
+        return (
+          <div className="modal-back" style={{ zIndex: 99998 }} onClick={e => e.target === e.currentTarget && setShowDrawerMenu(false)}>
+            <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:20, width:'100%', maxWidth:480, maxHeight:'86vh', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'var(--sh3)' }}>
+              <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--bdr)' }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <div>
+                    <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)' }}>{_mDrw.name}</div>
+                    <div style={{ fontSize:11, color:'var(--t3)', marginTop:2, textTransform:'uppercase', letterSpacing:'.07em', fontWeight:700 }}>
+                      <span style={{ color: _mStatus === 'open' ? 'var(--grn)' : _mStatus === 'counting' ? 'var(--amb,#e8a020)' : 'var(--t4)' }}>{_mStatus}</span>
+                      {' · '}Float <span style={{ color:'var(--t1)', fontFamily:'var(--font-mono)' }}>£{_float.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowDrawerMenu(false)} style={{ background:'transparent', border:'none', fontSize:24, color:'var(--t4)', cursor:'pointer', padding:4 }}>×</button>
+                </div>
+              </div>
+              {_mStatus === 'open' && (
+                <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--bdr)' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8 }}>
+                    <button disabled={!_mCan} onClick={() => { if (!requirePerm()) return; setShowDrawerMenu(false); setCashAction({ type:'float_in', title:'Pay in cash' }); setCashActionAmount(''); setCashActionReason(''); }}
+                      style={{ padding:'14px 8px', borderRadius:10, border:`1.5px solid ${_mCan?'var(--grn)':'var(--bdr)'}`, background:_mCan?'var(--bg2)':'var(--bg3)', color:_mCan?'var(--grn)':'var(--t4)', fontFamily:'inherit', fontWeight:800, fontSize:13, cursor:_mCan?'pointer':'not-allowed', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                      <span>Pay in</span><span style={{ fontSize:10, fontWeight:500, opacity:.75 }}>+ cash</span>
+                    </button>
+                    <button disabled={!_mCan} onClick={() => { if (!requirePerm()) return; setShowDrawerMenu(false); setCashAction({ type:'expense', title:'Pay out / expense' }); setCashActionAmount(''); setCashActionReason(''); }}
+                      style={{ padding:'14px 8px', borderRadius:10, border:`1.5px solid ${_mCan?'var(--red,#cc5959)':'var(--bdr)'}`, background:_mCan?'var(--bg2)':'var(--bg3)', color:_mCan?'var(--red,#cc5959)':'var(--t4)', fontFamily:'inherit', fontWeight:800, fontSize:13, cursor:_mCan?'pointer':'not-allowed', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                      <span>Pay out</span><span style={{ fontSize:10, fontWeight:500, opacity:.75 }}>− cash</span>
+                    </button>
+                    <button disabled={!_mCan} onClick={() => { if (!requirePerm()) return; setShowDrawerMenu(false); setCashAction({ type:'cash_drop', title:'Cash drop to safe' }); setCashActionAmount(''); setCashActionReason(''); }}
+                      style={{ padding:'14px 8px', borderRadius:10, border:`1.5px solid ${_mCan?'var(--amb,#e8a020)':'var(--bdr)'}`, background:_mCan?'var(--bg2)':'var(--bg3)', color:_mCan?'var(--amb,#e8a020)':'var(--t4)', fontFamily:'inherit', fontWeight:800, fontSize:13, cursor:_mCan?'pointer':'not-allowed', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                      <span>Cash drop</span><span style={{ fontSize:10, fontWeight:500, opacity:.75 }}>to safe</span>
+                    </button>
+                    <button onClick={() => { setShowDrawerMenu(false); openCashDrawer?.({ type:'drawer_open', reason:'No sale (POS)', amount:0 }); }}
+                      style={{ padding:'14px 8px', borderRadius:10, border:'1.5px solid var(--bdr2)', background:'var(--bg2)', color:'var(--t2)', fontFamily:'inherit', fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                      <span>No sale</span><span style={{ fontSize:10, fontWeight:500, opacity:.75 }}>open drawer</span>
+                    </button>
+                    <button disabled={!_mCan} onClick={async () => { if (!requirePerm()) return; setShowDrawerMenu(false); const exp = typeof computeExpectedCash === 'function' ? await computeExpectedCash(_mDrw.id) : 0; setExpectedForCashOut(exp); setShowCashOut(true); }}
+                      style={{ padding:'14px 8px', borderRadius:10, border:`1.5px solid ${_mCan?'var(--red,#cc5959)':'var(--bdr)'}`, background:_mCan?'var(--red-d, rgba(235,97,97,0.12))':'var(--bg3)', color:_mCan?'var(--red,#cc5959)':'var(--t4)', fontFamily:'inherit', fontWeight:800, fontSize:13, cursor:_mCan?'pointer':'not-allowed', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                      <span>Cash up</span><span style={{ fontSize:10, fontWeight:500, opacity:.75 }}>close drawer</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {(!_mStatus || _mStatus === 'idle') && (
+                <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--bdr)' }}>
+                  <button onClick={() => { setShowDrawerMenu(false); setShowCashIn(true); }} style={{ width:'100%', padding:'14px', borderRadius:10, border:'1px solid var(--grn-b)', background:'var(--grn-d)', color:'var(--grn)', fontFamily:'inherit', fontWeight:800, fontSize:14, cursor:'pointer' }}>
+                    Cash in drawer
+                    <div style={{ fontSize:11, fontWeight:500, marginTop:3, opacity:.8 }}>Declare opening float. Drawer opens for trading.</div>
+                  </button>
+                </div>
+              )}
+              {_mStatus === 'counting' && (
+                <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--bdr)', textAlign:'center', fontSize:13, color:'var(--amb,#e8a020)' }}>
+                  Cash-up in progress. Finish from Back Office &rarr; Cash drawers.
+                </div>
+              )}
+              <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 }}>Recent activity</div>
+                {_entries.length === 0 ? (
+                  <div style={{ fontSize:12, color:'var(--t4)', fontStyle:'italic' }}>No activity yet.</div>
+                ) : (
+                  _entries.map(e => {
+                    const sign = _SIGN[e.type] ?? 0;
+                    const amt = Number(e.amount) || 0;
+                    const tStr = new Date(e.timestamp || Date.now()).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+                    return (
+                      <div key={e.id} style={{ display:'grid', gridTemplateColumns:'60px 1fr auto', gap:10, padding:'5px 0', fontSize:12, alignItems:'baseline' }}>
+                        <span style={{ color:'var(--t4)', fontFamily:'var(--font-mono)' }}>{tStr}</span>
+                        <span style={{ color:'var(--t2)' }}>{_TYPE_LABEL[e.type] || e.type}{e.reason ? <span style={{ color:'var(--t4)' }}> &middot; {e.reason}</span> : null}</span>
+                        <span style={{ color: sign > 0 ? 'var(--grn)' : sign < 0 ? 'var(--red)' : 'var(--t4)', fontFamily:'var(--font-mono)', fontWeight:700 }}>
+                          {sign === 0 ? '—' : (sign > 0 ? '+' : '\u2212') + '£' + amt.toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* v4.6.54: cash action modal */}
+      {cashAction && (() => {
+        let _mDevId = null;
+        try { _mDevId = JSON.parse(localStorage.getItem('rpos-device') || '{}')?.id || null; } catch {}
+        const _mDrw = Array.isArray(cashDrawers) ? cashDrawers.find(d => d.deviceId === _mDevId) || null : null;
+        if (!_mDrw) return null;
+        const _amt = parseFloat(cashActionAmount) || 0;
+        const _valid = _amt > 0 && cashActionReason.trim().length > 0;
+        const _btnColor = cashAction.type === 'float_in' ? 'var(--grn)' : cashAction.type === 'expense' ? 'var(--red,#cc5959)' : 'var(--amb,#e8a020)';
+        const _placeholder = cashAction.type === 'float_in' ? 'e.g. Change from safe' : cashAction.type === 'expense' ? 'e.g. Milk delivery, tip out' : 'e.g. Bank drop';
+        return (
+          <div className="modal-back" style={{ zIndex: 99999 }} onClick={e => e.target === e.currentTarget && setCashAction(null)}>
+            <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:20, width:'100%', maxWidth:420, padding:'22px 24px', boxShadow:'var(--sh3)' }}>
+              <div style={{ fontSize:17, fontWeight:800, color:'var(--t1)', marginBottom:4 }}>{cashAction.title}</div>
+              <div style={{ fontSize:12, color:'var(--t3)', marginBottom:18 }}>Drawer: {_mDrw.name}</div>
+              <label style={{ fontSize:11, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', display:'block', marginBottom:6 }}>Amount</label>
+              <div style={{ position:'relative', marginBottom:14 }}>
+                <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', fontSize:22, fontWeight:700, color:'var(--t3)' }}>£</span>
+                <input type="number" step="0.01" min="0" autoFocus value={cashActionAmount} onChange={e => setCashActionAmount(e.target.value)} placeholder="0.00"
+                  style={{ width:'100%', padding:'14px 14px 14px 36px', fontSize:22, fontWeight:800, fontFamily:'var(--font-mono)', borderRadius:10, border:'1.5px solid var(--bdr2)', background:'var(--bg2)', color:'var(--t1)' }} />
+              </div>
+              <label style={{ fontSize:11, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em', display:'block', marginBottom:6 }}>Reason</label>
+              <input type="text" value={cashActionReason} onChange={e => setCashActionReason(e.target.value)} placeholder={_placeholder}
+                style={{ width:'100%', padding:'10px 12px', fontSize:14, borderRadius:10, border:'1.5px solid var(--bdr2)', background:'var(--bg2)', color:'var(--t1)', fontFamily:'inherit', marginBottom:20 }} />
+              <div style={{ display:'flex', gap:8 }}>
+                <button onClick={() => setCashAction(null)} style={{ flex:1, padding:'11px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--bdr)', color:'var(--t2)', fontFamily:'inherit', fontWeight:600, fontSize:13, cursor:'pointer' }}>Cancel</button>
+                <button disabled={!_valid} onClick={async () => {
+                  const type = cashAction.type;
+                  const reason = cashActionReason.trim();
+                  setCashAction(null);
+                  await openCashDrawer?.({ type, amount: _amt, reason, force: true });
+                  setCashActionAmount(''); setCashActionReason('');
+                }}
+                  style={{ flex:2, padding:'11px', borderRadius:10, background: _valid ? _btnColor : 'var(--bg4)', border:'none', color: _valid ? '#fff' : 'var(--t4)', fontFamily:'inherit', fontWeight:800, fontSize:14, cursor: _valid ? 'pointer' : 'not-allowed' }}>
+                  {_valid ? `Confirm £${_amt.toFixed(2)}` : 'Enter amount & reason'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* v4.6.54: explicit cash-in from menu (non-locked) */}
+      {showCashIn && (() => {
+        let _mDevId = null;
+        try { _mDevId = JSON.parse(localStorage.getItem('rpos-device') || '{}')?.id || null; } catch {}
+        const _mDrw = Array.isArray(cashDrawers) ? cashDrawers.find(d => d.deviceId === _mDevId) || null : null;
+        if (!_mDrw) return null;
+        return (
+          <DrawerCashModal mode="in" drawer={_mDrw} locked={false} onClose={() => setShowCashIn(false)}
+            onComplete={async ({ amount, denominations }) => {
+              await cashInDrawer?.(_mDrw.id, { openingFloat: amount, denominations });
+              await loadCurrentDrawerSession?.();
+              if (typeof useStore.getState().loadCashDrawers === 'function') await useStore.getState().loadCashDrawers();
+              setShowCashIn(false);
+            }} />
+        );
+      })()}
+
+      {/* v4.6.54: cash-out flow */}
+      {showCashOut && (() => {
+        let _mDevId = null;
+        try { _mDevId = JSON.parse(localStorage.getItem('rpos-device') || '{}')?.id || null; } catch {}
+        const _mDrw = Array.isArray(cashDrawers) ? cashDrawers.find(d => d.deviceId === _mDevId) || null : null;
+        if (!_mDrw) return null;
+        return (
+          <DrawerCashModal mode="out" drawer={_mDrw} expectedCash={expectedForCashOut} onClose={() => setShowCashOut(false)}
+            onComplete={async ({ amount, denominations, notes }) => {
+              await cashOutDrawer?.(_mDrw.id, { declaredCash: amount, denominations, notes });
+              setShowCashOut(false);
+            }} />
         );
       })()}
 

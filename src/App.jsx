@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.54', date: '24 Apr 2026', label: 'POS drawer menu — pay in / pay out / cash drop / no sale + recent activity',
+    changes: [
+      'Full drawer management from the POS header button. Clicking 🔓 Drawer now opens a sheet with drawer name, status badge, current float, and a 3x2 grid of actions: Pay in (add cash), Pay out (expense), Cash drop (move to safe), No sale (pulse open, no money), Cash up (close drawer).',
+      'Each money-moving action opens a small Amount + Reason modal. Submit calls the existing openCashDrawer store action with the right type (float_in / expense / cash_drop), which pulses the drawer, adjusts currentFloat, writes the petty cash entry, and writes the cash_movements row to Supabase — same code path as the back-office Petty Cash page, so everything flows into the same ledger and reports.',
+      'Recent activity panel at the bottom of the menu shows the last 6 movements on this drawer with timestamp, type label, reason, and signed amount (green for inflow, red for outflow).',
+      'Permission gating: Pay in / Pay out / Cash drop / Cash up all require cashup permission OR Manager / Admin role. No sale is available to anyone with openDrawer. Idle drawer menu only shows Cash in. Counting shows a read-only message pointing to back office.',
+      'Placed inside POSSurface\'s main return (post-v4.6.53 pattern). The old buried versions in OrdersHub are left in place but harmless — state is shared so both conditionals resolve to the same menu, but the POSSurface one renders first.',
+    ],
+  },
+  {
     version: '4.6.53', date: '24 Apr 2026', label: 'Lock overlay was in the wrong components render — moved to POSSurfaces main return',
     changes: [
       'Finally found why none of my v4.6.48/49/51/52 lock attempts fired: the inline IIFE I kept adding ended up INSIDE a nested sub-component at line 1555+ of POSSurface.jsx, NOT inside POSSurface\'s own return (which ends at line 1237). So POSSurface rendered without any lock and my code only would have run for that buried sub-component — which the user never reaches directly.',
