@@ -251,6 +251,16 @@ export const useStore = create((set, get) => ({
     // Move tables in deleted section to 'main'
     tables: s.tables.map(t => t.section===id ? { ...t, section:'main' } : t),
   })),
+  // v4.6.56: reorder a section by moving it up or down within the array.
+  moveSection: (id, direction) => set(s => {
+    const arr = [...(s.locationSections || [])];
+    const idx = arr.findIndex(sec => sec.id === id);
+    if (idx < 0) return s;
+    const target = direction === 'up' ? idx - 1 : idx + 1;
+    if (target < 0 || target >= arr.length) return s;
+    [arr[idx], arr[target]] = [arr[target], arr[idx]];
+    return { locationSections: arr };
+  }),
 
   // ── Sync status — tracks whether POS config is current ───────────────────
   syncStatus: {

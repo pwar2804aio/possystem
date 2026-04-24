@@ -276,9 +276,12 @@ export default function TablesSurface() {
 
   const selectedTable = tables.find(t => t.id === selected);
 
+  // v4.6.56: filter hidden sections from the tab list. Hidden flag set in Back Office.
+  const visibleSections = (locationSections || []).filter(s => !s.hidden);
+  const hiddenSectionIds = new Set((locationSections || []).filter(s => s.hidden).map(s => s.id));
   const sections = [
     { id:'all', label:'All' },
-    ...locationSections,
+    ...visibleSections,
   ];
 
   const counts = {
@@ -328,11 +331,22 @@ export default function TablesSurface() {
     }
   };
 
-  const filteredTables = (section === 'all' ? tables : tables.filter(t => t.section === section))
+  // v4.6.56: in 'all' view exclude tables whose section is hidden.
+  const filteredTables = (section === 'all'
+      ? tables.filter(t => !hiddenSectionIds.has(t.section))
+      : tables.filter(t => t.section === section))
     .filter(t => !t.parentId);  // never render child tables (T1.2) on the floor plan
-  // Canvas size — just big enough for all positions
-  const canvasW = Math.max(...tables.map(t => t.x + t.w)) + 20;
-  const canvasH = Math.max(...tables.map(t => t.y + t.h)) + 20;
+  // v4.6.56: per-section auto-fit. When a single section is selected, shift
+  // tables to top-left of the canvas (subtract section's min-x/min-y) so the
+  // user sees just that section filling the viewport. 'All' view keeps absolute
+  // positions so multi-section layouts retain their relative geometry.
+  const _tbls = filteredTables.length ? filteredTables : tables;
+  const _minX = section === 'all' ? 0 : Math.min(..._tbls.map(t => t.x || 0));
+  const _minY = section === 'all' ? 0 : Math.min(..._tbls.map(t => t.y || 0));
+  const _offX = section === 'all' ? 0 : Math.max(0, _minX - 20);
+  const _offY = section === 'all' ? 0 : Math.max(0, _minY - 40);
+  const canvasW = (_tbls.length ? Math.max(..._tbls.map(t => (t.x || 0) + (t.w || 80))) : 0) - _offX + 40;
+  const canvasH = (_tbls.length ? Math.max(..._tbls.map(t => (t.y || 0) + (t.h || 64))) : 0) - _offY + 40;
 
   return (
     <div style={{ display:'flex', flex:1, overflow:'hidden', background:'var(--bg)' }}>
@@ -554,7 +568,7 @@ export default function TablesSurface() {
                 const minX = Math.min(...secTables.map(t => t.x || 0));
                 const label = SECTION_LABELS[secKey] || secKey;
                 return (
-                  <div key={secKey} style={{ position:'absolute', top:8, left:Math.max(8, minX), fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>
+                  <div key={secKey} style={{ position:'absolute', top:Math.max(4, 8 - _offY), left:Math.max(8, minX - _offX), fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>
                     {label}
                   </div>
                 );
@@ -563,11 +577,11 @@ export default function TablesSurface() {
 
             {filteredTables.map(table=>(
               <div key={table.id}>
-                <TableNode table={table} onClick={()=>handleTableClick(table)}/>
+                <TableNode table={{ ...table, x: (table.x || 0) - _offX, y: (table.y || 0) - _offY }} onClick={()=>handleTableClick(table)}/>
                 {/* Highlight ring when selected */}
                 {selected===table.id && (
                   <div style={{
-                    position:'absolute', left:table.x-4, top:table.y-4, width:table.w+8, height:table.h+8,
+                    position:'absolute', left:(table.x || 0) - _offX - 4, top:(table.y || 0) - _offY - 4, width:table.w+8, height:table.h+8,
                     borderRadius:table.shape==='rd'?'50%':16,
                     border:'2px solid var(--acc)', pointerEvents:'none',
                     boxShadow:'0 0 0 3px rgba(232,160,32,.2)',

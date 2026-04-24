@@ -7,7 +7,7 @@ const SECTION_PALETTE = ['#3b82f6','#e8a020','#22c55e','#a855f7','#ef4444','#22d
 export default function FloorPlanBuilder() {
   const {
     tables, updateTableLayout, addTableToLayout, removeTableFromLayout,
-    locationSections, addSection, updateSection, removeSection,
+    locationSections, addSection, updateSection, removeSection, moveSection,
     showToast,
   } = useStore();
 
@@ -108,8 +108,23 @@ export default function FloorPlanBuilder() {
                   display:'flex', alignItems:'center', justifyContent:'space-between',
                 }}>
                   <span>{sec.icon} {sec.label}</span>
-                  <span style={{ fontSize:10, color:'var(--t4)' }}>{count}</span>
+                  {sec.hidden ? (
+                    <span style={{ fontSize:9, color:'var(--amb,#e8a020)', background:'rgba(232,160,32,.12)', padding:'2px 6px', borderRadius:4, fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em' }}>hidden</span>
+                  ) : (
+                    <span style={{ fontSize:10, color:'var(--t4)' }}>{count}</span>
+                  )}
                 </button>
+                {/* v4.6.56: reorder buttons */}
+                <button onClick={(e) => { e.stopPropagation(); moveSection(sec.id, 'up'); }} style={{
+                  width:18, height:22, borderRadius:5, border:'none', background:'transparent',
+                  color:'var(--t4)', cursor:'pointer', fontFamily:'inherit', fontSize:11, padding:0,
+                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                }} title="Move up">\u25B2</button>
+                <button onClick={(e) => { e.stopPropagation(); moveSection(sec.id, 'down'); }} style={{
+                  width:18, height:22, borderRadius:5, border:'none', background:'transparent',
+                  color:'var(--t4)', cursor:'pointer', fontFamily:'inherit', fontSize:11, padding:0,
+                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                }} title="Move down">\u25BC</button>
                 <button onClick={() => setEditingSection(sec)} style={{
                   width:22, height:22, borderRadius:6, border:'none', background:'transparent',
                   color:'var(--t4)', cursor:'pointer', fontFamily:'inherit', fontSize:13,
@@ -388,6 +403,7 @@ function SectionModal({ section, onSave, onDelete, onClose }) {
   const [label, setLabel] = useState(section?.label || '');
   const [color, setColor] = useState(section?.color || '#3b82f6');
   const [icon, setIcon]   = useState(section?.icon  || '🍽');
+  const [hidden, setHidden] = useState(!!section?.hidden);  // v4.6.56
   const ICONS = ['🍽','🍸','🌿','☕','🍕','🎭','🌅','🏖','🏠','⬚'];
 
   return (
@@ -414,10 +430,22 @@ function SectionModal({ section, onSave, onDelete, onClose }) {
               {ICONS.map(ic => <button key={ic} onClick={() => setIcon(ic)} style={{ width:36, height:36, borderRadius:9, border:`1.5px solid ${icon===ic?'var(--acc)':'var(--bdr)'}`, background:icon===ic?'var(--acc-d)':'var(--bg3)', cursor:'pointer', fontSize:18 }}>{ic}</button>)}
             </div>
           </div>
+          {/* v4.6.56: Hide on POS toggle (only on Edit) */}
+          {section && (
+            <div style={{ marginBottom:14, padding:'10px 12px', borderRadius:10, background:'var(--bg3)', border:'1px solid var(--bdr)' }}>
+              <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+                <input type="checkbox" checked={hidden} onChange={e => setHidden(e.target.checked)} style={{ width:16, height:16, cursor:'pointer', accentColor:'var(--acc)' }}/>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color: hidden ? 'var(--amb,#e8a020)' : 'var(--t1)' }}>Hide on POS</div>
+                  <div style={{ fontSize:11, color:'var(--t3)', marginTop:2, lineHeight:1.4 }}>Section disappears from POS tabs and the All view. Tables stay in place; you can unhide anytime.</div>
+                </div>
+              </label>
+            </div>
+          )}
           <div style={{ display:'flex', gap:8 }}>
             {section && onDelete && <button onClick={onDelete} style={{ padding:'8px 12px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--red-d)', border:'1px solid var(--red-b)', color:'var(--red)', fontSize:12, fontWeight:700 }}>Remove</button>}
             <button className="btn btn-ghost" style={{ flex:1 }} onClick={onClose}>Cancel</button>
-            <button className="btn btn-acc" style={{ flex:2, height:40 }} disabled={!label.trim()} onClick={() => onSave({ label, color, icon })}>
+            <button className="btn btn-acc" style={{ flex:2, height:40 }} disabled={!label.trim()} onClick={() => onSave({ label, color, icon, hidden })}>
               {section ? 'Save' : 'Add section'}
             </button>
           </div>

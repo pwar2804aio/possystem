@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.56', date: '24 Apr 2026', label: 'Floor plan — responsive per-section view + hide/reorder sections',
+    changes: [
+      'POS floor plan now auto-fits the selected section. When you tap a single section tab (Bar, Patio, Main dining, etc) the canvas shifts the tables to the top-left of the viewport and shrinks to just that section. Big restaurants no longer waste screen space showing empty lanes — the active section fills the visible area. The All view keeps the absolute multi-section layout you designed in the back office.',
+      'Hide on POS toggle. Edit any section in Back Office > Floor plan and tick Hide on POS — that section disappears from the POS tab bar AND from the All view. Tables stay in place and unhide instantly when you flip the toggle back. Use this for sections that only matter to one shift type (e.g. hide Patio in winter, hide Bar at lunch).',
+      'Reorder sections. Each section row in the back-office sidebar now has up/down chevrons. Reordering changes the tab order on the POS too — drag your most-used sections to the top.',
+      'Hidden sections are visually marked in the back office sidebar with an amber HIDDEN chip in place of the table count. Helps you see at a glance which sections are live.',
+      'Implementation: TablesSurface filters by visibleSections (excludes hidden), per-section view subtracts each section\'s min-x/min-y as offsets so tables shift to the top-left automatically. Section labels and selection rings use the same offset. New moveSection(id, direction) store action swaps array indices. updateSection already handles the hidden flag because it does a generic patch merge.',
+    ],
+  },
+  {
     version: '4.6.55', date: '24 Apr 2026', label: 'Floor plan rendering — section labels now dynamic to match back-office layout',
     changes: [
       'Peter reported back-office floor plan shows tables correctly but the POS renders them wrong. Root cause: TablesSurface had HARDCODED section label positions (Main @ left:8, Bar @ left:400, Patio @ left:490) plus hardcoded dividers at 398/488, assuming every install uses those exact lane widths. The back-office FloorPlanBuilder places labels dynamically at each section\'s min-x, so Bar tables placed at x=656 visually fit the Bar section there. On the POS with hardcoded dividers, the same x=656 crossed the Patio boundary and rendered in Patio.',
