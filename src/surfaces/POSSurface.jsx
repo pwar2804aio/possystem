@@ -1609,7 +1609,7 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
               )}
               {_myDrw.status === 'counting' && (
                 <div style={{ padding:'12px 14px', borderRadius:10, background:'rgba(232,160,32,.12)', border:'1px solid var(--amb,#e8a020)', color:'var(--amb,#e8a020)', fontSize:13, fontWeight:600 }}>
-                  Cash-up in progress. Finish the count from Back Office > Cash drawers.
+                  Cash-up in progress. Finish the count from Back Office &rarr; Cash drawers.
                 </div>
               )}
             </div>
