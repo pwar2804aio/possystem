@@ -359,6 +359,17 @@ function OrderCard({ order, onAdvance, onOpen }) {
   let statusColor = qs.color;
   if (order.status === 'bill_req')  { statusText = 'Bill req.';    statusColor = '#ef4444'; }
   if (order.status === 'ordering')  { statusText = 'Building…';    statusColor = '#888780'; }
+  if (order.status === 'scheduled') {
+    // v4.6.61: dedicated label + colour for orders parked awaiting their fire time
+    const fireAt = order._raw?.scheduledFireAt;
+    if (fireAt) {
+      const t = new Date(fireAt);
+      statusText = `Fires ${t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+    } else {
+      statusText = 'Scheduled';
+    }
+    statusColor = '#a855f7'; // violet — distinct from prep/ready
+  }
   if (order.status === 'active' && order._kind === 'table') { statusText = 'In service';  statusColor = '#3b82f6'; }
   if (order.status === 'active' && order._kind === 'tab')   { statusText = 'Open tab';    statusColor = '#a855f7'; }
 

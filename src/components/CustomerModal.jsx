@@ -1,14 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useStore, getCollectionSlots } from '../store';
 
-export default function CustomerModal({ orderType, onConfirm, onCancel }) {
+export default function CustomerModal({ orderType, existing, onConfirm, onCancel }) {
   const { searchCustomers, addToHistory, showToast } = useStore();
-  const [name, setName]       = useState('');
-  const [phone, setPhone]     = useState('');
-  const [email, setEmail]     = useState('');
-  const [notes, setNotes]     = useState('');
-  const [isASAP, setIsASAP]   = useState(true);
-  const [slotIdx, setSlotIdx] = useState(0);
+  const [name, setName]       = useState(existing?.name || '');
+  const [phone, setPhone]     = useState(existing?.phone || '');
+  const [email, setEmail]     = useState(existing?.email || '');
+  const [notes, setNotes]     = useState(existing?.notes || '');
+  // v4.6.61: when editing, default to non-ASAP if a collectionTime is already set,
+  // so the user sees their existing time pre-selected on the slot grid.
+  const [isASAP, setIsASAP]   = useState(existing ? !!existing.isASAP : true);
+  // v4.6.61: preselect the slot matching existing.collectionTime when editing
+  const [slotIdx, setSlotIdx] = useState(() => {
+    if (!existing?.collectionTime) return 0;
+    try {
+      const all = getCollectionSlots();
+      const futureSlots = all.slice(1);
+      const matchIdx = futureSlots.findIndex(s => s.label === existing.collectionTime);
+      return matchIdx >= 0 ? matchIdx : 0;
+    } catch { return 0; }
+  });
   const [results, setResults] = useState([]);
   const [searched, setSearched] = useState(false);
 
@@ -62,7 +73,7 @@ export default function CustomerModal({ orderType, onConfirm, onCancel }) {
               {orderType === 'collection' ? '📦 Collection order' : '🥡 Takeaway order'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>
-              {orderType === 'collection' ? 'Customer collects from the counter' : 'Order to be taken away now'}
+              {existing ? 'Editing customer details — update only what you need' : (orderType === 'collection' ? 'Customer collects from the counter' : 'Order to be taken away now')}
             </div>
           </div>
           <button onClick={onCancel} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:22, lineHeight:1 }}>×</button>

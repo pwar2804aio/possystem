@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.61', date: '24 Apr 2026', label: 'Edit customer pre-fills + scheduled re-send works + OrdersHub fires-at badge',
+    changes: [
+      'Edit customer button on the POS now pre-fills the existing customer details. Previously the modal opened blank, the operator hit Confirm thinking nothing changed, and the empty form OVERWROTE customer.collectionTime — losing the schedule. On re-Send the deferral logic saw no collection time and fired straight to the kitchen. Now editing without changing values keeps every field intact, including the previously-selected collection time slot.',
+      'CustomerModal accepts new existing prop. Name / phone / email / notes / isASAP / slotIdx all initialise from existing? when present. The collection-time slot grid pre-selects the slot whose label matches existing.collectionTime so editing a schedule shows the original time highlighted.',
+      'POSSurface passes existing={customer} to CustomerModal so the edit click flows the existing data through.',
+      'OrdersHub now visually distinguishes scheduled orders. The status badge reads Fires HH:MM in violet (instead of Building or Pending) so the operator can see at a glance which orders are parked awaiting their fire time. The HH:MM is the actual scheduledFireAt timestamp from the queue entry, not the collection time itself — so it tells you when the kitchen ticket actually goes out.',
+      'No store changes. The bug was entirely upstream of sendToKitchen — the existing scheduled-collection deferral logic at L1384 always worked correctly when customer.collectionTime is preserved.',
+    ],
+  },
+  {
     version: '4.6.60', date: '24 Apr 2026', label: 'Configurable collection lead time (5-min increments)',
     changes: [
       'Back office Location settings now has a Collection lead time card. Pick how many minutes before a scheduled collection the kitchen ticket should fire — 0 (fire immediately) up to 120 minutes in 5-minute increments. Default 30 (matches the previous hardcoded value).',

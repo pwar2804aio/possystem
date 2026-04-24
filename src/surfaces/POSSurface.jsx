@@ -1241,7 +1241,7 @@ export default function POSSurface() {
       {pendingItem&&<AllergenModal item={pendingItem} activeAllergens={allergens} onConfirm={()=>{const i=pendingItem;clearPendingItem();openFlow(i);}} onCancel={clearPendingItem}/>}
       {modalItem&&modalItem.type==='pizza'&&<ProductModal key={modalItem.id} item={modalItem} activeAllergens={allergens} onConfirm={(item,mods,cfg,opts)=>{addItem(item,mods,cfg,opts);setModalItem(null);showToast(`${opts.displayName||item.name} added`,'success');}} onCancel={()=>setModalItem(null)}/>}
       {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={activeTableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={handlePayComplete}/>}
-      {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} onConfirm={c=>{setShowCustomerModal(false);setCustomer(c);setOrderType(pendingOrderType);setPendingOrderType(null);showToast(`${c.name} — ${pendingOrderType} order started`,'success');}} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
+      {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} existing={customer} onConfirm={c=>{setShowCustomerModal(false);setCustomer(c);setOrderType(pendingOrderType);setPendingOrderType(null);showToast(`${c.name} — ${pendingOrderType} order started`,'success');}} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
 
       {/* Void modal */}
       {voidTarget&&(
