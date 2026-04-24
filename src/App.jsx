@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.57', date: '24 Apr 2026', label: 'Floor plan auto-fit zoom + manual zoom controls',
+    changes: [
+      'Floor plan canvas now auto-zooms to fit whatever viewport size the POS is running on. Big restaurants with sprawling layouts no longer overflow off-screen on smaller tablets — the whole plan shrinks to fit. Small layouts on big screens stop at 100% so tables stay a sensible size.',
+      'Manual zoom controls top-right of the canvas: minus / percentage readout / plus / Fit button. Zoom range 40% to 160%. Hitting Fit returns to auto-fit and zoom recomputes whenever the viewport resizes.',
+      'Implementation: ResizeObserver on the scroll viewport reads its dimensions live. _fitZoom = min(1, vpW/canvasW, vpH/canvasH). When autoFit is on we use _fitZoom; manual zoom buttons flip autoFit off and let the user pick. Wrapper div sized to scaled dimensions so the scrollbars match the visible content.',
+      'Coverage: works for both All view and per-section view. Per-section view already shifts tables to top-left (v4.6.56), so it pairs naturally with auto-fit — small sections render at 100% and large multi-table sections shrink as needed.',
+    ],
+  },
+  {
     version: '4.6.56', date: '24 Apr 2026', label: 'Floor plan — responsive per-section view + hide/reorder sections',
     changes: [
       'POS floor plan now auto-fits the selected section. When you tap a single section tab (Bar, Patio, Main dining, etc) the canvas shifts the tables to the top-left of the viewport and shrinks to just that section. Big restaurants no longer waste screen space showing empty lanes — the active section fills the visible area. The All view keeps the absolute multi-section layout you designed in the back office.',

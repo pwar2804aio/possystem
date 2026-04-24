@@ -267,6 +267,20 @@ export default function TablesSurface() {
   const [section, setSection] = useState(deviceConfig?.assignedSection || 'all');
   const [view, setView]           = useState('floor');  // floor | mine | all
   const [, setTick] = useState(0);
+  // v4.6.57: zoom + auto-fit
+  const _viewportRef = useRef(null);
+  const [zoom, setZoom] = useState(1);          // current zoom (0.4-1.6)
+  const [autoFit, setAutoFit] = useState(true); // when true, zoom auto-recomputes on viewport resize
+  const [vp, setVp] = useState({ w: 0, h: 0 }); // viewport size
+  useEffect(() => {
+    if (!_viewportRef.current) return;
+    const el = _viewportRef.current;
+    const update = () => setVp({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Re-render every 30s so urgency colours stay live
   useEffect(() => {
@@ -347,6 +361,13 @@ export default function TablesSurface() {
   const _offY = section === 'all' ? 0 : Math.max(0, _minY - 40);
   const canvasW = (_tbls.length ? Math.max(..._tbls.map(t => (t.x || 0) + (t.w || 80))) : 0) - _offX + 40;
   const canvasH = (_tbls.length ? Math.max(..._tbls.map(t => (t.y || 0) + (t.h || 64))) : 0) - _offY + 40;
+  // v4.6.57: derive fit zoom from viewport + canvas. Cap zoom at 1 (don't enlarge,
+  // only shrink). User can override via manual zoom controls (autoFit becomes false).
+  const _padding = 32;
+  const _fitZoom = (vp.w > 0 && vp.h > 0 && canvasW > 0 && canvasH > 0)
+    ? Math.min(1, (vp.w - _padding) / canvasW, (vp.h - _padding) / canvasH)
+    : 1;
+  const _effectiveZoom = autoFit ? Math.max(0.3, _fitZoom) : zoom;
 
   return (
     <div style={{ display:'flex', flex:1, overflow:'hidden', background:'var(--bg)' }}>
@@ -553,8 +574,18 @@ export default function TablesSurface() {
 
         {/* ── Floor plan canvas ─────────────────────────────── */}
         {view==='floor' && (
-          <div style={{ flex:1, overflow:'auto', padding:24 }}>
-          <div style={{ position:'relative', width:canvasW, height:canvasH, minWidth:'100%', minHeight:'100%' }}>
+          <div ref={_viewportRef} style={{ flex:1, overflow:'auto', padding:24, position:'relative' }}>
+            {/* v4.6.57: zoom controls */}
+            <div style={{ position:'sticky', top:0, zIndex:10, display:'flex', gap:6, alignItems:'center', justifyContent:'flex-end', padding:'4px 0', pointerEvents:'none' }}>
+              <div style={{ display:'flex', gap:4, alignItems:'center', background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:8, padding:'4px 8px', boxShadow:'var(--sh1, 0 1px 3px rgba(0,0,0,.1))', pointerEvents:'auto' }}>
+                <button onClick={() => { setAutoFit(false); setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2))); }} style={{ width:24, height:24, borderRadius:6, border:'none', background:'var(--bg3)', color:'var(--t1)', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }} title="Zoom out">−</button>
+                <span style={{ fontSize:11, color:'var(--t3)', fontFamily:'var(--font-mono)', minWidth:38, textAlign:'center' }}>{Math.round(_effectiveZoom * 100)}%</span>
+                <button onClick={() => { setAutoFit(false); setZoom(z => Math.min(1.6, +(z + 0.1).toFixed(2))); }} style={{ width:24, height:24, borderRadius:6, border:'none', background:'var(--bg3)', color:'var(--t1)', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }} title="Zoom in">+</button>
+                <button onClick={() => { setAutoFit(true); setZoom(1); }} style={{ height:24, padding:'0 8px', borderRadius:6, border:'none', background: autoFit ? 'var(--acc-d)' : 'var(--bg3)', color: autoFit ? 'var(--acc)' : 'var(--t2)', fontSize:10, fontWeight:700, cursor:'pointer', fontFamily:'inherit', textTransform:'uppercase', letterSpacing:'.07em' }} title="Auto-fit to viewport">Fit</button>
+              </div>
+            </div>
+          <div style={{ position:'relative', width:canvasW * _effectiveZoom, height:canvasH * _effectiveZoom }}>
+          <div style={{ position:'absolute', top:0, left:0, width:canvasW, height:canvasH, transform:`scale(${_effectiveZoom})`, transformOrigin:'top left' }}>
             {/* v4.6.55: Dynamic section labels. Position each label at its section's
                 min-x (matches FloorPlanBuilder back-office rendering). Previously
                 hardcoded label positions assumed fixed lane widths and broke when
@@ -589,6 +620,7 @@ export default function TablesSurface() {
                 )}
               </div>
             ))}
+          </div>
           </div>
           </div>  /* scroll wrapper */
         )}  {/* end floor view */}
