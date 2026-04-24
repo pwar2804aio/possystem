@@ -2267,8 +2267,18 @@ export const useStore = create((set, get) => ({
       // printService.openCashDrawer accepts printerId as its first arg.
       // If we have the drawer's printer, use it; else fall back to legacy
       // behaviour (search for cashDrawerAttached flag).
-      printService?.openCashDrawer?.(resolvedPrinterId)?.catch?.(err => console.warn('[openCashDrawer] pulse failed:', err?.message || err));
+      const pulsePromise = printService?.openCashDrawer?.(resolvedPrinterId);
+      pulsePromise?.catch?.(err => {
+        console.warn('[openCashDrawer] pulse failed:', err?.message || err);
+        get().showToast?.(`Drawer pulse failed: ${err?.message || 'no printer'}`, 'error');
+      });
     } catch (err) { console.warn('[openCashDrawer] pulse threw:', err); }
+    // v4.6.39: visible feedback for manual opens. Auto-fire on cash sale
+    // skips the toast (the sale already renders a 'paid' toast).
+    if (type === 'drawer_open' && !force) {
+      const _drawerName = resolvedDrawer?.name;
+      get().showToast?.(_drawerName ? `${_drawerName} opened` : 'Drawer opened', 'success');
+    }
     // Legacy pettyCashEntries for backwards-compat UI; also mirror to
     // cash_movements (Supabase-backed, per-drawer, per-shift).
     const entry = get().addPettyCashEntry({
@@ -2302,6 +2312,9 @@ export const useStore = create((set, get) => ({
   // above which still populates pettyCashEntries) and Supabase (this function).
   insertCashMovement: async ({ type, amount, drawerId = null, shiftId = null, fromDrawerId = null, toDrawerId = null, reason = '', note = '', ref = null, staffId = null, staffName = '' }) => {
     if (isMock || !supabase) return null;
+    // v4.6.39: if no shiftId was passed, default to the currently open shift.
+    // Runs before the try so resolvedShiftId is available throughout.
+    const resolvedShiftId = shiftId || get().currentShift?.id || null;
     try {
       const locId = await getLocationId();
       if (!locId) return null;
@@ -2311,7 +2324,7 @@ export const useStore = create((set, get) => ({
         timestamp: new Date().toISOString(),
         type, amount: Number(amount) || 0,
         drawer_id: drawerId,
-        shift_id: shiftId,
+        shift_id: resolvedShiftId,
         from_drawer_id: fromDrawerId,
         to_drawer_id: toDrawerId,
         reason, note, ref,

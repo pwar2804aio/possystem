@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.39', date: '23 Apr 2026', label: 'Drawer button toast + fix shift_id on cash movements',
+    changes: [
+      'Peter: the POS cash drawer button appeared to do nothing. Backend investigation showed it was actually firing correctly — 40 petty cash entries + 5 cash_movements rows written in quick succession — but there was no visible confirmation. Manual drawer opens now toast "Cash Drawer 1 opened" (or just "Drawer opened" if no drawer is bound) so theres a clear signal something happened. Failure path also toasts now so "Drawer pulse failed: no printer" surfaces if the printer is unreachable.',
+      'Separate bug: every cash_movements row was being written with shift_id: null even though a shift was open. The v4.6.37 edit that was supposed to add `const resolvedShiftId = shiftId || get().currentShift?.id || null` and swap the column value never landed — the patch failed silently and the fallback code was missing. Now properly wired: every movement inserted through insertCashMovement picks up the currently open shift when no shift_id is explicitly passed.',
+      'Auto-fire on cash sale deliberately skips the toast (the sale already shows its own paid toast, and chaining two toasts for one action is noise). The force:true flag from recordClosedCheck/recordWalkInClosedCheck/recordWalkInClosed distinguishes auto from manual.',
+      'Existing cash_movements rows with shift_id: null from the last hour stay null (no backfill). Future rows — including the ones from any cash sales you ring after this deploys — will carry the correct shift_id.',
+    ],
+  },
+  {
     version: '4.6.38', date: '23 Apr 2026', label: 'Fix Cash drawer dropdowns (printer + device populate correctly)',
     changes: [
       'Peter reported: dropdowns for printer and POS device were empty in the Cash drawers section. Two issues — (1) the component was reading printers and deviceProfiles from the Zustand store, but neither is a store slice: printers live in rpos-printers localStorage (populated by PrinterRegistry from Supabase), device profiles live in rpos-device-profiles localStorage. Both reads returned undefined. (2) Drawers should bind to actual paired devices, not profile templates — profiles are shared across terminals so binding to profile would not be strict 1:1.',
