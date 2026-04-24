@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.52', date: '24 Apr 2026', label: 'POS lock overlay inlined into POSSurface (bundler wasnt including external component)',
+    changes: [
+      'v4.6.51 created a separate POSLockOverlay component. The file was committed, the import+usage were added to POSSurface, but the compiled bundle never included the component — likely a Vite cache / import-resolution problem. Inlining the same logic directly into POSSurface so there\'s no separate file dependency.',
+      'Same behaviour as v4.6.51: drawer bound to this device AND drawer status is not open/counting → lock. Manager/Admin/cashup perm gets the cash-in modal, other roles get a read-only ask-a-manager screen. createPortal renders to document.body so z-index and overflow issues can\'t hide it. 15s poll re-fetches drawer state from Supabase.',
+      'Distinct console log [POSLockV452] on every render so we can verify it\'s actually running.',
+    ],
+  },
+  {
     version: '4.6.51', date: '24 Apr 2026', label: 'POS lock overlay as a standalone Portal component',
     changes: [
       'Rewrote the POS sign-in gate as a self-contained component, POSLockOverlay, rendered via React createPortal into document.body. Fixes whatever was preventing the previous in-line gate from showing on the running bundle — renders above every existing style context, not dependent on the component tree\'s CSS.',

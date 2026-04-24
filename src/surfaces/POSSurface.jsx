@@ -1,7 +1,7 @@
 import { useCompact } from '../lib/useCompact';
+import { createPortal } from 'react-dom';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import DrawerCashModal from '../components/DrawerCashModal';
-import POSLockOverlay from '../components/POSLockOverlay';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
@@ -70,6 +70,15 @@ export default function POSSurface() {
   const [expectedForCashOut, setExpectedForCashOut] = useState(0);
   useEffect(() => {
     if (typeof loadCurrentDrawerSession === 'function') loadCurrentDrawerSession();
+    // v4.6.52: periodic poll
+    const _lockPoll = setInterval(() => {
+      try {
+        if (typeof useStore.getState().loadCashDrawers === 'function') useStore.getState().loadCashDrawers();
+        if (typeof loadCurrentDrawerSession === 'function') loadCurrentDrawerSession();
+      } catch {}
+    }, 15000);
+    // capture cleanup for unmount
+    window.__rposLockPollClean = () => clearInterval(_lockPoll);
     // v4.6.49: periodic poll of cashDrawers + drawer session. Catches remote
     // changes from the back office (manager cashes up / cashes in a drawer)
     // without needing to refresh the POS. 15s cadence — cheap single-table read.
@@ -1541,8 +1550,47 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
           );
         })}
       </div>
-            {/* v4.6.51: portal-based lock overlay, self-contained */}
-      <POSLockOverlay />
+            {/* v4.6.52: inline portal-based lock overlay */}
+      {(() => {
+        // Resolve drawer for this physical terminal
+        let _lockDevId = null;
+        try { _lockDevId = JSON.parse(localStorage.getItem('rpos-device') || '{}')?.id || null; } catch {}
+        const _lockDrawer = Array.isArray(cashDrawers)
+          ? cashDrawers.find(d => d.deviceId === _lockDevId) || null
+          : null;
+        const _lockActive = _lockDrawer && staff && _lockDrawer.status !== 'open' && _lockDrawer.status !== 'counting';
+        console.log('[POSLockV452]', { _lockDevId, drawer: _lockDrawer?.name, status: _lockDrawer?.status, staffRole: staff?.role, _lockActive });
+        if (!_lockActive) return null;
+        const _canCash = staff?.role === 'Manager' || staff?.role === 'Admin' || (Array.isArray(staff?.permissions) && staff.permissions.includes('cashup'));
+        const node = _canCash ? (
+          <DrawerCashModal
+            mode="in"
+            drawer={_lockDrawer}
+            locked={true}
+            onComplete={async ({ amount, denominations }) => {
+              await cashInDrawer?.(_lockDrawer.id, { openingFloat: amount, denominations });
+              await loadCurrentDrawerSession?.();
+              if (typeof useStore.getState().loadCashDrawers === 'function') await useStore.getState().loadCashDrawers();
+            }}
+          />
+        ) : (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.78)', zIndex:99999, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+            <div style={{ background:'var(--bg1)', border:'1.5px solid var(--bdr2)', borderRadius:20, padding:'36px 32px', maxWidth:460, textAlign:'center' }}>
+              <div style={{ fontSize:46, marginBottom:18 }}>&#128274;</div>
+              <div style={{ fontSize:20, fontWeight:800, color:'var(--t1)', marginBottom:10 }}>POS locked</div>
+              <div style={{ fontSize:14, color:'var(--t2)', marginBottom:26, lineHeight:1.5 }}>
+                <b>{_lockDrawer.name}</b> needs to be cashed in before this terminal can trade. Ask a manager to sign in and declare the opening float.
+              </div>
+              <button
+                onClick={() => { try { useStore.getState().logout?.(); } catch {} }}
+                style={{ padding:'11px 28px', borderRadius:10, border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t2)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                Sign out
+              </button>
+            </div>
+          </div>
+        );
+        return createPortal(node, document.body);
+      })()}
 
 {/* v4.6.49: role-aware sign-in gate. When the POS has a drawer bound
           and it's not in a usable state (idle/closed), lock the whole POS.
