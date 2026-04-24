@@ -119,12 +119,12 @@ export default function FloorPlanBuilder() {
                   width:18, height:22, borderRadius:5, border:'none', background:'transparent',
                   color:'var(--t4)', cursor:'pointer', fontFamily:'inherit', fontSize:11, padding:0,
                   display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                }} title="Move up">\u25B2</button>
+                }} title="Move up">▲</button>
                 <button onClick={(e) => { e.stopPropagation(); moveSection(sec.id, 'down'); }} style={{
                   width:18, height:22, borderRadius:5, border:'none', background:'transparent',
                   color:'var(--t4)', cursor:'pointer', fontFamily:'inherit', fontSize:11, padding:0,
                   display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                }} title="Move down">\u25BC</button>
+                }} title="Move down">▼</button>
                 <button onClick={() => setEditingSection(sec)} style={{
                   width:22, height:22, borderRadius:6, border:'none', background:'transparent',
                   color:'var(--t4)', cursor:'pointer', fontFamily:'inherit', fontSize:13,
