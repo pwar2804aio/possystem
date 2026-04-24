@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.55', date: '24 Apr 2026', label: 'Floor plan rendering — section labels now dynamic to match back-office layout',
+    changes: [
+      'Peter reported back-office floor plan shows tables correctly but the POS renders them wrong. Root cause: TablesSurface had HARDCODED section label positions (Main @ left:8, Bar @ left:400, Patio @ left:490) plus hardcoded dividers at 398/488, assuming every install uses those exact lane widths. The back-office FloorPlanBuilder places labels dynamically at each section\'s min-x, so Bar tables placed at x=656 visually fit the Bar section there. On the POS with hardcoded dividers, the same x=656 crossed the Patio boundary and rendered in Patio.',
+      'Fix: replaced the hardcoded labels with an IIFE that computes min-x per section from the actual filteredTables array, same approach as FloorPlanBuilder. Removed the hardcoded dividers — tables are absolutely positioned and don\'t need visual dividers since their grouping is defined by where they\'re placed.',
+      'No data migration. Existing tables render correctly wherever their x-coords place them.',
+    ],
+  },
+  {
     version: '4.6.54', date: '24 Apr 2026', label: 'POS drawer menu — pay in / pay out / cash drop / no sale + recent activity',
     changes: [
       'Full drawer management from the POS header button. Clicking 🔓 Drawer now opens a sheet with drawer name, status badge, current float, and a 3x2 grid of actions: Pay in (add cash), Pay out (expense), Cash drop (move to safe), No sale (pulse open, no money), Cash up (close drawer).',

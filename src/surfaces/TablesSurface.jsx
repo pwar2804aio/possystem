@@ -541,14 +541,25 @@ export default function TablesSurface() {
         {view==='floor' && (
           <div style={{ flex:1, overflow:'auto', padding:24 }}>
           <div style={{ position:'relative', width:canvasW, height:canvasH, minWidth:'100%', minHeight:'100%' }}>
-            {/* Section labels */}
-            <div style={{ position:'absolute', top:8, left:8, fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>Main dining</div>
-            <div style={{ position:'absolute', top:8, left:400, fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>Bar</div>
-            <div style={{ position:'absolute', top:8, left:490, fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>Patio</div>
-
-            {/* Section dividers */}
-            <div style={{ position:'absolute', top:0, left:398, bottom:0, width:1, background:'var(--bdr)', opacity:.5 }}/>
-            <div style={{ position:'absolute', top:0, left:488, bottom:0, width:1, background:'var(--bdr)', opacity:.5 }}/>
+            {/* v4.6.55: Dynamic section labels. Position each label at its section's
+                min-x (matches FloorPlanBuilder back-office rendering). Previously
+                hardcoded label positions assumed fixed lane widths and broke when
+                tables were placed past the Bar lane's hardcoded x=488 boundary. */}
+            {(() => {
+              const sectionSet = new Set(filteredTables.map(t => t.section).filter(Boolean));
+              const SECTION_LABELS = { main: 'Main dining', bar: 'Bar', patio: 'Patio' };
+              return [...sectionSet].map(secKey => {
+                const secTables = filteredTables.filter(t => t.section === secKey);
+                if (!secTables.length) return null;
+                const minX = Math.min(...secTables.map(t => t.x || 0));
+                const label = SECTION_LABELS[secKey] || secKey;
+                return (
+                  <div key={secKey} style={{ position:'absolute', top:8, left:Math.max(8, minX), fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em' }}>
+                    {label}
+                  </div>
+                );
+              });
+            })()}
 
             {filteredTables.map(table=>(
               <div key={table.id}>
