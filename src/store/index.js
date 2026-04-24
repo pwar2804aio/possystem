@@ -2038,6 +2038,217 @@ export const useStore = create((set, get) => ({
     return (cashDrawers || []).find(d => d.deviceId === deviceId) || null;
   },
 
+  // ── Drawer sessions (v4.6.40) ───────────────────────────────────
+  // A drawer session is one cash-in → cash-out cycle. Every cash sale
+  // or movement while the drawer is open carries this sessions id, so
+  // at cash-up we can compute the expected cash exactly = opening_float
+  // + cash_sales − drops − expenses + adjustments within this session.
+  currentDrawerSession: null,
+
+  loadCurrentDrawerSession: async () => {
+    if (isMock || !supabase) return null;
+    try {
+      const drw = get().myDrawer?.();
+      if (!drw) { set({ currentDrawerSession: null }); return null; }
+      const { data } = await supabase
+        .from('drawer_sessions')
+        .select('*')
+        .eq('drawer_id', drw.id)
+        .in('status', ['open', 'counting'])
+        .order('cash_in_at', { ascending: false })
+        .limit(1);
+      const row = data?.[0] || null;
+      set({ currentDrawerSession: row });
+      return row;
+    } catch (err) {
+      console.warn('[loadCurrentDrawerSession] failed:', err?.message || err);
+      return null;
+    }
+  },
+
+  // Open a drawer for trading. Writes drawer_sessions row, updates
+  // cash_drawers.status='open'+opening_float, writes float_in movement.
+  cashInDrawer: async (drawerId, { openingFloat, denominations = null, notes = '' } = {}) => {
+    if (isMock || !supabase) return null;
+    try {
+      const locId = await getLocationId();
+      if (!locId) { get().showToast?.('No location', 'error'); return null; }
+      const staff = get().staff;
+      const shiftId = get().currentShift?.id || null;
+      const now = new Date().toISOString();
+      const row = {
+        id: `ds-${Date.now()}`,
+        drawer_id: drawerId,
+        shift_id: shiftId,
+        location_id: locId,
+        cash_in_at: now,
+        cash_in_by_staff_id: staff?.id || null,
+        opening_float: Number(openingFloat) || 0,
+        denominations,
+        status: 'open',
+        notes: notes || null,
+      };
+      const { data, error } = await supabase.from('drawer_sessions').insert(row).select().single();
+      if (error) {
+        // Duplicate — drawer already has an open session
+        if (error.code === '23505') {
+          get().showToast?.('Drawer already has an open session', 'error');
+          await get().loadCurrentDrawerSession?.();
+          return null;
+        }
+        throw error;
+      }
+      // Flip the drawer to open
+      await get().updateCashDrawer?.(drawerId, {
+        status: 'open',
+        currentFloat: Number(openingFloat) || 0,
+        openedAt: now,
+        openedByStaffId: staff?.id || null,
+      });
+      // Float-in movement
+      await get().insertCashMovement?.({
+        type: 'float_in',
+        amount: Number(openingFloat) || 0,
+        drawerId,
+        shiftId,
+        sessionId: data.id,
+        reason: 'Opening float',
+        staffId: staff?.id || null,
+        staffName: staff?.name || 'Unknown',
+      });
+      set({ currentDrawerSession: data });
+      get().showToast?.(`Drawer opened with ${typeof Intl !== 'undefined' ? new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(Number(openingFloat)||0) : '£'+Number(openingFloat||0).toFixed(2)}`, 'success');
+      return data;
+    } catch (err) {
+      console.warn('[cashInDrawer] failed:', err?.message || err);
+      get().showToast?.(`Cash in failed: ${err?.message}`, 'error');
+      return null;
+    }
+  },
+
+  // Calculate expected cash for a drawer's current open session.
+  // expected = opening_float + sum(cash_sales) − sum(drops) − sum(expenses) + sum(adjustments)
+  computeExpectedCash: async (drawerId) => {
+    if (isMock || !supabase) return 0;
+    try {
+      const sess = get().currentDrawerSession;
+      if (!sess || sess.drawer_id !== drawerId) {
+        // Reload first
+        await get().loadCurrentDrawerSession?.();
+      }
+      const activeSess = get().currentDrawerSession;
+      if (!activeSess) return 0;
+      const { data } = await supabase
+        .from('cash_movements')
+        .select('type, amount')
+        .eq('session_id', activeSess.id);
+      const SIGN = { float_in: +1, cash_sale: +1, adjustment: +1, downlift_from_safe: +1, cash_drop: -1, drop: -1, expense: -1, uplift_to_safe: -1, drawer_open: 0 };
+      const net = (data || []).reduce((s, m) => s + (SIGN[m.type] || 0) * (Number(m.amount) || 0), 0);
+      return net;
+    } catch (err) {
+      console.warn('[computeExpectedCash] failed:', err?.message || err);
+      return 0;
+    }
+  },
+
+  // Cash out a drawer. Closes the session, logs variance, flips drawer to idle,
+  // and if all drawers are now idle, auto-closes the shift.
+  cashOutDrawer: async (drawerId, { declaredCash, denominations = null, notes = '' } = {}) => {
+    if (isMock || !supabase) return null;
+    try {
+      // Find the open session for this drawer (don't trust currentDrawerSession — might be another device's drawer)
+      const { data: sessions } = await supabase
+        .from('drawer_sessions')
+        .select('*')
+        .eq('drawer_id', drawerId)
+        .in('status', ['open', 'counting'])
+        .order('cash_in_at', { ascending: false })
+        .limit(1);
+      const sess = sessions?.[0];
+      if (!sess) {
+        get().showToast?.('No open session for this drawer', 'error');
+        return null;
+      }
+      // Compute expected directly from cash_movements for THIS session (reliable)
+      const { data: movs } = await supabase
+        .from('cash_movements')
+        .select('type, amount')
+        .eq('session_id', sess.id);
+      const SIGN = { float_in: +1, cash_sale: +1, adjustment: +1, downlift_from_safe: +1, cash_drop: -1, drop: -1, expense: -1, uplift_to_safe: -1, drawer_open: 0 };
+      const expected = (movs || []).reduce((s, m) => s + (SIGN[m.type] || 0) * (Number(m.amount) || 0), 0);
+      const declared = Number(declaredCash) || 0;
+      const variance = declared - expected;
+      const now = new Date().toISOString();
+      const staff = get().staff;
+
+      // 1. Update the session row to closed
+      const { error: updErr } = await supabase
+        .from('drawer_sessions')
+        .update({
+          cash_out_at: now,
+          cash_out_by_staff_id: staff?.id || null,
+          declared_cash: declared,
+          expected_cash: expected,
+          variance,
+          denominations,
+          status: 'closed',
+          notes: [sess.notes, notes].filter(Boolean).join(' · ') || null,
+        })
+        .eq('id', sess.id);
+      if (updErr) throw updErr;
+
+      // 2. Log variance as an adjustment movement (always — even £0.00 for audit)
+      if (Math.abs(variance) >= 0.01) {
+        await get().insertCashMovement?.({
+          type: 'adjustment',
+          amount: Math.abs(variance),
+          drawerId,
+          sessionId: sess.id,
+          reason: variance > 0 ? 'Cash-up variance (drawer over)' : 'Cash-up variance (drawer short)',
+          note: `Declared £${declared.toFixed(2)} vs expected £${expected.toFixed(2)}`,
+          staffId: staff?.id || null,
+          staffName: staff?.name || 'Unknown',
+        });
+      }
+
+      // 3. Flip drawer to idle, zero float
+      await get().updateCashDrawer?.(drawerId, {
+        status: 'idle',
+        currentFloat: 0,
+        openedAt: null,
+        openedByStaffId: null,
+      });
+      set({ currentDrawerSession: null });
+
+      get().showToast?.(
+        Math.abs(variance) < 0.01 ? 'Drawer closed — balanced' : `Drawer closed — variance £${Math.abs(variance).toFixed(2)} ${variance > 0 ? 'over' : 'short'}`,
+        Math.abs(variance) < 0.01 ? 'success' : 'warning',
+      );
+
+      // 4. Auto-finalise shift if every drawer is now idle
+      await get().loadCashDrawers?.();
+      const allIdle = (get().cashDrawers || []).every(d => d.status === 'idle' || !d.status);
+      if (allIdle && get().currentShift) {
+        // Auto-close the shift — this is the per-drawer EOD path
+        await get().closeShift?.({ auto: false, notes: 'All drawers cashed up' });
+      }
+
+      return { expected, declared, variance };
+    } catch (err) {
+      console.warn('[cashOutDrawer] failed:', err?.message || err);
+      get().showToast?.(`Cash out failed: ${err?.message}`, 'error');
+      return null;
+    }
+  },
+
+  // Returns true when the POS should block itself because the assigned drawer
+  // needs cashing in. Only POSes with a drawer assigned ever see this block.
+  needsCashIn: () => {
+    const drw = get().myDrawer?.();
+    if (!drw) return false;
+    return drw.status === 'idle' || !drw.status;
+  },
+
   // ── Shifts (v4.6.37) ────────────────────────────────────────────
   // The shift is the reporting window: opened by a manager (or auto
   // on first boot of the business day), closed when all drawers are
@@ -2310,11 +2521,13 @@ export const useStore = create((set, get) => ({
   // v4.6.36: persist a movement row to Supabase cash_movements. Fire-and-forget;
   // failure is logged not fatal. Dual-writes here: Zustand (via addPettyCashEntry
   // above which still populates pettyCashEntries) and Supabase (this function).
-  insertCashMovement: async ({ type, amount, drawerId = null, shiftId = null, fromDrawerId = null, toDrawerId = null, reason = '', note = '', ref = null, staffId = null, staffName = '' }) => {
+  insertCashMovement: async ({ type, amount, drawerId = null, shiftId = null, sessionId = null, fromDrawerId = null, toDrawerId = null, reason = '', note = '', ref = null, staffId = null, staffName = '' }) => {
     if (isMock || !supabase) return null;
     // v4.6.39: if no shiftId was passed, default to the currently open shift.
-    // Runs before the try so resolvedShiftId is available throughout.
+    // v4.6.40: also default session_id to the currentDrawerSession when the caller
+    // didn't specify. This is what links every cash-sale to the session it occurred in.
     const resolvedShiftId = shiftId || get().currentShift?.id || null;
+    const resolvedSessionId = sessionId || get().currentDrawerSession?.id || null;
     try {
       const locId = await getLocationId();
       if (!locId) return null;
@@ -2330,6 +2543,7 @@ export const useStore = create((set, get) => ({
         reason, note, ref,
         staff_id: staffId,
         staff_name: staffName,
+        session_id: resolvedSessionId,
       };
       const { error } = await supabase.from('cash_movements').insert(row);
       if (error) console.warn('[insertCashMovement] DB error:', error.message);

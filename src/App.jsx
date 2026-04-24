@@ -59,6 +59,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.40', date: '24 Apr 2026', label: 'Cash drawer lifecycle — cash in / cash up / POS sign-in gate',
+    changes: [
+      'Drawer state machine: idle -> cash in -> open -> cash up -> idle. Every cycle writes a drawer_sessions row that captures opening float, closing count, expected cash, variance, and per-denomination breakdown. Every cash_movement in that session links back via session_id so at cash-up we can compute expected cash exactly from the sessions movements — not from a running tally that could drift.',
+      'POS sign-in gate: when a staff member signs into a POS terminal whose drawer is idle, a LOCKED modal blocks the whole terminal until opening float is declared. Cant cancel, cant dismiss — the only way past it is to cash in. Non-cash-drawer POSes (KDS, kiosks, terminals with no drawer assigned) are not affected.',
+      'New shared DrawerCashModal component handles both cash-in and cash-out flows. Supports per-denomination count (audit trail, computes total) or quick flat amount entry. For cash-out mode it shows expected vs counted vs variance in real time, colour-coded (green balanced, amber over, red short).',
+      'POS header 🔓 button is now a drawer action sheet. Shows current status + float, offers Open drawer (pulse), Cash up drawer (permission-gated). Cash up opens the shared modal in out mode with the expected total pre-computed from cash_movements.',
+      'Back Office > Cash drawers page gets inline Cash in / Cash up buttons on every drawer. Green Cash in button for idle drawers, red Cash up button for open ones. Permission-gated the same way as the POS. This is what a manager uses for central cash-up when staff leave without counting.',
+      'Cash up triggers an automatic shift close when every drawer in the location is back to idle. First commit where shifts actually finalise from a user action rather than just at the business day boundary.',
+      'Variance is always logged as an adjustment cash_movement with the session_id, so the petty cash page will show who was short/over and by how much. Notes field on cash-up lets the manager annotate (till tape broken, needs recount, etc).',
+      'Shift close + printed Z-read aggregation per drawer is Phase 2b. Safe uplift and downlift is Phase 3. All the data is now in place to light up both.',
+    ],
+  },
+  {
     version: '4.6.39', date: '23 Apr 2026', label: 'Drawer button toast + fix shift_id on cash movements',
     changes: [
       'Peter: the POS cash drawer button appeared to do nothing. Backend investigation showed it was actually firing correctly — 40 petty cash entries + 5 cash_movements rows written in quick succession — but there was no visible confirmation. Manual drawer opens now toast "Cash Drawer 1 opened" (or just "Drawer opened" if no drawer is bound) so theres a clear signal something happened. Failure path also toasts now so "Drawer pulse failed: no printer" surfaces if the printer is unreachable.',

@@ -133,6 +133,14 @@ export default function useSupabaseInit() {
         console.warn('[useSupabaseInit] shift reconcile failed:', err?.message || err);
       }
 
+      // v4.6.40: load the currently open drawer session (if any) for this POS.
+      // Used by needsCashIn() and the sign-in gate in POSSurface.
+      try {
+        await useStore.getState().loadCurrentDrawerSession?.();
+      } catch (err) {
+        console.warn('[useSupabaseInit] drawer session load failed:', err?.message || err);
+      }
+
       // Tax rates for this location
       if (locId && supabase) {
         const { data: rates } = await supabase

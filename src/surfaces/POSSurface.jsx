@@ -1,5 +1,6 @@
 import { useCompact } from '../lib/useCompact';
 import { useState, useMemo, useRef, useEffect } from 'react';
+import DrawerCashModal from '../components/DrawerCashModal';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
@@ -34,7 +35,9 @@ export default function POSSurface() {
     updateItemSeat, updateItemCourse, setOrderNote,
     sendToKitchen, fireCourse, saveTableSession, toggleServiceCharge,
     openCashDrawer,
-    cashDrawers, myDrawer,
+    cashDrawers, myDrawer, needsCashIn,
+    cashInDrawer, cashOutDrawer, computeExpectedCash, currentDrawerSession,
+    loadCurrentDrawerSession,
     getPOSItems, getPOSTotals, getPOSOrderNote,
     activeTableId, tables, clearTable, clearWalkIn, setActiveTableId, recordWalkInClosed,
     orderType, setOrderType, customer, setCustomer, clearCustomer,
@@ -57,6 +60,18 @@ export default function POSSurface() {
     showItemImages,
     location,
   } = useStore();
+
+  // v4.6.40: cash drawer workflow state
+  const [showDrawerMenu, setShowDrawerMenu] = useState(false);
+  const [showCashOut, setShowCashOut] = useState(false);
+  const [expectedForCashOut, setExpectedForCashOut] = useState(0);
+  useEffect(() => {
+    if (typeof loadCurrentDrawerSession === 'function') loadCurrentDrawerSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const _myDrw = typeof myDrawer === 'function' ? myDrawer() : null;
+  const _needsCashIn = typeof needsCashIn === 'function' ? needsCashIn() : false;
+  const _canCashup = Array.isArray(staff?.permissions) && staff.permissions.includes('cashup');
 
   // Use store's editable menu — prefer menuName for display, fall back to name
   // IMPORTANT: useMemo keeps object references stable so modalItem doesn't change
@@ -419,7 +434,7 @@ export default function POSSurface() {
                 const _title = _drw ? `Open ${_drw.name} cash drawer` : 'No drawer bound to this device (Back Office > Devices > Cash drawers)';
                 return (
                   <button
-                    onClick={()=>openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 })}
+                    onClick={()=> setShowDrawerMenu(true)}
                     title={_title}
                     style={{fontSize:12,fontWeight:700,color: _drw ? 'var(--acc)' : 'var(--t4)',background:'var(--bg3)',border:`1px solid ${_drw ? 'var(--acc-b)' : 'var(--bdr)'}`,borderRadius:8,cursor:'pointer',fontFamily:'inherit',padding:'4px 10px',marginRight:8,flexShrink:0}}>
                     {_label}
@@ -438,7 +453,7 @@ export default function POSSurface() {
                 return (
                   <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
                     <button
-                      onClick={()=>openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 })}
+                      onClick={()=> setShowDrawerMenu(true)}
                       title={_title}
                       style={{fontSize:11,fontWeight:700,color: _drw ? 'var(--acc)' : 'var(--t3)',background:'var(--bg3)',border:`1px solid ${_drw ? 'var(--acc-b)' : 'var(--bdr)'}`,borderRadius:8,cursor:'pointer',fontFamily:'inherit',padding:'3px 10px'}}>
                       {_label}
@@ -1514,5 +1529,78 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
         })}
       </div>
     </div>
+
+      {/* v4.6.40: cash drawer sign-in gate (can't be dismissed — LOCKED) */}
+      {_needsCashIn && staff && (
+        <DrawerCashModal
+          mode="in"
+          drawer={_myDrw}
+          locked={true}
+          onComplete={async ({ amount, denominations }) => {
+            await cashInDrawer?.(_myDrw.id, { openingFloat: amount, denominations });
+            await loadCurrentDrawerSession?.();
+          }}
+        />
+      )}
+
+      {/* v4.6.40: drawer action sheet — opens from the 🔓 Drawer button */}
+      {showDrawerMenu && _myDrw && !_needsCashIn && (
+        <div className="modal-back" onClick={e => e.target === e.currentTarget && setShowDrawerMenu(false)}>
+          <div style={{
+            background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:20,
+            width:'100%', maxWidth:380, padding:'18px 20px', boxShadow:'var(--sh3)',
+          }}>
+            <div style={{ fontSize:16, fontWeight:800, color:'var(--t1)', marginBottom:4 }}>{_myDrw.name}</div>
+            <div style={{ fontSize:12, color:'var(--t3)', marginBottom:16 }}>
+              Status: <b style={{color: _myDrw.status === 'open' ? 'var(--grn)' : 'var(--t3)'}}>{_myDrw.status || 'idle'}</b>
+              {' · '}Float: <b style={{color:'var(--t1)', fontFamily:'var(--font-mono)'}}>£{Number(_myDrw.currentFloat || 0).toFixed(2)}</b>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <button
+                onClick={() => {
+                  setShowDrawerMenu(false);
+                  openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 });
+                }}
+                style={{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t1)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor:'pointer', textAlign:'left' }}>
+                🔓 Open drawer (pulse)
+                <div style={{ fontSize:11, color:'var(--t3)', fontWeight:500, marginTop:2 }}>Pops the drawer open. Logged as a drawer_open event.</div>
+              </button>
+              <button
+                onClick={async () => {
+                  if (!_canCashup) { useStore.getState().showToast?.('Cashup permission required', 'error'); return; }
+                  setShowDrawerMenu(false);
+                  const exp = typeof computeExpectedCash === 'function' ? await computeExpectedCash(_myDrw.id) : 0;
+                  setExpectedForCashOut(exp);
+                  setShowCashOut(true);
+                }}
+                disabled={!_canCashup}
+                style={{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--red-b)', background: _canCashup ? 'var(--red-d)' : 'var(--bg3)', color: _canCashup ? 'var(--red)' : 'var(--t4)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor: _canCashup ? 'pointer' : 'not-allowed', textAlign:'left' }}>
+                💰 Cash up drawer
+                <div style={{ fontSize:11, color: _canCashup ? 'var(--red)' : 'var(--t4)', fontWeight:500, marginTop:2, opacity:.8 }}>
+                  {_canCashup ? 'Count cash, declare variance, close this drawer.' : 'Manager / cashup permission required.'}
+                </div>
+              </button>
+            </div>
+            <button onClick={() => setShowDrawerMenu(false)}
+              style={{ marginTop:14, width:'100%', padding:'9px', borderRadius:8, background:'transparent', border:'1px solid var(--bdr)', color:'var(--t3)', fontFamily:'inherit', fontWeight:600, fontSize:12, cursor:'pointer' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* v4.6.40: cash-out flow */}
+      {showCashOut && _myDrw && (
+        <DrawerCashModal
+          mode="out"
+          drawer={_myDrw}
+          expectedCash={expectedForCashOut}
+          onClose={() => setShowCashOut(false)}
+          onComplete={async ({ amount, denominations, notes }) => {
+            await cashOutDrawer?.(_myDrw.id, { declaredCash: amount, denominations, notes });
+            setShowCashOut(false);
+          }}
+        />
+      )}
   );
 }

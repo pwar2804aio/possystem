@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../../store';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
+import DrawerCashModal from '../../components/DrawerCashModal';
 
 /**
  * Cash Drawers registry (v4.6.35).
@@ -65,6 +66,10 @@ export default function CashDrawers() {
     })();
   }, []);
   const createCashDrawer = useStore(s => s.createCashDrawer);
+  const cashInDrawer = useStore(s => s.cashInDrawer);
+  const cashOutDrawer = useStore(s => s.cashOutDrawer);
+  const computeExpectedCash = useStore(s => s.computeExpectedCash);
+  const staff = useStore(s => s.staff);
   const updateCashDrawer = useStore(s => s.updateCashDrawer);
   const deleteCashDrawer = useStore(s => s.deleteCashDrawer);
   const loadCashDrawers  = useStore(s => s.loadCashDrawers);
@@ -72,6 +77,9 @@ export default function CashDrawers() {
   const [selId, setSelId]   = useState(null);
   const [form, setForm]     = useState(EMPTY);
   const [isNew, setIsNew]   = useState(false);
+  // v4.6.40: cash-in / cash-out modal state
+  const [cashActionDrawer, setCashActionDrawer] = useState(null); // { drawer, mode, expected }
+
 
   useEffect(() => {
     loadCashDrawers?.();
@@ -159,6 +167,29 @@ export default function CashDrawers() {
                 {Number(d.currentFloat) !== 0 && (
                   <div style={{ fontSize:11, color:'var(--t4)', marginTop:3, fontFamily:'var(--font-mono)' }}>Float: £{Number(d.currentFloat || 0).toFixed(2)}</div>
                 )}
+                {/* v4.6.40: inline cash in/out actions */}
+                <div style={{ display:'flex', gap:6, marginTop:8 }}>
+                  {(!d.status || d.status === 'idle') ? (
+                    <button onClick={(e) => { e.stopPropagation(); setCashActionDrawer({ drawer: d, mode: 'in', expected: 0 }); }}
+                      style={{ flex:1, padding:'6px 8px', borderRadius:6, border:'1px solid var(--grn-b)', background:'var(--grn-d)', color:'var(--grn)', fontFamily:'inherit', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                      Cash in
+                    </button>
+                  ) : (
+                    <button onClick={async (e) => {
+                      e.stopPropagation();
+                      const allowed = Array.isArray(staff?.permissions) && staff.permissions.includes('cashup');
+                      if (!allowed && staff?.role !== 'Manager' && staff?.role !== 'Admin') {
+                        useStore.getState().showToast?.('Cashup permission required', 'error');
+                        return;
+                      }
+                      const exp = typeof computeExpectedCash === 'function' ? await computeExpectedCash(d.id) : 0;
+                      setCashActionDrawer({ drawer: d, mode: 'out', expected: exp });
+                    }}
+                      style={{ flex:1, padding:'6px 8px', borderRadius:6, border:'1px solid var(--red-b)', background:'var(--red-d)', color:'var(--red)', fontFamily:'inherit', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                      Cash up
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -270,6 +301,25 @@ export default function CashDrawers() {
           </div>
         )}
       </div>
+
+      {/* v4.6.40: Cash in / Cash out modal, shared component */}
+      {cashActionDrawer && (
+        <DrawerCashModal
+          mode={cashActionDrawer.mode}
+          drawer={cashActionDrawer.drawer}
+          expectedCash={cashActionDrawer.expected}
+          onClose={() => setCashActionDrawer(null)}
+          onComplete={async ({ amount, denominations, notes }) => {
+            if (cashActionDrawer.mode === 'in') {
+              await cashInDrawer?.(cashActionDrawer.drawer.id, { openingFloat: amount, denominations });
+            } else {
+              await cashOutDrawer?.(cashActionDrawer.drawer.id, { declaredCash: amount, denominations, notes });
+            }
+            setCashActionDrawer(null);
+            useStore.getState().loadCashDrawers?.();
+          }}
+        />
+      )}
     </div>
   );
 }
