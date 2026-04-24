@@ -68,6 +68,16 @@ export default function POSSurface() {
   const [expectedForCashOut, setExpectedForCashOut] = useState(0);
   useEffect(() => {
     if (typeof loadCurrentDrawerSession === 'function') loadCurrentDrawerSession();
+    // v4.6.49: periodic poll of cashDrawers + drawer session. Catches remote
+    // changes from the back office (manager cashes up / cashes in a drawer)
+    // without needing to refresh the POS. 15s cadence — cheap single-table read.
+    const _poll = setInterval(async () => {
+      try {
+        if (typeof useStore.getState().loadCashDrawers === 'function') await useStore.getState().loadCashDrawers();
+        if (typeof loadCurrentDrawerSession === 'function') await loadCurrentDrawerSession();
+      } catch {}
+    }, 15000);
+    return () => clearInterval(_poll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const _myDrw = typeof myDrawer === 'function' ? myDrawer() : null;
@@ -1529,20 +1539,47 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
           );
         })}
       </div>
-      {/* v4.6.48: sign-in gate. When the POS has a cash drawer bound and
-          it's not in a usable state, block the POS. No drawer bound = no
-          gate (POS trades card-only). */}
+      {/* v4.6.49: role-aware sign-in gate. When the POS has a drawer bound
+          and it's not in a usable state (idle/closed), lock the whole POS.
+          Manager/Admin or staff with cashup permission → shown the cash-in
+          modal. Other roles → shown a read-only "ask a manager" screen
+          that can't be dismissed without signing out. No drawer bound =
+          no gate (POS trades card-only). */}
       {_myDrw && _myDrw.status !== 'open' && _myDrw.status !== 'counting' && staff && !showCashIn && (
-        <DrawerCashModal
-          mode="in"
-          drawer={_myDrw}
-          locked={true}
-          onComplete={async ({ amount, denominations }) => {
-            await cashInDrawer?.(_myDrw.id, { openingFloat: amount, denominations });
-            await loadCurrentDrawerSession?.();
-            if (typeof useStore.getState().loadCashDrawers === 'function') await useStore.getState().loadCashDrawers();
-          }}
-        />
+        _canCashup || staff?.role === 'Manager' || staff?.role === 'Admin' ? (
+          <DrawerCashModal
+            mode="in"
+            drawer={_myDrw}
+            locked={true}
+            onComplete={async ({ amount, denominations }) => {
+              await cashInDrawer?.(_myDrw.id, { openingFloat: amount, denominations });
+              await loadCurrentDrawerSession?.();
+              if (typeof useStore.getState().loadCashDrawers === 'function') await useStore.getState().loadCashDrawers();
+            }}
+          />
+        ) : (
+          <div className="modal-back" style={{ zIndex:9999 }}>
+            <div style={{
+              background:'var(--bg1)', border:'1.5px solid var(--bdr2)', borderRadius:20,
+              padding:'32px 28px', maxWidth:440, textAlign:'center',
+              boxShadow:'var(--sh3)',
+            }}>
+              <div style={{ fontSize:42, marginBottom:14 }}>&#128274;</div>
+              <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)', marginBottom:8 }}>POS locked</div>
+              <div style={{ fontSize:13, color:'var(--t3)', marginBottom:6, lineHeight:1.5 }}>
+                <b>{_myDrw.name}</b> needs to be cashed in before this POS can trade.
+              </div>
+              <div style={{ fontSize:13, color:'var(--t3)', marginBottom:22, lineHeight:1.5 }}>
+                Ask a manager to cash in the drawer, or sign out and let them sign in.
+              </div>
+              <button
+                onClick={() => { try { useStore.getState().logout?.(); } catch {} }}
+                style={{ padding:'10px 24px', borderRadius:10, border:'1px solid var(--bdr)', background:'var(--bg3)', color:'var(--t2)', fontFamily:'inherit', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                Sign out
+              </button>
+            </div>
+          </div>
+        )
       )}
       {/* Explicit cash-in flow from the drawer menu (always dismissable). */}
       {showCashIn && _myDrw && (

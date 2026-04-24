@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.49', date: '24 Apr 2026', label: 'Shift no longer auto-closes on cash-up + role-aware POS lock + cross-device drawer sync',
+    changes: [
+      'Peter: cash-up on back office auto-closed the shift. That was wrong. The shift should stay open until a manager runs Close day manually from back office (which aggregates per-POS totals, not just drawer-level). Removed the v4.6.40 auto-finalise-on-all-drawers-idle block from cashOutDrawer. Drawer cash-up now simply closes that session and leaves the shift running.',
+      'Peter: Sunmi POS did not lock after the drawer was cashed up from back office — only the Cash payment button was hidden, the rest of the POS stayed usable. Root cause: cashDrawers state was cached locally on the Sunmi, back-office changes never reached it. Added a 15-second periodic poll on the POS that reloads cashDrawers + currentDrawerSession from Supabase. Manager cashes up from back office → within 15s the Sunmi picks up drawer.status = idle → sign-in gate fires → POS fully locked.',
+      'Sign-in gate is now role-aware. Manager / Admin / staff with cashup permission → shown the full DrawerCashModal and can cash in. Other roles (Server, Cashier without cashup perm, Host) → shown a read-only POS locked screen with name of the drawer, a "ask a manager to cash in" message, and a Sign out button. Ensures non-managers can\'t accidentally (or deliberately) declare opening float.',
+      'Non-drawer POSes (Test 1 and similar — myDrawer() returns null) are still unaffected. Gate never fires, full POS is usable, Cash button stays hidden per v4.6.47.',
+    ],
+  },
+  {
     version: '4.6.48', date: '24 Apr 2026', label: 'POS sign-in gate rebuilt + cash-in from POS',
     changes: [
       'Sign-in gate rebuilt. Now triggers on any POS where the bound drawer is not open and not counting (idle, missing, whatever) — regardless of the old _needsCashIn flag. Modal is locked=true so the operator cannot dismiss it. Non-drawer POSes (myDrawer() returns null) skip the gate entirely. Back office sessions without staff signed in also skip (gate still requires the staff object).',

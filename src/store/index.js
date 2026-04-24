@@ -2229,13 +2229,10 @@ export const useStore = create((set, get) => ({
         Math.abs(variance) < 0.01 ? 'success' : 'warning',
       );
 
-      // 4. Auto-finalise shift if every drawer is now idle
+      // v4.6.49: removed auto-finalise. Shift stays open after all drawers
+      // cash up. Manager must manually run Close day from Back Office, which
+      // aggregates totals across the full location. Just refresh drawer state.
       await get().loadCashDrawers?.();
-      const allIdle = (get().cashDrawers || []).every(d => d.status === 'idle' || !d.status);
-      if (allIdle && get().currentShift) {
-        // Auto-close the shift — this is the per-drawer EOD path
-        await get().closeShift?.({ auto: false, notes: 'All drawers cashed up' });
-      }
 
       return { expected, declared, variance };
     } catch (err) {
