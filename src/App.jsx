@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.36', date: '23 Apr 2026', label: 'POS routes cash to the right drawer; petty cash goes per-drawer (Phase 1b)',
+    changes: [
+      'POS cash-drawer button now shows the name of the drawer bound to this device (e.g. 🔓 Bar, 🔓 Counter). If no drawer is bound the label stays generic and the button hints at Back Office > Devices > Cash drawers in its tooltip. Both the active-table header and the no-table header updated.',
+      'openCashDrawer store action is now drawer-aware. Resolves the target drawer from (1) explicit drawerId arg, (2) myDrawer() via device binding, (3) falls back to legacy cashDrawerAttached flag scan. The ESC p pulse fires at the resolved drawers printer; a movement row is written to Supabase cash_movements carrying drawer_id; the drawers current_float updates locally and in DB.',
+      'New insertCashMovement store action persists each movement to the cash_movements table in parallel with the existing legacy pettyCashEntries array. Dual-write means the petty cash page keeps working and the per-drawer Supabase source of truth is populated for reports.',
+      'Petty Cash back-office page gains a Drawer filter (only shown when drawers are configured). Each ledger row now shows the drawer name as a coloured chip next to the movement type. Entries without a drawerId (pre-4.6.36 or drawer-open events without binding) show unbadged and still appear under All.',
+      'Float tracking: drawer.currentFloat updates on every cash_sale (+), float_in (+), drop (-), expense (-), uplift_to_safe (-), downlift_from_safe (+), adjustment (±). drawer_open events leave the float alone. This gives reliable running totals without needing to re-aggregate cash_movements at query time.',
+      'Phase 2 (v4.6.37) adds the shift lifecycle: auto-open at business day start, manager-gated close, shift_id stamped on every closed_check and cash_movement, per-drawer EOD rollup feeding into a single shift Z-read.',
+    ],
+  },
+  {
     version: '4.6.35', date: '23 Apr 2026', label: 'Cash drawers as first-class entities (Phase 1 of Drawers+Shifts)',
     changes: [
       'First piece of the multi-drawer + shift expansion. Cash drawers are now first-class entities in their own right, not just a boolean flag on a printer.',

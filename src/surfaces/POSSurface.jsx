@@ -34,6 +34,7 @@ export default function POSSurface() {
     updateItemSeat, updateItemCourse, setOrderNote,
     sendToKitchen, fireCourse, saveTableSession, toggleServiceCharge,
     openCashDrawer,
+    cashDrawers, myDrawer,
     getPOSItems, getPOSTotals, getPOSOrderNote,
     activeTableId, tables, clearTable, clearWalkIn, setActiveTableId, recordWalkInClosed,
     orderType, setOrderType, customer, setCustomer, clearCustomer,
@@ -411,30 +412,40 @@ export default function POSSurface() {
                   {session?.seatedAt?<span style={{color:'var(--t4)'}}> · {Math.floor((Date.now()-session.seatedAt)/60000)}m</span>:''}
                 </div>
               </div>
-              {/* v4.6.32: drawer pulse shortcut for staff with the openDrawer perm. */}
-              {Array.isArray(staff?.permissions) && staff.permissions.includes('openDrawer') && (
-                <button
-                  onClick={()=>openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 })}
-                  title="Open cash drawer"
-                  style={{fontSize:12,fontWeight:700,color:'var(--t4)',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:8,cursor:'pointer',fontFamily:'inherit',padding:'4px 10px',marginRight:8,flexShrink:0}}>
-                  🔓 Drawer
-                </button>
-              )}
+              {/* v4.6.36: drawer pulse shortcut — shows the bound drawer's name */}
+              {Array.isArray(staff?.permissions) && staff.permissions.includes('openDrawer') && (() => {
+                const _drw = typeof myDrawer === 'function' ? myDrawer() : null;
+                const _label = _drw ? `🔓 ${_drw.name}` : '🔓 Drawer';
+                const _title = _drw ? `Open ${_drw.name} cash drawer` : 'No drawer bound to this device (Back Office > Devices > Cash drawers)';
+                return (
+                  <button
+                    onClick={()=>openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 })}
+                    title={_title}
+                    style={{fontSize:12,fontWeight:700,color: _drw ? 'var(--acc)' : 'var(--t4)',background:'var(--bg3)',border:`1px solid ${_drw ? 'var(--acc-b)' : 'var(--bdr)'}`,borderRadius:8,cursor:'pointer',fontFamily:'inherit',padding:'4px 10px',marginRight:8,flexShrink:0}}>
+                    {_label}
+                  </button>
+                );
+              })()}
               <button onClick={()=>setSurface('tables')} style={{fontSize:12,fontWeight:700,color:'var(--t4)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:'4px 0',flexShrink:0}}>← Floor</button>
             </div>
           ) : (
             <>
-              {/* v4.6.32: drawer pulse shortcut — only when permission granted. */}
-              {Array.isArray(staff?.permissions) && staff.permissions.includes('openDrawer') && (
-                <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
-                  <button
-                    onClick={()=>openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 })}
-                    title="Open cash drawer"
-                    style={{fontSize:11,fontWeight:700,color:'var(--t3)',background:'var(--bg3)',border:'1px solid var(--bdr)',borderRadius:8,cursor:'pointer',fontFamily:'inherit',padding:'3px 10px'}}>
-                    🔓 Drawer
-                  </button>
-                </div>
-              )}
+              {/* v4.6.36: drawer pulse shortcut — shows the bound drawer's name */}
+              {Array.isArray(staff?.permissions) && staff.permissions.includes('openDrawer') && (() => {
+                const _drw = typeof myDrawer === 'function' ? myDrawer() : null;
+                const _label = _drw ? `🔓 ${_drw.name}` : '🔓 Drawer';
+                const _title = _drw ? `Open ${_drw.name} cash drawer` : 'No drawer bound to this device (Back Office > Devices > Cash drawers)';
+                return (
+                  <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
+                    <button
+                      onClick={()=>openCashDrawer?.({ type:'drawer_open', reason:'Manual open (POS)', amount:0 })}
+                      title={_title}
+                      style={{fontSize:11,fontWeight:700,color: _drw ? 'var(--acc)' : 'var(--t3)',background:'var(--bg3)',border:`1px solid ${_drw ? 'var(--acc-b)' : 'var(--bdr)'}`,borderRadius:8,cursor:'pointer',fontFamily:'inherit',padding:'3px 10px'}}>
+                      {_label}
+                    </button>
+                  </div>
+                );
+              })()}
               <div style={{display:'flex',gap:4,marginBottom:orderType==='dine-in'?0:8}}>
                 {visibleOrderTypes.map(([t,ic,l])=>(
                   <button key={t} onClick={()=>handleTypeChange(t)} style={{flex:1,padding:'7px 3px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',border:`1.5px solid ${orderType===t?'var(--acc-b)':'var(--bdr)'}`,background:orderType===t?'var(--acc-d)':'transparent',color:orderType===t?'var(--acc)':'var(--t3)',fontSize:10,fontWeight:800,display:'flex',flexDirection:'column',alignItems:'center',gap:1,letterSpacing:.01,transition:'all .14s'}}>

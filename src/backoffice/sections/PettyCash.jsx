@@ -29,6 +29,8 @@ const fmtTime = (ts) => new Date(ts).toLocaleString('en-GB', {
 export default function PettyCash() {
   const entries = useStore(s => s.pettyCashEntries) || [];
   const staff = useStore(s => s.staff);
+  // v4.6.36: per-drawer view
+  const cashDrawers = useStore(s => s.cashDrawers) || [];
   // v4.6.32: gate the action buttons on the openDrawer permission so servers
   // without permission don't see live buttons they can't use. The store
   // also enforces this (see openCashDrawer).
@@ -39,6 +41,7 @@ export default function PettyCash() {
   const [showAdd, setShowAdd] = useState(false);
   const [filterType, setFilterType] = useState('all');
   const [filterDate, setFilterDate] = useState('today'); // today | 7d | all
+  const [filterDrawer, setFilterDrawer] = useState('all'); // v4.6.36
 
   const filtered = useMemo(() => {
     const now = Date.now();
@@ -48,9 +51,11 @@ export default function PettyCash() {
       if (filterType !== 'all' && e.type !== filterType) return false;
       if (filterDate === 'today' && e.timestamp < startOfToday.getTime()) return false;
       if (filterDate === '7d'    && (now - e.timestamp) > 7 * dayMs) return false;
+      // v4.6.36: per-drawer filter. Entries with no drawerId match 'all' only.
+      if (filterDrawer !== 'all' && e.drawerId !== filterDrawer) return false;
       return true;
     });
-  }, [entries, filterType, filterDate]);
+  }, [entries, filterType, filterDate, filterDrawer]);
 
   const balance = useMemo(() =>
     filtered.reduce((s, e) => s + (TYPE_META[e.type]?.sign ?? 0) * (Number(e.amount) || 0), 0),
@@ -101,6 +106,14 @@ export default function PettyCash() {
           value={filterDate}
           onChange={setFilterDate}
         />
+        {cashDrawers.length > 0 && (
+          <FilterGroup
+            label="Drawer"
+            options={[['all','All'],...cashDrawers.map(d => [d.id, d.name])]}
+            value={filterDrawer}
+            onChange={setFilterDrawer}
+          />
+        )}
         <FilterGroup
           label="Type"
           options={[['all','All'],...Object.entries(TYPE_META).map(([id, meta]) => [id, meta.label])]}
@@ -130,6 +143,10 @@ export default function PettyCash() {
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:14, fontWeight:700, color:'var(--t1)', display:'flex', gap:10, alignItems:'baseline' }}>
                     <span>{meta.label}</span>
+                    {e.drawerId && (() => {
+                      const _d = cashDrawers.find(d => d.id === e.drawerId);
+                      return _d ? <span style={{ fontSize:11, fontWeight:600, color:'var(--acc)', background:'var(--acc-d)', padding:'1px 7px', borderRadius:5 }}>{_d.name}</span> : null;
+                    })()}
                     {e.ref && <span style={{ fontSize:11, fontWeight:500, color:'var(--t4)' }}>· {e.ref}</span>}
                   </div>
                   <div style={{ fontSize:12, color:'var(--t3)', marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>

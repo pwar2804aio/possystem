@@ -2065,11 +2065,14 @@ export const useStore = create((set, get) => ({
   // Pulse the cash drawer via the printer (if a cash-drawer-attached printer
   // is configured) AND log to the petty cash ledger. Swallow print failures —
   // the drawer pulse is best-effort and should never block a payment flow.
-  openCashDrawer: ({ reason = 'Manual open', amount = 0, type = 'drawer_open', ref = null, note = '', force = false } = {}) => {
+  openCashDrawer: ({ reason = 'Manual open', amount = 0, type = 'drawer_open', ref = null, note = '', force = false, drawerId = null } = {}) => {
     // v4.6.32: permission gate. 'force' is passed by the automatic cash-sale
     // firing path — no permission check needed there (the sale itself was
     // already authorised). Manual opens from the POS or the petty cash page
     // must have the 'openDrawer' staff permission.
+    // v4.6.36: drawer-aware routing. If drawerId is provided (or myDrawer()
+    // resolves one) the pulse fires at that drawer's printer, and the
+    // movement row carries drawer_id + shift_id.
     const { staff } = get();
     if (!force) {
       const allowed = Array.isArray(staff?.permissions) && staff.permissions.includes('openDrawer');
@@ -2078,14 +2081,74 @@ export const useStore = create((set, get) => ({
         return null;
       }
     }
+    // Resolve the drawer: explicit drawerId > myDrawer() > null
+    const resolvedDrawer = drawerId
+      ? (get().cashDrawers || []).find(d => d.id === drawerId)
+      : get().myDrawer?.() || null;
+    const resolvedDrawerId = resolvedDrawer?.id || null;
+    const resolvedPrinterId = resolvedDrawer?.printerId || null;
     try {
-      printService?.openCashDrawer?.()?.catch?.(err => console.warn('[openCashDrawer] pulse failed:', err?.message || err));
+      // printService.openCashDrawer accepts printerId as its first arg.
+      // If we have the drawer's printer, use it; else fall back to legacy
+      // behaviour (search for cashDrawerAttached flag).
+      printService?.openCashDrawer?.(resolvedPrinterId)?.catch?.(err => console.warn('[openCashDrawer] pulse failed:', err?.message || err));
     } catch (err) { console.warn('[openCashDrawer] pulse threw:', err); }
-    return get().addPettyCashEntry({
+    // Legacy pettyCashEntries for backwards-compat UI; also mirror to
+    // cash_movements (Supabase-backed, per-drawer, per-shift).
+    const entry = get().addPettyCashEntry({
       type, amount, reason, ref, note,
       staff: staff?.name || 'Unknown',
       staffId: staff?.id || null,
+      drawerId: resolvedDrawerId,
     });
+    // Mirror to cash_movements (async, fire-and-forget)
+    get().insertCashMovement?.({
+      type, amount,
+      drawerId: resolvedDrawerId,
+      reason, note, ref,
+      staffId: staff?.id || null,
+      staffName: staff?.name || 'Unknown',
+    });
+    // Update drawer's current_float locally + in DB
+    if (resolvedDrawerId && type !== 'drawer_open') {
+      const SIGN = { cash_sale: +1, float_in: +1, adjustment: +1, drop: -1, cash_drop: -1, expense: -1, uplift_to_safe: -1, downlift_from_safe: +1 };
+      const delta = (SIGN[type] || 0) * (Number(amount) || 0);
+      if (delta !== 0) {
+        const current = resolvedDrawer.currentFloat || 0;
+        get().updateCashDrawer?.(resolvedDrawerId, { currentFloat: current + delta });
+      }
+    }
+    return entry;
+  },
+
+  // v4.6.36: persist a movement row to Supabase cash_movements. Fire-and-forget;
+  // failure is logged not fatal. Dual-writes here: Zustand (via addPettyCashEntry
+  // above which still populates pettyCashEntries) and Supabase (this function).
+  insertCashMovement: async ({ type, amount, drawerId = null, shiftId = null, fromDrawerId = null, toDrawerId = null, reason = '', note = '', ref = null, staffId = null, staffName = '' }) => {
+    if (isMock || !supabase) return null;
+    try {
+      const locId = await getLocationId();
+      if (!locId) return null;
+      const row = {
+        id: `mov-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+        location_id: locId,
+        timestamp: new Date().toISOString(),
+        type, amount: Number(amount) || 0,
+        drawer_id: drawerId,
+        shift_id: shiftId,
+        from_drawer_id: fromDrawerId,
+        to_drawer_id: toDrawerId,
+        reason, note, ref,
+        staff_id: staffId,
+        staff_name: staffName,
+      };
+      const { error } = await supabase.from('cash_movements').insert(row);
+      if (error) console.warn('[insertCashMovement] DB error:', error.message);
+      return row.id;
+    } catch (err) {
+      console.warn('[insertCashMovement] failed:', err?.message || err);
+      return null;
+    }
   },
 
   // ── Closed check history ──────────────────
