@@ -1528,8 +1528,6 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
           );
         })}
       </div>
-    </div>
-
       {/* v4.6.40: cash drawer sign-in gate (can't be dismissed — LOCKED) */}
       {_needsCashIn && staff && (
         <DrawerCashModal
@@ -1602,5 +1600,8 @@ function OrdersHub({ orderQueue, updateQueueStatus, removeFromQueue, showToast }
           }}
         />
       )}
+    </div>
+
+
   );
 }
