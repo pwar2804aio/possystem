@@ -271,11 +271,13 @@ function CashTransaction({ grand, onComplete, onBack }) {
 export default function CheckoutModal({ items, subtotal, service, total, orderType, covers, tableId, tabName, onClose, onComplete }) {
   const compact = useCompact();
   const { taxRates, deviceConfig, myDrawer } = useStore();
-  // v4.6.47: resolve the drawer bound to this POS terminal. If the POS has
-  // no drawer configured OR the bound drawer isn't currently open, cash
-  // payments shouldn't be offered — operator has nowhere to put the cash.
+  // v4.6.50: resolve the drawer bound to this POS terminal. If the POS has
+  // no drawer configured at all, cash payments shouldn't be offered —
+  // nowhere to put the cash. Drawer status (open/idle) is not gated here.
   const _drawer = typeof myDrawer === 'function' ? myDrawer() : null;
-  const _canTakeCash = !!_drawer && _drawer.status === 'open';
+  // v4.6.50: Cash shows whenever a drawer is bound to the POS. Cashed-in vs
+  // idle is handled by the sign-in gate (lock), not by hiding the button.
+  const _canTakeCash = !!_drawer;
   const [screen, setScreen] = useState('review');
   const [namesOnly, setNamesOnly] = useState(false);
   const [tipAmt, setTipAmt] = useState(0);

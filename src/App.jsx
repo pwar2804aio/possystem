@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.50', date: '24 Apr 2026', label: 'Cash button shows whenever a drawer is bound (status-agnostic)',
+    changes: [
+      'Peter: assigned Cash Drawer 1 to a POS but the Cash button was still hidden in Checkout even though the drawer shows on the header. Root cause: v4.6.47 added a status === open requirement on top of the drawer-bound check. Since the drawer was idle (never cashed in), Cash got hidden. Confusing — operator sees a drawer on the POS but no way to take cash.',
+      'Simplified the rule: Cash button shows whenever any drawer is bound to this POS terminal. No status check. POSes with NO drawer bound still hide Cash entirely (Test 1, kiosks, kitchen handhelds).',
+      'Cashed-in vs idle state is the sign-in gate\'s job, not the button\'s job. When the gate is firing properly, you can\'t reach Checkout without cashing in first. When it\'s not firing (v4.6.49 pending), at least the button is visible and consistent with what the POS header says.',
+    ],
+  },
+  {
     version: '4.6.49', date: '24 Apr 2026', label: 'Shift no longer auto-closes on cash-up + role-aware POS lock + cross-device drawer sync',
     changes: [
       'Peter: cash-up on back office auto-closed the shift. That was wrong. The shift should stay open until a manager runs Close day manually from back office (which aggregates per-POS totals, not just drawer-level). Removed the v4.6.40 auto-finalise-on-all-drawers-idle block from cashOutDrawer. Drawer cash-up now simply closes that session and leaves the shift running.',
