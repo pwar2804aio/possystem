@@ -2427,15 +2427,11 @@ export const useStore = create((set, get) => ({
     }
   },
 
-  // Open the cash drawer attached to the receipt printer
-  openCashDrawer: async (printerId = null) => {
-    try {
-      return await printService.openCashDrawer(printerId);
-    } catch (err) {
-      get().showToast(`Cash drawer failed: ${err.message}`, 'error');
-      return { ok: false, error: err.message };
-    }
-  },
+  // v4.6.34: legacy openCashDrawer removed — it was overriding the permission-
+  // gated + petty-cash-logging version defined earlier in the object. Two
+  // actions with the same key collapse to the last declared one in JS object
+  // literals, which is what caused 'No printer with cash drawer configured'
+  // even when the flag was correctly set.
 
   // Manually reprint a failed or pending print_jobs row (called from StatusDrawer)
   // Uses the job's stored payload rather than rebuilding — exact reprint.

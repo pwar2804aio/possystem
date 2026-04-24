@@ -59,6 +59,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.34', date: '23 Apr 2026', label: 'Fix Cash drawer failed: No printer with cash drawer configured',
+    changes: [
+      'Root cause of the POS toast "Cash drawer failed: No printer with cash drawer configured" even when the printer had the flag set and localStorage was correct: the store had TWO openCashDrawer actions declared under the same key. The first one (added in v4.6.30 with permission gate, force bypass, and petty cash logging) was being silently overridden by a legacy one further down the object literal that took printerId as the first positional arg and called printService.openCashDrawer directly.',
+      'When the POS header Drawer button fired openCashDrawer({ type, reason, amount }) the legacy signature treated that object as printerId. _printerById(someObject) returned null, the receipt-role fallback was skipped because the truthy object satisfied the `if (printerId)` branch in printer.js, and the throw fired: "No printer with cash drawer configured". Caught by the legacy catch block which toasted "Cash drawer failed: {message}".',
+      'Removed the legacy duplicate. Only the v4.6.30 version remains — options-form signature, permission-gated (manual opens require openDrawer perm, auto-fire uses force:true), and writes a petty cash entry on every successful pulse.',
+      'No schema changes, no new files. Single-file commit (store/index.js) plus version + CHANGELOG.',
+    ],
+  },
+  {
     version: '4.6.33', date: '23 Apr 2026', label: 'POS hydrates printers from Supabase on mount (fixes cash drawer not recognised)',
     changes: [
       'Peter reported: set up Cash drawer attached on a printer in Back Office, saved fine, but POS says drawer is not configured on this printer. Cause: the POS devices local rpos-printers cache is only ever populated when the user is on the Printers screen in the back office in that same browser. A cross-device install (Sunmi terminal here, laptop for back office) never refreshes its own printer list, so any meta flag added later (roles change, cash drawer, etc) is invisible to the POS.',
