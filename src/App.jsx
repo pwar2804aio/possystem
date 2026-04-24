@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.53', date: '24 Apr 2026', label: 'Lock overlay was in the wrong components render — moved to POSSurfaces main return',
+    changes: [
+      'Finally found why none of my v4.6.48/49/51/52 lock attempts fired: the inline IIFE I kept adding ended up INSIDE a nested sub-component at line 1555+ of POSSurface.jsx, NOT inside POSSurface\'s own return (which ends at line 1237). So POSSurface rendered without any lock and my code only would have run for that buried sub-component — which the user never reaches directly.',
+      'Moved the lock logic to the TOP of POSSurface\'s main return (line 438), right after the outer flex div opens. Removed the now-dead v4.6.52 version from line 1555. Distinct console log [POSLockV453] FIRING so we can confirm it\'s running.',
+      'Behaviour unchanged from intent: drawer bound + drawer not open + staff signed in → lock. Manager/Admin/cashup → DrawerCashModal (cash in). Other roles → read-only Ask a manager screen.',
+    ],
+  },
+  {
     version: '4.6.52', date: '24 Apr 2026', label: 'POS lock overlay inlined into POSSurface (bundler wasnt including external component)',
     changes: [
       'v4.6.51 created a separate POSLockOverlay component. The file was committed, the import+usage were added to POSSurface, but the compiled bundle never included the component — likely a Vite cache / import-resolution problem. Inlining the same logic directly into POSSurface so there\'s no separate file dependency.',
