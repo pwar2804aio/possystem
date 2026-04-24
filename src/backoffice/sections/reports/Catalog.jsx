@@ -37,6 +37,7 @@ export const CATEGORIES = [
       { id:'zreport',  label:'Z-report',         desc:'Printable end-of-day snapshot — thermal 80mm or PDF', badge:'new' },
       { id:'tax',      label:'Tax summary',      desc:'Per-rate + per-order-type breakdown, reuses POS tax engine', badge:'updated' },
       { id:'payments', label:'Payments & cash',  desc:'Method breakdown + drawer reconciliation' },
+      { id:'cash_drawer', label:'Cash drawer sessions', desc:'Every cash-in / cash-out with opening float, expected, declared, variance', badge:'new' },
     ],
   },
   {

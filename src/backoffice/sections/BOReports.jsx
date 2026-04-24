@@ -31,6 +31,7 @@ import KDSPerformance from './reports/KDSPerformance';
 import ZReport      from './reports/ZReport';
 import Tax          from './reports/Tax';
 import LocationCompare from './reports/LocationCompare';
+import CashDrawer    from './reports/CashDrawer';
 
 const fmt  = n => `£${(n || 0).toFixed(2)}`;
 const fmtN = n => (n || 0).toLocaleString();
@@ -229,6 +230,7 @@ export default function BOReports() {
           {view === 'zreport'     && <ZReport      checks={filtered} periodLabelText={periodLabel(period, customRange, range)} rangeFrom={range.from} rangeTo={range.to} fmt={fmt} fmtN={fmtN}/>}
           {view === 'tax'        && <Tax          checks={filtered} fmt={fmt} fmtN={fmtN}/>}
           {view === 'location_compare' && <LocationCompare rangeFrom={range.from} rangeTo={range.to} periodLabelText={periodLabel(period, customRange, range)} fmt={fmt} fmtN={fmtN}/>}
+          {view === 'cash_drawer' && <CashDrawer   fromMs={range.from} toMs={range.to}/>}
           {view === 'open'       && <LegacyOpen   openOrders={openOrders} fmt={fmt}/>}
         </>
       )}

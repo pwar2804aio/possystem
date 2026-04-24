@@ -59,6 +59,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.42', date: '24 Apr 2026', label: 'Cash drawer report under Fiscal reports',
+    changes: [
+      'New report: Reports > Fiscal > Cash drawer sessions. Lists every cash-in / cash-out cycle for every drawer in the selected period. Each row is one drawer session showing opened at, closed at, duration, opening float, cash sales, drops, expenses, expected cash, declared cash, and variance (colour-coded: green for balanced, amber for over, red for short).',
+      'Click any session to expand an inline breakdown — running mini-stats (opening float, cash sales, drops, expenses, expected, declared) plus a full movement log with timestamps, type labels, reasons, and signed amounts. Any notes captured at cash-up time are shown at the bottom of the expanded view.',
+      'Rollup stats across all sessions in the filter: total sessions, cash sales, floats, drops, expenses, net variance. Variance rollup shows ✓ Balanced when zero, positive for drawer over, negative for drawer short.',
+      'Filter by drawer at the top — All drawers by default, chip-style selector that switches to just one drawer when clicked. Respects whatever date range is set via the top-level BOReports period picker (today / yesterday / 7d / 30d / custom).',
+      'Export CSV button top right. One row per session. Includes drawer name, open/close times, duration, opening float, cash sales, drops, expenses, expected, declared, variance, status, notes.',
+      'Data source: drawer_sessions + cash_movements tables from v4.6.40. Each session links to its own movements via session_id so the report doesn\'t need to re-run the variance calc — it just reads what was captured at cash-up. Sessions still open (not yet cashed out) show a Running total based on live movement sum, no declared/variance yet.',
+    ],
+  },
+  {
     version: '4.6.41', date: '24 Apr 2026', label: 'Back-office Cash up button actually opens the modal',
     changes: [
       'Peter tested v4.6.40 and found the Cash up button did nothing on click. Root cause: the button guarded on staff.permissions.includes("cashup") OR staff.role === Manager/Admin, but in back-office mode the staff object (which comes from POS PIN login) is empty. Both checks failed silently, the function returned before ever setting the modal state, no error, no feedback.',
