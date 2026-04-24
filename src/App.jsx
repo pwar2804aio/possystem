@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.46', date: '24 Apr 2026', label: 'Fix Close day button — closeShift permission gate now allows back-office',
+    changes: [
+      'Peter tested v4.6.45 Close day and the red Close day button did nothing. Root cause: finaliseShift delegates to closeShift, and closeShift had its own older permission gate that checked staff.role === Manager/Admin OR cashup/eod permission. In back-office mode the staff object is empty (staff is PIN-login, not Supabase Auth), so both checks failed and closeShift returned null silently. Same bug class as the earlier Cash Up button issue.',
+      'Fix: closeShift permission gate now also accepts empty-staff as "called from back office" (same pattern as finaliseShift already uses and the same pattern applied to CashDrawers Cash up button in v4.6.41). POS-side calls still enforce PIN-login role checks — those are unchanged.',
+      'Single-file commit (store/index.js) plus version + CHANGELOG. No schema, no UI.',
+    ],
+  },
+  {
     version: '4.6.45', date: '24 Apr 2026', label: 'Close day — redesigned EOD flow with per-drawer breakdown',
     changes: [
       'Rewrote End of day from scratch as Close day. Three clean states: no shift open (nothing to do), drawers still open (blocking, shows which drawers need cash up), and all drawers cashed up (full review + close button). Dropped the legacy denomination counter that was mentioning opening float at the wrong step — opening float is a cash-in concept, not an end-of-day concept.',

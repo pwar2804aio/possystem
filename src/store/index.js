@@ -2383,12 +2383,15 @@ export const useStore = create((set, get) => ({
       get().showToast?.('No open shift to close', 'error');
       return null;
     }
-    // Permission gate — manual close requires admin or manager role (or cashup perm)
+    // Permission gate — manual close requires admin/manager role, cashup/eod
+    // perm, OR back-office auth (empty staff = user signed in via Supabase
+    // Auth as the business owner, not a POS PIN login).
     if (!auto) {
       const { staff } = get();
       const role = staff?.role;
       const hasPerm = Array.isArray(staff?.permissions) && (staff.permissions.includes('cashup') || staff.permissions.includes('eod'));
-      if (role !== 'Manager' && role !== 'Admin' && !hasPerm) {
+      const fromBackOffice = !staff?.id; // v4.6.46: allow when called from BO
+      if (role !== 'Manager' && role !== 'Admin' && !hasPerm && !fromBackOffice) {
         get().showToast?.('Only manager/admin can close a shift', 'error');
         return null;
       }
