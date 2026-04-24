@@ -2341,6 +2341,38 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  // v4.6.43: Location-wide Z-read. Writes the aggregated report to the shifts
+  // row and closes the shift. Enforces Manager/Admin role at the call site —
+  // the EOD page checks staff.role before calling this, and closeShift also
+  // enforces the check below as a second guard.
+  finaliseShift: async ({ zReport, notes = '' } = {}) => {
+    const current = get().currentShift;
+    if (!current || current.status !== 'open') {
+      get().showToast?.('No open shift to finalise', 'error');
+      return null;
+    }
+    // Defence in depth: block if any drawer is still non-idle
+    const stillOpen = (get().cashDrawers || []).find(d => d.status && d.status !== 'idle');
+    if (stillOpen) {
+      get().showToast?.(`Can't finalise — ${stillOpen.name} is still ${stillOpen.status}`, 'error');
+      return null;
+    }
+    // Role check — Manager/Admin only
+    const { staff } = get();
+    const isAdmin = staff?.role === 'Manager' || staff?.role === 'Admin';
+    const hasEOD  = Array.isArray(staff?.permissions) && staff.permissions.includes('eod');
+    // Back office is already auth-gated via Supabase Auth, so if staff is empty
+    // that means this was called from the back office (where the page itself
+    // is behind Supabase Auth). Allow that.
+    const fromBackOffice = !staff?.id;
+    if (!isAdmin && !hasEOD && !fromBackOffice) {
+      get().showToast?.('Manager/Admin required to close a shift', 'error');
+      return null;
+    }
+    // closeShift persists z_report on the shifts row
+    return await get().closeShift?.({ auto: false, notes, zReport });
+  },
+
   closeShift: async ({ auto = false, notes = '', zReport = null } = {}) => {
     const current = get().currentShift;
     if (!current || current.status !== 'open') {
@@ -2405,7 +2437,44 @@ export const useStore = create((set, get) => ({
       if (current) {
         const openedMs = new Date(current.openedAt).getTime();
         if (openedMs < businessDayStartMs) {
-          // Shift has run past a business day boundary — auto-close + reopen
+          // v4.6.43: shift has run past the business-day boundary. Before we
+          // close the shift, force-close any drawers that are still open —
+          // nobody cashed them up, we don't know the physical cash count, so
+          // we honestly log declared=null variance=null and note it.
+          try {
+            await get().loadCashDrawers?.();
+            const openDrawers = (get().cashDrawers || []).filter(d => d.status && d.status !== 'idle');
+            for (const d of openDrawers) {
+              // Find + close the drawer's open session
+              const { data: sess } = await supabase
+                .from('drawer_sessions').select('*')
+                .eq('drawer_id', d.id)
+                .in('status', ['open', 'counting'])
+                .order('cash_in_at', { ascending: false })
+                .limit(1);
+              const row = sess?.[0];
+              if (row) {
+                await supabase.from('drawer_sessions').update({
+                  cash_out_at: new Date(businessDayStartMs).toISOString(),
+                  cash_out_by_staff_id: null,
+                  declared_cash: null,
+                  expected_cash: null,
+                  variance: null,
+                  status: 'closed',
+                  notes: [row.notes, 'Auto-closed at business day boundary — not physically counted'].filter(Boolean).join(' · '),
+                }).eq('id', row.id);
+              }
+              await get().updateCashDrawer?.(d.id, {
+                status: 'idle', currentFloat: 0, openedAt: null, openedByStaffId: null,
+              });
+            }
+            if (openDrawers.length > 0) {
+              console.warn(`[reconcileShiftOnMount] auto-closed ${openDrawers.length} drawer(s) with unknown variance`);
+            }
+          } catch (err) {
+            console.warn('[reconcileShiftOnMount] drawer force-close failed:', err?.message || err);
+          }
+          // Now close the shift itself
           await get().closeShift?.({ auto: true, notes: 'Auto-closed at business day boundary' });
           await get().openShift?.();
         }

@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.43', date: '24 Apr 2026', label: 'Location-wide End of Day Z-read',
+    changes: [
+      'Rewrote Back Office > End of day as a shift-scoped, location-wide Z-read. Aggregates every drawer session + every closed check for the current open shift into one consolidated report, then closes the shift. Replaces the previous single-drawer denomination counter flow — that counter logic is now owned by the per-drawer cash up modal on the Cash Drawers page and on the POS.',
+      'Three states. No open shift: empty card prompting you to go to the Shift page. Open shift with drawers still open: red banner listing each non-idle drawer by name, status, and current float, with the Run Z-read button disabled and hint text pointing to Back Office > Cash drawers for cash up. All drawers idle: full Z-read preview (shift totals, per-drawer breakdown, payment method breakdown) with a red Run Z-read & close shift button.',
+      'Per-drawer breakdown table shows every drawer side by side with session count, opening float, cash sales, drops, expenses, declared cash, and colour-coded variance (✓ for balanced, + for over, − for short, grey — for drawers that have no sessions or are not yet closed).',
+      'Payment methods table shows count, revenue, and tips per method (cash, card, stripe, other), sorted by revenue descending.',
+      'Run Z-read & close writes a z_report jsonb blob to the shifts row (shape: shiftId, openedAt, closedAt, totals, drawers[], paymentMethods[], generatedAt), flips shifts.status to closed, and toasts. Defence in depth: the store-level finaliseShift action re-checks drawer state, re-checks role (Manager/Admin, eod permission, or back-office auth), and only then delegates to closeShift.',
+      'Auto-close path (reconcileShiftOnMount) now handles drawers that were never cashed up. If the shift has crossed business-day-start with drawers still open, the system force-closes each drawers open session with declared=null, expected=null, variance=null, and notes="Auto-closed at business day boundary — not physically counted". The shift then closes and a new one opens. Visible in reports as grey — variance rather than a false £0.00 balance, so the manager knows to investigate.',
+      'All drawer-close math reuses the shift_id column on cash_movements (added v4.6.40). Sessions are fetched per shift, not per day, so if you manually close a shift mid-afternoon everything attributed to that shift stays with it.',
+    ],
+  },
+  {
     version: '4.6.42', date: '24 Apr 2026', label: 'Cash drawer report under Fiscal reports',
     changes: [
       'New report: Reports > Fiscal > Cash drawer sessions. Lists every cash-in / cash-out cycle for every drawer in the selected period. Each row is one drawer session showing opened at, closed at, duration, opening float, cash sales, drops, expenses, expected cash, declared cash, and variance (colour-coded: green for balanced, amber for over, red for short).',
