@@ -41,7 +41,7 @@ export default function POSSurface() {
     loadCurrentDrawerSession,
     getPOSItems, getPOSTotals, getPOSOrderNote,
     activeTableId, tables, clearTable, clearWalkIn, setActiveTableId, recordWalkInClosed,
-    orderType, setOrderType, customer, setCustomer, clearCustomer,
+    orderType, setOrderType, customer, setCustomer, setAllergens, clearCustomer,
     orderQueue, updateQueueStatus, removeFromQueue, showToast,
     pendingItem, setPendingItem, clearPendingItem,
     eightySixIds, toggle86,
@@ -144,6 +144,8 @@ export default function POSSurface() {
     const sessionCust = t?.session?.customer;
     if (sessionCust && sessionCust.phone && (!customer || customer.phone !== sessionCust.phone)) {
       setCustomer(sessionCust);
+      // v4.4.9: auto-apply guest's saved allergen filters when re-entering their table
+      if (Array.isArray(sessionCust.allergens)) setAllergens(sessionCust.allergens);
     } else if (!sessionCust && customer && orderType === 'dine-in') {
       // Table switched and the new table has no attached customer
       setCustomer(null);
@@ -454,6 +456,9 @@ export default function POSSurface() {
         clearWalkIn();
         showToast('Payment complete', 'success');
       }
+      // v4.4.9: reset attached customer + allergen filter so the next walk-in/seat starts clean
+      clearCustomer();
+      clearAllergens();
     } catch (mutErr) {
       console.error('[PayComplete] State mutation failed — continuing to print:', mutErr?.message || mutErr);
     }
