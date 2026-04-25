@@ -98,6 +98,21 @@ export default function POSSurface() {
   const _needsCashIn = typeof needsCashIn === 'function' ? needsCashIn() : false;
   const _canCashup = Array.isArray(staff?.permissions) && staff.permissions.includes('cashup');
 
+  // v4.6.65: hydrate `customer` state from the active table's session so the
+  // attached customer chip + Edit/Remove pills show up when staff returns to a table.
+  useEffect(() => {
+    if (!activeTableId) return;
+    const t = tables.find(x => x.id === activeTableId);
+    const sessionCust = t?.session?.customer;
+    if (sessionCust && sessionCust.phone && (!customer || customer.phone !== sessionCust.phone)) {
+      setCustomer(sessionCust);
+    } else if (!sessionCust && customer && orderType === 'dine-in') {
+      // Table switched and the new table has no attached customer
+      setCustomer(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTableId, tables]);
+
   // Use store's editable menu — prefer menuName for display, fall back to name
   // IMPORTANT: useMemo keeps object references stable so modalItem doesn't change
   // identity on re-renders (which would remount ProductModal and reset selections state)
@@ -718,7 +733,7 @@ export default function POSSurface() {
                   <button onClick={()=>{setShowCustomerModal(true);setPendingOrderType(orderType);}} style={{fontSize:11,fontWeight:700,color:'var(--acc)',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',padding:0,flexShrink:0}}>Edit</button>
                 </div>
               )}
-              {orderType!=='dine-in'&&!customer&&(
+              {!customer&&(
                 <button onClick={()=>{setShowCustomerModal(true);setPendingOrderType(orderType);}} style={{width:'100%',padding:'9px 12px',borderRadius:10,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1.5px dashed var(--bdr2)',color:'var(--t3)',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:8,justifyContent:'center',marginTop:8,transition:'all .14s'}}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--acc-b)';e.currentTarget.style.color='var(--acc)';}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--bdr2)';e.currentTarget.style.color='var(--t3)';}}>
@@ -1241,7 +1256,7 @@ export default function POSSurface() {
       {pendingItem&&<AllergenModal item={pendingItem} activeAllergens={allergens} onConfirm={()=>{const i=pendingItem;clearPendingItem();openFlow(i);}} onCancel={clearPendingItem}/>}
       {modalItem&&modalItem.type==='pizza'&&<ProductModal key={modalItem.id} item={modalItem} activeAllergens={allergens} onConfirm={(item,mods,cfg,opts)=>{addItem(item,mods,cfg,opts);setModalItem(null);showToast(`${opts.displayName||item.name} added`,'success');}} onCancel={()=>setModalItem(null)}/>}
       {showCheckout&&<CheckoutModal items={items} subtotal={subtotal} service={service} total={total} orderType={orderType} covers={covers} tableId={activeTableId} seatList={seatList} customer={customer} onClose={()=>setShowCheckout(false)} onComplete={handlePayComplete}/>}
-      {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} existing={customer} onConfirm={c=>{setShowCustomerModal(false);setCustomer(c);setOrderType(pendingOrderType);setPendingOrderType(null);showToast(`${c.name} — ${pendingOrderType} order started`,'success');}} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
+      {showCustomerModal&&<CustomerModal orderType={pendingOrderType||orderType} existing={customer} onConfirm={c=>{setShowCustomerModal(false);setCustomer(c);if(pendingOrderType&&pendingOrderType!=='dine-in'){setOrderType(pendingOrderType);}setPendingOrderType(null);if(activeTableId){const t=tables.find(x=>x.id===activeTableId);if(t)saveTableSession(activeTableId,{...t.session,customer:c});}showToast(`${c.name} attached to order`,'success');}} onCancel={()=>{setShowCustomerModal(false);if(!customer)setOrderType('dine-in');}}/>}
 
       {/* Void modal */}
       {voidTarget&&(

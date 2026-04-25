@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.65', date: '24 Apr 2026', label: 'Manual customer attach — works for any order type including dine-in',
+    changes: [
+      'Add customer details button on the POS order panel now appears for every order type, including dine-in. Previously only takeaway / collection / delivery showed it because customers were treated as a side-effect of those order flows. With the customer database now persistent (v4.6.62), dine-in guests can also be attached so their visit counts towards loyalty and lifetime spend.',
+      'CustomerModal onConfirm reworked. When attaching to a dine-in order it no longer flips the order type to takeaway. The customer object is also written to the active tables session.customer field so it survives table switches and persists across the order lifecycle.',
+      'New useEffect in POSSurface hydrates the local customer state from session.customer when staff switches between tables. The attached customer chip appears automatically when returning to a table that already has a customer.',
+      'recordClosedCheck (the dine-in close path) now calls attributeOrderToCustomer when session.customer is set. Visit count and lifetime spend bump on customer_locations, an order row goes into customer_orders, customer_id stamps onto closed_checks. Same code path that walk-in / takeaway / bar tabs already use.',
+      'Future: scannable loyalty card. The data model is ready (phone is the lookup key); a card scan would just fire a customer search by phone and call setCustomer + saveTableSession.',
+    ],
+  },
+  {
     version: '4.6.64', date: '24 Apr 2026', label: 'Cross-location customer insights (CRM stage 3)',
     changes: [
       'Customer Insights & cross-location panel inside the existing Customers section. Tab bar at the top switches between Customer list (the v4.6.63 view) and Insights & cross-location (the new view). Insights has 5 sub-tabs:',

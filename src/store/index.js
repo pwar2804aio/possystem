@@ -2900,6 +2900,14 @@ export const useStore = create((set, get) => ({
     };
     set(s => ({ closedChecks: [record, ...s.closedChecks] }));
     insertClosedCheck(record);
+    // v4.6.65: dine-in customer attribution. Reads session.customer (attached
+    // manually via the Add customer button on the order panel — no order-type
+    // switch required).
+    if (session.customer?.phone) {
+      get().attributeOrderToCustomer({
+        customer: session.customer, orderRecord: record,
+      }).catch(err => console.warn('[recordClosedCheck customer]', err?.message || err));
+    }
     // v4.6.30: fire cash drawer + log petty cash entry for cash sales.
     if (record.method === 'cash') {
       // v4.6.32: force=true — cash sale itself is the authorisation.
