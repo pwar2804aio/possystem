@@ -748,15 +748,25 @@ export const useStore = create((set, get) => ({
 
   // Seat a table: create session, go to POS
   seatTable: (tableId, { covers, server }) => {
+    // v4.6.67: pull the existing reservation's customer (if any) into the session
+    // so the dine-in flow attributes loyalty automatically.
+    const tbl = get().tables.find(t => t.id === tableId);
+    const reservedCustomer = tbl?.reservation?.customer || null;
     const session = {
       id: `ORD-${++_orderNum}`,
       items: [], firedCourses: [],
       sentAt: null, covers, server,
       seatedAt: Date.now(), note: '', orderNote: '',
       subtotal: 0, total: 0,
+      customer: reservedCustomer,
     };
     get()._updateTable(tableId, { status:'open', session, reservation:null });
     set({ activeTableId:tableId, surface:'pos', orderType:'dine-in' });
+    // Auto-apply the customer's stored allergens (if any) on next visit.
+    if (reservedCustomer?.allergens?.length) {
+      set({ allergens: [...reservedCustomer.allergens] });
+      get().showToast?.(`Allergen filter applied — ${reservedCustomer.name} is allergic to ${reservedCustomer.allergens.join(', ')}`, 'info');
+    }
   },
 
   // Seat a table AND pre-populate its session with walk-in items
@@ -1729,6 +1739,14 @@ export const useStore = create((set, get) => ({
   },
 
   // ── Allergens ─────────────────────────────
+  // v4.6.67: when allergen filter is set on a customer-attached order, the toast
+  // offers Save to profile. This action runs upsertCustomer with the active filter.
+  saveAllergensToCustomer: async (customer) => {
+    if (!customer?.phone) return null;
+    const list = get().allergens || [];
+    return await get().upsertCustomer({ ...customer, allergens: list });
+  },
+  // ── Allergens ─────────────────────────────
   allergens: [],
   toggleAllergen: id => set(s=>({ allergens:s.allergens.includes(id)?s.allergens.filter(a=>a!==id):[...s.allergens,id] })),
   clearAllergens: () => set({ allergens:[] }),
@@ -1789,7 +1807,7 @@ export const useStore = create((set, get) => ({
       const safe = term.replace(/[,%]/g, '');
       const { data } = await supabase
         .from('customers')
-        .select('id, name, phone, phone_raw, email, marketing_opt_in, notes')
+        .select('id, name, phone, phone_raw, email, marketing_opt_in, notes, allergens')
         .eq('org_id', orgId)
         .is('deleted_at', null)
         .or(`name.ilike.%${safe}%,phone.ilike.%${safe}%,phone_raw.ilike.%${safe}%,email.ilike.%${safe}%`)
@@ -1859,10 +1877,12 @@ export const useStore = create((set, get) => ({
         notes: c.notes || null,
         marketing_opt_in: !!c.marketingOptIn,
         marketing_opt_in_at: c.marketingOptIn ? new Date().toISOString() : null,
+        // v4.6.67: allergens carried through. Caller decides whether to include them.
+        allergens: Array.isArray(c.allergens) ? c.allergens : undefined,
         updated_at: new Date().toISOString(),
       };
       const { data: existing } = await supabase.from('customers')
-        .select('id, name, email, marketing_opt_in')
+        .select('id, name, email, marketing_opt_in, allergens')
         .eq('org_id', orgId).eq('phone', phoneN).is('deleted_at', null).maybeSingle();
       if (existing?.id) {
         const patch = { updated_at: row.updated_at };
@@ -1872,6 +1892,9 @@ export const useStore = create((set, get) => ({
           patch.marketing_opt_in = true;
           patch.marketing_opt_in_at = row.marketing_opt_in_at;
         }
+        // v4.6.67: replace allergens array if caller passed one (explicit save
+        // from the toast / detail page). Don't merge — operator decides exact set.
+        if (Array.isArray(row.allergens)) patch.allergens = row.allergens;
         if (Object.keys(patch).length > 1) {
           await supabase.from('customers').update(patch).eq('id', existing.id);
         }

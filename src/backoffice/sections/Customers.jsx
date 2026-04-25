@@ -324,6 +324,7 @@ function DetailPanel({ customer, onClose, onChanged, onDeleted }) {
     email: customer.email || '',
     notes: customer.notes || '',
     marketing_opt_in: !!customer.marketing_opt_in,
+    allergens: Array.isArray(customer.allergens) ? customer.allergens : [],  // v4.6.67
   });
 
   useEffect(() => {
@@ -350,6 +351,7 @@ function DetailPanel({ customer, onClose, onChanged, onDeleted }) {
       email: customer.email || '',
       notes: customer.notes || '',
       marketing_opt_in: !!customer.marketing_opt_in,
+      allergens: Array.isArray(customer.allergens) ? customer.allergens : [],
     });
     setEditing(false);
   }, [customer.id]);
@@ -363,6 +365,7 @@ function DetailPanel({ customer, onClose, onChanged, onDeleted }) {
         email: form.email.trim() || null,
         notes: form.notes.trim() || null,
         marketing_opt_in: !!form.marketing_opt_in,
+        allergens: Array.isArray(form.allergens) ? form.allergens : [],  // v4.6.67
         updated_at: new Date().toISOString(),
       };
       if (form.marketing_opt_in && !customer.marketing_opt_in) {
@@ -444,6 +447,22 @@ function DetailPanel({ customer, onClose, onChanged, onDeleted }) {
             <Field label="Phone"><input type="text" value={form.phone_raw} onChange={e => setForm(f => ({ ...f, phone_raw: e.target.value }))} style={inputStyle}/></Field>
             <Field label="Email"><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} style={inputStyle}/></Field>
             <Field label="Notes"><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ ...inputStyle, resize:'vertical' }}/></Field>
+            <Field label="Allergens">
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {["gluten","dairy","milk","eggs","nuts","peanuts","soy","fish","shellfish","sesame","sulphites","celery","mustard","lupin","molluscs"].map(a => {
+                  const on = form.allergens.includes(a);
+                  return (
+                    <button key={a} type="button" onClick={() => setForm(f => ({ ...f, allergens: on ? f.allergens.filter(x => x !== a) : [...f.allergens, a] }))} style={{
+                      padding:'4px 10px', fontSize:11, borderRadius:6,
+                      border: on ? '1px solid var(--red,#cc5959)' : '1px solid var(--bdr)',
+                      background: on ? 'rgba(235,97,97,.12)' : 'var(--bg2)',
+                      color: on ? 'var(--red,#cc5959)' : 'var(--t3)',
+                      fontFamily:'inherit', fontWeight:600, cursor:'pointer',
+                    }}>{a}</button>
+                  );
+                })}
+              </div>
+            </Field>
             <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'var(--t2)', cursor:'pointer' }}>
               <input type="checkbox" checked={form.marketing_opt_in} onChange={e => setForm(f => ({ ...f, marketing_opt_in: e.target.checked }))}/>
               Marketing opt-in
@@ -452,6 +471,9 @@ function DetailPanel({ customer, onClose, onChanged, onDeleted }) {
         ) : (
           <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:13 }}>
             {customer.notes && <Row label="Notes" value={customer.notes}/>}
+            {Array.isArray(customer.allergens) && customer.allergens.length > 0 && (
+              <Row label="Allergens" value={customer.allergens.join(', ')}/>
+            )}
             <Row label="Marketing" value={customer.marketing_opt_in ? '✓ Opted in' : '✗ Not opted in'}/>
             <Row label="Customer since" value={fmtDate(customer.created_at)}/>
           </div>

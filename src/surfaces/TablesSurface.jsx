@@ -1,5 +1,6 @@
 import { useCompact } from '../lib/useCompact';
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { useStore } from '../store';
 import { resolveServiceCharge } from '../lib/serviceCharge';
 import CheckSelectorModal from '../components/CheckSelectorModal';
@@ -818,8 +819,30 @@ export default function TablesSurface() {
         <ReservationModal
           table={selectedTable}
           existing={selectedTable.reservation}
-          onConfirm={(res)=>{
-            setReservation(selectedTable.id, res);
+          onConfirm={async (res)=>{
+            // v4.6.67: persist to the customer database when phone is provided.
+            // The returned customer (with id + allergens + opt-in flag) is
+            // stored on the reservation so seatTable can lift it into the session.
+            let customerObj = null;
+            if (res.phone) {
+              try {
+                const { upsertCustomer, _normalisePhone, _cachedOrgId } = useStore.getState();
+                await upsertCustomer({ name: res.name, phone: res.phone });
+                // Refetch with allergens / id
+                const phoneN = _normalisePhone(res.phone);
+                if (phoneN && _cachedOrgId) {
+                  const { data } = await supabase.from('customers')
+                    .select('id, name, phone, phone_raw, email, allergens, marketing_opt_in, notes')
+                    .eq('org_id', _cachedOrgId).eq('phone', phoneN).is('deleted_at', null).maybeSingle();
+                  if (data) customerObj = data;
+                }
+              } catch (err) {
+                console.warn('[reservation customer upsert]', err?.message || err);
+              }
+            }
+            // Stash the customer object on the reservation so seatTable can lift it.
+            const reservationWithCustomer = customerObj ? { ...res, customer: customerObj } : res;
+            setReservation(selectedTable.id, reservationWithCustomer);
             setShowReservation(false);
             showToast(`${selectedTable.label} reserved for ${res.name} at ${res.time}`, 'success');
           }}

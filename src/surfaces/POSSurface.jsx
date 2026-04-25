@@ -98,6 +98,44 @@ export default function POSSurface() {
   const _needsCashIn = typeof needsCashIn === 'function' ? needsCashIn() : false;
   const _canCashup = Array.isArray(staff?.permissions) && staff.permissions.includes('cashup');
 
+  // v4.6.67: when filter changes AND a customer is attached AND filter differs from
+  // the customer's stored allergens, prompt to save. One-shot per filter change.
+  const _lastAllergenPromptRef = useRef('');
+  useEffect(() => {
+    if (!customer?.phone) return;
+    if (!Array.isArray(allergens) || allergens.length === 0) return;
+    const filterKey = [...allergens].sort().join(',');
+    const storedKey = (customer.allergens || []).slice().sort().join(',');
+    if (filterKey === storedKey) return;            // already matches — nothing to ask
+    if (_lastAllergenPromptRef.current === filterKey) return;  // already asked this round
+    _lastAllergenPromptRef.current = filterKey;
+    // Prompt — replicate showToast pattern with action button via store helper if available.
+    const labels = allergens.map(a => (ALLERGENS.find(x => x.id === a)?.label || a)).join(', ');
+    if (typeof useStore.getState().showToast === 'function') {
+      useStore.getState().showToast(
+        `Save ${labels} to ${customer.name}'s profile?`,
+        'info',
+        {
+          action: 'Save',
+          onAction: async () => {
+            const updatedId = await useStore.getState().saveAllergensToCustomer(customer);
+            if (updatedId) {
+              // Update local customer state so we don't ask again this session.
+              setCustomer({ ...customer, allergens: [...allergens] });
+              // Persist to current table session as well.
+              if (activeTableId) {
+                const t = tables.find(x => x.id === activeTableId);
+                if (t) saveTableSession(activeTableId, { ...t.session, customer: { ...customer, allergens: [...allergens] } });
+              }
+              useStore.getState().showToast(`Allergens saved to ${customer.name}`, 'success');
+            }
+          },
+        }
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allergens, customer?.phone]);
+
   // v4.6.65: hydrate `customer` state from the active table's session so the
   // attached customer chip + Edit/Remove pills show up when staff returns to a table.
   useEffect(() => {

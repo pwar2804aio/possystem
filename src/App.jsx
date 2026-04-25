@@ -59,6 +59,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.67', date: '24 Apr 2026', label: 'Reservations linked to customer DB + allergen capture per profile',
+    changes: [
+      'Reservations now create or match a customer record at booking time. When the operator confirms a reservation with a phone number, the system upserts the customer (phone-keyed, name preserved on existing matches), then stashes the full customer object on the reservation. When the table is seated, seatTable lifts that customer into session.customer automatically — the dine-in flow attributes the visit to their loyalty record without anyone re-typing the details.',
+      'Walk-ins keep working as before: hit Add customer details on the order panel and the v4.6.65 attach flow runs. Same end result.',
+      'Allergens stored on the customer profile (new customers.allergens text[] column, default empty). When a customer is attached AND the allergen filter has any items selected AND that filter differs from the customer profile, the POS shows a toast: Save [allergens] to [Name] profile? with a Save button. One-shot per filter change so the operator does not get spammed.',
+      'Auto-apply on return. When a returning customer with stored allergens is seated (via reservation seating), the allergen filter populates automatically with their stored allergens and an info toast confirms what was applied. Operator can override the filter for tonights specific needs.',
+      'Back-office Customers detail panel gains an allergen chip selector in edit mode (15 standard UK allergens — gluten, dairy, milk, eggs, nuts, peanuts, soy, fish, shellfish, sesame, sulphites, celery, mustard, lupin, molluscs). Read-only profile shows the saved list. Saves go through the same upsertCustomer path as the POS prompt.',
+      'Reservation modal already captured phone in the existing form, so no UI change there — just the persistence side.',
+      'Future: allergens on the modal also when adding via the Add customer button. The current toast-prompt covers it dynamically as filters are toggled, so manual entry from the modal can be added later if needed.',
+    ],
+  },
+  {
     version: '4.6.66', date: '24 Apr 2026', label: 'CustomerModal dine-in mode (correct title and copy when attaching to a table)',
     changes: [
       'Peter: clicking Add customer details on a dine-in order opened the modal saying Takeaway order. Misleading because the modal is genuinely doing something different — attaching a customer to an existing dine-in session for loyalty, not starting a new takeaway order.',
