@@ -15,6 +15,7 @@ import PrinterRegistry from './sections/PrinterRegistry';
 import CashDrawers from './sections/CashDrawers';
 import BOReports from './sections/BOReports';
 import EODClose from './sections/EODClose';
+import Customers from './sections/Customers';
 import Shift from './sections/Shift';
 import Inventory from './sections/Inventory';
 import SupabaseSetup from '../lib/SupabaseSetup';
@@ -41,6 +42,7 @@ const NAV = [
   { id:'shift',      label:'Shift',             icon:'⏱', group:'Analytics' },
   { id:'eod',        label:'Close day',        icon:'🔒',  group:'Analytics' },
   { id:'pettycash',  label:'Petty cash',        icon:'\u{1F4B0}', group:'Analytics' },
+  { id:'customers',  label:'Customers',         icon:'\u{1F465}', group:'Analytics' },
   { id:'tax',        label:'Tax & VAT',          icon:'%',   group:'Analytics' },
   { id:'ai',         label:'AI Assistant',      icon:'✦',   group:'Analytics' },
   { id:'network',    label:'Network & Sync',     icon:'📡',  group:'Analytics' },
@@ -349,6 +351,7 @@ export default function BackOfficeApp() {
           {section === 'shift'      && <Shift />}
           {section === 'eod'        && <EODClose />}
           {section === 'pettycash'  && <PettyCash />}
+          {section === 'customers'  && <Customers />}
           {section === 'admin'       && <CompanyAdmin />}
           {section === 'ai'         && <AIAssistantSection />}
           {section === 'network'     && <NetworkStatus />}

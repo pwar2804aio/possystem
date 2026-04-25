@@ -59,6 +59,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.63', date: '24 Apr 2026', label: 'Back-office Customers section (CRM stage 2)',
+    changes: [
+      'New Customers section under Analytics in the back office. Lists every customer the org has ever recorded across every location, with search by name/phone/email, filters for location / last-visit window / marketing opt-in status, sortable columns (name, visits, lifetime spend, last visit), CSV export of the current filtered view.',
+      'Click any row → side panel opens with the customer\'s full profile. Three stat tiles at the top (lifetime spend, total visits, last visit). Below: per-location breakdown showing visit count + revenue + last visit per location they\'ve shopped at. Profile section with edit-in-place for name / phone / email / notes / marketing opt-in (saves directly to Supabase). Order history list showing the last 50 orders with timestamp, channel, total, and item summary inline. Soft-delete button at the bottom for GDPR right-to-be-forgotten — sets deleted_at on the customer row, keeping the closed_check + customer_orders history intact for audit but hiding from search and reports.',
+      'Filter dormant: customers whose last_visit_at is older than 90 days. Useful for re-engagement / win-back marketing campaigns.',
+      'Single-tier query model: one read of customers + one read of customer_locations + (on row click) one read of customer_orders. Should scale fine to thousands of customers per location without pagination — Supabase does the heavy lifting and we render up to 1000 rows in memory. If a chain ever has 10k+ customers we\'ll add server-side pagination.',
+      'Coming next (v4.6.64): cross-location aggregation views — top 100 customers per location, brand-wide VIPs vs single-location regulars, comparison reports.',
+    ],
+  },
+  {
     version: '4.6.62', date: '24 Apr 2026', label: 'Persistent customer database (CRM stage 1)',
     changes: [
       'Customers now persist beyond a refresh. The CustomerModal\'s search remembers people forever, not just the session, because they live in a real Supabase database. Phone is the primary key (normalised to E.164 — UK 07 prefixes get rewritten to +44 automatically). Same person at multiple locations of the same brand maps to one record under the org_id.',
