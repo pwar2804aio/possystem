@@ -59,6 +59,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.66', date: '24 Apr 2026', label: 'CustomerModal dine-in mode (correct title and copy when attaching to a table)',
+    changes: [
+      'Peter: clicking Add customer details on a dine-in order opened the modal saying Takeaway order. Misleading because the modal is genuinely doing something different — attaching a customer to an existing dine-in session for loyalty, not starting a new takeaway order.',
+      'CustomerModal now branches on orderType for its title, subtitle, and confirm button. Dine-in shows Add customer to table / Attach a customer so this visit counts toward their loyalty / Attach to table. Takeaway and collection unchanged.',
+      'Existing edit-customer flow (v4.6.61) keeps showing Editing customer details when existing is set, regardless of order type.',
+    ],
+  },
+  {
     version: '4.6.65', date: '24 Apr 2026', label: 'Manual customer attach — works for any order type including dine-in',
     changes: [
       'Add customer details button on the POS order panel now appears for every order type, including dine-in. Previously only takeaway / collection / delivery showed it because customers were treated as a side-effect of those order flows. With the customer database now persistent (v4.6.62), dine-in guests can also be attached so their visit counts towards loyalty and lifetime spend.',

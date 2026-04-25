@@ -90,10 +90,10 @@ export default function CustomerModal({ orderType, existing, onConfirm, onCancel
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--t1)' }}>
-              {orderType === 'collection' ? '📦 Collection order' : '🥡 Takeaway order'}
+              {orderType === 'collection' ? '📦 Collection order' : orderType === 'dine-in' ? '👤 Add customer to table' : '🥡 Takeaway order'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>
-              {existing ? 'Editing customer details — update only what you need' : (orderType === 'collection' ? 'Customer collects from the counter' : 'Order to be taken away now')}
+              {existing ? 'Editing customer details — update only what you need' : (orderType === 'collection' ? 'Customer collects from the counter' : orderType === 'dine-in' ? 'Attach a customer so this visit counts toward their loyalty' : 'Order to be taken away now')}
             </div>
           </div>
           <button onClick={onCancel} style={{ background:'none', border:'none', color:'var(--t3)', cursor:'pointer', fontSize:22, lineHeight:1 }}>×</button>
@@ -217,7 +217,7 @@ export default function CustomerModal({ orderType, existing, onConfirm, onCancel
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onCancel}>Cancel</button>
           <button className="btn btn-acc" style={{ flex: 2, height: 46, fontSize: 15 }} onClick={handleConfirm}>
-            Confirm {orderType === 'collection' ? 'collection' : 'takeaway'} →
+            {orderType === 'dine-in' ? 'Attach to table' : ('Confirm ' + (orderType === 'collection' ? 'collection' : 'takeaway') + ' →')}
           </button>
         </div>
       </div>
