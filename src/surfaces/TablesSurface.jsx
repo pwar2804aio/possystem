@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useStore } from '../store';
 import { resolveServiceCharge } from '../lib/serviceCharge';
 import CheckSelectorModal from '../components/CheckSelectorModal';
+import CustomerModal from '../components/CustomerModal';
 
 const STATUS = {
   available: { color:'#22c55e', bg:'rgba(34,197,94,.12)',  border:'rgba(34,197,94,.35)', label:'Available' },
@@ -258,11 +259,14 @@ function TableNode({ table, onClick }) {
 // ─── Main Tables Surface ─────────────────────────────────────────────────────
 export default function TablesSurface() {
   const compact = useCompact();
-  const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff, locationSections, deviceConfig } = useStore();
+  const { tables, seatTable, openTableInPOS, clearTable, setReservation, setSurface, showToast, staff, locationSections, deviceConfig, setSessionCustomer } = useStore();
   const [selected, setSelected]   = useState(null);
   const [showSeat, setShowSeat]   = useState(false);
   const [showReservation, setShowReservation] = useState(false);
   const [showCheckSelector, setShowCheckSelector] = useState(false);
+  // v4.4.9: guest attach UI for seated tables. Opens CustomerModal which lets staff
+  // search by phone (exact) or name (loose match) via searchCustomersLive in store.
+  const [showCustomer, setShowCustomer] = useState(false);
   const [checkSelectorTable, setCheckSelectorTable] = useState(null);
   // Auto-filter to assigned section from device profile (e.g. bar terminal shows bar section by default)
   const [section, setSection] = useState(deviceConfig?.assignedSection || 'all');
@@ -728,6 +732,35 @@ export default function TablesSurface() {
               })()}
             </div>
 
+            {/* v4.4.9: Guest (optional, post-seating) */}
+            {selectedTable.session && (
+              <div style={{ padding:16, borderBottom:'1px solid var(--bdr)' }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'var(--t3)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>
+                  Guest
+                </div>
+                {selectedTable.session.customer?.phone ? (
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {selectedTable.session.customer.name || 'Guest'}
+                      </div>
+                      <div style={{ fontSize:12, color:'var(--t3)' }}>
+                        {selectedTable.session.customer.phone}
+                      </div>
+                      {Array.isArray(selectedTable.session.customer.allergens) && selectedTable.session.customer.allergens.length > 0 && (
+                        <div style={{ fontSize:11, color:'var(--orn)', marginTop:4 }}>
+                          {selectedTable.session.customer.allergens.length} allergen filter{selectedTable.session.customer.allergens.length === 1 ? '' : 's'} active
+                        </div>
+                      )}
+                    </div>
+                    <button className="btn btn-ghost" style={{ height:32, padding:'0 10px', fontSize:12 }} onClick={()=>setShowCustomer(true)}>Edit</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-ghost" style={{ width:'100%', height:36, fontSize:13 }} onClick={()=>setShowCustomer(true)}>+ Add guest</button>
+                )}
+              </div>
+            )}
+
             {/* Current items */}
             {selectedTable.session?.items?.length > 0 && (
               <div style={{ padding:'10px 16px', borderBottom:'1px solid var(--bdr)', flexShrink:0, maxHeight:200, overflowY:'auto' }}>
@@ -815,6 +848,20 @@ export default function TablesSurface() {
         />
       )}
 
+      {showCustomer && selectedTable && selectedTable.session && (
+        <CustomerModal
+          orderType="dine-in"
+          existing={selectedTable.session.customer || null}
+          onConfirm={(c)=>{
+            // Write customer onto the table session. POSSurface's v4.4.9 hydrate-on-mount
+            // useEffect picks up customer + allergens next time staff enters POS.
+            setSessionCustomer(selectedTable.id, c);
+            setShowCustomer(false);
+            showToast(c?.name ? `Guest "${c.name}" attached` : 'Guest attached', 'success');
+          }}
+          onCancel={()=>setShowCustomer(false)}
+        />
+      )}
       {showReservation && selectedTable && (
         <ReservationModal
           table={selectedTable}
