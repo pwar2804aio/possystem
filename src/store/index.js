@@ -1739,13 +1739,194 @@ export const useStore = create((set, get) => ({
   customer: null,
   setCustomer: c => set({ customer:c }),
   clearCustomer: () => set({ customer:null }),
-  customerHistory: [
-    { id:'c1', name:'James Wilson',   phone:'07700 900123', email:'james@email.com',  visits:8,  lastOrder:'2 days ago' },
-    { id:'c2', name:'Sophie Chen',    phone:'07700 900456', email:'sophie@email.com', visits:14, lastOrder:'1 week ago' },
-    { id:'c3', name:'Marcus Johnson', phone:'07700 900789', email:'',                 visits:3,  lastOrder:'3 weeks ago' },
-  ],
-  searchCustomers: q => { if(!q||q.length<3)return[]; const l=q.toLowerCase(); return get().customerHistory.filter(c=>c.name.toLowerCase().includes(l)||c.phone.replace(/\s/g,'').includes(q.replace(/\s/g,''))); },
-  addToHistory: c => set(s=>({ customerHistory:[{...c,id:`c${Date.now()}`,visits:1,lastOrder:'Just now'},...s.customerHistory.filter(x=>x.phone!==c.phone)] })),
+  // v4.6.62: customer cache (session). DB-backed via searchCustomersLive + upsertCustomer.
+  customerHistory: [],
+  _cachedOrgId: null,
+  // ── Customers (v4.6.62) ──────────────────────────────────────
+  // Phone is the primary identifier (normalised to E.164). DB-backed via Supabase.
+
+  // Normalise UK-ish phone strings into E.164. Falls back to digits-only if format unknown.
+  _normalisePhone: (raw) => {
+    if (!raw) return null;
+    const digits = String(raw).replace(/[^\d+]/g, '');
+    if (!digits) return null;
+    if (digits.startsWith('+')) return digits;
+    if (digits.startsWith('07') && digits.length === 11) return '+44' + digits.slice(1);
+    if (digits.startsWith('44')) return '+' + digits;
+    return digits;
+  },
+
+  // Synchronous filter against the session cache. Used by CustomerModal alongside the live
+  // Supabase search for instant feedback.
+  searchCustomers: q => {
+    if (!q || q.length < 2) return [];
+    const l = String(q).toLowerCase();
+    const qd = String(q).replace(/\s/g, '');
+    return (get().customerHistory || []).filter(c =>
+      (c.name || '').toLowerCase().includes(l) ||
+      (c.phone || '').replace(/\s/g, '').includes(qd) ||
+      (c.phone_raw || '').replace(/\s/g, '').includes(qd) ||
+      (c.email || '').toLowerCase().includes(l)
+    ).slice(0, 8);
+  },
+
+  // Live Supabase search. CustomerModal calls this with debounce.
+  searchCustomersLive: async (q) => {
+    if (!q || q.length < 2) return [];
+    if (isMock || !supabase) return get().searchCustomers(q);
+    try {
+      const locId = await getLocationId();
+      if (!locId) return [];
+      let orgId = get()._cachedOrgId;
+      if (!orgId) {
+        const { data: loc } = await supabase.from('locations').select('org_id').eq('id', locId).single();
+        orgId = loc?.org_id;
+        if (orgId) set({ _cachedOrgId: orgId });
+      }
+      if (!orgId) return [];
+      const term = String(q).trim();
+      // Escape % and , for or() syntax — keep simple. Term is operator-typed so length is bounded.
+      const safe = term.replace(/[,%]/g, '');
+      const { data } = await supabase
+        .from('customers')
+        .select('id, name, phone, phone_raw, email, marketing_opt_in, notes')
+        .eq('org_id', orgId)
+        .is('deleted_at', null)
+        .or(`name.ilike.%${safe}%,phone.ilike.%${safe}%,phone_raw.ilike.%${safe}%,email.ilike.%${safe}%`)
+        .limit(8);
+      const enriched = data || [];
+      // Merge into customerHistory cache, deduped
+      const merged = [...enriched, ...(get().customerHistory || [])];
+      const seen = new Set();
+      const dedup = merged.filter(c => {
+        const key = c.phone || c.email || c.id;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 50);
+      set({ customerHistory: dedup });
+      return enriched;
+    } catch (err) {
+      console.warn('[searchCustomersLive] failed:', err?.message || err);
+      return get().searchCustomers(q);
+    }
+  },
+
+  // Entry point from CustomerModal when the operator confirms customer details.
+  addToHistory: (c) => {
+    const phoneN = get()._normalisePhone(c.phone);
+    const cached = {
+      ...c,
+      id: c.id || `c${Date.now()}`,
+      phone: phoneN,
+      phone_raw: c.phone,
+      visits: (c.visits || 0) + 1,
+      lastOrder: 'Just now',
+    };
+    set(s => ({
+      customerHistory: [
+        cached,
+        ...(s.customerHistory || []).filter(x => x.phone !== phoneN && x.phone_raw !== c.phone),
+      ].slice(0, 50),
+    }));
+    // Async upsert to Supabase (don't block the UI)
+    get().upsertCustomer(c).catch(err => console.warn('[addToHistory upsert]', err?.message || err));
+    return cached;
+  },
+
+  // Persist a customer. Returns the customer's UUID. Phone wins on conflict;
+  // if a different operator types a different name, the existing one stands.
+  upsertCustomer: async (c) => {
+    if (isMock || !supabase) return null;
+    try {
+      const locId = await getLocationId();
+      if (!locId) return null;
+      let orgId = get()._cachedOrgId;
+      if (!orgId) {
+        const { data: loc } = await supabase.from('locations').select('org_id').eq('id', locId).single();
+        orgId = loc?.org_id;
+        if (orgId) set({ _cachedOrgId: orgId });
+      }
+      if (!orgId) return null;
+      const phoneN = get()._normalisePhone(c.phone);
+      if (!phoneN) return null;
+      const row = {
+        org_id: orgId,
+        phone: phoneN,
+        phone_raw: c.phone || phoneN,
+        email: c.email || null,
+        name: c.name || 'Customer',
+        notes: c.notes || null,
+        marketing_opt_in: !!c.marketingOptIn,
+        marketing_opt_in_at: c.marketingOptIn ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      };
+      const { data: existing } = await supabase.from('customers')
+        .select('id, name, email, marketing_opt_in')
+        .eq('org_id', orgId).eq('phone', phoneN).is('deleted_at', null).maybeSingle();
+      if (existing?.id) {
+        const patch = { updated_at: row.updated_at };
+        if (!existing.name && row.name) patch.name = row.name;
+        if (!existing.email && row.email) patch.email = row.email;
+        if (row.marketing_opt_in && !existing.marketing_opt_in) {
+          patch.marketing_opt_in = true;
+          patch.marketing_opt_in_at = row.marketing_opt_in_at;
+        }
+        if (Object.keys(patch).length > 1) {
+          await supabase.from('customers').update(patch).eq('id', existing.id);
+        }
+        return existing.id;
+      } else {
+        const { data: created, error } = await supabase.from('customers').insert(row).select('id').single();
+        if (error) {
+          console.warn('[upsertCustomer] insert failed:', error.message);
+          return null;
+        }
+        return created?.id || null;
+      }
+    } catch (err) {
+      console.warn('[upsertCustomer] failed:', err?.message || err);
+      return null;
+    }
+  },
+
+  // Attribute a closed check / walk-in to a customer. Increments visit_count + spend
+  // on customer_locations and inserts a customer_orders row. Returns customer_id.
+  attributeOrderToCustomer: async ({ customer, orderRecord }) => {
+    if (isMock || !supabase) return null;
+    if (!customer?.phone || !orderRecord) return null;
+    try {
+      const locId = await getLocationId();
+      if (!locId) return null;
+      const customerId = await get().upsertCustomer(customer);
+      if (!customerId) return null;
+      await supabase.rpc('upsert_customer_visit', {
+        p_customer_id: customerId,
+        p_location_id: locId,
+        p_revenue: Number(orderRecord.total) || 0,
+        p_visit_at: new Date().toISOString(),
+      });
+      const itemSummary = (orderRecord.items || []).map(i => ({
+        name: i.name, qty: i.qty, price: i.price,
+      }));
+      await supabase.from('customer_orders').insert({
+        customer_id: customerId,
+        location_id: locId,
+        closed_check_id: orderRecord.ref || orderRecord.id || null,
+        ordered_at: new Date().toISOString(),
+        total: Number(orderRecord.total) || 0,
+        channel: orderRecord.orderType || orderRecord.type || 'unknown',
+        item_summary: itemSummary,
+      });
+      if (orderRecord.ref) {
+        await supabase.from('closed_checks').update({ customer_id: customerId }).eq('ref', orderRecord.ref);
+      }
+      return customerId;
+    } catch (err) {
+      console.warn('[attributeOrderToCustomer] failed:', err?.message || err);
+      return null;
+    }
+  },
 
   // ── Collection queue ──────────────────────
   orderQueue: [],
@@ -2747,6 +2928,12 @@ export const useStore = create((set, get) => ({
     set(s => ({ closedChecks: [fullRecord, ...s.closedChecks] }));
     insertClosedCheck(fullRecord).catch(()=>{});
     // v4.6.30: cash drawer auto-fire on cash payment
+    // v4.6.62: attribute bar-tab orders to customer DB if customer was set on tab
+    if (fullRecord.customer?.phone) {
+      get().attributeOrderToCustomer({
+        customer: fullRecord.customer, orderRecord: fullRecord,
+      }).catch(err => console.warn('[recordWalkInClosedCheck customer]', err?.message || err));
+    }
     if (fullRecord.method === 'cash') {
       // v4.6.32: force=true — cash sale itself is the authorisation.
       get().openCashDrawer({
@@ -2807,6 +2994,12 @@ export const useStore = create((set, get) => ({
       orderQueue: existingRef ? s.orderQueue.filter(o => o.ref !== existingRef) : s.orderQueue,
     }));
     // v4.6.30: cash drawer auto-fire on cash payment
+    // v4.6.62: attribute to customer DB (fire-and-forget)
+    if (customer?.phone) {
+      get().attributeOrderToCustomer({
+        customer, orderRecord: record,
+      }).catch(err => console.warn('[recordWalkInClosed customer]', err?.message || err));
+    }
     if (record.method === 'cash') {
       // v4.6.32: force=true — cash sale itself is the authorisation.
       get().openCashDrawer({

@@ -59,6 +59,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.62', date: '24 Apr 2026', label: 'Persistent customer database (CRM stage 1)',
+    changes: [
+      'Customers now persist beyond a refresh. The CustomerModal\'s search remembers people forever, not just the session, because they live in a real Supabase database. Phone is the primary key (normalised to E.164 — UK 07 prefixes get rewritten to +44 automatically). Same person at multiple locations of the same brand maps to one record under the org_id.',
+      'Three new tables in Ops Supabase: customers (org-scoped, phone-keyed, name + email + notes + marketing_opt_in flag, soft-deletable for GDPR right-to-be-forgotten), customer_locations (per-location stats — first_visit_at, last_visit_at, visit_count, lifetime_revenue, location-specific notes), customer_orders (denormalised order summary with channel + item summary jsonb for fast detail rendering). closed_checks gets a customer_id column for cross-reference.',
+      'Atomic upsert helper upsert_customer_visit(p_customer_id, p_location_id, p_revenue, p_visit_at) bumps visit_count + lifetime_revenue without a read-update-write race.',
+      'Three new store actions: searchCustomersLive (debounced Supabase ILIKE on name/phone/phone_raw/email), upsertCustomer (phone-conflict tolerant; existing names/emails are preserved if the operator types something different), attributeOrderToCustomer (called after recordWalkInClosed and recordWalkInClosedCheck — bumps stats, inserts customer_orders row, stamps customer_id on closed_check). All fire-and-forget so a Supabase blip never blocks order completion.',
+      'CustomerModal: replaced the in-memory mock list (James Wilson, Sophie Chen, Marcus Johnson) with a session cache that gets hydrated from live Supabase on every search. Local-cache filter renders instantly (no debounce delay), then 250ms later the Supabase result merges in. Returning customers from any device, any session, now show up.',
+      'Marketing opt-in set to false on every new customer for now — Peter will add a customer-facing screen for this later.',
+      'Phone matching: 07700 900123 / 07700900123 / +447700900123 all normalise to the same key, so the same physical phone always finds the same customer record regardless of how the operator types it.',
+      'Coming next (v4.6.63): back-office Customers section under Analytics with list, filters, detail page (per-location stats grid + order history), CSV export. v4.6.64: cross-location aggregation views.',
+    ],
+  },
+  {
     version: '4.6.61', date: '24 Apr 2026', label: 'Edit customer pre-fills + scheduled re-send works + OrdersHub fires-at badge',
     changes: [
       'Edit customer button on the POS now pre-fills the existing customer details. Previously the modal opened blank, the operator hit Confirm thinking nothing changed, and the empty form OVERWROTE customer.collectionTime — losing the schedule. On re-Send the deferral logic saw no collection time and fired straight to the kitchen. Now editing without changing values keeps every field intact, including the previously-selected collection time slot.',

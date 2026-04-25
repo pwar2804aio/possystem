@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStore, getCollectionSlots } from '../store';
 
 export default function CustomerModal({ orderType, existing, onConfirm, onCancel }) {
-  const { searchCustomers, addToHistory, showToast } = useStore();
+  const { searchCustomers, searchCustomersLive, addToHistory, showToast } = useStore();
   const [name, setName]       = useState(existing?.name || '');
   const [phone, setPhone]     = useState(existing?.phone || '');
   const [email, setEmail]     = useState(existing?.email || '');
@@ -29,8 +29,28 @@ export default function CustomerModal({ orderType, existing, onConfirm, onCancel
   // Live phone/name search
   useEffect(() => {
     const q = phone.length >= 3 ? phone : name.length >= 3 ? name : '';
-    if (q) { setResults(searchCustomers(q)); setSearched(true); }
-    else { setResults([]); setSearched(false); }
+    if (!q) { setResults([]); setSearched(false); return; }
+    // Show local cache immediately for snappy UI
+    setResults(searchCustomers(q));
+    setSearched(true);
+    // Then hit Supabase for the full list (debounced)
+    const t = setTimeout(async () => {
+      try {
+        const live = typeof searchCustomersLive === 'function' ? await searchCustomersLive(q) : [];
+        if (live && live.length) {
+          // Merge live with whatever local cache had, dedupe by phone
+          const seen = new Set();
+          const merged = [...live, ...searchCustomers(q)].filter(c => {
+            const k = c.phone || c.email || c.id;
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          }).slice(0, 8);
+          setResults(merged);
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(t);
   }, [phone, name]);
 
   const selectCustomer = (c) => {
