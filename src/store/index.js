@@ -1757,6 +1757,20 @@ export const useStore = create((set, get) => ({
   customer: null,
   setCustomer: c => set({ customer:c }),
   clearCustomer: () => set({ customer:null }),
+
+  // v4.4.9: write a customer record onto a specific table's session. Used by
+  // TablesSurface (Add/Edit Guest from detail panel + ReservationModal) so that
+  // the existing POSSurface hydrate-from-session-on-mount path picks the customer
+  // up automatically when staff returns to the table. Persists immutably; if the
+  // table has no session yet (rare, but possible during reservation), this is a
+  // no-op since reservation flow stores the customer on tbl.reservation, not session.
+  setSessionCustomer: (tableId, c) => set(s => ({
+    tables: s.tables.map(t =>
+      t.id === tableId && t.session
+        ? { ...t, session: { ...t.session, customer: c || null } }
+        : t
+    ),
+  })),
   // v4.6.62: customer cache (session). DB-backed via searchCustomersLive + upsertCustomer.
   customerHistory: [],
   _cachedOrgId: null,
