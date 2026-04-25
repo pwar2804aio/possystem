@@ -59,6 +59,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.6.64', date: '24 Apr 2026', label: 'Cross-location customer insights (CRM stage 3)',
+    changes: [
+      'Customer Insights & cross-location panel inside the existing Customers section. Tab bar at the top switches between Customer list (the v4.6.63 view) and Insights & cross-location (the new view). Insights has 5 sub-tabs:',
+      'Brand VIPs — top 50 customers by lifetime spend across every location, with location chips showing where they shop. The leaderboard for VIP rewards, personal touches, and email outreach.',
+      'Top per location — top 10 customers per location separately, ranked by spend AT THAT LOCATION (not lifetime brand-wide). Useful for site-specific loyalty and reactivation campaigns.',
+      'Multi-location — distribution tiles (1 / 2 / 3 / 4+ locations) plus a leaderboard of customers who have shopped at 2+ sites, sorted by lifetime spend. These are the brand most loyal customers.',
+      'Cross-sell — pick a primary location and a target location. Lists regulars (2+ visits) at the primary who have not visited the target. Perfect for we would love to see you at our other site campaigns. Disabled if the brand has fewer than 2 locations.',
+      'Dormant — customers with lifetime spend who have not visited any location in 90+ days, sorted by spend. Top win-back candidates for an email reactivation flow.',
+      'No new schema, no new queries — all derived client-side from the customers + customer_locations data already loaded by Customers.jsx. Same query that powers the list view powers the insights, no extra DB load.',
+      'CRM stages 1 (persistence + attribution), 2 (back-office list + detail panel), 3 (cross-location insights) are now complete. Tier-1 of the customer database is done. Future stages we discussed: customer-facing screen for marketing opt-in capture (separate flow), email marketing integration (export-driven for now via the CSV button on the list view).',
+    ],
+  },
+  {
     version: '4.6.63', date: '24 Apr 2026', label: 'Back-office Customers section (CRM stage 2)',
     changes: [
       'New Customers section under Analytics in the back office. Lists every customer the org has ever recorded across every location, with search by name/phone/email, filters for location / last-visit window / marketing opt-in status, sortable columns (name, visits, lifetime spend, last visit), CSV export of the current filtered view.',

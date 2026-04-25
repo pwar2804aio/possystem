@@ -44,6 +44,8 @@ export default function Customers() {
   const [sortBy, setSortBy] = useState('lastVisit');         // lastVisit | spend | visits | name
   const [sortDir, setSortDir] = useState('desc');
   const [selectedId, setSelectedId] = useState(null);
+  const [view, setView] = useState('list');           // v4.6.64: 'list' | 'insights'
+  const [insightsTab, setInsightsTab] = useState('vips'); // vips | multi | crossSell | dormant
 
   // Load all customers + their per-location stats (for the org)
   useEffect(() => {
@@ -191,8 +193,19 @@ export default function Customers() {
     URL.revokeObjectURL(url);
   };
 
+  // v4.6.64: insights view shown via the tab bar at the top.
+  if (view === 'insights') {
+    return (
+      <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+        <ViewTabs view={view} setView={setView} />
+        <Insights customers={customers} locations={allLocations} insightsTab={insightsTab} setInsightsTab={setInsightsTab}/>
+      </div>
+    );
+  }
   return (
-    <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+      <ViewTabs view={view} setView={setView} />
+      <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
       {/* Left: list + filters */}
       <div style={{ width: selected ? 540 : '100%', borderRight: selected ? '1px solid var(--bdr)' : 'none', display:'flex', flexDirection:'column', flexShrink:0, overflow:'hidden' }}>
         {/* Header */}
@@ -273,6 +286,7 @@ export default function Customers() {
         setCustomers(cs => cs.filter(c => c.id !== selected.id));
         setSelectedId(null);
       }}/>}
+      </div>
     </div>
   );
 }
@@ -485,6 +499,288 @@ function DetailPanel({ customer, onClose, onChanged, onDeleted }) {
     </div>
   );
 }
+
+
+
+// ── v4.6.64: View tabs ───────────────────────────────────────────
+
+function ViewTabs({ view, setView }) {
+  const tabs = [
+    ['list',     'Customer list'],
+    ['insights', 'Insights & cross-location'],
+  ];
+  return (
+    <div style={{ display:'flex', gap:0, borderBottom:'1px solid var(--bdr)', background:'var(--bg1)', flexShrink:0 }}>
+      {tabs.map(([id, label]) => (
+        <button key={id} onClick={() => setView(id)}
+          style={{
+            padding:'12px 22px', border:'none', background:'transparent',
+            color: view === id ? 'var(--t1)' : 'var(--t4)',
+            borderBottom: view === id ? '2px solid var(--acc)' : '2px solid transparent',
+            fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
+          }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── v4.6.64: Insights panel ──────────────────────────────────────
+
+function Insights({ customers, locations, insightsTab, setInsightsTab }) {
+  const tabs = [
+    ['vips',      'Brand VIPs'],
+    ['perLoc',    'Top per location'],
+    ['multi',     'Multi-location'],
+    ['crossSell', 'Cross-sell'],
+    ['dormant',   'Dormant'],
+  ];
+
+  return (
+    <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:'14px 24px 10px', borderBottom:'1px solid var(--bdr)', display:'flex', gap:8, flexWrap:'wrap', background:'var(--bg2)' }}>
+        {tabs.map(([id, label]) => (
+          <button key={id} onClick={() => setInsightsTab(id)}
+            style={{
+              padding:'7px 14px', borderRadius:6, fontFamily:'inherit', cursor:'pointer', fontWeight:700,
+              background: insightsTab === id ? 'var(--acc-d)' : 'var(--bg3)',
+              border: `1px solid ${insightsTab === id ? 'var(--acc)' : 'var(--bdr)'}`,
+              color: insightsTab === id ? 'var(--acc)' : 'var(--t3)',
+              fontSize:12,
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div style={{ flex:1, overflowY:'auto', padding:'18px 24px' }}>
+        {insightsTab === 'vips'      && <BrandVIPs customers={customers}/>}
+        {insightsTab === 'perLoc'    && <TopPerLocation customers={customers} locations={locations}/>}
+        {insightsTab === 'multi'     && <MultiLocation customers={customers} locations={locations}/>}
+        {insightsTab === 'crossSell' && <CrossSell customers={customers} locations={locations}/>}
+        {insightsTab === 'dormant'   && <Dormant customers={customers}/>}
+      </div>
+    </div>
+  );
+}
+
+function BrandVIPs({ customers }) {
+  const top = useMemo(() => {
+    return [...customers].filter(c => c.totalSpend > 0).sort((a, b) => b.totalSpend - a.totalSpend).slice(0, 50);
+  }, [customers]);
+
+  if (top.length === 0) return <EmptyMsg label="No spending customers yet"/>;
+
+  return (
+    <div>
+      <H label="Top 50 customers by lifetime spend" sub="Across every location in your brand. The leaderboard for VIP rewards, personal touches, and email campaigns."/>
+      <Leaderboard rows={top} showLocations/>
+    </div>
+  );
+}
+
+function TopPerLocation({ customers, locations }) {
+  if (locations.length === 0) return <EmptyMsg label="No locations configured"/>;
+
+  return (
+    <div>
+      <H label="Top 10 customers per location" sub="Each location's biggest spenders. Useful for location-specific loyalty and reactivation."/>
+      <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
+        {locations.map(loc => {
+          const top = customers
+            .map(c => {
+              const stat = c.stats.find(s => s.location_id === loc.id);
+              if (!stat || (stat.lifetime_revenue || 0) === 0) return null;
+              return { ...c, locSpend: Number(stat.lifetime_revenue) || 0, locVisits: stat.visit_count || 0, locLastVisit: stat.last_visit_at };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.locSpend - a.locSpend)
+            .slice(0, 10);
+          return (
+            <div key={loc.id} style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:10, overflow:'hidden' }}>
+              <div style={{ padding:'10px 14px', background:'var(--bg2)', borderBottom:'1px solid var(--bdr)', fontSize:13, fontWeight:800, color:'var(--t1)' }}>
+                {loc.name} <span style={{ color:'var(--t4)', fontWeight:500, marginLeft:6 }}>· {top.length} customers</span>
+              </div>
+              {top.length === 0 ? (
+                <div style={{ padding:'14px', fontSize:12, color:'var(--t4)' }}>No customers at this location yet.</div>
+              ) : (
+                <Leaderboard rows={top.map(r => ({ ...r, totalSpend: r.locSpend, totalVisits: r.locVisits, lastVisit: r.locLastVisit }))} compact/>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MultiLocation({ customers, locations }) {
+  const buckets = useMemo(() => {
+    const counts = {};
+    customers.forEach(c => {
+      const n = c.stats.filter(s => (s.visit_count || 0) > 0).length;
+      counts[n] = (counts[n] || 0) + 1;
+    });
+    return counts;
+  }, [customers]);
+
+  const multiOnly = useMemo(() =>
+    customers.filter(c => c.stats.filter(s => (s.visit_count || 0) > 0).length >= 2)
+             .sort((a, b) => b.totalSpend - a.totalSpend)
+             .slice(0, 50),
+    [customers]
+  );
+
+  return (
+    <div>
+      <H label="Multi-location customers" sub="Customers who've shopped at more than one location. These are your most loyal — extend that relationship."/>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:10, marginBottom:18 }}>
+        <Tile label="Single location" value={buckets[1] || 0} color="var(--t3)"/>
+        <Tile label="2 locations" value={buckets[2] || 0} color="var(--acc)"/>
+        <Tile label="3 locations" value={buckets[3] || 0} color="var(--grn)"/>
+        {Object.keys(buckets).filter(n => Number(n) >= 4).reduce((a, n) => a + buckets[n], 0) > 0 && (
+          <Tile label="4+ locations" value={Object.keys(buckets).filter(n => Number(n) >= 4).reduce((a, n) => a + buckets[n], 0)} color="#a855f7"/>
+        )}
+      </div>
+      {multiOnly.length === 0 ? (
+        <EmptyMsg label="No multi-location customers yet"/>
+      ) : (
+        <>
+          <div style={{ fontSize:13, fontWeight:700, color:'var(--t2)', marginBottom:10 }}>Top multi-location VIPs</div>
+          <Leaderboard rows={multiOnly} showLocations/>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CrossSell({ customers, locations }) {
+  const [primaryLocId, setPrimaryLocId] = useState(locations[0]?.id || '');
+  const [targetLocId, setTargetLocId] = useState(locations[1]?.id || '');
+
+  const candidates = useMemo(() => {
+    if (!primaryLocId || !targetLocId || primaryLocId === targetLocId) return [];
+    return customers.filter(c => {
+      const visitsAtPrimary = c.stats.find(s => s.location_id === primaryLocId)?.visit_count || 0;
+      const visitsAtTarget  = c.stats.find(s => s.location_id === targetLocId)?.visit_count || 0;
+      return visitsAtPrimary >= 2 && visitsAtTarget === 0;
+    }).sort((a, b) => b.totalSpend - a.totalSpend).slice(0, 50);
+  }, [customers, primaryLocId, targetLocId]);
+
+  if (locations.length < 2) {
+    return <EmptyMsg label="Cross-sell needs 2+ locations" sub="Add another location to your brand and customers will start showing up here."/>;
+  }
+
+  return (
+    <div>
+      <H label="Cross-sell candidates" sub={`Regulars at one location who haven't visited another yet. Perfect for "we'd love to see you at ${locations.find(l => l.id === targetLocId)?.name || 'our other site'}" outreach.`}/>
+      <div style={{ display:'flex', gap:14, alignItems:'center', marginBottom:14, padding:'12px 14px', background:'var(--bg2)', borderRadius:8 }}>
+        <span style={{ fontSize:12, color:'var(--t3)' }}>Show regulars at</span>
+        <select value={primaryLocId} onChange={e => setPrimaryLocId(e.target.value)} style={selectStyle}>
+          {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+        <span style={{ fontSize:12, color:'var(--t3)' }}>who've never visited</span>
+        <select value={targetLocId} onChange={e => setTargetLocId(e.target.value)} style={selectStyle}>
+          {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+      </div>
+      {candidates.length === 0 ? (
+        <EmptyMsg label="No candidates match" sub="Either there aren't enough regulars at the primary location yet, or they've all already visited the target."/>
+      ) : (
+        <Leaderboard rows={candidates} showLocations/>
+      )}
+    </div>
+  );
+}
+
+function Dormant({ customers }) {
+  const dormant = useMemo(() => {
+    const cutoff = Date.now() - 90 * 86400000;
+    return customers
+      .filter(c => c.lastVisit && new Date(c.lastVisit).getTime() < cutoff && c.totalSpend > 0)
+      .sort((a, b) => b.totalSpend - a.totalSpend)
+      .slice(0, 100);
+  }, [customers]);
+
+  if (dormant.length === 0) return <EmptyMsg label="No dormant high-spenders" sub="No customers with lifetime spend who haven't visited in 90+ days. Healthy retention!"/>;
+
+  return (
+    <div>
+      <H label="Dormant VIPs (90+ days)" sub={`${dormant.length} customers who used to spend with you but haven't been back in 3 months. Top win-back candidates.`}/>
+      <Leaderboard rows={dormant} showLocations/>
+    </div>
+  );
+}
+
+// ── Insights helpers ─────────────────────────────────────────────
+
+function Leaderboard({ rows, showLocations, compact }) {
+  return (
+    <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:10, overflow:'hidden' }}>
+      <div style={{ display:'grid', gridTemplateColumns: compact ? '32px 2fr 0.8fr 1fr 1fr' : '32px 2fr 1fr 0.8fr 1fr 1fr', gap:10, padding:'10px 14px', fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', background:'var(--bg2)', borderBottom:'1px solid var(--bdr)' }}>
+        <span>#</span>
+        <span>Customer</span>
+        {!compact && <span>Phone</span>}
+        <span style={{ textAlign:'right' }}>Visits</span>
+        <span style={{ textAlign:'right' }}>Spend</span>
+        <span style={{ textAlign:'right' }}>Last visit</span>
+      </div>
+      {rows.map((c, i) => (
+        <div key={c.id} style={{ display:'grid', gridTemplateColumns: compact ? '32px 2fr 0.8fr 1fr 1fr' : '32px 2fr 1fr 0.8fr 1fr 1fr', gap:10, padding:'9px 14px', fontSize:12, alignItems:'center', borderBottom:'1px solid var(--bdr)' }}>
+          <span style={{ color:'var(--t4)', fontFamily:'var(--font-mono)' }}>{i + 1}</span>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontWeight:700, color:'var(--t1)', overflow:'hidden', textOverflow:'ellipsis' }}>{c.name}</div>
+            {showLocations && c.stats?.length > 0 && (
+              <div style={{ display:'flex', gap:3, marginTop:3, flexWrap:'wrap' }}>
+                {c.stats.filter(s => (s.visit_count || 0) > 0).slice(0, 4).map(s => (
+                  <span key={s.location_id} style={{ fontSize:9, fontWeight:600, padding:'1px 6px', borderRadius:4, background:'var(--bg3)', color:'var(--t3)' }}>{s.locationName}</span>
+                ))}
+              </div>
+            )}
+          </div>
+          {!compact && <div style={{ color:'var(--t3)', fontFamily:'var(--font-mono)', fontSize:11 }}>{c.phone_raw || c.phone || '—'}</div>}
+          <div style={{ textAlign:'right', color:'var(--t1)', fontWeight:700, fontFamily:'var(--font-mono)' }}>{c.totalVisits || 0}</div>
+          <div style={{ textAlign:'right', color:'var(--acc)', fontWeight:800, fontFamily:'var(--font-mono)' }}>£{(Number(c.totalSpend) || 0).toFixed(2)}</div>
+          <div style={{ textAlign:'right', color:'var(--t3)', fontSize:11 }}>{c.lastVisit ? fmtRel(c.lastVisit) : '—'}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function H({ label, sub }) {
+  return (
+    <div style={{ marginBottom:14 }}>
+      <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)' }}>{label}</div>
+      {sub && <div style={{ fontSize:12, color:'var(--t3)', marginTop:4, lineHeight:1.5 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Tile({ label, value, color = 'var(--t1)' }) {
+  return (
+    <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:8, padding:'10px 14px' }}>
+      <div style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.07em' }}>{label}</div>
+      <div style={{ fontSize:24, fontWeight:800, color, marginTop:4, fontFamily:'var(--font-mono)' }}>{value}</div>
+    </div>
+  );
+}
+
+function EmptyMsg({ label, sub }) {
+  return (
+    <div style={{ padding:'40px 20px', textAlign:'center', color:'var(--t4)', background:'var(--bg1)', border:'1px dashed var(--bdr2)', borderRadius:10 }}>
+      <div style={{ fontSize:36, marginBottom:8, opacity:.3 }}>📊</div>
+      <div style={{ fontSize:14, fontWeight:700, color:'var(--t3)' }}>{label}</div>
+      {sub && <div style={{ fontSize:12, marginTop:4, lineHeight:1.5 }}>{sub}</div>}
+    </div>
+  );
+}
+
+const selectStyle = {
+  padding:'6px 10px', fontSize:13, borderRadius:6,
+  border:'1px solid var(--bdr2)', background:'var(--bg3)', color:'var(--t1)',
+  fontFamily:'inherit', fontWeight:700, cursor:'pointer',
+};
 
 // ── Tiny helpers ────────────────────────────────────────────────
 
