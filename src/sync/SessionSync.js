@@ -87,6 +87,37 @@ export async function flushSessions() {
     .filter(t => t.status === 'available' || !t.session)
     .map(t => t.id);
 
+
+  // v4.5.2 INSTRUMENTATION: log every active_sessions delete with stack trace.
+  // T2 was lost overnight 25→26 Apr; we need to know which call path triggers
+  // status='available' or session=null on a table that previously had an open session.
+  if (availableIds.length > 0) {
+    const stack = new Error('session-delete-trace').stack;
+    const tableInfo = availableIds.map(tid => {
+      const t = tables.find(x => x.id === tid);
+      return { id: tid, label: t?.label, status: t?.status, hasSession: !!t?.session };
+    });
+    const willActuallyDelete = availableIds.filter(tid => _lastSent[tid] && _lastSent[tid] !== 'cleared');
+    if (willActuallyDelete.length > 0) {
+      console.warn('[SessionSync] About to DELETE active_sessions row(s) for tables:', willActuallyDelete.join(', '));
+      console.warn('[SessionSync] Table info:', tableInfo);
+      console.warn('[SessionSync] Stack trace:', stack);
+      try {
+        const log = JSON.parse(localStorage.getItem('rpos-session-delete-log') || '[]');
+        log.push({
+          ts: Date.now(),
+          tsISO: new Date().toISOString(),
+          tableIds: willActuallyDelete,
+          tableInfo,
+          stack: (stack || '').split('\n').slice(0, 15).join('\n'),
+          docVisible: typeof document !== 'undefined' ? document.visibilityState : '?',
+          online: typeof navigator !== 'undefined' ? navigator.onLine : '?',
+        });
+        localStorage.setItem('rpos-session-delete-log', JSON.stringify(log.slice(-20)));
+      } catch {}
+    }
+  }
+
   for (const tid of availableIds) {
     if (_lastSent[tid] !== 'cleared') {
       _lastSent[tid] = 'cleared';
