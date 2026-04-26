@@ -127,20 +127,19 @@ ON CONFLICT (menu_id, category_id) DO NOTHING;
 
 ALTER TABLE menu_category_links ENABLE ROW LEVEL SECURITY;
 
+-- Mirror the existing menu_categories / menu_items / menus policy: single
+-- "allow all" rule for the public role so the publishable key (anon) can
+-- read and write. If the rest of the schema gets locked down later, harden
+-- this table at the same time so the model stays consistent.
 DROP POLICY IF EXISTS "menu_category_links: read" ON menu_category_links;
-CREATE POLICY "menu_category_links: read"
-  ON menu_category_links FOR SELECT
-  TO authenticated
-  USING (true);
-
 DROP POLICY IF EXISTS "menu_category_links: write" ON menu_category_links;
-CREATE POLICY "menu_category_links: write"
+DROP POLICY IF EXISTS "allow all" ON menu_category_links;
+CREATE POLICY "allow all"
   ON menu_category_links FOR ALL
-  TO authenticated
+  TO public
   USING (true)
   WITH CHECK (true);
 
--- Match the publishable-key access patterns the rest of the app uses
 GRANT SELECT, INSERT, UPDATE, DELETE ON menu_category_links TO anon, authenticated;
 
 COMMIT;
