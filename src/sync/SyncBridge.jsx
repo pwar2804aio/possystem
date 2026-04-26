@@ -438,23 +438,59 @@ export default function SyncBridge({ onSyncPulse }) {
         return false;
       });
       if (meaningful) {
-        // v4.5.0: SYNCHRONOUS emergency snapshot. Written to localStorage immediately on
-        // any meaningful tables change. Pure safety net — bypasses SessionSync entirely so
-        // that even if the debounced flush, the queueWrite, or the Supabase upsert silently
-        // fails, the session data is still on disk and the boot-path merge can rescue it.
-        // Fix for: data loss on Mac wake-from-sleep when active_sessions write path was silent.
+        // v4.5.2 INSTRUMENTATION: detect mass-wipe events BEFORE we overwrite the snapshot.
+        // T2 was lost overnight on 25→26 Apr because the previous snapshot logic blindly
+        // mirrored whatever in-memory was — when something else cleared the store,
+        // the snapshot was overwritten with empty and the rescue path had nothing to restore.
+        // This pass logs every shrink with a stack trace so we can find the wipe trigger.
+        try {
+          const newSessionCount = state.tables.filter(t => t.session).length;
+          const prevSessionCount = prev.tables.filter(t => t.session).length;
+          const lostTables = prev.tables.filter(p => p.session && !state.tables.find(t => t.id === p.id && t.session));
+          if (lostTables.length > 0) {
+            const stack = new Error('session-loss-trace').stack;
+            const forensicEntry = {
+              ts: Date.now(),
+              tsISO: new Date().toISOString(),
+              prevCount: prevSessionCount,
+              newCount: newSessionCount,
+              lost: lostTables.map(t => ({
+                id: t.id,
+                label: t.label,
+                items: t.session?.items?.length,
+                seatedAt: t.session?.seatedAt,
+              })),
+              stack: (stack || '').split('\n').slice(0, 12).join('\n'),
+              docVisible: typeof document !== 'undefined' ? document.visibilityState : '?',
+              online: typeof navigator !== 'undefined' ? navigator.onLine : '?',
+            };
+            console.error('[SyncBridge] ⚠️  SESSION LOSS DETECTED — ' + lostTables.length + ' table(s) had session, now do not. Lost:', lostTables.map(t => t.label || t.id).join(', '));
+            console.error('[SyncBridge] Stack trace of wipe:', stack);
+            console.error('[SyncBridge] Full forensic entry:', forensicEntry);
+            try {
+              const log = JSON.parse(localStorage.getItem('rpos-session-loss-log') || '[]');
+              log.push(forensicEntry);
+              // Cap at last 20 entries to bound localStorage size
+              localStorage.setItem('rpos-session-loss-log', JSON.stringify(log.slice(-20)));
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('[SyncBridge] v4.5.2 forensic detector errored:', e?.message || e);
+        }
+        // Snapshot write — UNCHANGED behaviour from v4.5.0 (still mirrors current in-memory).
+        // Will be replaced with non-shrinking variant in v4.5.3 once we know the wipe source.
         try {
           const snapshot = {};
           for (const t of state.tables) {
             if (t.session) snapshot[t.id] = t.session;
           }
           localStorage.setItem('rpos-session-snapshot', JSON.stringify({
-            v: '4.5.0',
+            v: '4.5.2',
             ts: Date.now(),
             sessions: snapshot,
           }));
         } catch (e) {
-          console.warn('[SyncBridge] v4.5.0 emergency snapshot failed:', e?.message || e);
+          console.warn('[SyncBridge] v4.5.2 emergency snapshot failed:', e?.message || e);
         }
         scheduleFlush();
       }
