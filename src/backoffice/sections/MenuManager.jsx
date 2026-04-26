@@ -1099,7 +1099,7 @@ function ItemsLibrary() {
             <option value="simple">Simple</option>
             <option value="modifiable">Options (modifiable)</option>
             <option value="variants">Has sizes / variants</option>
-            <option value="pizza">Pizza</option>
+            {/* v4.6.2: pizza item type removed — covered by 'modifiable' + 'variants' */}
             <option value="subitem">⊕ Sub items</option>
           </select>
           <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ ...inp, width:'auto', cursor:'pointer', fontSize:11 }}>
