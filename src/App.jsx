@@ -3308,7 +3308,9 @@ function Sidebar({ surface, setSurface }) {
   const printers = (() => { try { return JSON.parse(localStorage.getItem('rpos-printers') || '[]'); } catch { return []; } })();
   const hasPrinters = printers.length > 0;
 
-  const FEATURE_MAP = { kds:'kds', reports:'backoffice', barTabs:'bar', bar:'bar', floorplan:'tables', tables:'tables', floor:'tables', orders:'orders' };
+  // v4.5.1: trimmed to only the flags exposed in DeviceProfiles.jsx.
+  // Removed: kds, reports, kiosk, floorplan/tables/floor/orders (none were exposed in the profile editor).
+  const FEATURE_MAP = { barTabs:'bar', bar:'bar' };
   const visibleNav = NAV.filter(n => {
     // Table service disabled → hide floor plan
     if (n.id === 'tables' && deviceConfig && deviceConfig.tableServiceEnabled === false) return false;
