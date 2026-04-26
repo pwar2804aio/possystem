@@ -1762,17 +1762,17 @@ export const useStore = create((set, get) => ({
 
   // ── Order type / customer ─────────────────
   orderType: 'dine-in',
-  // v4.5.5: when order type changes (dine-in → takeaway → delivery etc),
-  // recompute prices on every item already in every active session against the NEW
-  // channel. Without this, items added BEFORE the toggle keep their old price.
+  // v4.5.6: when order type changes (dine-in / takeaway / collection / delivery),
+  // reprice every item in every cart against the new channel. Covers BOTH:
+  //   - tables[].session.items (dine-in tables)
+  //   - walkInOrder.items (walk-in / takeaway / collection / delivery flow)
+  // Without this, items added BEFORE the toggle keep their old price (was the bug).
   setOrderType: t => set(s => {
     const fn = s.getItemPrice;
     if (!fn) return { orderType:t };
+    const menu = (s.menuItems || []).concat(s.SEED_MENU_ITEMS || []);
     const repriceItems = (items) => (items || []).map(it => {
-      // Find the source menu_item by id from the live menu
-      const src = (s.menuItems || s.MENU_ITEMS || [])
-        .concat(s.SEED_MENU_ITEMS || [])
-        .find(m => m && m.id === it.itemId);
+      const src = menu.find(m => m && m.id === it.itemId);
       if (!src) return it;
       const newUnitPrice = fn(src, t);
       if (newUnitPrice == null) return it;
@@ -1782,7 +1782,10 @@ export const useStore = create((set, get) => ({
       if (!tb.session?.items) return tb;
       return { ...tb, session: { ...tb.session, items: repriceItems(tb.session.items) } };
     });
-    return { orderType:t, tables };
+    const walkInOrder = s.walkInOrder?.items
+      ? { ...s.walkInOrder, items: repriceItems(s.walkInOrder.items) }
+      : s.walkInOrder;
+    return { orderType:t, tables, walkInOrder };
   }),
   customer: null,
   setCustomer: c => set({ customer:c }),
