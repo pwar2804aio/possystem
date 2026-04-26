@@ -1099,7 +1099,7 @@ function ItemsLibrary() {
             <option value="simple">Simple</option>
             <option value="modifiable">Options (modifiable)</option>
             <option value="variants">Has sizes / variants</option>
-            {/* v4.6.2: pizza item type removed — covered by 'modifiable' + 'variants' */}
+            <option value="pizza">Pizza</option>
             <option value="subitem">⊕ Sub items</option>
           </select>
           <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{ ...inp, width:'auto', cursor:'pointer', fontSize:11 }}>
@@ -1628,17 +1628,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
               </div>
             </div>
 
-            {!isSub && (
-              <div>
-                <span style={lbl}>Visible on</span>
-                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                  {[['pos','POS'],['kiosk','Kiosk'],['online','Online'],['onlineDelivery','Delivery']].map(([k,l])=>{
-                    const on=(item.visibility||{pos:true,kiosk:true,online:true,onlineDelivery:true})[k]!==false;
-                    return <button key={k} onClick={()=>onUpdate({visibility:{...(item.visibility||{pos:true,kiosk:true,online:true,onlineDelivery:true}),[k]:!on}})} style={{ padding:'4px 10px', borderRadius:10, cursor:'pointer', fontFamily:'inherit', fontSize:11, fontWeight:on?700:400, border:`1px solid ${on?'var(--grn-b)':'var(--bdr)'}`, background:on?'var(--grn-d)':'var(--bg3)', color:on?'var(--grn)':'var(--t4)' }}>{on?'✓ ':''}{l}</button>;
-                  })}
-                </div>
-              </div>
-            )}
+            {/* v4.6.2b: visibility (POS/Kiosk/Online/Delivery) UI removed — surface targeting will move to per-menu assignment in v4.6.3+. Existing visibility data preserved on items. */}
 
             {isSub && (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
