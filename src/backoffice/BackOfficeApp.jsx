@@ -138,6 +138,12 @@ export default function BackOfficeApp() {
       assignedInstructionGroups: item.assigned_instruction_groups ?? item.assignedInstructionGroups ?? [],
       taxRateId:   item.tax_rate_id  ?? item.taxRateId  ?? null,
       taxOverrides: item.tax_overrides ?? item.taxOverrides ?? {},
+      // v4.6.3: ownership / sharing fields (added by v4.6.0 schema migration)
+      scope:        item.scope         ?? 'local',
+      orgId:        item.org_id        ?? item.orgId        ?? null,
+      masterId:     item.master_id     ?? item.masterId     ?? null,
+      lockPricing:  item.lock_pricing  ?? item.lockPricing  ?? false,
+      lockedFields: item.locked_fields ?? item.lockedFields ?? [],
     }));
     if (floorRes.data?.tables?.length) patch.tables = floorRes.data.tables;
     // Map modifier groups from snake_case DB columns to camelCase store format
