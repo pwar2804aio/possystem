@@ -134,9 +134,35 @@ export default function SyncBridge({ onSyncPulse }) {
                 if (!sessionMap[tid]) sessionMap[tid] = sess;
               });
             } catch {}
+            // v4.5.0: ALSO check the synchronous emergency snapshot (written from
+            // SyncBridge's subscribe handler on every meaningful change). This bypasses
+            // the SessionSync write path entirely and survives wake-from-sleep even if
+            // the active_sessions table write was silently failing.
+            try {
+              const snap = JSON.parse(localStorage.getItem('rpos-session-snapshot') || '{}');
+              if (snap?.sessions) {
+                Object.entries(snap.sessions).forEach(([tid, sess]) => {
+                  if (!sessionMap[tid]) {
+                    sessionMap[tid] = sess;
+                    console.log('[SyncBridge] v4.5.0: rescued session for table', tid, 'from emergency snapshot');
+                  }
+                });
+              }
+            } catch {}
+            // v4.5.0: PRESERVE in-memory sessions when DB + backup are silent.
+            // Mac wake / page re-init was wiping live sessions because active_sessions
+            // writes weren't reaching DB and the boot rebuild trusted (DB || backup || null).
+            // Now: also fall back to whatever is already in the live Zustand store before
+            // declaring a table empty. closedChecks already does this kind of additive merge.
+            const existingTablesInStore = useStore.getState().tables || [];
+            const existingById = Object.fromEntries(existingTablesInStore.map(t => [t.id, t]));
             // Build tables with sessions already applied — never flash as empty
             const tables = floorRes.data.tables.map(t => {
-              const session = sessionMap[t.id] || null;
+              const inMemory = existingById[t.id];
+              const session = sessionMap[t.id] || inMemory?.session || null;
+              if (!sessionMap[t.id] && inMemory?.session) {
+                console.warn('[SyncBridge] v4.5.0: preserving in-memory session for table', t.label || t.id, '— DB + backup were silent. Items:', inMemory.session.items?.length);
+              }
               // v4.6.5 Bug 6: floor_tables uses snake_case (max_covers, sort_order) but every
               // TablesSurface read expects camelCase (maxCovers). Rename on hydration.
               return {
@@ -145,8 +171,8 @@ export default function SyncBridge({ onSyncPulse }) {
                 sortOrder: t.sort_order ?? t.sortOrder ?? 0,
                 status: session ? 'occupied' : 'available',
                 session,
-                firedCourses: session?.firedCourses || [],
-                sentAt: session?.sentAt || null,
+                firedCourses: session?.firedCourses || inMemory?.firedCourses || [],
+                sentAt: session?.sentAt || inMemory?.sentAt || null,
               };
             });
             patch.tables = tables;
@@ -411,7 +437,27 @@ export default function SyncBridge({ onSyncPulse }) {
         if (tSent !== pSent) return true;
         return false;
       });
-      if (meaningful) scheduleFlush();
+      if (meaningful) {
+        // v4.5.0: SYNCHRONOUS emergency snapshot. Written to localStorage immediately on
+        // any meaningful tables change. Pure safety net — bypasses SessionSync entirely so
+        // that even if the debounced flush, the queueWrite, or the Supabase upsert silently
+        // fails, the session data is still on disk and the boot-path merge can rescue it.
+        // Fix for: data loss on Mac wake-from-sleep when active_sessions write path was silent.
+        try {
+          const snapshot = {};
+          for (const t of state.tables) {
+            if (t.session) snapshot[t.id] = t.session;
+          }
+          localStorage.setItem('rpos-session-snapshot', JSON.stringify({
+            v: '4.5.0',
+            ts: Date.now(),
+            sessions: snapshot,
+          }));
+        } catch (e) {
+          console.warn('[SyncBridge] v4.5.0 emergency snapshot failed:', e?.message || e);
+        }
+        scheduleFlush();
+      }
     }) : () => {};
 
     // v4.6.5 Bug 4: Write walk-in orderQueue and bar tabs to Supabase too, so they
