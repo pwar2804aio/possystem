@@ -369,6 +369,25 @@ export default function SyncBridge({ onSyncPulse }) {
         if (local.id === activeId) return local;
         const incoming = byId.get(local.id);
         if (!incoming) return local;
+
+        // v4.5.3 STOP-BLEED: never let incoming overwrite local with FEWER items
+        // OR destroy a session that the local operator is actively building.
+        // Caught 26 Apr 2026 by v4.5.2 forensic logging — cross-tab BroadcastChannel
+        // races were wiping in-progress orders (e.g. T1 with 3 items wiped to 0
+        // while user was actively at the POS).
+        const localItems = local.session?.items?.length || 0;
+        const incomingItems = incoming.session?.items?.length || 0;
+        if (local.session && (!incoming.session || incomingItems < localItems)) {
+          console.warn('[SyncBridge] mergeTablesSafely: refusing incoming for', local.label || local.id, '— would lose data (local=' + localItems + ' items, incoming=' + incomingItems + ' items)');
+          return local;
+        }
+        // v4.5.3 timestamp tiebreaker: if local.session is newer than incoming, keep local.
+        // updatedAt is stamped on every store mutation that touches the session.
+        if (local.session?.updatedAt && incoming.session?.updatedAt
+            && local.session.updatedAt > incoming.session.updatedAt) {
+          return local;
+        }
+
         const keepLocalLayout = {};
         for (const f of LAYOUT_FIELDS) if (f in local) keepLocalLayout[f] = local[f];
         return { ...incoming, ...keepLocalLayout };
