@@ -15,16 +15,13 @@ const ORDER_TYPES = [
   { id:'collection', label:'Collection', icon:'📦' },
 ];
 
+// v4.5.1: trimmed to only the features actually wired in the codebase.
+// Removed (Apr 26): kds (KDS is now a standalone product), kiosk (own surface, not a flag),
+// reports (cosmetic-only — Back Office is web-accessible anyway), discounts/voids/splitCheck/
+// tableTransfer (all pure stubs — never wired to anything).
 const FEATURES = [
-  { id:'barTabs',      label:'Bar tabs',             desc:'Hide bar tab surface from POS sidebar' },
-  { id:'courses',      label:'Course management',    desc:'Fire course buttons on orders' },
-  { id:'kds',          label:'KDS screen',           desc:'Kitchen display screen in sidebar' },
-  { id:'kiosk',        label:'Kiosk mode',           desc:'Self-service kiosk capability' },
-  { id:'reports',      label:'Reports access',       desc:'Shift reports in back office tab' },
-  { id:'discounts',    label:'Discounts',            desc:'Apply discounts without manager PIN' },
-  { id:'voids',        label:'Voids (no PIN)',        desc:'Void items without manager PIN' },
-  { id:'splitCheck',   label:'Split checks',         desc:'Allow creating split checks' },
-  { id:'tableTransfer',label:'Table transfer',       desc:'Transfer tables to other terminals' },
+  { id:'barTabs', label:'Bar tabs',          desc:'Hide bar tab surface from POS sidebar' },
+  { id:'courses', label:'Course management', desc:'Hide per-course headers + Fire course buttons. Items still carry course assignment internally.' },
 ];
 
 const DEFAULT_PROFILES = [
