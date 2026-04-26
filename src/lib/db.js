@@ -90,6 +90,12 @@ export const upsertMenuItem = async (item, locationId = null) => {
     tax_rate_id:  item.taxRateId   || item.tax_rate_id  || null,
     tax_overrides: item.taxOverrides || item.tax_overrides || {},
     image:        item.image || null,
+    // v4.6.3: ownership / sharing fields (added by v4.6.0 schema migration)
+    scope:           item.scope          || item.ownership_scope || 'local',
+    org_id:          item.orgId          ?? item.org_id          ?? null,
+    master_id:       item.masterId       ?? item.master_id       ?? null,
+    lock_pricing:    item.lockPricing    ?? item.lock_pricing    ?? false,
+    locked_fields:   item.lockedFields   ?? item.locked_fields   ?? [],
     updated_at:   new Date().toISOString(),
   };
 
