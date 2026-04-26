@@ -49,7 +49,12 @@ export async function startSessionReconciler() {
         const isActive = t.id === store.activeTableId;
         const isNew = t.session?.seatedAt && (now - t.session.seatedAt) < GRACE_MS;
 
-        if (inStore && !inSupabase && !isActive && !isNew) {
+        // v4.5.4 KILL SWITCH: this wipe branch was the source of all "table vanished"
+        // bugs over 25-26 Apr 2026. The reconciler assumed Supabase active_sessions is the
+        // source of truth — but writes to that table fail/lag often enough that this branch
+        // catastrophically wipes in-progress orders every 10 seconds. Disabled until we have
+        // a guaranteed-success write path. Sessions are only cleared via explicit clearTable.
+        if (false && inStore && !inSupabase && !isActive && !isNew) {
           // Table is open in store but NOT in Supabase — another device closed it
           changed = true;
           return { ...t, session: null, status: 'available' };
