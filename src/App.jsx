@@ -2884,6 +2884,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
                 serviceCharge: dbProfile.service_charge || null,
                 isMaster: dbProfile.is_master === true,
                 autoPrintReceiptOnClose: dbProfile.auto_print_receipt_on_close !== false,
+                menuId: dbProfile.menu_id || null,
               };
             }
           } catch {}
@@ -2906,6 +2907,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
               serviceCharge: profile.serviceCharge || null,
               isMaster: profile.isMaster === true,
               autoPrintReceiptOnClose: profile && profile.autoPrintReceiptOnClose !== false,
+              menuId: profile?.menuId || null,
             };
             localStorage.setItem('rpos-device-config', JSON.stringify(config));
             useStore.getState().setDeviceConfig(config);
@@ -2943,6 +2945,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
               quickScreenEnabled: existingConfig?.quickScreenEnabled !== false,
               serviceCharge: existingConfig?.serviceCharge || null,
               autoPrintReceiptOnClose: existingConfig?.autoPrintReceiptOnClose !== false,
+              menuId: existingConfig?.menuId || null,
             };
             localStorage.setItem('rpos-device-config', JSON.stringify(minConfig));
             useStore.getState().setDeviceConfig(minConfig);
@@ -3015,6 +3018,7 @@ function ValidatedPOSApp({ pairedDevice, staff, surface, setSurface, toast, shif
             quickScreenEnabled: p.quick_screen_enabled !== false,
             serviceCharge: p.service_charge || null,
             autoPrintReceiptOnClose: p.auto_print_receipt_on_close !== false,
+            menuId: p.menu_id || null,
             terminalName: useStore.getState().deviceConfig?.terminalName,
           };
           localStorage.setItem('rpos-device-config', JSON.stringify(config));
