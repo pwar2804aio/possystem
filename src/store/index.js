@@ -1040,7 +1040,25 @@ export const useStore = create((set, get) => ({
       try { return get().getItemPrice(item, _currentOrderType); }
       catch { return item?.pricing?.base ?? item?.price ?? 0; }
     })();
-    const price = opts.linePrice != null ? opts.linePrice/qty : _channelPrice;
+    // v4.5.7: if caller passed linePrice but it equals item.pricing.base * qty, the
+    // caller is using the dumb-base shortcut (e.g. QuickAdd) and we should swap in the
+    // channel-aware price instead. If linePrice differs from base*qty, modifiers are at
+    // play (e.g. ProductModal added surcharges) — we SCALE the linePrice by the channel
+    // ratio so per-channel pricing applies even when modifiers are stacked.
+    let price;
+    const _basePrice = item?.pricing?.base ?? item?.price ?? 0;
+    if (opts.linePrice == null) {
+      price = _channelPrice;
+    } else if (_basePrice && Math.abs(opts.linePrice/qty - _basePrice) < 0.001) {
+      // Caller passed plain base — use channel price instead
+      price = _channelPrice;
+    } else if (_basePrice && _channelPrice && _basePrice !== _channelPrice) {
+      // Caller passed modifiers-included price — scale by channel ratio
+      const ratio = _channelPrice / _basePrice;
+      price = (opts.linePrice / qty) * ratio;
+    } else {
+      price = opts.linePrice / qty;
+    }
     const newItem = {
       uid: uid(), itemId: item.id,
       name: opts.displayName || item.name,
