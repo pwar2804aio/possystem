@@ -6,7 +6,6 @@ import BOLogin from './BOLogin';
 import LocationSwitcher from './LocationSwitcher';
 import { VERSION } from '../lib/version';
 import MenuManager from './sections/MenuManager';
-import Items from './sections/Items';
 import FloorPlanBuilder from './sections/FloorPlanBuilder';
 import DeviceProfiles from './sections/DeviceProfiles';
 import DeviceRegistry from './sections/DeviceRegistry';
@@ -30,7 +29,6 @@ import PettyCash from './sections/PettyCash';
 
 const NAV = [
   { id:'overview',   label:'Overview',        icon:'◈',  group:'Dashboard' },
-  { id:'items',      label:'Items',           icon:'🍽',  group:'Configuration' },
   { id:'menu',       label:'Menu manager',    icon:'🍽',  group:'Configuration' },
   { id:'floorplan',  label:'Floor plan',      icon:'⬚',  group:'Configuration' },
   { id:'inventory',  label:'Inventory',       icon:'📦',  group:'Configuration' },
@@ -340,7 +338,6 @@ export default function BackOfficeApp() {
         {/* Sections */}
         <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
           {section === 'overview'   && <BOOverview setSection={setSection} orgCtx={orgCtx} />}
-          {section === 'items'  && <Items />}
           {section === 'menu'       && <MenuManager />}
           {section === 'floorplan'  && <FloorPlanBuilder />}
           {section === 'inventory'  && <Inventory />}
