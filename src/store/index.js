@@ -1031,7 +1031,16 @@ export const useStore = create((set, get) => ({
   addItem: (item, mods=[], pizzaConfig=null, opts={}) => {
     const { activeTableId, staff, tables } = get();
     const qty = opts.qty || 1;
-    const price = opts.linePrice != null ? opts.linePrice/qty : item.price;
+    // v4.5.5: when caller doesn't pass an explicit linePrice (e.g. quick add),
+    // resolve the price via getItemPrice(item, currentOrderType) so per-channel pricing
+    // (dineIn / takeaway / collection / delivery) is applied. Fixes pricing schema being
+    // wired but POS never reading channel keys.
+    const _currentOrderType = get().orderType;
+    const _channelPrice = (() => {
+      try { return get().getItemPrice(item, _currentOrderType); }
+      catch { return item?.pricing?.base ?? item?.price ?? 0; }
+    })();
+    const price = opts.linePrice != null ? opts.linePrice/qty : _channelPrice;
     const newItem = {
       uid: uid(), itemId: item.id,
       name: opts.displayName || item.name,
@@ -1753,7 +1762,28 @@ export const useStore = create((set, get) => ({
 
   // ── Order type / customer ─────────────────
   orderType: 'dine-in',
-  setOrderType: t => set({ orderType:t }),
+  // v4.5.5: when order type changes (dine-in → takeaway → delivery etc),
+  // recompute prices on every item already in every active session against the NEW
+  // channel. Without this, items added BEFORE the toggle keep their old price.
+  setOrderType: t => set(s => {
+    const fn = s.getItemPrice;
+    if (!fn) return { orderType:t };
+    const repriceItems = (items) => (items || []).map(it => {
+      // Find the source menu_item by id from the live menu
+      const src = (s.menuItems || s.MENU_ITEMS || [])
+        .concat(s.SEED_MENU_ITEMS || [])
+        .find(m => m && m.id === it.itemId);
+      if (!src) return it;
+      const newUnitPrice = fn(src, t);
+      if (newUnitPrice == null) return it;
+      return { ...it, price: newUnitPrice };
+    });
+    const tables = (s.tables || []).map(tb => {
+      if (!tb.session?.items) return tb;
+      return { ...tb, session: { ...tb.session, items: repriceItems(tb.session.items) } };
+    });
+    return { orderType:t, tables };
+  }),
   customer: null,
   setCustomer: c => set({ customer:c }),
   clearCustomer: () => set({ customer:null }),
