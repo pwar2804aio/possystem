@@ -216,6 +216,7 @@ function MenuTab() {
 
   const [selMenuId, setSelMenuId] = useState(menus?.[0]?.id||'menu-1');
   const [addingMenu, setAddingMenu]   = useState(false);
+  const [editingMenuId, setEditingMenuId] = useState(null); // v4.6.4: which menu's settings panel is open
   const [newMenuName, setNewMenuName] = useState('');
   const [selCatId, setSelCatId]   = useState(null);
   const [selItemId, setSelItemId] = useState(null);
@@ -416,33 +417,103 @@ function MenuTab() {
         )}
 
         <div style={{ flex:1, overflowY:'auto', padding:'6px' }}>
-          {(menus||[]).map(m=>(
-            <div key={m.id}
-              style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3,
-                borderRadius:8, border:`1.5px solid ${selMenuId===m.id?'var(--acc)':'transparent'}`,
-                background:selMenuId===m.id?'var(--acc-d)':'transparent', transition:'all .1s' }}>
-              <button onClick={()=>{setSelMenuId(m.id);setSelCatId(null);setSelItemId(null);}}
-                style={{ flex:1, display:'flex', flexDirection:'column', padding:'8px 9px', cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:'none', background:'transparent' }}>
-                <div style={{ fontSize:12, fontWeight:700, color:selMenuId===m.id?'var(--acc)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                  {m.isDefault?'★ ':''}{m.name}
+          {(menus||[]).map(m=>{
+            const sched = m.schedule || null;
+            const days = sched?.days || [1,2,3,4,5,6,7];
+            const from = sched?.from || '09:00';
+            const to   = sched?.to   || '23:59';
+            const isEditing = editingMenuId === m.id;
+            const dayLabels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+            return (
+              <div key={m.id}>
+                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3,
+                  borderRadius:8, border:`1.5px solid ${selMenuId===m.id?'var(--acc)':'transparent'}`,
+                  background:selMenuId===m.id?'var(--acc-d)':'transparent', transition:'all .1s' }}>
+                  <button onClick={()=>{ setSelMenuId(m.id); setSelCatId(null); }}
+                    style={{ flex:1, display:'flex', flexDirection:'column', padding:'8px 9px', cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:'none', background:'transparent' }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:selMenuId===m.id?'var(--acc)':'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {m.isDefault?'★ ':''}{m.name}
+                      {sched && <span style={{ marginLeft:4, fontSize:9, color:'var(--t4)' }}>⏰</span>}
+                    </div>
+                    <div style={{ fontSize:9, color:'var(--t4)', marginTop:1 }}>
+                      {sched ? `${sched.days?.length||7}d · ${sched.from}–${sched.to}` : 'Always active'}
+                    </div>
+                  </button>
+                  <button onClick={()=>{ setEditingMenuId(isEditing ? null : m.id); }}
+                    title="Edit menu settings"
+                    style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--bdr)',background:isEditing?'var(--acc-d)':'var(--bg3)',color:isEditing?'var(--acc)':'var(--t3)',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>✎</button>
+                  {!m.isDefault && (
+                    <button onClick={()=>{
+                        if (!confirm(`Delete "${m.name}"? This won't delete its categories or items.`)) return;
+                        if (selMenuId===m.id && menus.length>1) setSelMenuId(menus.find(x=>x.id!==m.id).id);
+                        if (editingMenuId===m.id) setEditingMenuId(null);
+                        removeMenu(m.id); markBOChange(); showToast(`"${m.name}" deleted`,'info');
+                      }}
+                      style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginRight:5 }}>
+                      ×
+                    </button>
+                  )}
                 </div>
-                <div style={{ fontSize:9, color:'var(--t4)', marginTop:1 }}>
-                  {menuCategories.filter(c=>!c.parentId&&c.menuId===m.id).length} categories
-                </div>
-              </button>
-              {!m.isDefault && (
-                <button onClick={()=>{
-                    if (!confirm(`Delete "${m.name}"? This won't delete its categories or items.`)) return;
-                    const fallback = (menus||[]).find(x=>x.id!==m.id)?.id||'menu-1';
-                    if (selMenuId===m.id) { setSelMenuId(fallback); setSelCatId(null); setSelItemId(null); }
-                    removeMenu(m.id); markBOChange(); showToast(`"${m.name}" deleted`,'info');
-                  }}
-                  style={{ width:20,height:20,borderRadius:5,border:'1px solid var(--red-b)',background:'var(--red-d)',color:'var(--red)',cursor:'pointer',fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginRight:5 }}>
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
+                {isEditing && (
+                  <div style={{ padding:8, marginBottom:4, background:'var(--bg1)', border:'1px solid var(--bdr)', borderRadius:8, fontSize:11 }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>Schedule</div>
+                    <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:8 }}>
+                      {dayLabels.map((lab, i) => {
+                        const dayNum = i + 1;
+                        const on = days.includes(dayNum);
+                        return (
+                          <button key={dayNum} onClick={()=>{
+                            const next = on ? days.filter(d=>d!==dayNum) : [...days, dayNum].sort();
+                            updateMenu(m.id, { schedule: { days: next, from, to } });
+                            markBOChange();
+                          }}
+                            style={{ padding:'3px 7px', fontSize:10, fontWeight:600, borderRadius:4,
+                              background: on ? 'var(--acc-d)' : 'var(--bg3)',
+                              color: on ? 'var(--acc)' : 'var(--t3)',
+                              border: '1px solid ' + (on ? 'var(--acc)' : 'var(--bdr)'),
+                              cursor:'pointer' }}>{lab}</button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display:'flex', gap:5, alignItems:'center', marginBottom:8 }}>
+                      <input type="time" value={from} onChange={e=>{ updateMenu(m.id, { schedule: { days, from: e.target.value, to } }); markBOChange(); }}
+                        style={{ ...inp, fontSize:11, padding:'4px 6px', flex:1 }}/>
+                      <span style={{ color:'var(--t3)' }}>to</span>
+                      <input type="time" value={to} onChange={e=>{ updateMenu(m.id, { schedule: { days, from, to: e.target.value } }); markBOChange(); }}
+                        style={{ ...inp, fontSize:11, padding:'4px 6px', flex:1 }}/>
+                    </div>
+                    {sched && (
+                      <button onClick={()=>{ updateMenu(m.id, { schedule: null }); markBOChange(); showToast('Schedule cleared — always active','info'); }}
+                        style={{ width:'100%', padding:'4px', fontSize:10, fontWeight:600, borderRadius:5, border:'1px dashed var(--bdr)', background:'transparent', color:'var(--t3)', cursor:'pointer', marginBottom:8 }}>
+                        Clear schedule (always active)
+                      </button>
+                    )}
+                    <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:6 }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'.06em', flex:1 }}>Priority</span>
+                      <input type="number" min={0} max={99} value={m.priority ?? 0}
+                        onChange={e=>{ updateMenu(m.id, { priority: parseInt(e.target.value)||0 }); markBOChange(); }}
+                        style={{ ...inp, fontSize:11, padding:'3px 6px', width:50, textAlign:'right' }}/>
+                    </div>
+                    <div style={{ fontSize:10, color:'var(--t4)', lineHeight:1.4 }}>
+                      Higher priority wins when multiple scheduled menus overlap.
+                    </div>
+                    {!m.isDefault && (
+                      <button onClick={()=>{
+                          (menus||[]).forEach(other => {
+                            if (other.id !== m.id && other.isDefault) updateMenu(other.id, { isDefault: false });
+                          });
+                          updateMenu(m.id, { isDefault: true });
+                          markBOChange(); showToast(`"${m.name}" is now the default`,'success');
+                        }}
+                        style={{ width:'100%', padding:'4px 8px', marginTop:6, fontSize:10, fontWeight:600, borderRadius:5, border:'1px solid var(--acc)', background:'var(--acc-d)', color:'var(--acc)', cursor:'pointer' }}>
+                        Set as default
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
