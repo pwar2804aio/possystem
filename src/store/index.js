@@ -18,6 +18,12 @@ const sbUpsertMenu = async (menu) => {
     is_default: menu.isDefault || false,
     is_active: menu.isActive !== false,
     sort_order: menu.sortOrder || 0,
+    // v4.6.4: schedule (timed menus) + priority (tiebreaker when multiple menus active)
+    schedule:   menu.schedule ?? null,
+    priority:   menu.priority ?? 0,
+    // v4.6.0 sharing fields
+    scope:      menu.scope    || 'local',
+    org_id:     menu.orgId    ?? menu.org_id    ?? null,
     updated_at: new Date().toISOString(),
   });
   if (error) console.error('[Supabase] menus upsert error:', error);
