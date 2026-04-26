@@ -171,7 +171,49 @@ export default function POSSurface() {
 
   // Order types this terminal is allowed to show (from device profile)
   const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];
-  const deviceMenuId = deviceConfig?.menuId || null; // null = show all categories (default behaviour)
+  // v4.6.5: Active menu resolver — picks the right menu based on schedule, priority, device profile.
+  // Recomputes every minute via clockTick so menus auto-switch at schedule boundaries.
+  const [_clockTick, _setClockTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => _setClockTick(x => x + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const deviceMenuId = useMemo(() => {
+    const now = new Date();
+    const day = now.getDay() || 7; // ISO: Mon=1, Sun=7
+    const time = now.getHours() * 60 + now.getMinutes();
+    const isActive = (m) => {
+      if (!m.schedule) return true;
+      const s = m.schedule;
+      if (s.days && Array.isArray(s.days) && !s.days.includes(day)) return false;
+      if (s.from && s.to) {
+        const [fh, fm] = s.from.split(':').map(Number);
+        const [th, tm] = s.to.split(':').map(Number);
+        const fromMin = fh * 60 + fm;
+        const toMin = th * 60 + tm;
+        if (fromMin <= toMin) return time >= fromMin && time <= toMin;
+        // crosses midnight (e.g. 22:00–02:00)
+        return time >= fromMin || time <= toMin;
+      }
+      return true;
+    };
+    const allMenus = (menus || []).filter(m => m.isActive !== false && m.is_active !== false);
+    const activeNow = allMenus.filter(isActive);
+    const preferred = deviceConfig?.menuId;
+    // 1. If device pinned to a menu and that menu is currently active, honour it.
+    if (preferred && activeNow.some(m => m.id === preferred)) return preferred;
+    // 2. Otherwise pick highest-priority menu currently active.
+    if (activeNow.length > 0) {
+      return activeNow.slice().sort((a, b) => (b.priority || 0) - (a.priority || 0))[0].id;
+    }
+    // 3. No menus active right now: fall back to default flagged menu.
+    const def = allMenus.find(m => m.isDefault || m.is_default);
+    if (def) return def.id;
+    // 4. Last resort: device pinned (even if its schedule says inactive).
+    if (preferred) return preferred;
+    // 5. Nothing matches: show all categories (legacy behaviour).
+    return null;
+  }, [menus, deviceConfig?.menuId, _clockTick]);
   const ALL_ORDER_TYPES = [['dine-in','🍽','Dine in'],['takeaway','🥡','Takeaway'],['collection','📦','Collect']];
   const visibleOrderTypes = ALL_ORDER_TYPES.filter(([t]) => allowedOrderTypes.includes(t));
 
