@@ -19,17 +19,31 @@ let _lastSent = {}; // table_id → JSON string, avoid redundant writes
 
 // ── Write ─────────────────────────────────────────────────────────────────────
 export async function flushSessions() {
-  if (!_locationId) _locationId = await getLocationId().catch(() => null);
-  if (!_locationId) return;
+  // v4.5.0: log every entry + every short-circuit. Silent failures here cost us a real
+  // order on 25 Apr 2026 (active_sessions writes were never firing for hours and we
+  // had no visibility because the function returned silently).
+  if (!_locationId) {
+    try { _locationId = await getLocationId(); }
+    catch (e) {
+      console.warn('[SessionSync] flushSessions: getLocationId() threw —', e?.message || e);
+      return;
+    }
+  }
+  if (!_locationId) {
+    console.warn('[SessionSync] flushSessions: no locationId resolved, skipping all writes');
+    return;
+  }
 
   const tables = useStore.getState().tables;
   const occupied = tables.filter(t => t.session && t.status !== 'available');
+  let writesIssued = 0, skipped = 0;
 
   // Upsert each occupied table
   for (const t of occupied) {
     const payload = JSON.stringify(t.session);
-    if (_lastSent[t.id] === payload) continue; // no change
+    if (_lastSent[t.id] === payload) { skipped++; continue; } // no change
     _lastSent[t.id] = payload;
+    writesIssued++;
 
     // Write to localStorage backup immediately (instant, never fails)
     try {
@@ -57,7 +71,13 @@ export async function flushSessions() {
           table_id: t.id,
           session: t.session,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'location_id,table_id' })).catch(e => console.warn('[SessionSync]', e.message));
+        }, { onConflict: 'location_id,table_id' })).then(res => {
+          if (res?.error) {
+            console.warn('[SessionSync] upsert returned error for table', t.id, '—', res.error.message || res.error);
+          } else {
+            console.log('[SessionSync] ✓ wrote table', t.label || t.id, 'to active_sessions (' + (t.session?.items?.length || 0) + ' items)');
+          }
+        }).catch(e => console.warn('[SessionSync] upsert threw for table', t.id, '—', e?.message || e));
       }
     });
   }
@@ -86,10 +106,14 @@ export async function flushSessions() {
         Promise.resolve(
           supabase.from('active_sessions')
             .delete().eq('location_id', _locationId).eq('table_id', tid)
-        ).catch(e => console.warn('[SessionSync] delete error:', e.message));
+        ).then(res => {
+          if (res?.error) console.warn('[SessionSync] delete returned error for table', tid, '—', res.error.message || res.error);
+        }).catch(e => console.warn('[SessionSync] delete threw for table', tid, '—', e?.message || e));
       }
     }
   }
+  // v4.5.0: summary line so we can see at a glance whether the flush actually fired
+  console.log('[SessionSync] flushSessions done — issued ' + writesIssued + ' write(s), skipped ' + skipped + ' (unchanged), occupied tables: ' + occupied.length);
 }
 
 // Debounce writes — don't hammer Supabase on every keystroke
