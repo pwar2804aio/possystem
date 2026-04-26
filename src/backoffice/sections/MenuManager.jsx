@@ -1629,6 +1629,52 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
             </div>
 
             {/* v4.6.2b: visibility (POS/Kiosk/Online/Delivery) UI removed — surface targeting will move to per-menu assignment in v4.6.3+. Existing visibility data preserved on items. */}
+            {/* v4.6.3: Sharing & ownership scope. Only shown on top-level items (variants inherit). */}
+            {!isSub && (
+              <div>
+                <span style={lbl}>Sharing</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 4 }}>
+                  {[
+                    { id: 'local',  label: 'Local',  desc: 'This location only.' },
+                    { id: 'shared', label: 'Shared', desc: 'All locations in this org. Each can override price, category, image.' },
+                    { id: 'global', label: 'Global', desc: 'Managed centrally. Edit once, applies everywhere. Locations cannot override.' },
+                  ].map(s => {
+                    const on = (item.scope || 'local') === s.id;
+                    return (
+                      <button key={s.id} onClick={() => onUpdate({ scope: s.id })} style={{
+                        background: on ? 'rgba(249,115,22,0.06)' : 'var(--bg2)',
+                        border: '1.5px solid ' + (on ? 'rgba(249,115,22,0.45)' : 'var(--bdr)'),
+                        borderRadius: 8, padding: 10, cursor: 'pointer', textAlign: 'left',
+                        color: 'inherit', fontFamily: 'inherit',
+                      }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: on ? 'var(--acc)' : 'var(--t1)', marginBottom: 3 }}>{s.label}</div>
+                        <div style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.4 }}>{s.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {(item.scope || 'local') !== 'local' && (
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--bg2)', border: '1px solid var(--bdr)', borderRadius: 6 }}>
+                    <button onClick={() => onUpdate({ lockPricing: !item.lockPricing })} style={{
+                      width: 32, height: 18, padding: 0, borderRadius: 9, flexShrink: 0,
+                      background: item.lockPricing ? 'var(--acc)' : 'var(--bg3)',
+                      border: 0, cursor: 'pointer', position: 'relative',
+                    }}>
+                      <span style={{
+                        position: 'absolute', top: 2, left: item.lockPricing ? 16 : 2,
+                        width: 14, height: 14, borderRadius: '50%',
+                        background: item.lockPricing ? '#fff' : 'var(--t3)', transition: 'all .15s',
+                      }} />
+                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--t1)' }}>Lock pricing</span>
+                      <span style={{ fontSize: 11, color: 'var(--t3)' }}>Other locations can change category &amp; image but not price.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {isSub && (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
