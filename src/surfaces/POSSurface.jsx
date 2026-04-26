@@ -208,6 +208,9 @@ export default function POSSurface() {
   const { subtotal, service, total, itemCount, checkDiscount, discountedSub, serviceChargeWaived, serviceChargeApplicable } = getPOSTotals();
   const orderNote = getPOSOrderNote();
   const firedCourses = session?.firedCourses || [];
+  // v4.5.1: course management is gated per device profile. Hides per-course header (Fire button)
+  // and the standalone Fire-course banner. Item.course data is preserved internally.
+  const hideCourses = (deviceConfig?.hiddenFeatures || []).includes('courses');
   const covers = session?.covers || 2;
   const hasSent = !!session?.sentAt;
   const daypart = getDaypart();
@@ -828,7 +831,7 @@ export default function POSSurface() {
             const canFire=hasSent&&!isFired&&courseNum>1&&(firedCourses.includes(courseNum-1)||firedCourses.includes(1));
             return(
               <div key={courseNum} style={{marginBottom:8}}>
-                {courseNums.length>1&&(
+                {!hideCourses && courseNums.length>1&&(
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5,marginTop:3}}>
                     <div style={{height:1,flex:1,background:'var(--bdr)'}}/>
                     <div style={{display:'flex',alignItems:'center',gap:5}}>
@@ -941,8 +944,8 @@ export default function POSSurface() {
                 ):null;
               })()}
 
-              {/* Fire course banner */}
-              {hasSent&&nextToFire&&(
+              {/* Fire course banner — v4.5.1 gated by deviceConfig.hiddenFeatures.courses */}
+              {!hideCourses && hasSent&&nextToFire&&(
                 <div style={{margin:'4px 10px 0',padding:'8px 12px',background:'rgba(232,160,32,.1)',border:'1px solid rgba(232,160,32,.25)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                   <span style={{fontSize:12,color:'var(--acc)',fontWeight:700}}>{COURSE_COLORS[nextToFire]?.label} ready to fire</span>
                   <button onClick={()=>fireCourse(nextToFire)} style={{fontSize:12,fontWeight:800,padding:'4px 12px',borderRadius:8,background:'var(--acc)',color:'#0b0c10',border:'none',cursor:'pointer',fontFamily:'inherit'}}>🔥 Fire</button>
