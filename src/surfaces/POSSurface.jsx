@@ -1022,10 +1022,10 @@ export default function POSSurface() {
             return (
               <button key={c.id} onClick={() => { setCat(c.id); setSearch(''); }} className="cat-btn" style={{
                 marginBottom:3,
-                background:isActive?`${color}15`:'transparent',
-                borderColor:isActive?`${color}40`:'transparent',
+                background:isActive?`${color}28`:`${color}12`,
+                borderColor:isActive?`${color}80`:`${color}35`,
               }}>
-                <div style={{width:3,height:32,borderRadius:2,background:isActive?color:'var(--bg5)',flexShrink:0,transition:'all .14s'}}/>
+                <div style={{width:3,height:32,borderRadius:3,background:color,flexShrink:0,transition:'all .14s'}}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:1}}>
                     <span style={{fontSize:compact?15:20,lineHeight:1,flexShrink:0}}>{c.icon||'•'}</span>
