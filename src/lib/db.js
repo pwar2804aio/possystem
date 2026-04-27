@@ -778,3 +778,59 @@ export const setMenuCategoryScope = async (cat, newScope) => {
 
   return { ok: true, action: isFirstPromotion ? 'promoted' : 'rescoped', createdCount, updatedSiblings };
 };
+
+
+// ──────────────────────────────────────────────────────────────────
+// v4.7.4 — Category ↔ Menu join helpers
+//
+// menu_categories.menu_id is kept as the legacy "primary menu" pointer
+// (unchanged when a cat is created via the existing flow). The new
+// menu_category_links table (added by v4.6.0 migration) holds
+// additional menu memberships, enabling one category to appear in
+// many menus without duplication.
+//
+// At read time, a cat is considered "in menu M" if either:
+//   - cat.menu_id === M, OR
+//   - a row exists in menu_category_links with (menu_id=M, category_id=cat.id)
+// ──────────────────────────────────────────────────────────────────
+
+export const fetchMenuCategoryLinks = async (locationId = null) => {
+  if (isMock) return { data: null, error: null };
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  if (!locationId || !supabase) return { data: [], error: null };
+  // Pull all link rows whose menu belongs to this location. menu_category_links
+  // doesn't have a location_id column, so we join via menus.
+  const { data: locMenus, error: e1 } = await supabase
+    .from('menus').select('id').eq('location_id', locationId);
+  if (e1) return { data: [], error: e1 };
+  if (!locMenus?.length) return { data: [], error: null };
+  const menuIds = locMenus.map(m => m.id);
+  return await supabase
+    .from('menu_category_links')
+    .select('menu_id, category_id, sort_order')
+    .in('menu_id', menuIds);
+};
+
+export const linkCategoryToMenu = async (menuId, categoryId, sortOrder = 0) => {
+  if (isMock) return { ok: true };
+  if (!supabase) return { ok: false, error: 'no supabase' };
+  if (!menuId || !categoryId) return { ok: false, error: 'menuId and categoryId required' };
+  const { error } = await supabase
+    .from('menu_category_links')
+    .upsert({ menu_id: menuId, category_id: categoryId, sort_order: sortOrder }, { onConflict: 'menu_id,category_id' });
+  if (error) { console.error('[linkCategoryToMenu]', error); return { ok: false, error }; }
+  return { ok: true };
+};
+
+export const unlinkCategoryFromMenu = async (menuId, categoryId) => {
+  if (isMock) return { ok: true };
+  if (!supabase) return { ok: false, error: 'no supabase' };
+  if (!menuId || !categoryId) return { ok: false, error: 'menuId and categoryId required' };
+  const { error } = await supabase
+    .from('menu_category_links')
+    .delete()
+    .eq('menu_id', menuId)
+    .eq('category_id', categoryId);
+  if (error) { console.error('[unlinkCategoryFromMenu]', error); return { ok: false, error }; }
+  return { ok: true };
+};
