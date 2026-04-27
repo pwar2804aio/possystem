@@ -58,7 +58,24 @@ export const getLocationId = async () => {
   return null;
 };
 
-export const setResolvedLocationId = (id) => { _resolvedLocationId = id; };
+export const setResolvedLocationId = (id) => {
+  // v4.7.1: when switching locations, the previous location's cached menu data
+  // (config snapshot, shared zustand state, session snapshots) MUST be cleared
+  // before the upcoming page reload — otherwise the rehydrate path will
+  // restore Location A's items even though the active location is now B.
+  // The override key (rpos-bo-location), auth, device-mode and theme survive.
+  if (id !== _resolvedLocationId) {
+    try {
+      const KEEP = new Set(['rpos-bo-location', 'rpos-auth', 'rpos-device-mode', 'rpos-theme']);
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('rpos-') && !KEEP.has(k)) localStorage.removeItem(k);
+      });
+    } catch (e) {
+      console.warn('[setResolvedLocationId] cache clear failed:', e?.message || e);
+    }
+  }
+  _resolvedLocationId = id;
+};
 export const clearResolvedLocationId = () => { _resolvedLocationId = null; };
 export const LOCATION_ID = 'loc-demo';
 
