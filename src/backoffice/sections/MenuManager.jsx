@@ -24,7 +24,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
-import { upsertMenuItem, uploadProductImage, deleteProductImage, saveQuickScreenIds, setMenuItemScope } from '../../lib/db';
+import { upsertMenuItem, uploadProductImage, deleteProductImage, saveQuickScreenIds, setMenuItemScope, linkCategoryToMenu, unlinkCategoryFromMenu, fetchMenuCategoryLinks } from '../../lib/db';
 import MenuImportModal from '../components/MenuImportModal';
 
 // ── Clone item helper ─────────────────────────────────────────────────────────
@@ -223,6 +223,46 @@ function MenuTab() {
   const [editingCat, setEditingCat] = useState(null);
   const [movingCatId, setMovingCatId] = useState(null);
   const [addingCat, setAddingCat]   = useState(false);
+  // v4.7.5: cats↔menus join data, loaded on mount, mutated locally on link/unlink
+  const [categoryLinks, setCategoryLinks] = useState([]);
+  const [showLinkPicker, setShowLinkPicker] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data } = await fetchMenuCategoryLinks();
+      if (!alive) return;
+      setCategoryLinks(data || []);
+    })();
+    return () => { alive = false; };
+  }, []);
+  const handleLinkCat = async (catId) => {
+    if (!selMenuId || !catId) return;
+    if ((categoryLinks||[]).some(l => l.menu_id === selMenuId && l.category_id === catId)) {
+      setShowLinkPicker(false); return;
+    }
+    const result = await linkCategoryToMenu(selMenuId, catId, menuCategories.length);
+    if (result.ok) {
+      setCategoryLinks(prev => [...prev, { menu_id: selMenuId, category_id: catId, sort_order: menuCategories.length }]);
+      const cat = menuCategories.find(c => c.id === catId);
+      showToast(`"${cat?.label || 'Category'}" linked to this menu`, 'success');
+      markBOChange();
+    } else {
+      showToast(`Couldn't link: ${result.error?.message || 'unknown error'}`, 'error');
+    }
+    setShowLinkPicker(false);
+  };
+  const handleUnlinkCat = async (catId) => {
+    const cat = menuCategories.find(c => c.id === catId);
+    if (!confirm(`Unlink "${cat?.label || 'category'}" from this menu? Items in this category will stop showing on this menu.`)) return;
+    const result = await unlinkCategoryFromMenu(selMenuId, catId);
+    if (result.ok) {
+      setCategoryLinks(prev => prev.filter(l => !(l.menu_id === selMenuId && l.category_id === catId)));
+      showToast(`"${cat?.label || 'Category'}" unlinked`, 'info');
+      markBOChange();
+    } else {
+      showToast(`Couldn't unlink: ${result.error?.message || 'unknown error'}`, 'error');
+    }
+  };
   const [catForm, setCatForm]       = useState({ label:'', icon:'🍽', color:'#3b82f6', parentId:'' });
   const [dragCatId, setDragCatId]   = useState(null);
   const [overCatId, setOverCatId]   = useState(null);
@@ -234,7 +274,12 @@ function MenuTab() {
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [addSearch, setAddSearch]     = useState('');
 
-  const roots     = useMemo(()=>menuCategories.filter(c=>!c.parentId&&!c.isSpecial&&(!c.menuId||c.menuId===selMenuId)).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)),[menuCategories,selMenuId]);
+  // v4.7.5: roots include cats whose menu_id matches selMenuId OR which appear in
+  // categoryLinks for selMenuId. This is what makes "linked categories" work.
+  const linkedCatIdsForMenu = useMemo(() => {
+    return new Set((categoryLinks||[]).filter(l => l.menu_id === selMenuId).map(l => l.category_id));
+  }, [categoryLinks, selMenuId]);
+  const roots     = useMemo(()=>menuCategories.filter(c=>!c.parentId&&!c.isSpecial&&(!c.menuId||c.menuId===selMenuId||linkedCatIdsForMenu.has(c.id))).sort((a,b)=>(a.sortOrder||0)-(b.sortOrder||0)),[menuCategories,selMenuId,linkedCatIdsForMenu]);
   const selCat    = menuCategories.find(c=>c.id===selCatId);
   const selItem   = menuItems.find(i=>i.id===selItemId);
 
@@ -541,6 +586,44 @@ function MenuTab() {
               <button onClick={()=>setAddingCat(false)} style={{ flex:1,padding:'4px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',background:'var(--bg3)',border:'1px solid var(--bdr)',color:'var(--t3)',fontSize:11 }}>Cancel</button>
               <button onClick={saveNewCat} disabled={!catForm.label.trim()} style={{ flex:2,padding:'4px',borderRadius:6,cursor:'pointer',fontFamily:'inherit',background:'var(--acc)',border:'none',color:'#0b0c10',fontSize:11,fontWeight:700,opacity:catForm.label.trim()?1:.4 }}>Add</button>
             </div>
+          </div>
+        )}
+
+        {/* v4.7.5: Link existing category */}
+        {!addingCat && selMenuId && (
+          <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--bdr)', flexShrink: 0 }}>
+            <button onClick={() => setShowLinkPicker(s => !s)}
+              style={{ width:'100%', padding:'5px 8px', borderRadius:6, border:'1px dashed var(--bdr2,var(--bdr))', background:'transparent', color:'var(--t3)', cursor:'pointer', fontSize:11, fontFamily:'inherit' }}>
+              {showLinkPicker ? '✕ Cancel' : '+ Link existing category'}
+            </button>
+            {showLinkPicker && (
+              <div style={{ marginTop:6, maxHeight:200, overflowY:'auto', background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:6, padding:4 }}>
+                {(() => {
+                  const inMenuCatIds = new Set([
+                    ...menuCategories.filter(c => c.menuId === selMenuId).map(c => c.id),
+                    ...(categoryLinks||[]).filter(l => l.menu_id === selMenuId).map(l => l.category_id),
+                  ]);
+                  const available = menuCategories
+                    .filter(c => !c.parentId && !c.isSpecial && !inMenuCatIds.has(c.id))
+                    .sort((a,b) => (a.label||'').localeCompare(b.label||''));
+                  if (available.length === 0) {
+                    return <div style={{ padding:8, fontSize:11, color:'var(--t3)', textAlign:'center' }}>No categories left to link.</div>;
+                  }
+                  return available.map(c => (
+                    <button key={c.id} onClick={() => handleLinkCat(c.id)}
+                      style={{ display:'flex', width:'100%', alignItems:'center', gap:8, padding:'5px 8px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:11.5, color:'var(--t1)', textAlign:'left', borderRadius:4 }}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--bg3)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      <span style={{ width:6, height:6, borderRadius:2, background:c.color || 'var(--t3)', flexShrink:0 }} />
+                      <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.label}</span>
+                      {c.scope && c.scope !== 'local' && (
+                        <span style={{ fontSize:9, fontFamily:'ui-monospace,monospace', fontWeight:700, letterSpacing:'0.06em', color:c.scope==='shared'?'#80b4ff':'#c89bff', textTransform:'uppercase' }}>{c.scope}</span>
+                      )}
+                    </button>
+                  ));
+                })()}
+              </div>
+            )}
           </div>
         )}
 
