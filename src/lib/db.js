@@ -520,3 +520,169 @@ export const fetchClosedChecksMultiRange = async (locationIds = [], fromDate, to
     return { data: [], error: err };
   }
 };
+
+
+// ──────────────────────────────────────────────────────────────────
+// v4.7.0 — multi-location promote / demote helpers
+//
+// Model recap (Peter's rules, 26 Apr 2026):
+//   - "shared" = item visible at every location in the org. Each location
+//     holds its OWN copy of the row. Editing at location B only changes
+//     that location's settings. master_id is the shared "family key" —
+//     every linked row in the org has master_id = <original promoter's id>.
+//   - "global" = same as shared, PLUS edits at any location propagate to
+//     all sibling rows. Implemented in upsertMenuItem (propagate-on-edit).
+//   - "local" = independent row, master_id null, org_id null.
+//   - Demote shared/global → local: just clears the flags on this row.
+//     Sibling rows at other locations stay where they are and become
+//     independent local items at those locations.
+// ──────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve the current org and a list of all OTHER locations within it.
+ * Returns { org_id, otherLocationIds: [] }.
+ */
+const getOrgPeerLocations = async (currentLocationId) => {
+  if (isMock || !supabase) return { org_id: null, otherLocationIds: [] };
+  const { data: thisLoc, error: e1 } = await supabase
+    .from('locations').select('id, org_id').eq('id', currentLocationId).maybeSingle();
+  if (e1 || !thisLoc?.org_id) return { org_id: null, otherLocationIds: [] };
+  const { data: peers, error: e2 } = await supabase
+    .from('locations').select('id').eq('org_id', thisLoc.org_id).neq('id', currentLocationId);
+  if (e2) return { org_id: thisLoc.org_id, otherLocationIds: [] };
+  return { org_id: thisLoc.org_id, otherLocationIds: (peers || []).map(p => p.id) };
+};
+
+/**
+ * Promote a local item to shared (or global). Creates copies at every other
+ * location in the org. Source row gets master_id = source.id; copies share
+ * the same master_id. Each copy gets a deterministic id <masterId>_<locShort>.
+ *
+ * If the item is already shared/global, just changes scope on all linked rows.
+ * If demoting (newScope = 'local'), only clears flags on the source row.
+ */
+export const setMenuItemScope = async (item, newScope) => {
+  if (isMock) return { ok: true };
+  if (!supabase) return { ok: false, error: 'no supabase' };
+  if (!item?.id) return { ok: false, error: 'no item id' };
+  if (!['local', 'shared', 'global'].includes(newScope)) return { ok: false, error: 'invalid scope' };
+
+  const currentScope = item.scope || 'local';
+  const sourceLocId = item.location_id || (await getLocationId());
+  if (!sourceLocId) return { ok: false, error: 'no location id' };
+
+  // ── DEMOTE → local ──
+  if (newScope === 'local') {
+    const { error } = await supabase.from('menu_items')
+      .update({ scope: 'local', org_id: null, master_id: null, updated_at: new Date().toISOString() })
+      .eq('id', item.id);
+    if (error) { console.error('[setMenuItemScope] demote error:', error); return { ok: false, error }; }
+    return { ok: true, action: 'demoted', affected: 1 };
+  }
+
+  // ── PROMOTE / RE-SCOPE among shared/global ──
+  // We need: org_id, masterId (source's id if first time, item.master_id otherwise),
+  // and the list of peer locations to copy to (only on FIRST promotion).
+  const { org_id, otherLocationIds } = await getOrgPeerLocations(sourceLocId);
+  if (!org_id) return { ok: false, error: 'this location is not in an org — cannot share' };
+
+  const masterId = item.master_id || item.id;
+  const isFirstPromotion = currentScope === 'local';
+
+  // 1) Update the source row. Always.
+  const sourcePatch = {
+    scope: newScope,
+    org_id,
+    master_id: masterId,
+    updated_at: new Date().toISOString(),
+  };
+  const { error: e1 } = await supabase.from('menu_items').update(sourcePatch).eq('id', item.id);
+  if (e1) { console.error('[setMenuItemScope] source update error:', e1); return { ok: false, error: e1 }; }
+
+  let createdCount = 0;
+  let updatedSiblings = 0;
+
+  if (isFirstPromotion) {
+    // 2) First-time promotion: copy this item to every peer location.
+    //    Build a deterministic id per peer so re-promoting later is idempotent.
+    const baseRow = {
+      // Take the relevant editable fields from the source item
+      name: item.name,
+      menu_name: item.menu_name ?? item.menuName ?? null,
+      receipt_name: item.receipt_name ?? item.receiptName ?? null,
+      kitchen_name: item.kitchen_name ?? item.kitchenName ?? null,
+      description: item.description ?? null,
+      type: item.type ?? 'simple',
+      cat: item.cat ?? null,
+      cats: item.cats ?? [],
+      pricing: item.pricing ?? { base: item.price ?? 0 },
+      price: item.pricing?.base ?? item.price ?? 0,
+      allergens: item.allergens ?? [],
+      assigned_modifier_groups: item.assignedModifierGroups ?? item.assigned_modifier_groups ?? [],
+      sort_order: item.sortOrder ?? item.sort_order ?? 999,
+      image: item.image ?? null,
+      // The shared metadata
+      scope: newScope,
+      org_id,
+      master_id: masterId,
+      lock_pricing: item.lockPricing ?? item.lock_pricing ?? false,
+      locked_fields: item.lockedFields ?? item.locked_fields ?? [],
+      updated_at: new Date().toISOString(),
+    };
+    for (const peerLocId of otherLocationIds) {
+      const peerId = `${masterId}_${peerLocId.slice(-8)}`;
+      const peerRow = { ...baseRow, id: peerId, location_id: peerLocId };
+      const { error } = await supabase.from('menu_items').upsert(peerRow);
+      if (error) {
+        console.warn('[setMenuItemScope] peer upsert failed for', peerLocId, error);
+      } else {
+        createdCount++;
+      }
+    }
+  } else {
+    // 3) Re-scoping (shared ↔ global): just update scope on all sibling rows.
+    const { error, count } = await supabase.from('menu_items')
+      .update({ scope: newScope, updated_at: new Date().toISOString() }, { count: 'exact' })
+      .eq('master_id', masterId)
+      .neq('id', item.id);
+    if (error) console.warn('[setMenuItemScope] sibling rescope error:', error);
+    else updatedSiblings = count || 0;
+  }
+
+  return { ok: true, action: isFirstPromotion ? 'promoted' : 'rescoped', createdCount, updatedSiblings };
+};
+
+/**
+ * When upsertMenuItem runs and the item has scope='global', call this to
+ * propagate the same payload to every sibling row in the org. Excludes id
+ * and location_id so each row stays bound to its own location.
+ */
+export const propagateGlobalEdit = async (item, payload) => {
+  if (isMock || !supabase) return { ok: true, propagated: 0 };
+  if ((item.scope || 'local') !== 'global') return { ok: true, propagated: 0 };
+  const masterId = item.master_id || item.id;
+  if (!masterId) return { ok: true, propagated: 0 };
+
+  // Strip identity / location-specific fields from the payload before propagating.
+  const safe = { ...payload };
+  delete safe.id;
+  delete safe.location_id;
+  delete safe.created_at;
+  // Don't overwrite scope/org_id/master_id during propagate — those are
+  // managed by setMenuItemScope.
+  delete safe.scope;
+  delete safe.org_id;
+  delete safe.master_id;
+  safe.updated_at = new Date().toISOString();
+
+  const { error, count } = await supabase.from('menu_items')
+    .update(safe, { count: 'exact' })
+    .eq('master_id', masterId)
+    .neq('id', item.id);
+
+  if (error) {
+    console.warn('[propagateGlobalEdit] update error:', error);
+    return { ok: false, error };
+  }
+  return { ok: true, propagated: count || 0 };
+};
