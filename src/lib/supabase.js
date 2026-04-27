@@ -61,3 +61,62 @@ export const getLocationId = async () => {
 export const setResolvedLocationId = (id) => { _resolvedLocationId = id; };
 export const clearResolvedLocationId = () => { _resolvedLocationId = null; };
 export const LOCATION_ID = 'loc-demo';
+
+
+// ──────────────────────────────────────────────────────────────────
+// v4.7.1 — Back Office location switching
+//
+// The existing getLocationId() reads 'rpos-bo-location' from localStorage
+// as a manual override. setLocationId writes to that key, clears the
+// in-memory resolver cache, and emits a custom event so consumers can
+// re-fetch their data.
+//
+// getAvailableLocations() returns every location the current authenticated
+// user has access to via user_locations + a join to locations.
+// ──────────────────────────────────────────────────────────────────
+
+export const setLocationId = (locId) => {
+  if (locId == null) {
+    localStorage.removeItem('rpos-bo-location');
+  } else {
+    localStorage.setItem('rpos-bo-location', JSON.stringify(locId));
+  }
+  // Bust the cached resolved id so the next getLocationId() picks up the change.
+  _resolvedLocationId = locId || null;
+  // Notify consumers — the back office can listen for this and reload data.
+  try { window.dispatchEvent(new CustomEvent('rpos-location-changed', { detail: { locationId: locId } })); } catch {}
+  return locId;
+};
+
+/**
+ * Returns the locations the current user has access to. Uses user_locations
+ * join. Falls back to the user's profile location if user_locations is empty.
+ * Mock-mode returns a single sentinel location.
+ */
+export const getAvailableLocations = async () => {
+  if (isMock) return [{ id: 'loc-demo', name: 'Demo Location' }];
+  if (!supabase) return [];
+  try {
+    const { data: { user } = {} } = await supabase.auth.getUser();
+    if (!user) return [];
+    // user_locations row(s) for this user
+    const { data: links, error: e1 } = await supabase
+      .from('user_locations')
+      .select('location_id, role')
+      .eq('user_id', user.id);
+    if (e1 || !links) return [];
+    if (links.length === 0) return [];
+    const locIds = [...new Set(links.map(r => r.location_id).filter(Boolean))];
+    if (locIds.length === 0) return [];
+    const { data: locs, error: e2 } = await supabase
+      .from('locations')
+      .select('id, name, org_id')
+      .in('id', locIds)
+      .order('name');
+    if (e2) return [];
+    return locs || [];
+  } catch (e) {
+    console.warn('[supabase] getAvailableLocations failed:', e?.message || e);
+    return [];
+  }
+};
