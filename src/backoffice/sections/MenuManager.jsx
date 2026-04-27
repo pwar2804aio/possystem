@@ -24,7 +24,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
-import { upsertMenuItem, uploadProductImage, deleteProductImage, saveQuickScreenIds } from '../../lib/db';
+import { upsertMenuItem, uploadProductImage, deleteProductImage, saveQuickScreenIds, setMenuItemScope } from '../../lib/db';
 import MenuImportModal from '../components/MenuImportModal';
 
 // ── Clone item helper ─────────────────────────────────────────────────────────
@@ -1712,7 +1712,31 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
                   ].map(s => {
                     const on = (item.scope || 'local') === s.id;
                     return (
-                      <button key={s.id} onClick={() => onUpdate({ scope: s.id })} style={{
+                      <button key={s.id} onClick={async () => {
+                      // v4.7.0: setMenuItemScope handles the full promote/demote flow:
+                      // - local→shared/global creates copies at peer locations
+                      // - shared↔global rescopes all sibling rows
+                      // - shared/global→local just clears flags on this row
+                      const prev = item.scope || 'local';
+                      // Optimistic UI update first
+                      onUpdate({ scope: s.id });
+                      try {
+                        const result = await setMenuItemScope(item, s.id);
+                        if (!result.ok) {
+                          showToast(`Couldn't change scope: ${result.error?.message || result.error || 'unknown'}`, 'error');
+                          onUpdate({ scope: prev }); // revert
+                          return;
+                        }
+                        if (result.action === 'promoted')   showToast(`"${item.name}" promoted to ${s.id} — copied to ${result.createdCount} other location(s)`, 'success');
+                        else if (result.action === 'demoted')  showToast(`"${item.name}" set to local at this site only — siblings unchanged`, 'info');
+                        else if (result.action === 'rescoped') showToast(`"${item.name}" rescoped to ${s.id} across ${result.updatedSiblings + 1} location(s)`, 'success');
+                        markBOChange();
+                      } catch (e) {
+                        console.warn('[MenuManager] scope change failed:', e?.message || e);
+                        showToast('Scope change failed: ' + (e?.message || 'unknown error'), 'error');
+                        onUpdate({ scope: prev });
+                      }
+                    }} style={{
                         background: on ? 'rgba(249,115,22,0.06)' : 'var(--bg2)',
                         border: '1.5px solid ' + (on ? 'rgba(249,115,22,0.45)' : 'var(--bdr)'),
                         borderRadius: 8, padding: 10, cursor: 'pointer', textAlign: 'left',
