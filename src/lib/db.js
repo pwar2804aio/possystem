@@ -650,7 +650,25 @@ export const setMenuItemScope = async (item, newScope) => {
     else updatedSiblings = count || 0;
   }
 
-  return { ok: true, action: isFirstPromotion ? 'promoted' : 'rescoped', createdCount, updatedSiblings };
+  // v4.7.3: when promoting an item to shared/global, also promote its primary category
+  // (Peter's rule: "the category its in should go to the other location also").
+  // Only auto-promote if the cat is currently local. If already shared/global at any scope,
+  // we leave it alone so we don't downgrade or override existing operator intent.
+  let categoryAction = null;
+  if (newScope !== 'local' && item.cat) {
+    try {
+      const { data: catRow } = await supabase.from('menu_categories').select('*').eq('id', item.cat).maybeSingle();
+      if (catRow && (catRow.scope || 'local') === 'local') {
+        const catResult = await setMenuCategoryScope(catRow, newScope);
+        if (catResult.ok) categoryAction = catResult.action;
+        else console.warn('[setMenuItemScope] cat auto-promote failed:', catResult.error);
+      }
+    } catch (e) {
+      console.warn('[setMenuItemScope] cat auto-promote threw:', e?.message || e);
+    }
+  }
+
+  return { ok: true, action: isFirstPromotion ? 'promoted' : 'rescoped', createdCount, updatedSiblings, categoryAction };
 };
 
 /**
@@ -686,4 +704,77 @@ export const propagateGlobalEdit = async (item, payload) => {
     return { ok: false, error };
   }
   return { ok: true, propagated: count || 0 };
+};
+
+
+// ──────────────────────────────────────────────────────────────────
+// v4.7.3 — Category promote/demote, mirrors setMenuItemScope.
+// ──────────────────────────────────────────────────────────────────
+
+export const setMenuCategoryScope = async (cat, newScope) => {
+  if (isMock) return { ok: true };
+  if (!supabase) return { ok: false, error: 'no supabase' };
+  if (!cat?.id) return { ok: false, error: 'no cat id' };
+  if (!['local', 'shared', 'global'].includes(newScope)) return { ok: false, error: 'invalid scope' };
+
+  const currentScope = cat.scope || 'local';
+  const sourceLocId = cat.location_id || (await getLocationId());
+  if (!sourceLocId) return { ok: false, error: 'no location id' };
+
+  if (newScope === 'local') {
+    const { error } = await supabase.from('menu_categories')
+      .update({ scope: 'local', org_id: null, master_id: null, updated_at: new Date().toISOString() })
+      .eq('id', cat.id);
+    if (error) { console.error('[setMenuCategoryScope] demote error:', error); return { ok: false, error }; }
+    return { ok: true, action: 'demoted', affected: 1 };
+  }
+
+  const { org_id, otherLocationIds } = await getOrgPeerLocations(sourceLocId);
+  if (!org_id) return { ok: false, error: 'this location is not in an org — cannot share' };
+
+  const masterId = cat.master_id || cat.id;
+  const isFirstPromotion = currentScope === 'local';
+
+  const sourcePatch = { scope: newScope, org_id, master_id: masterId, updated_at: new Date().toISOString() };
+  const { error: e1 } = await supabase.from('menu_categories').update(sourcePatch).eq('id', cat.id);
+  if (e1) { console.error('[setMenuCategoryScope] source update error:', e1); return { ok: false, error: e1 }; }
+
+  let createdCount = 0;
+  let updatedSiblings = 0;
+
+  if (isFirstPromotion) {
+    const baseRow = {
+      label: cat.label,
+      icon: cat.icon ?? null,
+      color: cat.color ?? null,
+      accounting_group: cat.accounting_group ?? cat.accountingGroup ?? '',
+      sort_order: cat.sort_order ?? cat.sortOrder ?? 0,
+      is_special: cat.is_special ?? cat.isSpecial ?? false,
+      default_course: cat.default_course ?? cat.defaultCourse ?? 1,
+      spacer_slots: cat.spacer_slots ?? cat.spacerSlots ?? [],
+      parent_id: null,
+      menu_id: null,
+      scope: newScope,
+      org_id,
+      master_id: masterId,
+      lock_pricing: cat.lock_pricing ?? cat.lockPricing ?? false,
+      updated_at: new Date().toISOString(),
+    };
+    for (const peerLocId of otherLocationIds) {
+      const peerId = `${masterId}_${peerLocId.slice(-8)}`;
+      const peerRow = { ...baseRow, id: peerId, location_id: peerLocId };
+      const { error } = await supabase.from('menu_categories').upsert(peerRow);
+      if (error) console.warn('[setMenuCategoryScope] peer upsert failed for', peerLocId, error);
+      else createdCount++;
+    }
+  } else {
+    const { error, count } = await supabase.from('menu_categories')
+      .update({ scope: newScope, updated_at: new Date().toISOString() }, { count: 'exact' })
+      .eq('master_id', masterId)
+      .neq('id', cat.id);
+    if (error) console.warn('[setMenuCategoryScope] sibling rescope error:', error);
+    else updatedSiblings = count || 0;
+  }
+
+  return { ok: true, action: isFirstPromotion ? 'promoted' : 'rescoped', createdCount, updatedSiblings };
 };
