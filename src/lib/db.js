@@ -616,7 +616,8 @@ export const setMenuItemScope = async (item, newScope) => {
       cat: item.cat ?? null,
       cats: item.cats ?? [],
       pricing: item.pricing ?? { base: item.price ?? 0 },
-      price: item.pricing?.base ?? item.price ?? 0,
+      // v4.7.1 fix: 'price' column does NOT exist on menu_items — only 'pricing' jsonb.
+      // Including it caused PGRST204 "column not found" error which silently failed every promote.
       allergens: item.allergens ?? [],
       assigned_modifier_groups: item.assignedModifierGroups ?? item.assigned_modifier_groups ?? [],
       sort_order: item.sortOrder ?? item.sort_order ?? 999,
