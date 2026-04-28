@@ -673,11 +673,24 @@ export const useStore = create((set, get) => ({
   },
 
   // Get effective price for an order type
-  getItemPrice: (item, orderType = 'dineIn') => {
+  // v4.7.7: per-menu pricing tiers. Resolution order:
+  //   1. p.menus[menuId][channel]   — menu-specific channel price (e.g. Deliveroo takeaway)
+  //   2. p.menus[menuId].all        — menu-wide flat (applies to every channel for this menu)
+  //   3. p[channel]                 — channel default (the existing dineIn/takeaway/collection/delivery)
+  //   4. p.base                     — fallback
+  // Backward compatible: callers passing (item, orderType) still work — menuId is optional.
+  getItemPrice: (item, orderType = 'dineIn', menuId = null) => {
     const p = item?.pricing;
     if (!p) return item?.price || 0;
     const MAP = { 'dine-in':'dineIn', 'takeaway':'takeaway', 'collection':'collection', 'delivery':'delivery', 'dineIn':'dineIn' };
     const key = MAP[orderType] || 'dineIn';
+    // 1+2: menu-specific tier, if set
+    if (menuId && p.menus && p.menus[menuId]) {
+      const tier = p.menus[menuId];
+      if (tier[key] !== null && tier[key] !== undefined) return tier[key];
+      if (tier.all  !== null && tier.all  !== undefined) return tier.all;
+    }
+    // 3+4: channel default → base
     return (p[key] !== null && p[key] !== undefined) ? p[key] : (p.base || 0);
   },
 
