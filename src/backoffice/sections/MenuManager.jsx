@@ -2309,7 +2309,6 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
                 </div>
               )}
             </div>
-          )}
         )}
 
         {/* ════ TAX ════════════════════════════════════════════════════════ */}
