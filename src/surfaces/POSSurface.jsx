@@ -167,7 +167,7 @@ export default function POSSurface() {
     .map(i => ({
       ...i,
       name: i.menuName || i.name,
-      price: getItemPrice ? getItemPrice(i, orderType) : (i.pricing?.base ?? i.price ?? 0),
+      price: getItemPrice ? getItemPrice(i, orderType, deviceMenuId) : (i.pricing?.base ?? i.price ?? 0),
     })), [rawItems, orderType]);
 
   // Order types this terminal is allowed to show (from device profile)
@@ -215,6 +215,14 @@ export default function POSSurface() {
     // 5. Nothing matches: show all categories (legacy behaviour).
     return null;
   }, [menus, deviceConfig?.menuId, _clockTick]);
+
+  // v4.7.7: mirror the resolved deviceMenuId into the store's activeMenuId so internal
+  // getItemPrice calls (addItem fallback, setOrderType reprice) pick up per-menu pricing
+  // tiers. Other surfaces (kiosk, online, mobile) will set this from their own resolvers.
+  const _setActiveMenuId = useStore(s => s.setActiveMenuId);
+  useEffect(() => {
+    if (_setActiveMenuId) _setActiveMenuId(deviceMenuId);
+  }, [deviceMenuId, _setActiveMenuId]);
 
   // v4.7.6: load menu_category_links on mount + provide a Set of cat ids linked to deviceMenuId
   const [_categoryLinks, _setCategoryLinks] = useState([]);
