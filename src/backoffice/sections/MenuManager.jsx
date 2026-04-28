@@ -1630,27 +1630,6 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
 
   const f   = (k,v) => onUpdate({ [k]: v });
   const fp  = (k,v) => onUpdate({ pricing: { ...p, [k]: v===''?null:parseFloat(v)||0 }, ...(k==='base'?{price:parseFloat(v)||0}:{}) });
-  const fpm = (menuId, channel, v) => {
-    const menus = { ...(p.menus || {}) };
-    const tier = { ...(menus[menuId] || {}) };
-    if (v === '' || v === null || v === undefined) delete tier[channel];
-    else tier[channel] = parseFloat(v) || 0;
-    if (Object.keys(tier).length === 0) delete menus[menuId];
-    else menus[menuId] = tier;
-    onUpdate({ pricing: { ...p, menus } });
-  };
-  const fpmRemove = (menuId) => {
-    const menus = { ...(p.menus || {}) };
-    delete menus[menuId];
-    onUpdate({ pricing: { ...p, menus } });
-  };
-  const fpmAdd = () => {
-    const used = new Set(Object.keys(p.menus || {}));
-    const available = (menus || []).filter(m => !used.has(m.id));
-    if (available.length === 0) return;
-    const target = available[0];
-    onUpdate({ pricing: { ...p, menus: { ...(p.menus || {}), [target.id]: {} } } });
-  };
 
   // ── Variants ───────────────────────────────────────────────────────────────
   const variants = menuItems.filter(c => c.parentId===item.id && !c.archived)
@@ -2237,78 +2216,6 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
               </div>
             ))}
           </div>
-
-          {/* v4.7.8: per-menu pricing tiers */}
-          {!isSub && (
-            <div style={{ marginTop:18, paddingTop:14, borderTop:'1px solid var(--bdr)' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-                <div>
-                  <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)' }}>Per-menu pricing tiers</div>
-                  <div style={{ fontSize:10.5, color:'var(--t3)', marginTop:2 }}>Override prices for this item on specific menus (e.g. Deliveroo +£0.50). Empty fields fall back to channel/base above.</div>
-                </div>
-                {(menus || []).filter(m => !(p.menus || {})[m.id]).length > 0 && (
-                  <button onClick={fpmAdd} style={{ ...btn, fontSize:11, padding:'5px 10px', whiteSpace:'nowrap' }}>+ Add menu tier</button>
-                )}
-              </div>
-              {Object.keys(p.menus || {}).length === 0 ? (
-                <div style={{ padding:'14px 12px', background:'var(--bg2)', border:'1px dashed var(--bdr)', borderRadius:6, fontSize:11, color:'var(--t3)', textAlign:'center' }}>
-                  No menu tiers set. Item uses the prices above on every menu.
-                </div>
-              ) : (
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {Object.entries(p.menus || {}).map(([menuId, tier]) => {
-                    const menu = (menus || []).find(m => m.id === menuId);
-                    const remainingMenus = (menus || []).filter(m => m.id === menuId || !(p.menus || {})[m.id]);
-                    return (
-                      <div key={menuId} style={{ background:'var(--bg2)', border:'1px solid var(--bdr)', borderRadius:7, padding:10 }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                          <select value={menuId} onChange={e => {
-                            const newMenuId = e.target.value;
-                            if (newMenuId === menuId) return;
-                            const menus2 = { ...(p.menus || {}) };
-                            const data = menus2[menuId];
-                            delete menus2[menuId];
-                            menus2[newMenuId] = data;
-                            onUpdate({ pricing: { ...p, menus: menus2 } });
-                          }} style={{ ...inp, fontSize:11.5, padding:'4px 8px', flex:1, fontWeight:600 }}>
-                            {!menu && <option value={menuId}>(unknown menu)</option>}
-                            {remainingMenus.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                          </select>
-                          <button onClick={() => fpmRemove(menuId)} title="Remove this tier" style={{ background:'none', border:'1px solid var(--bdr)', borderRadius:5, color:'var(--t3)', cursor:'pointer', width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, lineHeight:1, flexShrink:0 }}>×</button>
-                        </div>
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
-                          {[
-                            { k:'all',        label:'Default for this menu', fb:null },
-                            { k:'base',       label:'Base',                  fb:'base' },
-                            { k:'dineIn',     label:'Dine in',               fb:'dineIn' },
-                            { k:'takeaway',   label:'Takeaway',              fb:'takeaway' },
-                            { k:'collection', label:'Collection',            fb:'collection' },
-                            { k:'delivery',   label:'Delivery',              fb:'delivery' },
-                          ].map(({ k, label, fb }) => {
-                            const v = tier[k];
-                            const fallback = !fb ? '' : (p[fb] != null ? p[fb] : (p.base != null ? p.base : ''));
-                            return (
-                              <div key={k} style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                                <label style={{ fontSize:9.5, fontWeight:600, color:'var(--t3)', textTransform:'uppercase', letterSpacing:'0.05em', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{label}</label>
-                                <div style={{ position:'relative' }}>
-                                  <span style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', color:'var(--t4)', fontSize:11, pointerEvents:'none' }}>£</span>
-                                  <input type="number" step="0.01" min="0"
-                                    value={v != null && v !== undefined ? v : ''}
-                                    onChange={e => fpm(menuId, k, e.target.value)}
-                                    placeholder={k === 'all' ? '—' : (fallback !== '' ? Number(fallback).toFixed(2) : '0.00')}
-                                    style={{ ...inp, paddingLeft:18, paddingRight:6, fontSize:11.5, width:'100%' }}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
         )}
 
         {/* ════ TAX ════════════════════════════════════════════════════════ */}
