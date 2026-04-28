@@ -2217,7 +2217,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
                 </div>
               </div>
             ))}
-          {!isSub && <PerMenuPricingTiers item={item} menus={menus} onUpdate={onUpdate} />}
+          {!isSub && <PerMenuPricingTiers item={item} onUpdate={onUpdate} />}
           </div>
         )}
 
