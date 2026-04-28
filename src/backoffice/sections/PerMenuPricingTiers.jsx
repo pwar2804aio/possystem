@@ -12,6 +12,7 @@
 */
 
 import { useMemo } from 'react';
+import { useStore } from '../../store';
 
 const inp = {
   background: 'var(--bg2)',
@@ -44,10 +45,10 @@ const CHANNELS = [
   { k: 'delivery',   label: 'Delivery',              fb: 'delivery' },
 ];
 
-export default function PerMenuPricingTiers({ item, menus, onUpdate }) {
+export default function PerMenuPricingTiers({ item, onUpdate }) {
+  const allMenus = useStore(s => s.menus) || [];
   const p = item && item.pricing ? item.pricing : {};
   const tiersByMenu = p.menus || {};
-  const allMenus = menus || [];
 
   // Set a single channel within a menu tier. Empty string clears it.
   // If the menu tier becomes empty, remove the menu key entirely.
