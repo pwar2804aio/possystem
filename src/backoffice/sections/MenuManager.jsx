@@ -25,6 +25,8 @@ import { useStore } from '../../store';
 import { ALLERGENS } from '../../data/seed';
 import { supabase, isMock, getLocationId } from '../../lib/supabase';
 import { upsertMenuItem, uploadProductImage, deleteProductImage, saveQuickScreenIds, setMenuItemScope, linkCategoryToMenu, unlinkCategoryFromMenu, fetchMenuCategoryLinks } from '../../lib/db';
+// v4.7.8: per-menu pricing tier UI (item-level)
+import PerMenuPricingTiers from './PerMenuPricingTiers';
 import MenuImportModal from '../components/MenuImportModal';
 
 // ── Clone item helper ─────────────────────────────────────────────────────────
@@ -2215,6 +2217,7 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
                 </div>
               </div>
             ))}
+          {!isSub && <PerMenuPricingTiers item={item} menus={menus} onUpdate={onUpdate} />}
           </div>
         )}
 
