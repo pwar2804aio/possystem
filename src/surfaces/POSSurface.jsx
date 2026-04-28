@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import DrawerCashModal from '../components/DrawerCashModal';
 import { useStore } from '../store';
+import { fetchMenuCategoryLinks } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { CATEGORIES, MENU_ITEMS as SEED_MENU_ITEMS, ALLERGENS, QUICK_IDS, getDaypart, CAT_META } from '../data/seed';
 import { calculateOrderTax } from '../lib/tax';
@@ -214,6 +215,27 @@ export default function POSSurface() {
     // 5. Nothing matches: show all categories (legacy behaviour).
     return null;
   }, [menus, deviceConfig?.menuId, _clockTick]);
+
+  // v4.7.6: load menu_category_links on mount + provide a Set of cat ids linked to deviceMenuId
+  const [_categoryLinks, _setCategoryLinks] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await fetchMenuCategoryLinks();
+        if (alive) _setCategoryLinks(data || []);
+      } catch (e) {
+        console.warn('[POSSurface] fetchMenuCategoryLinks failed:', e?.message || e);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+  // Set of category ids linked to the active deviceMenuId via menu_category_links.
+  // Used to extend the cat-strip filter so cats appear in linked menus too.
+  const _linkedCatIdsForDeviceMenu = useMemo(() => {
+    if (!deviceMenuId) return new Set();
+    return new Set((_categoryLinks||[]).filter(l => l.menu_id === deviceMenuId).map(l => l.category_id));
+  }, [_categoryLinks, deviceMenuId]);
   const ALL_ORDER_TYPES = [['dine-in','🍽','Dine in'],['takeaway','🥡','Takeaway'],['collection','📦','Collect']];
   const visibleOrderTypes = ALL_ORDER_TYPES.filter(([t]) => allowedOrderTypes.includes(t));
 
@@ -1052,7 +1074,8 @@ export default function POSSurface() {
         <div style={{flex:1,overflowY:'auto',padding:compact?'4px':'6px 7px'}}>
           {/* Quick screen always first */}
           {[{ id:'quick', label:'Quick', icon:'⚡', color:'var(--acc)' }].concat(
-            menuCategories.filter(c => !c.parentId && !c.isSpecial && (!deviceMenuId||c.menuId===deviceMenuId)).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0))
+            // v4.7.6: cat is in this menu if its primary menu_id matches OR it's joined via menu_category_links
+          menuCategories.filter(c => !c.parentId && !c.isSpecial && (!deviceMenuId||c.menuId===deviceMenuId||_linkedCatIdsForDeviceMenu.has(c.id))).sort((a,b) => (a.sortOrder||0)-(b.sortOrder||0))
           ).map(c => {
             const isActive = cat === c.id && !search;
             const color = c.color || 'var(--acc)';
