@@ -126,6 +126,8 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   // nestedSelections: { 'groupId:optionId:occurrenceIdx': { mods, summary, priceEach, selections } }
   // Keyed by occurrenceIdx so picking the same option twice gets independent configs.
   const [nestedSelections, setNestedSelections] = useState({});
+  // v5.4.0: special instructions / notes
+  const [instructions, setInstructions] = useState('');
 
   // Resolve a referenced item from an option ID. Options reference items by either:
   //  - option.id is the item's id directly (e.g. 'm-1776...')
@@ -344,6 +346,7 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       mods: allMods,
       summary: fullSummary,
       priceEach: totalPriceEach,
+      instructions: instructions.trim(),
     });
   };
 
@@ -478,6 +481,19 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
             </div>
           );
         })}
+      </div>
+
+      {/* v5.4.0: special instructions text */}
+      <div style={{ padding: '0 24px 16px' }}>
+        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Anything else?</label>
+        <textarea
+          value={instructions}
+          onChange={e => setInstructions(e.target.value)}
+          placeholder="e.g. no ice, light sauce, allergy notes…"
+          maxLength={140}
+          rows={2}
+          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '12px 14px', color: '#fff', fontFamily: 'inherit', fontSize: 14, outline: 'none', resize: 'none' }}
+        />
       </div>
 
       {/* Bottom CTA bar */}
