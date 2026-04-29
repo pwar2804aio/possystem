@@ -197,8 +197,9 @@ export default function KioskApp({ kioskId, onUnpair }) {
   // ─── Filtered menu (cats + items belonging to active menu) ───
   const visibleCategories = useMemo(() => {
     const linkedIds = new Set(links.filter(l => l.menu_id === activeMenuId).map(l => l.category_id));
+    // v5.3.1: include sub-categories (Coffee under Drinks, etc). Only filter out is_special.
     return categories
-      .filter(c => !c.parent_id && !c.is_special)
+      .filter(c => !c.is_special)
       .filter(c => !activeMenuId || c.menu_id === activeMenuId || linkedIds.has(c.id))
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }, [categories, links, activeMenuId]);
@@ -206,7 +207,9 @@ export default function KioskApp({ kioskId, onUnpair }) {
   const visibleItems = useMemo(() => {
     if (!selectedCategoryId) return [];
     return items
-      .filter(i => i.type !== 'subitem' || i.sold_alone)
+      // v5.3.1: hide variant children — kiosk shows parent, modal handles size selection
+      .filter(i => !i.parent_id)
+      .filter(i => (i.visibility?.kiosk !== false))
       .filter(i => i.cat === selectedCategoryId || (Array.isArray(i.cats) && i.cats.includes(selectedCategoryId)))
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }, [items, selectedCategoryId]);
@@ -406,9 +409,10 @@ export default function KioskApp({ kioskId, onUnpair }) {
       {screen === 'tableNumber' && <ScreenTableNumber brandColor={brandColor} value={tableNumber} onChange={setTableNumber} onContinue={() => setScreen('menu')} onBack={() => setScreen('orderType')} />}
       {screen === 'menu' && <ScreenMenu brandColor={brandColor} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} banner={bannerFor('menu')} onBack={() => setScreen('orderType')} />}
       {screen === 'item' && selectedItem && (
-        Array.isArray(selectedItem.assigned_modifier_groups) && selectedItem.assigned_modifier_groups.length > 0 ? (
+        ((Array.isArray(selectedItem.assigned_modifier_groups) && selectedItem.assigned_modifier_groups.length > 0) || selectedItem.type === 'variants') ? (
           <KioskProductModal
             item={selectedItem}
+            allItems={items}
             brandColor={brandColor}
             brandAccent={brandAccent}
             basePrice={resolvePrice(selectedItem, orderType, activeMenuId)}
