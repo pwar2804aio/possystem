@@ -120,6 +120,33 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   const [qty, setQty] = useState(1);
   const [showError, setShowError] = useState(false);
 
+  // v5.3.5: nested modifiers
+  // childContext: { groupId, optionId, item } — when set, render a child modal for that item.
+  const [childContext, setChildContext] = useState(null);
+  // nestedSelections: { 'groupId:optionId:occurrenceIdx': { mods, summary, priceEach, selections } }
+  // Keyed by occurrenceIdx so picking the same option twice gets independent configs.
+  const [nestedSelections, setNestedSelections] = useState({});
+
+  // Resolve a referenced item from an option ID. Options reference items by either:
+  //  - option.id is the item's id directly (e.g. 'm-1776...')
+  //  - option.id has a trailing item id (e.g. 'opt-xxx-m-1776...')
+  const resolveLinkedItem = (optionId) => {
+    if (!optionId || !Array.isArray(allItems)) return null;
+    // Direct match
+    let it = allItems.find(i => i.id === optionId);
+    if (it) return it;
+    // Trailing m-... pattern
+    const m = optionId.match(/(m-[\w-]+)$/);
+    if (m) it = allItems.find(i => i.id === m[1]);
+    return it || null;
+  };
+
+  // Does this option open a child modal? Yes if its linked item has its own modifier groups.
+  const isOptionNested = (optionId) => {
+    const linked = resolveLinkedItem(optionId);
+    return !!(linked && Array.isArray(linked.assigned_modifier_groups) && linked.assigned_modifier_groups.length > 0);
+  };
+
   // Load modifier groups + synthesize a Size group from variants
   useEffect(() => {
     let alive = true;
@@ -196,8 +223,6 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
 
   const validation = useMemo(() => validateSelections(groups, selections), [groups, selections]);
   const isValid = validation === null;
-  // For variants-type items, the base price is the SELECTED variant's price (or cheapest if none selected).
-  // For other items, basePrice is the item's resolved price.
   const variantGroup = groups.find(g => g.__isVariantGroup);
   let effectiveBase = basePrice || 0;
   if (variantGroup) {
@@ -205,15 +230,25 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
     const pickedOpt = pickedVariantId ? variantGroup.options.find(o => o.id === pickedVariantId) : null;
     effectiveBase = pickedOpt ? pickedOpt.__absolutePrice : variantGroup.__cheapestPrice;
   }
-  // priceDelta should NOT count the variant group (that's the base, not a delta)
   const nonVariantGroups = groups.filter(g => !g.__isVariantGroup);
-  const totalPriceEach = effectiveBase + priceDelta(nonVariantGroups, selections);
+  // Sum nested children's priceEach contributions
+  const nestedTotal = Object.values(nestedSelections).reduce((sum, n) => sum + (n?.priceEach || 0), 0);
+  const totalPriceEach = effectiveBase + priceDelta(nonVariantGroups, selections) + nestedTotal;
   const totalPrice = totalPriceEach * qty;
 
   // For single-select: tap toggles between [] and [optId].
   // For multi-select: tap ADDS one occurrence (up to max). Use decOption to subtract.
+  // For NESTED options: open the child modal instead of toggling. The actual selection commits when child returns.
   const incOption = (group, optId) => {
     setShowError(false);
+    if (isOptionNested(optId)) {
+      const linked = resolveLinkedItem(optId);
+      // Pre-validate cap before opening child
+      const current = selections[group.id] || [];
+      if (!group._isSingle && current.length >= group._max) return;
+      setChildContext({ groupId: group.id, optionId: optId, optionName: (group.options || []).find(o => o.id === optId)?.name, item: linked });
+      return;
+    }
     setSelections(prev => {
       const current = prev[group.id] || [];
       let next;
@@ -227,6 +262,31 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
     });
   };
 
+  // Called when child modal returns with the nested selections.
+  const commitChild = (childResult) => {
+    if (!childContext) return;
+    const { groupId, optionId } = childContext;
+    // Add the option to the parent selection (count up by 1)
+    setSelections(prev => {
+      const current = prev[groupId] || [];
+      const group = groups.find(g => g.id === groupId);
+      let next;
+      if (group?._isSingle) {
+        next = [optionId];
+      } else {
+        next = [...current, optionId];
+      }
+      return { ...prev, [groupId]: next };
+    });
+    // Stash the child config so summary/mods/priceDelta know about it
+    setNestedSelections(prev => {
+      const occurrenceIdx = ((selections[groupId] || []).filter(id => id === optionId).length);
+      const key = groupId + ':' + optionId + ':' + occurrenceIdx;
+      return { ...prev, [key]: childResult };
+    });
+    setChildContext(null);
+  };
+
   const decOption = (group, optId) => {
     setShowError(false);
     setSelections(prev => {
@@ -235,6 +295,17 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       if (idx < 0) return prev;
       const next = [...current.slice(0, idx), ...current.slice(idx + 1)];
       return { ...prev, [group.id]: next };
+    });
+    // Also drop the LAST nested selection entry for this option (if any)
+    setNestedSelections(prev => {
+      const current = selections[group.id] || [];
+      const lastIdx = current.filter(id => id === optId).length - 1;
+      if (lastIdx < 0) return prev;
+      const key = group.id + ':' + optId + ':' + lastIdx;
+      if (!prev[key]) return prev;
+      const out = { ...prev };
+      delete out[key];
+      return out;
     });
   };
 
@@ -254,16 +325,45 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       }
       return;
     }
+    // Combine parent + nested mods. Annotate nested with a 'via' field so kitchen sees the parent option.
+    const baseMods = buildModsArray(groups, selections);
+    const nestedMods = [];
+    Object.entries(nestedSelections).forEach(([key, child]) => {
+      const [, optionId] = key.split(':');
+      const parentOptName = groups.flatMap(g => g.options || []).find(o => o.id === optionId)?.name;
+      (child?.mods || []).forEach(m => nestedMods.push({ ...m, groupLabel: (parentOptName ? parentOptName + ' → ' : '') + (m.groupLabel || '') }));
+    });
+    const allMods = [...baseMods, ...nestedMods];
+    // Combine display summaries
+    const baseSummary = summarizeForDisplay(groups, selections);
+    const nestedSummaries = Object.values(nestedSelections).map(n => n?.summary).filter(Boolean);
+    const fullSummary = [baseSummary, ...nestedSummaries].filter(Boolean).join(' · ');
     onAdd({
       qty,
       selections,
-      mods: buildModsArray(groups, selections),
-      summary: summarizeForDisplay(groups, selections),
+      mods: allMods,
+      summary: fullSummary,
       priceEach: totalPriceEach,
     });
   };
 
   // ─── Render ───
+  // If a nested modal is active, render it on top.
+  if (childContext) {
+    return (
+      <KioskProductModal
+        item={childContext.item}
+        allItems={allItems}
+        brandColor={brandColor}
+        brandAccent={brandAccent}
+        addLabel={addLabel}
+        basePrice={childContext.item?.pricing?.base ?? childContext.item?.price ?? 0}
+        onAdd={commitChild}
+        onCancel={() => setChildContext(null)}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div style={overlayStyle()}>
@@ -354,6 +454,9 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                         }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
                         <span style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{opt.name}</span>
                         {priceLabel && <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{priceLabel}</span>}
+                        {isOptionNested(opt.id) && (
+                          <span style={{ fontSize: 11, color: brandColor, fontWeight: 700, marginLeft: 4 }}>Configure ›</span>
+                        )}
                       </button>
                       {showStepper && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
