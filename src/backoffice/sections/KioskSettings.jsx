@@ -60,6 +60,10 @@ export default function KioskSettings({ kioskId, onBack }) {
           kiosk_brand_bg_color:    prof?.kiosk_brand_bg_color    ?? '#0e0e10',
           kiosk_brand_logo_url:    prof?.kiosk_brand_logo_url    ?? '',
           kiosk_attract_video_url: prof?.kiosk_attract_video_url ?? '',
+          kiosk_theme_mode:        prof?.kiosk_theme_mode        ?? 'dark',
+          kiosk_label_tap_to_order:  prof?.kiosk_label_tap_to_order  ?? '',
+          kiosk_label_place_order:   prof?.kiosk_label_place_order   ?? '',
+          kiosk_label_add_to_order:  prof?.kiosk_label_add_to_order  ?? '',
           menu_id:                 prof?.menu_id                 ?? null,
           kiosk_idle_timeout_sec:  prof?.kiosk_idle_timeout_sec  ?? 60,
           kiosk_table_mode:        prof?.kiosk_table_mode        ?? 'either',
@@ -97,6 +101,10 @@ export default function KioskSettings({ kioskId, onBack }) {
         kiosk_brand_bg_color:    draft.kiosk_brand_bg_color    || null,
         kiosk_brand_logo_url:    draft.kiosk_brand_logo_url    || null,
         kiosk_attract_video_url: draft.kiosk_attract_video_url || null,
+        kiosk_theme_mode:        draft.kiosk_theme_mode        || 'dark',
+        kiosk_label_tap_to_order:  draft.kiosk_label_tap_to_order || null,
+        kiosk_label_place_order:   draft.kiosk_label_place_order  || null,
+        kiosk_label_add_to_order:  draft.kiosk_label_add_to_order || null,
         menu_id:                 draft.menu_id                 || null,
         kiosk_idle_timeout_sec:  draft.kiosk_idle_timeout_sec  ?? 60,
         kiosk_table_mode:        draft.kiosk_table_mode        || 'either',
@@ -215,6 +223,37 @@ export default function KioskSettings({ kioskId, onBack }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 24, marginTop: 8 }}>
         {/* LEFT — settings */}
         <div>
+
+          {/* ── Theme + button labels ── */}
+          <Section title="Theme & wording" desc="Pick light or dark surface. Customise key buttons with your brand voice.">
+            <Field label="Theme" hint="Dark = white text on dark bg. Light = dark text on light bg. Brand colours still apply on top.">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {[
+                  { v: 'dark',  label: 'Dark',  desc: 'White text, dark surface' },
+                  { v: 'light', label: 'Light', desc: 'Dark text, light surface' },
+                ].map(opt => (
+                  <button key={opt.v} onClick={() => setField('kiosk_theme_mode', opt.v)} style={{
+                    background: opt.v === 'dark' ? '#0e0e10' : '#fafafa',
+                    color:      opt.v === 'dark' ? '#fff'    : '#111',
+                    border: '2px solid ' + (draft.kiosk_theme_mode === opt.v ? 'var(--acc)' : 'var(--bdr)'),
+                    borderRadius: 10, padding: '14px 12px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                  }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{opt.label}</div>
+                    <div style={{ fontSize: 11, opacity: 0.7 }}>{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Attract screen CTA" hint="Default: TAP TO ORDER">
+              <input value={draft.kiosk_label_tap_to_order || ''} onChange={e => setField('kiosk_label_tap_to_order', e.target.value)} placeholder="TAP TO ORDER" maxLength={24} style={inp()} />
+            </Field>
+            <Field label="Add to order button" hint="Default: Add to order">
+              <input value={draft.kiosk_label_add_to_order || ''} onChange={e => setField('kiosk_label_add_to_order', e.target.value)} placeholder="Add to order" maxLength={24} style={inp()} />
+            </Field>
+            <Field label="Place order button" hint="Default: Place order. Shown after loyalty step.">
+              <input value={draft.kiosk_label_place_order || ''} onChange={e => setField('kiosk_label_place_order', e.target.value)} placeholder="Place order" maxLength={24} style={inp()} />
+            </Field>
+          </Section>
 
           {/* ── Branding ── */}
           <Section title="Brand" desc="This is the customer's first impression. Make it count.">
