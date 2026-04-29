@@ -304,14 +304,17 @@ export default function KioskApp({ kioskId, onUnpair }) {
   }, []);
 
   // ─── Cart actions ───
-  const addToCart = useCallback((item, qty = 1, selectedMods = {}, summaryOverride = null, priceEachOverride = null, modsArrayOverride = null) => {
+  const addToCart = useCallback((item, qty = 1, selectedMods = {}, summaryOverride = null, priceEachOverride = null, modsArrayOverride = null, instructions = '') => {
     const linePrice = priceEachOverride ?? resolvePrice(item, orderType, activeMenuId);
     const modSummary = summaryOverride ?? Object.entries(selectedMods)
       .filter(([, v]) => v)
       .map(([k, v]) => Array.isArray(v) ? v.join(', ') : v)
       .join(' · ');
-    // POS-compatible mods array of {label, price, groupLabel}. From modal, or empty if no modal.
-    const modsArray = Array.isArray(modsArrayOverride) ? modsArrayOverride : [];
+    let modsArray = Array.isArray(modsArrayOverride) ? [...modsArrayOverride] : [];
+    // v5.4.0: append instructions as a special mod entry so POS / kitchen sees it
+    if (instructions && instructions.trim()) {
+      modsArray.push({ label: instructions.trim(), price: 0, groupLabel: 'Note', _instruction: true });
+    }
     const key = item.id + ':' + JSON.stringify(selectedMods);
     setCart(prev => {
       const existing = prev.find(l => l.key === key);
@@ -326,8 +329,9 @@ export default function KioskApp({ kioskId, onUnpair }) {
         item,
         name: item.name,
         qty,
-        mods: modSummary,        // string for kiosk's own cart UI
-        modsArray,               // POS-shape array for closed_checks payload
+        mods: modSummary + ((instructions && instructions.trim()) ? ((modSummary ? ' · ' : '') + 'Note: ' + instructions.trim()) : ''),
+        modsArray,
+        instructions: instructions || '',
         linePrice,
         lineTotal: qty * linePrice,
       }];
@@ -453,8 +457,8 @@ export default function KioskApp({ kioskId, onUnpair }) {
             brandAccent={brandAccent}
             addLabel={labelAddToOrder}
             basePrice={resolvePrice(selectedItem, orderType, activeMenuId)}
-            onAdd={({ qty, selections, summary, priceEach, mods }) => {
-              addToCart(selectedItem, qty, selections, summary, priceEach, mods);
+            onAdd={({ qty, selections, summary, priceEach, mods, instructions }) => {
+              addToCart(selectedItem, qty, selections, summary, priceEach, mods, instructions);
               setScreen('menu');
             }}
             onCancel={() => setScreen('menu')}
