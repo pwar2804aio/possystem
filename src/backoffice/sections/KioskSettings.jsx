@@ -147,6 +147,13 @@ export default function KioskSettings({ kioskId, onBack }) {
   const onVideoUpload = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    // Browser-incompatible formats — fail fast with a clear message.
+    const name = f.name.toLowerCase();
+    if (name.endsWith('.mov') || name.endsWith('.avi') || name.endsWith('.mkv') || name.endsWith('.wmv')) {
+      setError('Video must be MP4 (H.264). Convert ' + f.name + ' first — most browsers (Chrome, Firefox, Android) can\'t play .mov / .avi / .mkv files.');
+      e.target.value = '';
+      return;
+    }
     const url = await uploadFile(f, 'video');
     if (url) setField('kiosk_attract_video_url', url);
     e.target.value = '';
@@ -234,12 +241,12 @@ export default function KioskSettings({ kioskId, onBack }) {
               />
             </Field>
 
-            <Field label="Attract video" hint="Loops on the screensaver · MP4, max 30MB · keep it short and silent-friendly">
+            <Field label="Attract video" hint="⚠ MUST be MP4 (H.264). iPhone .mov files won't play in browsers · max 30MB · silent">
               <FileSlot
                 currentUrl={draft.kiosk_attract_video_url}
                 onUpload={onVideoUpload}
                 onClear={() => setField('kiosk_attract_video_url', '')}
-                accept="video/*"
+                accept="video/mp4"
                 uploading={uploadingFor === 'video'}
                 kind="video"
               />
