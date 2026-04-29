@@ -21,6 +21,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase, getLocationId } from '../lib/supabase';
 import { useStore } from '../store';
+import KioskProductModal from './KioskProductModal';
 
 // ============================================================
 // HOOKS
@@ -268,9 +269,9 @@ export default function KioskApp({ kioskId, onUnpair }) {
   }, []);
 
   // ─── Cart actions ───
-  const addToCart = useCallback((item, qty = 1, selectedMods = {}) => {
-    const linePrice = resolvePrice(item, orderType, activeMenuId);
-    const modSummary = Object.entries(selectedMods)
+  const addToCart = useCallback((item, qty = 1, selectedMods = {}, summaryOverride = null, priceEachOverride = null) => {
+    const linePrice = priceEachOverride ?? resolvePrice(item, orderType, activeMenuId);
+    const modSummary = summaryOverride ?? Object.entries(selectedMods)
       .filter(([, v]) => v)
       .map(([k, v]) => Array.isArray(v) ? v.join(', ') : v)
       .join(' · ');
@@ -404,7 +405,23 @@ export default function KioskApp({ kioskId, onUnpair }) {
       }} onBack={() => setScreen('attract')} />}
       {screen === 'tableNumber' && <ScreenTableNumber brandColor={brandColor} value={tableNumber} onChange={setTableNumber} onContinue={() => setScreen('menu')} onBack={() => setScreen('orderType')} />}
       {screen === 'menu' && <ScreenMenu brandColor={brandColor} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} banner={bannerFor('menu')} onBack={() => setScreen('orderType')} />}
-      {screen === 'item' && selectedItem && <ScreenItemDetail brandColor={brandColor} item={selectedItem} orderType={orderType} activeMenuId={activeMenuId} onAdd={(qty, mods) => { addToCart(selectedItem, qty, mods); setScreen('menu'); }} onBack={() => setScreen('menu')} />}
+      {screen === 'item' && selectedItem && (
+        Array.isArray(selectedItem.assigned_modifier_groups) && selectedItem.assigned_modifier_groups.length > 0 ? (
+          <KioskProductModal
+            item={selectedItem}
+            brandColor={brandColor}
+            brandAccent={brandAccent}
+            basePrice={resolvePrice(selectedItem, orderType, activeMenuId)}
+            onAdd={({ qty, selections, summary, priceEach }) => {
+              addToCart(selectedItem, qty, selections, summary, priceEach);
+              setScreen('menu');
+            }}
+            onCancel={() => setScreen('menu')}
+          />
+        ) : (
+          <ScreenItemDetail brandColor={brandColor} item={selectedItem} orderType={orderType} activeMenuId={activeMenuId} onAdd={(qty, mods) => { addToCart(selectedItem, qty, mods); setScreen('menu'); }} onBack={() => setScreen('menu')} />
+        )
+      )}
       {screen === 'cart' && <ScreenCart brandColor={brandColor} cart={cart} subtotal={subtotal} onUpdate={updateCartQty} onAddMore={() => setScreen('menu')} onContinue={() => setScreen('tip')} onBack={() => setScreen('menu')} />}
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
       {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder('', ''); }} onBack={() => setScreen('tip')} />}
