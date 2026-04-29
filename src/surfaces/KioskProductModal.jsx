@@ -86,7 +86,7 @@ function summarizeSelections(groups, selections) {
 // MAIN COMPONENT
 // ============================================================
 
-export default function KioskProductModal({ item, brandColor, brandAccent, basePrice, onAdd, onCancel }) {
+export default function KioskProductModal({ item, allItems = [], brandColor, brandAccent, basePrice, onAdd, onCancel }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -94,42 +94,94 @@ export default function KioskProductModal({ item, brandColor, brandAccent, baseP
   const [qty, setQty] = useState(1);
   const [showError, setShowError] = useState(false);
 
-  // Load modifier groups when modal opens
+  // Load modifier groups + synthesize a Size group from variants
   useEffect(() => {
     let alive = true;
     (async () => {
-      const groupIds = item?.assigned_modifier_groups;
-      if (!Array.isArray(groupIds) || groupIds.length === 0) {
-        // No modifiers — but the parent component should not even mount this modal.
-        // Defensive: just call onAdd directly with empty mods.
-        setLoading(false);
-        return;
+      const result = [];
+
+      // ── Synthesize 'Size' group for variants-type items ──
+      if (item?.type === 'variants') {
+        const children = (allItems || [])
+          .filter(i => i.parent_id === item.id && i.archived !== true)
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        if (children.length > 0) {
+          const cheapestPrice = Math.min(...children.map(c => c.pricing?.base ?? c.price ?? 0));
+          result.push(normalizeGroup({
+            id: '__variants__',
+            name: 'Size',
+            selection_type: 'single',
+            min: 1, max: 1, min_select: 1, max_select: 1,
+            __isVariantGroup: true,
+            __cheapestPrice: cheapestPrice,
+            options: children.map(c => ({
+              id: c.id,
+              name: c.name,
+              // Show price DELTA from cheapest, not absolute price (so the cheapest shows as base, others as +X)
+              price: ((c.pricing?.base ?? c.price ?? 0) - cheapestPrice),
+              // Stash the absolute price for later
+              __absolutePrice: c.pricing?.base ?? c.price ?? 0,
+            })),
+          }));
+        }
       }
-      try {
-        const { data, error } = await supabase
-          .from('modifier_groups')
-          .select('*')
-          .in('id', groupIds);
-        if (error) throw error;
-        if (!alive) return;
-        // Preserve the order from item.assigned_modifier_groups
-        const ordered = groupIds
-          .map(id => (data || []).find(g => g.id === id))
-          .filter(Boolean)
-          .map(normalizeGroup);
-        setGroups(ordered);
-      } catch (e) {
-        if (alive) setError(e?.message || 'Failed to load options');
-      } finally {
-        if (alive) setLoading(false);
+
+      // ── Load assigned_modifier_groups ──
+      // Real shape: array of objects { groupId, min, max } (per-item overrides)
+      // Fallback shape (older data): array of plain ids
+      const assignments = item?.assigned_modifier_groups;
+      if (Array.isArray(assignments) && assignments.length > 0) {
+        const idsAndOverrides = assignments.map(a => {
+          if (typeof a === 'string') return { id: a, min: null, max: null };
+          return { id: a.groupId || a.id, min: a.min ?? null, max: a.max ?? null };
+        }).filter(x => x.id);
+        const ids = idsAndOverrides.map(x => x.id);
+        try {
+          const { data, error } = await supabase
+            .from('modifier_groups')
+            .select('*')
+            .in('id', ids);
+          if (error) throw error;
+          if (!alive) return;
+          // Preserve order, apply per-item min/max overrides if present
+          const ordered = idsAndOverrides
+            .map(({ id, min, max }) => {
+              const g = (data || []).find(x => x.id === id);
+              if (!g) return null;
+              const merged = { ...g };
+              if (min !== null && min !== undefined) merged.min = min;
+              if (max !== null && max !== undefined) merged.max = max;
+              return normalizeGroup(merged);
+            })
+            .filter(Boolean);
+          result.push(...ordered);
+        } catch (e) {
+          if (alive) setError(e?.message || 'Failed to load options');
+        }
+      }
+
+      if (alive) {
+        setGroups(result);
+        setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [item]);
+  }, [item, allItems]);
 
   const validation = useMemo(() => validateSelections(groups, selections), [groups, selections]);
   const isValid = validation === null;
-  const totalPriceEach = (basePrice || 0) + priceDelta(groups, selections);
+  // For variants-type items, the base price is the SELECTED variant's price (or cheapest if none selected).
+  // For other items, basePrice is the item's resolved price.
+  const variantGroup = groups.find(g => g.__isVariantGroup);
+  let effectiveBase = basePrice || 0;
+  if (variantGroup) {
+    const pickedVariantId = (selections[variantGroup.id] || [])[0];
+    const pickedOpt = pickedVariantId ? variantGroup.options.find(o => o.id === pickedVariantId) : null;
+    effectiveBase = pickedOpt ? pickedOpt.__absolutePrice : variantGroup.__cheapestPrice;
+  }
+  // priceDelta should NOT count the variant group (that's the base, not a delta)
+  const nonVariantGroups = groups.filter(g => !g.__isVariantGroup);
+  const totalPriceEach = effectiveBase + priceDelta(nonVariantGroups, selections);
   const totalPrice = totalPriceEach * qty;
 
   // Toggle an option in a group. For single-select, replaces. For multi, adds/removes (capped at max).
