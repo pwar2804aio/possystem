@@ -112,7 +112,7 @@ function summarizeForDisplay(groups, selections) {
 // MAIN COMPONENT
 // ============================================================
 
-export default function KioskProductModal({ item, allItems = [], brandColor, brandAccent, basePrice, onAdd, onCancel }) {
+export default function KioskProductModal({ item, allItems = [], brandColor, brandAccent, basePrice, addLabel, onAdd, onCancel }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -397,7 +397,7 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
           fontFamily: 'inherit',
           boxShadow: isValid ? '0 8px 20px rgba(0,0,0,0.25)' : 'none',
         }}>
-          <span>{isValid ? 'Add to order' : (validation || 'Add to order')}</span>
+          <span>{isValid ? (addLabel || 'Add to order') : (validation || (addLabel || 'Add to order'))}</span>
           {isValid && <span>£{totalPrice.toFixed(2)}</span>}
         </button>
       </div>
