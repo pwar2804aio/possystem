@@ -53,7 +53,6 @@ import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
 import MasterOfflineModal from './components/MasterOfflineModal';
 import ConfigSyncBanner from './components/ConfigSyncBanner';
-import KioskSurface from './surfaces/KioskSurface';
 import OrdersHub from './surfaces/OrdersHub';
 import useSupabaseInit from './lib/useSupabaseInit';
 import { VERSION } from './lib/version';
