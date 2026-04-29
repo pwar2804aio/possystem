@@ -300,8 +300,9 @@ export default function KioskApp({ kioskId, onUnpair }) {
 
   // ─── Order submission ───
   // On 'simulate paid' → write closed_checks + kds_tickets row, set orderNumber, advance.
-  const submitOrder = useCallback(async () => {
+  const submitOrder = useCallback(async (nameOverride, phoneOverride) => {
     if (submitting) return;
+    console.log('[kiosk] submitOrder called', { nameOverride, phoneOverride, customerName, customerPhone });
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -334,9 +335,9 @@ export default function KioskApp({ kioskId, onUnpair }) {
         closed_at: new Date().toISOString(),
         source: 'kiosk',
         kiosk_id: kioskId,
-        customer: customerName || null,
-        customer_name: customerName || null,
-        customer_phone: customerPhone || null,
+        customer: (nameOverride ?? customerName) || null,
+        customer_name: (nameOverride ?? customerName) || null,
+        customer_phone: (phoneOverride ?? customerPhone) || null,
         tip_amount: tip,
         kiosk_table_number: tableNumber || null,
         covers: 1,
@@ -355,7 +356,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
         sent_at: new Date().toISOString(),
         table_id: null,
         table_label: tableNumber ? ('T' + tableNumber) : ('Kiosk #' + num),
-        server: customerName || ('Kiosk #' + num),
+        server: (nameOverride ?? customerName) || ('Kiosk #' + num),
         covers: 1,
       });
       if (e2) console.warn('[kiosk] kds insert failed:', e2);
@@ -402,8 +403,8 @@ export default function KioskApp({ kioskId, onUnpair }) {
       {screen === 'item' && selectedItem && <ScreenItemDetail brandColor={brandColor} item={selectedItem} orderType={orderType} activeMenuId={activeMenuId} onAdd={(qty, mods) => { addToCart(selectedItem, qty, mods); setScreen('menu'); }} onBack={() => setScreen('menu')} />}
       {screen === 'cart' && <ScreenCart brandColor={brandColor} cart={cart} subtotal={subtotal} onUpdate={updateCartQty} onAddMore={() => setScreen('menu')} onContinue={() => setScreen('tip')} onBack={() => setScreen('menu')} />}
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
-      {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder(); }} onBack={() => setScreen('tip')} />}
-      {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={submitOrder} onSkip={submitOrder} submitting={submitting} />}
+      {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder('', ''); }} onBack={() => setScreen('tip')} />}
+      {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} />}
       {screen === 'done' && <ScreenDone brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} orderNumber={orderNumber} orderType={orderType} tableNumber={tableNumber} onDone={resetSession} />}
 
       {/* Idle warning overlay */}
@@ -805,11 +806,13 @@ function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhon
   const [name, setName] = useState(customerName);
   const [phone, setPhone] = useState(customerPhone);
   const submit = () => {
-    onName(name.trim());
-    onPhone(phone.trim());
-    if (name.trim()) onContinue(); else onSkip();
+    const n = name.trim();
+    const p = phone.trim();
+    onName(n);
+    onPhone(p);
+    onContinue(n, p);
   };
-  const skip = () => { onName(''); onPhone(''); onSkip(); };
+  const skip = () => { onName(''); onPhone(''); onSkip('', ''); };
   return (
     <div style={fullScreen()}>
       <ScreenHeader title="Almost done" subtitle="Add your details to receive your receipt" brandColor={brandColor} />
