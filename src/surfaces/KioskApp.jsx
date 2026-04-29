@@ -409,7 +409,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
       {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder('', ''); }} onBack={() => setScreen('tip')} />}
       {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} />}
-      {screen === 'done' && <ScreenDone brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} orderNumber={orderNumber} orderType={orderType} tableNumber={tableNumber} avgWaitMinutes={avgWaitMinutes} onDone={resetSession} />}
+      {screen === 'done' && <ScreenDone brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} orderNumber={orderNumber} orderType={orderType} tableNumber={tableNumber} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('done')} onDone={resetSession} />}
 
       {/* Idle warning overlay */}
       {idleWarning && screen !== 'attract' && screen !== 'done' && (
@@ -463,11 +463,16 @@ function btnGhostLight() {
 // ============================================================
 function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attractVideoUrl, avgWaitMinutes, banner, onStart }) {
   const accentEnd = brandAccent || shade(brandColor, -20);
-  const useBannerAsBackground = !attractVideoUrl && banner && banner.imageUrl;
+  const [videoFailed, setVideoFailed] = useState(false);
+  const showVideo = attractVideoUrl && !videoFailed;
+  const useBannerAsBackground = (!attractVideoUrl || videoFailed) && banner && banner.imageUrl;
   return (
     <div onClick={onStart} style={{ position: 'absolute', inset: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(135deg, ' + brandColor + ' 0%, ' + accentEnd + ' 100%)' }}>
-      {attractVideoUrl ? (
-        <video src={attractVideoUrl} autoPlay loop muted playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      {showVideo ? (
+        <video src={attractVideoUrl} autoPlay loop muted playsInline
+          onError={(e) => { console.warn('[kiosk] attract video failed to load (browser may not support format — try MP4):', attractVideoUrl, e); setVideoFailed(true); }}
+          onLoadedData={() => console.log('[kiosk] attract video loaded')}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : useBannerAsBackground ? (
         <img src={banner.imageUrl} alt={banner.label || brandName} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : null}
@@ -864,10 +869,15 @@ function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhon
 // ============================================================
 // SCREEN: DONE (order number reveal)
 // ============================================================
-function ScreenDone({ brandColor, customerName, customerPhone, orderNumber, orderType, tableNumber, avgWaitMinutes, onDone }) {
+function ScreenDone({ brandColor, customerName, customerPhone, orderNumber, orderType, tableNumber, avgWaitMinutes, banner, onDone }) {
   const phoneMasked = customerPhone ? customerPhone.replace(/^(.{3}).+(.{3})$/, '$1*** *** $2') : null;
   return (
     <div style={{ ...fullScreen(), background: 'linear-gradient(180deg, #1a4d2e 0%, #0d3520 100%)' }}>
+      {banner && banner.imageUrl && (
+        <div style={{ width: '100%', maxHeight: '22vh', overflow: 'hidden', flexShrink: 0 }}>
+          <img src={banner.imageUrl} alt={banner.label || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </div>
+      )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '6vw' }}>
         <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#22c55e', display: 'grid', placeItems: 'center', fontSize: 60, color: '#fff', marginBottom: 30, boxShadow: '0 0 80px rgba(34,197,94,0.5)' }}>✓</div>
         <div style={{ fontSize: 'clamp(22px, 3.6vw, 32px)', fontWeight: 700, marginBottom: 4 }}>{customerName ? 'Thank you, ' + customerName + '!' : 'Thank you!'}</div>
