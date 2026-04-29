@@ -188,7 +188,7 @@ export default function KioskSettings({ kioskId, onBack }) {
   if (!device || !profile) return <div style={{ padding: 40, color: 'var(--t3)', textAlign: 'center' }}>Kiosk or profile not found.</div>;
 
   return (
-    <div style={{ padding: 24, maxWidth: 880, margin: '0 auto', fontFamily: 'inherit', color: 'var(--t1)' }}>
+    <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', overflowX: 'hidden' }}><div style={{ padding: 24, maxWidth: 880, margin: '0 auto', fontFamily: 'inherit', color: 'var(--t1)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
         <button onClick={onBack} style={btnGhost()}>← Back</button>
@@ -366,7 +366,7 @@ export default function KioskSettings({ kioskId, onBack }) {
           </div>
         </div>
       </div>
-    </div>
+    </div></div>
   );
 }
 
