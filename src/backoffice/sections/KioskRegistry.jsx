@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getLocationId } from '../../lib/supabase';
+import KioskSettings from './KioskSettings';
 
 // Word list for human-friendly pairing codes (matches DeviceRegistry style)
 const PAIRING_WORDS = [
@@ -39,6 +40,7 @@ export default function KioskRegistry() {
   const [newProfileId, setNewProfileId] = useState('');
   const [working, setWorking] = useState(false);
   const [activeCode, setActiveCode] = useState(null); // { id, name, code }
+  const [editingKioskId, setEditingKioskId] = useState(null); // when set, render KioskSettings instead of the list
 
   const load = useCallback(async () => {
     setError(null);
@@ -130,6 +132,11 @@ export default function KioskRegistry() {
     return Math.floor(ms / 86400000) + ' days ago';
   };
 
+  // Settings view takes over when a kiosk is being edited
+  if (editingKioskId) {
+    return <KioskSettings kioskId={editingKioskId} onBack={() => { setEditingKioskId(null); load(); }} />;
+  }
+
   return (
     <div style={{ padding: 24, maxWidth: 980, margin: '0 auto', fontFamily: 'inherit', color: 'var(--t1)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -194,6 +201,9 @@ export default function KioskRegistry() {
                     <button onClick={() => regenerateCode(k)}
                       title="New pairing code"
                       style={{ background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 6, padding: '4px 8px', fontSize: 11, color: 'var(--t2)', cursor: 'pointer', fontFamily: 'inherit' }}>↻</button>
+                    <button onClick={() => setEditingKioskId(k.id)}
+                      title="Settings"
+                      style={{ background: 'var(--bg3)', border: '1px solid var(--bdr)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: 'var(--t2)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Settings</button>
                     <button onClick={() => removeKiosk(k)}
                       title="Remove kiosk"
                       style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '4px 8px', fontSize: 11, color: '#fca5a5', cursor: 'pointer', fontFamily: 'inherit' }}>×</button>
