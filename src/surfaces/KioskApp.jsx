@@ -168,6 +168,9 @@ export default function KioskApp({ kioskId, onUnpair }) {
   // ─── Cart + flow state ───
   const [screen, setScreen] = useState('attract');
   const [orderType, setOrderType] = useState(null); // 'dineIn' | 'takeaway'
+  // v5.4.0: allergen filter
+  const [allergenFilter, setAllergenFilter] = useState(new Set());
+  const [showAllergenPicker, setShowAllergenPicker] = useState(false);
   const [tableNumber, setTableNumber] = useState('');
   const [cart, setCart] = useState([]); // [{ key, item, qty, mods, linePrice, lineTotal, name }]
   const [tip, setTip] = useState(0);
@@ -291,6 +294,8 @@ export default function KioskApp({ kioskId, onUnpair }) {
     setCustomerPhone('');
     setSelectedItem(null);
     setSelectedCategoryId(null);
+    setAllergenFilter(new Set());
+    setShowAllergenPicker(false);
     setOrderNumber(null);
     setSubmitError(null);
     setIdleWarning(false);
@@ -432,13 +437,13 @@ export default function KioskApp({ kioskId, onUnpair }) {
   return (
     <div onPointerDown={resetIdle} style={kioskShell(brandColor, effectiveBg, fg)}>
       {screen === 'attract' && <ScreenAttract brandName={brandName} brandColor={brandColor} brandAccent={brandAccent} brandLogoUrl={brandLogoUrl} attractVideoUrl={attractVideoUrl} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('attract')} ctaLabel={labelTapToOrder} onStart={() => { resetIdle(); setScreen('orderType'); }} />}
-      {screen === 'orderType' && <ScreenOrderType brandColor={brandColor} tableMode={tableMode} onPick={(t) => {
+      {screen === 'orderType' && <ScreenOrderType brandColor={brandColor} brandAccent={brandAccent} tableMode={tableMode} isLight={isLight} fg={fg} fgMuted={fgMuted} surfaceCard={surfaceCard} onPick={(t) => {
         setOrderType(t);
         if (t === 'dineIn' && (tableMode === 'enter' || tableMode === 'either')) setScreen('tableNumber');
         else setScreen('menu');
       }} onBack={() => setScreen('attract')} />}
       {screen === 'tableNumber' && <ScreenTableNumber brandColor={brandColor} value={tableNumber} onChange={setTableNumber} onContinue={() => setScreen('menu')} onBack={() => setScreen('orderType')} />}
-      {screen === 'menu' && <ScreenMenu brandColor={brandColor} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} banner={bannerFor('menu')} onBack={() => setScreen('orderType')} />}
+      {screen === 'menu' && <ScreenMenu brandColor={brandColor} brandAccent={brandAccent} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} banner={bannerFor('menu')} allergenFilter={allergenFilter} onShowAllergenPicker={() => setShowAllergenPicker(true)} isLight={isLight} fg={fg} fgMuted={fgMuted} surfaceCard={surfaceCard} onBack={() => setScreen('orderType')} />}
       {screen === 'item' && selectedItem && (
         ((Array.isArray(selectedItem.assigned_modifier_groups) && selectedItem.assigned_modifier_groups.length > 0) || selectedItem.type === 'variants') ? (
           <KioskProductModal
@@ -463,6 +468,18 @@ export default function KioskApp({ kioskId, onUnpair }) {
       {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder('', ''); }} onBack={() => setScreen('tip')} />}
       {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} placeOrderLabel={labelPlaceOrder} />}
       {screen === 'done' && <ScreenDone brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} orderNumber={orderNumber} orderType={orderType} tableNumber={tableNumber} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('done')} onDone={resetSession} />}
+
+      {/* v5.4.0: Allergen picker overlay */}
+      {showAllergenPicker && (
+        <AllergenPickerOverlay
+          brandColor={brandColor}
+          isLight={isLight}
+          allergens={Array.from(new Set(items.flatMap(i => Array.isArray(i.allergens) ? i.allergens : [])))}
+          selected={allergenFilter}
+          onChange={setAllergenFilter}
+          onClose={() => setShowAllergenPicker(false)}
+        />
+      )}
 
       {/* Idle warning overlay */}
       {idleWarning && screen !== 'attract' && screen !== 'done' && (
@@ -535,7 +552,7 @@ function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attra
           <img src={brandLogoUrl} alt={brandName} style={{ maxWidth: '50%', maxHeight: '20vh', marginBottom: '3vh', objectFit: 'contain' }} />
         ) : null}
         <div style={{ fontSize: 'clamp(48px, 9vw, 96px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#fff', textAlign: 'center', lineHeight: 1, marginBottom: '2vh', textShadow: '0 4px 30px rgba(0,0,0,0.3)' }}>{brandName}</div>
-        <div style={{ fontSize: 'clamp(16px, 2.4vw, 24px)', color: 'rgba(255,255,255,0.95)', marginBottom: '2vh', textAlign: 'center', fontWeight: 500 }}>Order · Pay · Collect</div>
+        {/* v5.4.0: subtitle removed */}
         {avgWaitMinutes ? (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(10px)', borderRadius: 100, fontSize: 'clamp(13px, 1.8vw, 18px)', fontWeight: 600, color: '#fff', marginBottom: '6vh' }}>⏱ ~{avgWaitMinutes} min wait</div>
         ) : null}
@@ -562,31 +579,52 @@ function shade(hex, percent) {
 // ============================================================
 // SCREEN: ORDER TYPE
 // ============================================================
-function ScreenOrderType({ brandColor, tableMode, onPick, onBack }) {
+function ScreenOrderType({ brandColor, brandAccent, tableMode, isLight, fg, fgMuted, surfaceCard, onPick, onBack }) {
   const dineInAvailable = tableMode !== 'none';
+  const accent = brandAccent || shade(brandColor, -20);
   return (
     <div style={fullScreen()}>
-      <ScreenHeader title="How would you like your order?" subtitle="This affects pricing — dine in includes table service" onBack={onBack} brandColor={brandColor} />
-      <div style={{ flex: 1, padding: '4vh 5vw', display: 'flex', flexDirection: 'column', gap: '3vh', justifyContent: 'center' }}>
-        {dineInAvailable && (
-          <button onClick={() => onPick('dineIn')} style={bigCard(brandColor)}>
-            <div style={{ fontSize: 'clamp(48px, 8vw, 80px)' }}>🍽️</div>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontSize: 'clamp(22px, 3.4vw, 32px)', fontWeight: 800, marginBottom: 6 }}>Eat in</div>
-              <div style={{ fontSize: 'clamp(13px, 1.8vw, 16px)', color: 'rgba(255,255,255,0.6)' }}>Dine-in pricing · served to your table</div>
+      <div style={{ padding: '24px 22px 12px', flexShrink: 0 }}>
+        <button onClick={onBack} style={iconBtn(isLight)}>←</button>
+      </div>
+      <div style={{ flex: 1, padding: '0 5vw 5vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '3vh' }}>
+        <div>
+          <div style={{ fontSize: 'clamp(36px, 6vw, 56px)', fontWeight: 900, letterSpacing: '-0.03em', color: fg || '#fff', lineHeight: 1.05, marginBottom: 4 }}>Where will you<br/>be eating?</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: dineInAvailable ? '1fr 1fr' : '1fr', gap: 'clamp(12px, 2vw, 18px)', flex: 1, maxHeight: '60vh' }}>
+          {dineInAvailable && (
+            <button onClick={() => onPick('dineIn')} style={otHeroCard(brandColor, accent)}>
+              <div style={{ fontSize: 'clamp(64px, 12vw, 110px)', filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.25))' }}>🍽️</div>
+              <div style={{ marginTop: 'auto' }}>
+                <div style={{ fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', marginBottom: 4 }}>Eat in</div>
+                <div style={{ fontSize: 'clamp(13px, 1.6vw, 16px)', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>Served to your table</div>
+              </div>
+            </button>
+          )}
+          <button onClick={() => onPick('takeaway')} style={otHeroCard(accent, brandColor)}>
+            <div style={{ fontSize: 'clamp(64px, 12vw, 110px)', filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.25))' }}>🥡</div>
+            <div style={{ marginTop: 'auto' }}>
+              <div style={{ fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', marginBottom: 4 }}>Takeaway</div>
+              <div style={{ fontSize: 'clamp(13px, 1.6vw, 16px)', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>Collect at the counter</div>
             </div>
           </button>
-        )}
-        <button onClick={() => onPick('takeaway')} style={bigCard(brandColor)}>
-          <div style={{ fontSize: 'clamp(48px, 8vw, 80px)' }}>🥡</div>
-          <div style={{ flex: 1, textAlign: 'left' }}>
-            <div style={{ fontSize: 'clamp(22px, 3.4vw, 32px)', fontWeight: 800, marginBottom: 6 }}>Takeaway</div>
-            <div style={{ fontSize: 'clamp(13px, 1.8vw, 16px)', color: 'rgba(255,255,255,0.6)' }}>Take-out pricing · collect at counter</div>
-          </div>
-        </button>
+        </div>
       </div>
     </div>
   );
+}
+
+function otHeroCard(c1, c2) {
+  return {
+    background: 'linear-gradient(155deg, ' + c1 + ' 0%, ' + c2 + ' 100%)',
+    border: 0, borderRadius: 24,
+    padding: 'clamp(24px, 4vw, 36px)',
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between',
+    cursor: 'pointer', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+    boxShadow: '0 14px 40px rgba(0,0,0,0.35)',
+    minHeight: '40vh',
+    transition: 'transform 0.12s',
+  };
 }
 
 // ============================================================
@@ -618,7 +656,7 @@ function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) 
 // ============================================================
 // SCREEN: MENU
 // ============================================================
-function ScreenMenu({ brandColor, categories, items, selectedCategoryId, onSelectCategory, onSelectItem, cartItemCount, subtotal, onCart, orderType, activeMenuId, banner, onBack }) {
+function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCategoryId, onSelectCategory, onSelectItem, cartItemCount, subtotal, onCart, orderType, activeMenuId, banner, allergenFilter, onShowAllergenPicker, isLight, fg, fgMuted, surfaceCard, onBack }) {
   return (
     <div style={fullScreen()}>
       {/* top bar */}
@@ -640,11 +678,22 @@ function ScreenMenu({ brandColor, categories, items, selectedCategoryId, onSelec
             <img src={banner.imageUrl} alt={banner.label || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           </div>
         )}
-        {/* allergen banner */}
-        <div style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 12, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* v5.4.0: interactive allergen filter */}
+        <button onClick={onShowAllergenPicker} style={{
+          background: (allergenFilter && allergenFilter.size > 0) ? 'rgba(234,179,8,0.18)' : 'rgba(234,179,8,0.10)',
+          border: '1px solid rgba(234,179,8,0.4)',
+          borderRadius: 12, padding: '10px 14px', marginBottom: 12,
+          display: 'flex', alignItems: 'center', gap: 10,
+          width: '100%', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        }}>
           <div style={{ fontSize: 18 }}>⚠️</div>
-          <div style={{ flex: 1, fontSize: 13, color: '#ddc270', fontWeight: 500 }}>Have allergies? Tap an item to see ingredients before ordering.</div>
-        </div>
+          <div style={{ flex: 1, fontSize: 13, color: '#ddc270', fontWeight: 600 }}>
+            {(allergenFilter && allergenFilter.size > 0)
+              ? 'Avoiding: ' + Array.from(allergenFilter).join(', ') + ' — unsafe items shown faded'
+              : 'Have allergies? Tap to filter the menu'}
+          </div>
+          <div style={{ fontSize: 16, color: '#ddc270', fontWeight: 700 }}>{(allergenFilter && allergenFilter.size > 0) ? 'Edit ›' : '›'}</div>
+        </button>
         {/* category strip */}
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
           {categories.length === 0 ? (
@@ -669,12 +718,21 @@ function ScreenMenu({ brandColor, categories, items, selectedCategoryId, onSelec
           <div style={{ gridColumn: '1 / -1', padding: 60, textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>No items in this category.</div>
         ) : items.map(it => {
           const price = resolvePrice(it, orderType, activeMenuId);
+          // v5.4.0: check if item contains any flagged allergen
+          const itemAllergens = Array.isArray(it.allergens) ? it.allergens.map(a => String(a).toLowerCase()) : [];
+          const flagged = allergenFilter && Array.from(allergenFilter).some(a => itemAllergens.includes(String(a).toLowerCase()));
           return (
             <button key={it.id} onClick={() => onSelectItem(it)} style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+              border: '1px solid ' + (flagged ? 'rgba(239,68,68,0.5)' : (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)')),
               borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
-              fontFamily: 'inherit', textAlign: 'left', padding: 0, color: '#fff',
+              fontFamily: 'inherit', textAlign: 'left', padding: 0, color: fg || '#fff',
+              opacity: flagged ? 0.45 : 1,
+              position: 'relative',
             }}>
+              {flagged && (
+                <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, background: '#ef4444', color: '#fff', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>UNSAFE</div>
+              )}
               <div style={{ width: '100%', height: 130, background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.2))', display: 'grid', placeItems: 'center', fontSize: 50, overflow: 'hidden' }}>
                 {it.image ? <img src={it.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
               </div>
@@ -965,10 +1023,76 @@ function ScreenHeader({ title, subtitle, onBack, brandColor }) {
 }
 
 // ============================================================
+// ALLERGEN PICKER (v5.4.0)
+// ============================================================
+function AllergenPickerOverlay({ brandColor, isLight, allergens, selected, onChange, onClose }) {
+  const COMMON = [
+    { key: 'gluten', label: 'Gluten', icon: '🌾' },
+    { key: 'dairy', label: 'Dairy', icon: '🥛' },
+    { key: 'nuts', label: 'Nuts', icon: '🦜' },
+    { key: 'peanuts', label: 'Peanuts', icon: '🥜' },
+    { key: 'soy', label: 'Soy', icon: '🌱' },
+    { key: 'egg', label: 'Egg', icon: '🥚' },
+    { key: 'fish', label: 'Fish', icon: '🐟' },
+    { key: 'shellfish', label: 'Shellfish', icon: '🦐' },
+    { key: 'sesame', label: 'Sesame', icon: '🪴' },
+    { key: 'mustard', label: 'Mustard', icon: '🌶' },
+    { key: 'celery', label: 'Celery', icon: '🥬' },
+    { key: 'sulphites', label: 'Sulphites', icon: '🍷' },
+  ];
+  const presentSet = new Set(allergens.map(a => String(a).toLowerCase()));
+  const list = [
+    ...COMMON.filter(a => presentSet.has(a.key) || presentSet.size === 0),
+    ...allergens.filter(a => !COMMON.find(c => c.key === String(a).toLowerCase())).map(a => ({ key: String(a).toLowerCase(), label: String(a), icon: '⚠' })),
+  ];
+  const finalList = list.length > 0 ? list : COMMON;
+  const toggle = (key) => {
+    const next = new Set(selected);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    onChange(next);
+  };
+  const overlayBg = isLight ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)';
+  const cardBg = isLight ? '#fff' : '#1a1a1f';
+  const fg = isLight ? '#111' : '#fff';
+  const fgMuted = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: overlayBg, backdropFilter: 'blur(8px)', display: 'grid', placeItems: 'center', padding: 24, zIndex: 200 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: cardBg, color: fg, border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'), borderRadius: 24, padding: 28, maxWidth: 460, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 6 }}>Any allergies?</div>
+        <div style={{ fontSize: 13, color: fgMuted, marginBottom: 22 }}>Tap to flag what you can't have. Items containing flagged allergens will be marked.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
+          {finalList.map(a => {
+            const isSel = selected.has(a.key);
+            return (
+              <button key={a.key} onClick={() => toggle(a.key)} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
+                background: isSel ? 'rgba(239,68,68,0.15)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)'),
+                border: '2px solid ' + (isSel ? '#ef4444' : 'transparent'),
+                borderRadius: 14, cursor: 'pointer', color: fg, fontFamily: 'inherit', textAlign: 'left',
+              }}>
+                <span style={{ fontSize: 22 }}>{a.icon}</span>
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{a.label}</span>
+                {isSel && <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444' }}>AVOID</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {selected.size > 0 && (
+            <button onClick={() => onChange(new Set())} style={{ flex: 1, background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', color: fg, border: 0, padding: '14px', borderRadius: 100, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Clear all</button>
+          )}
+          <button onClick={onClose} style={{ flex: 2, background: brandColor, color: '#fff', border: 0, padding: '14px', borderRadius: 100, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>{selected.size > 0 ? 'Show me what I can have' : 'Done'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // STYLE HELPERS
 // ============================================================
 function fullScreen() { return { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }; }
-function iconBtn() { return { width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.08)', display: 'grid', placeItems: 'center', fontSize: 20, color: '#fff', border: 0, cursor: 'pointer', fontFamily: 'inherit' }; }
+function iconBtn(isLight) { return { width: 44, height: 44, borderRadius: 14, background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', display: 'grid', placeItems: 'center', fontSize: 20, color: isLight ? '#111' : '#fff', border: 0, cursor: 'pointer', fontFamily: 'inherit' }; }
 function bigCard(brandColor) {
   return {
     background: 'rgba(255,255,255,0.04)',
