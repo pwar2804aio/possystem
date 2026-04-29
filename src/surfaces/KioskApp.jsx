@@ -193,17 +193,33 @@ export default function KioskApp({ kioskId, onUnpair }) {
   const idleTimeoutSec = profile?.kiosk_idle_timeout_sec || 60;
   const avgWaitMinutes = profile?.kiosk_avg_wait_minutes || 8;
   const bannerFor = (screen) => banners.find(b => b.screen === screen && b.imageUrl);
-  // v5.3.3: theme + label overrides
+  // v5.3.4: theme is dominant. brand_bg_color only takes effect if it visually matches the theme
+  // (avoids the bug where saving a dark bg via the picker AND switching to light theme leaves a dark bg).
   const themeMode = profile?.kiosk_theme_mode === 'light' ? 'light' : 'dark';
   const isLight = themeMode === 'light';
-  // If bg color isn't explicitly set by operator, theme drives the default
-  const effectiveBg = profile?.kiosk_brand_bg_color || (isLight ? '#fafafa' : '#0e0e10');
+  const themeDefaultBg = isLight ? '#fafafa' : '#0e0e10';
+  const customBg = profile?.kiosk_brand_bg_color;
+  // Decide if the saved bg color is compatible with the chosen theme. If it's not (e.g. dark hex on light theme), fall back to theme default.
+  const looksLight = (hex) => {
+    if (!hex || !hex.startsWith('#')) return false;
+    const n = parseInt(hex.slice(1), 16);
+    if (isNaN(n)) return false;
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return (r * 0.299 + g * 0.587 + b * 0.114) > 180;
+  };
+  const customMatchesTheme = customBg && (isLight ? looksLight(customBg) : !looksLight(customBg));
+  const effectiveBg = customMatchesTheme ? customBg : themeDefaultBg;
   const fg = isLight ? '#111' : '#fff';
   const fgMuted = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
   const surfaceCard = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)';
   const labelTapToOrder = profile?.kiosk_label_tap_to_order || 'TAP TO ORDER';
   const labelAddToOrder = profile?.kiosk_label_add_to_order || 'Add to order';
   const labelPlaceOrder = profile?.kiosk_label_place_order || 'Place order';
+  // Debug log so we can verify what's loaded
+  if (typeof window !== 'undefined' && !window.__kioskLogged) {
+    window.__kioskLogged = true;
+    console.log('[kiosk] profile loaded', { themeMode, effectiveBg, labelTapToOrder, labelAddToOrder, labelPlaceOrder, brandColor: profile?.kiosk_brand_color });
+  }
 
   // ─── Filtered menu (cats + items belonging to active menu) ───
   const visibleCategories = useMemo(() => {
