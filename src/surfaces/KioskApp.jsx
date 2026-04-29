@@ -193,6 +193,17 @@ export default function KioskApp({ kioskId, onUnpair }) {
   const idleTimeoutSec = profile?.kiosk_idle_timeout_sec || 60;
   const avgWaitMinutes = profile?.kiosk_avg_wait_minutes || 8;
   const bannerFor = (screen) => banners.find(b => b.screen === screen && b.imageUrl);
+  // v5.3.3: theme + label overrides
+  const themeMode = profile?.kiosk_theme_mode === 'light' ? 'light' : 'dark';
+  const isLight = themeMode === 'light';
+  // If bg color isn't explicitly set by operator, theme drives the default
+  const effectiveBg = profile?.kiosk_brand_bg_color || (isLight ? '#fafafa' : '#0e0e10');
+  const fg = isLight ? '#111' : '#fff';
+  const fgMuted = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
+  const surfaceCard = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)';
+  const labelTapToOrder = profile?.kiosk_label_tap_to_order || 'TAP TO ORDER';
+  const labelAddToOrder = profile?.kiosk_label_add_to_order || 'Add to order';
+  const labelPlaceOrder = profile?.kiosk_label_place_order || 'Place order';
 
   // ─── Filtered menu (cats + items belonging to active menu) ───
   const visibleCategories = useMemo(() => {
@@ -403,8 +414,8 @@ export default function KioskApp({ kioskId, onUnpair }) {
 
   // ─── Render ───
   return (
-    <div onPointerDown={resetIdle} style={kioskShell(brandColor, brandBg)}>
-      {screen === 'attract' && <ScreenAttract brandName={brandName} brandColor={brandColor} brandAccent={brandAccent} brandLogoUrl={brandLogoUrl} attractVideoUrl={attractVideoUrl} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('attract')} onStart={() => { resetIdle(); setScreen('orderType'); }} />}
+    <div onPointerDown={resetIdle} style={kioskShell(brandColor, effectiveBg, fg)}>
+      {screen === 'attract' && <ScreenAttract brandName={brandName} brandColor={brandColor} brandAccent={brandAccent} brandLogoUrl={brandLogoUrl} attractVideoUrl={attractVideoUrl} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('attract')} ctaLabel={labelTapToOrder} onStart={() => { resetIdle(); setScreen('orderType'); }} />}
       {screen === 'orderType' && <ScreenOrderType brandColor={brandColor} tableMode={tableMode} onPick={(t) => {
         setOrderType(t);
         if (t === 'dineIn' && (tableMode === 'enter' || tableMode === 'either')) setScreen('tableNumber');
@@ -419,6 +430,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
             allItems={items}
             brandColor={brandColor}
             brandAccent={brandAccent}
+            addLabel={labelAddToOrder}
             basePrice={resolvePrice(selectedItem, orderType, activeMenuId)}
             onAdd={({ qty, selections, summary, priceEach, mods }) => {
               addToCart(selectedItem, qty, selections, summary, priceEach, mods);
@@ -427,13 +439,13 @@ export default function KioskApp({ kioskId, onUnpair }) {
             onCancel={() => setScreen('menu')}
           />
         ) : (
-          <ScreenItemDetail brandColor={brandColor} item={selectedItem} orderType={orderType} activeMenuId={activeMenuId} onAdd={(qty, mods) => { addToCart(selectedItem, qty, mods); setScreen('menu'); }} onBack={() => setScreen('menu')} />
+          <ScreenItemDetail brandColor={brandColor} item={selectedItem} orderType={orderType} activeMenuId={activeMenuId} addLabel={labelAddToOrder} onAdd={(qty, mods) => { addToCart(selectedItem, qty, mods); setScreen('menu'); }} onBack={() => setScreen('menu')} />
         )
       )}
       {screen === 'cart' && <ScreenCart brandColor={brandColor} cart={cart} subtotal={subtotal} onUpdate={updateCartQty} onAddMore={() => setScreen('menu')} onContinue={() => setScreen('tip')} onBack={() => setScreen('menu')} />}
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
       {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder('', ''); }} onBack={() => setScreen('tip')} />}
-      {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} />}
+      {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} placeOrderLabel={labelPlaceOrder} />}
       {screen === 'done' && <ScreenDone brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} orderNumber={orderNumber} orderType={orderType} tableNumber={tableNumber} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('done')} onDone={resetSession} />}
 
       {/* Idle warning overlay */}
@@ -455,12 +467,12 @@ export default function KioskApp({ kioskId, onUnpair }) {
 // SHARED STYLES
 // ============================================================
 
-function kioskShell(brandColor, brandBg) {
+function kioskShell(brandColor, brandBg, fg) {
   return {
     position: 'fixed',
     inset: 0,
     background: brandBg || '#0e0e10',
-    color: '#fff',
+    color: fg || '#fff',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
     overflow: 'hidden',
     userSelect: 'none',
@@ -486,7 +498,7 @@ function btnGhostLight() {
 // ============================================================
 // SCREEN: ATTRACT
 // ============================================================
-function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attractVideoUrl, avgWaitMinutes, banner, onStart }) {
+function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attractVideoUrl, avgWaitMinutes, banner, ctaLabel, onStart }) {
   const accentEnd = brandAccent || shade(brandColor, -20);
   const [videoFailed, setVideoFailed] = useState(false);
   const showVideo = attractVideoUrl && !videoFailed;
@@ -511,7 +523,7 @@ function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attra
         {avgWaitMinutes ? (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(10px)', borderRadius: 100, fontSize: 'clamp(13px, 1.8vw, 18px)', fontWeight: 600, color: '#fff', marginBottom: '6vh' }}>⏱ ~{avgWaitMinutes} min wait</div>
         ) : null}
-        <div style={{ background: '#fff', color: shade(brandColor, -30), padding: 'clamp(18px, 3vh, 28px) clamp(40px, 8vw, 100px)', borderRadius: 100, fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, boxShadow: '0 10px 40px rgba(0,0,0,0.25)', animation: 'kioskPulse 2s infinite', letterSpacing: '-0.02em' }}>TAP TO ORDER</div>
+        <div style={{ background: '#fff', color: shade(brandColor, -30), padding: 'clamp(18px, 3vh, 28px) clamp(40px, 8vw, 100px)', borderRadius: 100, fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, boxShadow: '0 10px 40px rgba(0,0,0,0.25)', animation: 'kioskPulse 2s infinite', letterSpacing: '-0.02em' }}>{ctaLabel || 'TAP TO ORDER'}</div>
       </div>
       <div style={{ position: 'relative', padding: '0 30px 30px', fontSize: 13, color: 'rgba(255,255,255,0.7)', textAlign: 'center', zIndex: 1 }}>Tap anywhere to begin</div>
       <style>{'@keyframes kioskPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }'}</style>
@@ -671,7 +683,7 @@ function ScreenMenu({ brandColor, categories, items, selectedCategoryId, onSelec
 // ============================================================
 // SCREEN: ITEM DETAIL
 // ============================================================
-function ScreenItemDetail({ brandColor, item, orderType, activeMenuId, onAdd, onBack }) {
+function ScreenItemDetail({ brandColor, item, orderType, activeMenuId, addLabel, onAdd, onBack }) {
   const [qty, setQty] = useState(1);
   const price = resolvePrice(item, orderType, activeMenuId);
   return (
@@ -703,7 +715,7 @@ function ScreenItemDetail({ brandColor, item, orderType, activeMenuId, onAdd, on
           border: 0, cursor: 'pointer', fontFamily: 'inherit',
           boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
         }}>
-          <span>Add to order</span>
+          <span>{addLabel || 'Add to order'}</span>
           <span>£{(qty * price).toFixed(2)}</span>
         </button>
       </div>
@@ -851,7 +863,7 @@ function ScreenPay({ brandColor, total, submitting, error, onSimulatePaid, onBac
 // ============================================================
 // SCREEN: LOYALTY (single-screen name + phone)
 // ============================================================
-function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhone, onContinue, onSkip, submitting }) {
+function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhone, onContinue, onSkip, submitting, placeOrderLabel }) {
   const [name, setName] = useState(customerName);
   const [phone, setPhone] = useState(customerPhone);
   const submit = () => {
@@ -881,7 +893,7 @@ function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhon
       </div>
       <div style={{ padding: '14px 22px 22px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button onClick={submit} disabled={!name.trim() || submitting} style={{ ...primaryCta(brandColor), width: '100%', opacity: !name.trim() || submitting ? 0.4 : 1 }}>
-          {submitting ? 'Placing order…' : 'Place order →'}
+          {submitting ? 'Placing order…' : ((placeOrderLabel || 'Place order') + ' →')}
         </button>
         <button onClick={skip} disabled={submitting} style={{ background: 'transparent', color: 'rgba(255,255,255,0.6)', padding: 12, borderRadius: 10, fontSize: 13, border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
           Skip and place anonymously
