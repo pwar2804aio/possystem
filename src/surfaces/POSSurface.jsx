@@ -154,24 +154,6 @@ export default function POSSurface() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTableId, tables]);
 
-  // Use store's editable menu — prefer menuName for display, fall back to name
-  // IMPORTANT: useMemo keeps object references stable so modalItem doesn't change
-  // identity on re-renders (which would remount ProductModal and reset selections state)
-  const rawItems = storeMenuItems || SEED_MENU_ITEMS;
-  const { getItemPrice } = useStore.getState();
-  const MENU_ITEMS = useMemo(() => rawItems
-    .filter(i => {
-      if (i.type === 'subitem' && !i.soldAlone) return false;
-      return true;
-    }) // filter soldAlone
-    .map(i => ({
-      ...i,
-      name: i.menuName || i.name,
-      price: getItemPrice ? getItemPrice(i, orderType, deviceMenuId) : (i.pricing?.base ?? i.price ?? 0),
-    })), [rawItems, orderType]);
-
-  // Order types this terminal is allowed to show (from device profile)
-  const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];
   // v4.6.5: Active menu resolver — picks the right menu based on schedule, priority, device profile.
   // Recomputes every minute via clockTick so menus auto-switch at schedule boundaries.
   const [_clockTick, _setClockTick] = useState(0);
@@ -223,6 +205,24 @@ export default function POSSurface() {
   useEffect(() => {
     if (_setActiveMenuId) _setActiveMenuId(deviceMenuId);
   }, [deviceMenuId, _setActiveMenuId]);
+  // Use store's editable menu — prefer menuName for display, fall back to name
+  // IMPORTANT: useMemo keeps object references stable so modalItem doesn't change
+  // identity on re-renders (which would remount ProductModal and reset selections state)
+  const rawItems = storeMenuItems || SEED_MENU_ITEMS;
+  const { getItemPrice } = useStore.getState();
+  const MENU_ITEMS = useMemo(() => rawItems
+    .filter(i => {
+      if (i.type === 'subitem' && !i.soldAlone) return false;
+      return true;
+    }) // filter soldAlone
+    .map(i => ({
+      ...i,
+      name: i.menuName || i.name,
+      price: getItemPrice ? getItemPrice(i, orderType, deviceMenuId) : (i.pricing?.base ?? i.price ?? 0),
+    })), [rawItems, orderType]);
+
+  // Order types this terminal is allowed to show (from device profile)
+  const allowedOrderTypes = deviceConfig?.enabledOrderTypes || ['dine-in', 'takeaway', 'collection'];
 
   // v4.7.6: load menu_category_links on mount + provide a Set of cat ids linked to deviceMenuId
   const [_categoryLinks, _setCategoryLinks] = useState([]);
