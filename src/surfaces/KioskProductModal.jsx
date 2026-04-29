@@ -147,10 +147,16 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
     return it || null;
   };
 
-  // Does this option open a child modal? Yes if its linked item has its own modifier groups.
-  const isOptionNested = (optionId) => {
-    const linked = resolveLinkedItem(optionId);
+  // v5.4.2: nested if option has subGroupId (POS pattern) OR linked item has own mods
+  const isOptionNestedByOpt = (option) => {
+    if (!option) return false;
+    if (option.subGroupId) return true;
+    const linked = resolveLinkedItem(option.id);
     return !!(linked && Array.isArray(linked.assigned_modifier_groups) && linked.assigned_modifier_groups.length > 0);
+  };
+  const isOptionNested = (optionId) => {
+    const opt = groups.flatMap(g => g.options || []).find(o => o.id === optionId);
+    return isOptionNestedByOpt(opt);
   };
 
   // Load modifier groups + synthesize a Size group from variants
@@ -273,12 +279,25 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   // For NESTED options: open the child modal instead of toggling. The actual selection commits when child returns.
   const incOption = (group, optId) => {
     setShowError(false);
-    if (isOptionNested(optId)) {
-      const linked = resolveLinkedItem(optId);
-      // Pre-validate cap before opening child
+    const opt = (group.options || []).find(o => o.id === optId);
+    if (isOptionNestedByOpt(opt)) {
       const current = selections[group.id] || [];
       if (!group._isSingle && current.length >= group._max) return;
-      setChildContext({ groupId: group.id, optionId: optId, optionName: (group.options || []).find(o => o.id === optId)?.name, item: linked });
+      let childItem;
+      if (opt.subGroupId) {
+        childItem = {
+          id: '__nested__' + opt.id,
+          name: opt.name,
+          description: '',
+          allergens: [],
+          assigned_modifier_groups: [{ groupId: opt.subGroupId, min: 1, max: 1 }],
+          assigned_instruction_groups: [],
+          pricing: { base: 0 },
+        };
+      } else {
+        childItem = resolveLinkedItem(optId);
+      }
+      setChildContext({ groupId: group.id, optionId: optId, optionName: opt?.name, item: childItem });
       return;
     }
     setSelections(prev => {
