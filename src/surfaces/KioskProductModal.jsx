@@ -419,7 +419,7 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   if (loading) {
     return (
       <div style={overlayStyle()}>
-        <div style={{ color: 'var(--kFg, #fff)', fontSize: 18 }}>Loading options…</div>
+        <div style={{ color: 'var(--kFg)', fontSize: 18 }}>Loading options…</div>
       </div>
     );
   }
@@ -429,14 +429,14 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       {/* Top bar — image + back */}
       <div style={{ position: 'relative', width: '100%', height: '32vh', background: 'linear-gradient(135deg, ' + brandColor + ', ' + (brandAccent || brandColor) + ')', display: 'grid', placeItems: 'center', fontSize: 120, flexShrink: 0, overflow: 'hidden' }}>
         {item?.image ? <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '\ud83c\udf7d\ufe0f'}
-        <button onClick={onCancel} style={{ position: 'absolute', top: 18, left: 18, width: 48, height: 48, borderRadius: 14, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', fontSize: 22, color: 'var(--kFg, #fff)', border: 0, cursor: 'pointer' }}>←</button>
+        <button onClick={onCancel} style={{ position: 'absolute', top: 18, left: 18, width: 48, height: 48, borderRadius: 14, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', fontSize: 22, color: 'var(--kFg)', border: 0, cursor: 'pointer' }}>←</button>
       </div>
 
       {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px 16px' }}>
         <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8 }}>{item?.name}</div>
         {item?.description && (
-          <div style={{ fontSize: 14, color: 'var(--kFgMuted, rgba(255,255,255,0.7))', lineHeight: 1.5, marginBottom: 14 }}>{item.description}</div>
+          <div style={{ fontSize: 14, color: 'var(--kFgMuted)', lineHeight: 1.5, marginBottom: 14 }}>{item.description}</div>
         )}
 
         {Array.isArray(item?.allergens) && item.allergens.length > 0 && (
@@ -465,12 +465,12 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
           return (
             <div key={g.id} data-mod-group={g.id} style={{ marginBottom: 26 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--kFg, #fff)' }}>{g.name}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--kFg)' }}>{g.name}</div>
                 {picked.length > 0 && remaining > 0 && !g._isSingle && (
-                  <div style={{ fontSize: 11.5, color: 'var(--kFgMuted, rgba(255,255,255,0.5))' }}>{picked.length} / {g._max}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--kFgMuted)' }}>{picked.length} / {g._max}</div>
                 )}
               </div>
-              <div style={{ fontSize: 12, color: isInvalid ? '#fca5a5' : 'rgba(255,255,255,0.55)', marginBottom: 12, fontWeight: isInvalid ? 700 : 400 }}>
+              <div style={{ fontSize: 12, color: isInvalid ? '#fca5a5' : 'var(--kFgMuted)', marginBottom: 12, fontWeight: isInvalid ? 700 : 400 }}>
                 {hint}{isInvalid && picked.length < g._min ? ' — you must select ' + (g._min - picked.length) + ' more' : ''}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -484,28 +484,28 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                     <div key={opt.id} style={{
                       display: 'flex', alignItems: 'center', gap: 12,
                       padding: '14px 16px',
-                      background: isSelected ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
-                      border: '2px solid ' + (isSelected ? brandColor : (isInvalid ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)')),
+                      background: isSelected ? 'var(--kSurface2)' : 'var(--kSurface1)',
+                      border: '2px solid ' + (isSelected ? brandColor : (isInvalid ? 'rgba(239,68,68,0.3)' : 'var(--kSurface2)')),
                       borderRadius: 14,
-                      color: 'var(--kFg, #fff)',
+                      color: 'var(--kFg)',
                     }}>
                       <button onClick={() => incOption(g, opt.id)} disabled={!isSelected && atCap} style={{
                         flex: 1, display: 'flex', alignItems: 'center', gap: 14,
                         background: 'transparent', border: 0, padding: 0,
-                        cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer', color: 'var(--kFg, #fff)', fontFamily: 'inherit', textAlign: 'left',
+                        cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer', color: 'var(--kFg)', fontFamily: 'inherit', textAlign: 'left',
                         opacity: (atCap && !isSelected) ? 0.4 : 1,
                       }}>
                         <span style={{
                           flexShrink: 0,
                           width: 28, height: 28,
                           borderRadius: g._isSingle ? '50%' : 7,
-                          border: '2px solid ' + (isSelected ? brandColor : 'rgba(255,255,255,0.3)'),
+                          border: '2px solid ' + (isSelected ? brandColor : 'var(--kFgFaint)'),
                           display: 'grid', placeItems: 'center',
                           background: isSelected ? brandColor : 'transparent',
-                          color: 'var(--kFg, #fff)', fontSize: 14, fontWeight: 800,
+                          color: 'var(--kFg)', fontSize: 14, fontWeight: 800,
                         }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
                         <span style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{opt.name}</span>
-                        {priceLabel && <span style={{ fontSize: 13, color: 'var(--kFgMuted, rgba(255,255,255,0.6))', fontVariantNumeric: 'tabular-nums' }}>{priceLabel}</span>}
+                        {priceLabel && <span style={{ fontSize: 13, color: 'var(--kFgMuted)', fontVariantNumeric: 'tabular-nums' }}>{priceLabel}</span>}
                         {isOptionNested(opt.id) && (
                           <span style={{ fontSize: 11, color: brandColor, fontWeight: 700, marginLeft: 4 }}>Configure ›</span>
                         )}
@@ -513,12 +513,12 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                       {showStepper && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                           <button onClick={(e) => { e.stopPropagation(); decOption(g, opt.id); }} style={{
-                            width: 36, height: 36, borderRadius: '50%', background: 'var(--kSurface2, rgba(255,255,255,0.08))',
-                            border: 0, color: 'var(--kFg, #fff)', fontSize: 18, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                            width: 36, height: 36, borderRadius: '50%', background: 'var(--kSurface2)',
+                            border: 0, color: 'var(--kFg)', fontSize: 18, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                           }}>−</button>
                           <button onClick={(e) => { e.stopPropagation(); incOption(g, opt.id); }} disabled={atCap} style={{
-                            width: 36, height: 36, borderRadius: '50%', background: atCap ? 'rgba(255,255,255,0.04)' : brandColor,
-                            border: 0, color: 'var(--kFg, #fff)', fontSize: 18, fontWeight: 700, cursor: atCap ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                            width: 36, height: 36, borderRadius: '50%', background: atCap ? 'var(--kSurface1)' : brandColor,
+                            border: 0, color: 'var(--kFg)', fontSize: 18, fontWeight: 700, cursor: atCap ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
                             opacity: atCap ? 0.4 : 1,
                           }}>+</button>
                         </div>
@@ -534,28 +534,28 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
 
       {/* v5.4.0: special instructions text */}
       <div style={{ padding: '0 24px 16px' }}>
-        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kFgMuted, rgba(255,255,255,0.55))', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Anything else?</label>
+        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kFgMuted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Anything else?</label>
         <textarea
           value={instructions}
           onChange={e => setInstructions(e.target.value)}
           placeholder="e.g. no ice, light sauce, allergy notes…"
           maxLength={140}
           rows={2}
-          style={{ width: '100%', background: 'var(--kSurface1, rgba(255,255,255,0.04))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '12px 14px', color: 'var(--kFg, #fff)', fontFamily: 'inherit', fontSize: 14, outline: 'none', resize: 'none' }}
+          style={{ width: '100%', background: 'var(--kSurface1)', border: '1px solid var(--kBorder1)', borderRadius: 12, padding: '12px 14px', color: 'var(--kFg)', fontFamily: 'inherit', fontSize: 14, outline: 'none', resize: 'none' }}
         />
       </div>
 
       {/* Bottom CTA bar */}
-      <div style={{ padding: '14px 22px 22px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--kSurface1, rgba(255,255,255,0.06))', borderRadius: 100, padding: 4 }}>
+      <div style={{ padding: '14px 22px 22px', borderTop: '1px solid var(--kSurface2)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--kSurface1)', borderRadius: 100, padding: 4 }}>
           <button onClick={() => setQty(q => Math.max(1, q - 1))} style={qtyBtn()}>−</button>
           <div style={{ fontSize: 18, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{qty}</div>
           <button onClick={() => setQty(q => q + 1)} style={qtyBtn()}>+</button>
         </div>
         <button onClick={tryAdd} style={{
           flex: 1,
-          background: isValid ? brandColor : 'rgba(255,255,255,0.1)',
-          color: isValid ? '#fff' : 'rgba(255,255,255,0.5)',
+          background: isValid ? brandColor : 'var(--kBorder1)',
+          color: isValid ? '#fff' : 'var(--kFgFaint)',
           padding: '16px 20px',
           borderRadius: 100,
           fontSize: 16, fontWeight: 800,
@@ -578,11 +578,11 @@ function overlayStyle() {
   return {
     position: 'absolute', inset: 0,
     background: 'var(--kSurfaceShell, #0e0e10)',
-    color: 'var(--kFg, #fff)',
+    color: 'var(--kFg)',
     display: 'flex', flexDirection: 'column',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   };
 }
 function qtyBtn() {
-  return { width: 44, height: 44, borderRadius: '50%', background: 'var(--kSurface2, rgba(255,255,255,0.08))', color: 'var(--kFg, #fff)', border: 0, fontSize: 20, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  return { width: 44, height: 44, borderRadius: '50%', background: 'var(--kSurface2)', color: 'var(--kFg)', border: 0, fontSize: 20, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
 }

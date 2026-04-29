@@ -212,9 +212,8 @@ export default function KioskApp({ kioskId, onUnpair }) {
   };
   const customMatchesTheme = customBg && (isLight ? looksLight(customBg) : !looksLight(customBg));
   const effectiveBg = customMatchesTheme ? customBg : themeDefaultBg;
-  const fg = isLight ? '#111' : '#fff';
-  const fgMuted = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
-  const surfaceCard = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)';
+  // v5.5.0: fg/fgMuted/surfaceCard removed — these now live in globals.css under
+  // [data-kiosk-theme="light|dark"]. Use var(--kFg)/var(--kFgMuted)/var(--kSurface1) etc.
   const labelTapToOrder = profile?.kiosk_label_tap_to_order || 'TAP TO ORDER';
   const labelAddToOrder = profile?.kiosk_label_add_to_order || 'Add to order';
   const labelPlaceOrder = profile?.kiosk_label_place_order || 'Place order';
@@ -424,14 +423,14 @@ export default function KioskApp({ kioskId, onUnpair }) {
 
   // ─── Loading + error gates ───
   if (profLoading || menuLoading) {
-    return <div style={pageStyle()}><div style={{ color: 'var(--kFg, #fff)', fontSize: 18 }}>Loading…</div></div>;
+    return <div style={pageStyle()}><div style={{ color: 'var(--kFg)', fontSize: 18 }}>Loading…</div></div>;
   }
   if (profError || menuError || !device || !profile) {
     return <div style={pageStyle()}>
-      <div style={{ color: 'var(--kFg, #fff)', textAlign: 'center', padding: 40, maxWidth: 480 }}>
+      <div style={{ color: 'var(--kFg)', textAlign: 'center', padding: 40, maxWidth: 480 }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
         <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Kiosk not configured</div>
-        <div style={{ fontSize: 14, color: 'var(--kFgMuted, rgba(255,255,255,0.7))', marginBottom: 24 }}>{profError || menuError || 'Profile not found. Please ask staff.'}</div>
+        <div style={{ fontSize: 14, color: 'var(--kFgMuted)', marginBottom: 24 }}>{profError || menuError || 'Profile not found. Please ask staff.'}</div>
         <button onClick={onUnpair} style={btnGhostLight()}>Unpair</button>
       </div>
     </div>;
@@ -439,16 +438,15 @@ export default function KioskApp({ kioskId, onUnpair }) {
 
   // ─── Render ───
   return (
-    <div onPointerDown={resetIdle} data-kiosk-theme={isLight ? "light" : "dark"} style={kioskShell(brandColor, effectiveBg, fg)}>
-      <style dangerouslySetInnerHTML={{ __html: "[data-kiosk-theme=\"light\"] input,[data-kiosk-theme=\"light\"] textarea{background:rgba(0,0,0,0.05)!important;color:#111!important;border-color:rgba(0,0,0,0.12)!important}[data-kiosk-theme=\"light\"] *::placeholder{color:rgba(0,0,0,0.45)!important}" }} />
+    <div onPointerDown={resetIdle} data-kiosk-theme={isLight ? "light" : "dark"} style={kioskShell(brandColor, effectiveBg, brandAccent)}>
       {screen === 'attract' && <ScreenAttract brandName={brandName} brandColor={brandColor} brandAccent={brandAccent} brandLogoUrl={brandLogoUrl} attractVideoUrl={attractVideoUrl} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('attract')} ctaLabel={labelTapToOrder} onStart={() => { resetIdle(); setScreen('orderType'); }} />}
-      {screen === 'orderType' && <ScreenOrderType brandColor={brandColor} brandAccent={brandAccent} tableMode={tableMode} isLight={isLight} fg={fg} fgMuted={fgMuted} surfaceCard={surfaceCard} onPick={(t) => {
+      {screen === 'orderType' && <ScreenOrderType brandColor={brandColor} brandAccent={brandAccent} tableMode={tableMode} onPick={(t) => {
         setOrderType(t);
         if (t === 'dineIn' && (tableMode === 'enter' || tableMode === 'either')) setScreen('tableNumber');
         else setScreen('menu');
       }} onBack={() => setScreen('attract')} />}
       {screen === 'tableNumber' && <ScreenTableNumber brandColor={brandColor} value={tableNumber} onChange={setTableNumber} onContinue={() => setScreen('menu')} onBack={() => setScreen('orderType')} />}
-      {screen === 'menu' && <ScreenMenu brandColor={brandColor} brandAccent={brandAccent} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} banner={bannerFor('menu')} allergenFilter={allergenFilter} onShowAllergenPicker={() => setShowAllergenPicker(true)} isLight={isLight} fg={fg} fgMuted={fgMuted} surfaceCard={surfaceCard} onBack={() => setScreen('orderType')} />}
+      {screen === 'menu' && <ScreenMenu brandColor={brandColor} brandAccent={brandAccent} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} banner={bannerFor('menu')} allergenFilter={allergenFilter} onShowAllergenPicker={() => setShowAllergenPicker(true)} onBack={() => setScreen('orderType')} />}
       {screen === 'item' && selectedItem && (
         ((Array.isArray(selectedItem.assigned_modifier_groups) && selectedItem.assigned_modifier_groups.length > 0) || selectedItem.type === 'variants') ? (
           <KioskProductModal
@@ -478,7 +476,6 @@ export default function KioskApp({ kioskId, onUnpair }) {
       {showAllergenPicker && (
         <AllergenPickerOverlay
           brandColor={brandColor}
-          isLight={isLight}
           allergens={Array.from(new Set(items.flatMap(i => Array.isArray(i.allergens) ? i.allergens : [])))}
           selected={allergenFilter}
           onChange={setAllergenFilter}
@@ -488,12 +485,12 @@ export default function KioskApp({ kioskId, onUnpair }) {
 
       {/* Idle warning overlay */}
       {idleWarning && screen !== 'attract' && screen !== 'done' && (
-        <div onClick={resetIdle} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'grid', placeItems: 'center', zIndex: 200, padding: 24 }}>
-          <div style={{ background: '#1a1a1f', border: '2px solid ' + brandColor, borderRadius: 24, padding: '40px 36px', maxWidth: 400, textAlign: 'center', cursor: 'pointer' }}>
+        <div onClick={resetIdle} style={{ position: 'fixed', inset: 0, background: 'var(--kOverlay)', display: 'grid', placeItems: 'center', zIndex: 200, padding: 24 }}>
+          <div style={{ background: 'var(--kSurfaceRaised)', border: '2px solid ' + brandColor, borderRadius: 24, padding: '40px 36px', maxWidth: 400, textAlign: 'center', cursor: 'pointer' }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>⏰</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--kFg, #fff)', marginBottom: 8 }}>Still there?</div>
-            <div style={{ fontSize: 14, color: 'var(--kFgMuted, rgba(255,255,255,0.7))', marginBottom: 24 }}>This order will reset in {warningCountdown}s</div>
-            <div style={{ background: brandColor, color: 'var(--kFg, #fff)', padding: '14px 28px', borderRadius: 100, fontSize: 16, fontWeight: 700 }}>Tap to continue</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--kFg)', marginBottom: 8 }}>Still there?</div>
+            <div style={{ fontSize: 14, color: 'var(--kFgMuted)', marginBottom: 24 }}>This order will reset in {warningCountdown}s</div>
+            <div style={{ background: brandColor, color: 'var(--kFg)', padding: '14px 28px', borderRadius: 100, fontSize: 16, fontWeight: 700 }}>Tap to continue</div>
           </div>
         </div>
       )}
@@ -505,42 +502,36 @@ export default function KioskApp({ kioskId, onUnpair }) {
 // SHARED STYLES
 // ============================================================
 
-function kioskShell(brandColor, brandBg, fg) {
-  const isLightFg = fg && fg.startsWith('#1') ? true : false;
+// v5.5.0: theme vars now live in globals.css under [data-kiosk-theme="light|dark"].
+// kioskShell only sets the brand colors (which are per-org, not theme-bound) and
+// the background — light/dark fg/surfaces/borders flip via CSS.
+function kioskShell(brandColor, brandBg, brandAccent) {
   return {
     position: 'fixed',
     inset: 0,
-    background: brandBg || '#0e0e10',
-    color: fg || '#fff',
-    '--kFg': fg || '#fff',
-    '--kFgMuted': isLightFg ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)',
-    '--kFgFaint': isLightFg ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.4)',
-    '--kSurface1': isLightFg ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
-    '--kSurface2': isLightFg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
-    '--kSurface3': isLightFg ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
-    '--kBorder1': isLightFg ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
-    '--kBorder2': isLightFg ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)',
-    '--kBorder3': isLightFg ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.2)',
+    background: brandBg || 'var(--kSurfaceShell)',
+    color: 'var(--kFg)',
+    '--kBrand': brandColor || '#ff7070',
+    '--kBrandAccent': brandAccent || brandColor || '#ff7070',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
     overflow: 'hidden',
     userSelect: 'none',
     WebkitUserSelect: 'none',
     WebkitTapHighlightColor: 'transparent',
-    '--brand': brandColor,
   };
 }
 function pageStyle() {
   return {
     position: 'fixed', inset: 0,
-    background: 'linear-gradient(180deg, #0a0a0c 0%, #1a1a1f 100%)',
-    color: 'var(--kFg, #fff)',
+    background: 'var(--kSurfaceShell)',
+    color: 'var(--kFg)',
     display: 'grid',
     placeItems: 'center',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   };
 }
 function btnGhostLight() {
-  return { background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--kFgMuted, rgba(255,255,255,0.7))', padding: '10px 22px', borderRadius: 10, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' };
+  return { background: 'transparent', border: '1px solid var(--kBorder2)', color: 'var(--kFgMuted)', padding: '10px 22px', borderRadius: 10, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' };
 }
 
 // ============================================================
@@ -561,19 +552,19 @@ function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attra
       ) : useBannerAsBackground ? (
         <img src={banner.imageUrl} alt={banner.label || brandName} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : null}
-      <div style={{ position: 'absolute', inset: 0, background: (attractVideoUrl || useBannerAsBackground) ? 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%)' : 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.15), transparent 60%)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: (attractVideoUrl || useBannerAsBackground) ? 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%)' : 'radial-gradient(circle at 70% 30%, var(--kBorder2), transparent 60%)' }} />
       <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5vw', zIndex: 1 }}>
         {brandLogoUrl ? (
           <img src={brandLogoUrl} alt={brandName} style={{ maxWidth: '50%', maxHeight: '20vh', marginBottom: '3vh', objectFit: 'contain' }} />
         ) : null}
-        <div style={{ fontSize: 'clamp(48px, 9vw, 96px)', fontWeight: 900, letterSpacing: '-0.04em', color: 'var(--kFg, #fff)', textAlign: 'center', lineHeight: 1, marginBottom: '2vh', textShadow: '0 4px 30px rgba(0,0,0,0.3)' }}>{brandName}</div>
+        <div style={{ fontSize: 'clamp(48px, 9vw, 96px)', fontWeight: 900, letterSpacing: '-0.04em', color: 'var(--kFg)', textAlign: 'center', lineHeight: 1, marginBottom: '2vh', textShadow: '0 4px 30px rgba(0,0,0,0.3)' }}>{brandName}</div>
         {/* v5.4.0: subtitle removed */}
         {avgWaitMinutes ? (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(10px)', borderRadius: 100, fontSize: 'clamp(13px, 1.8vw, 18px)', fontWeight: 600, color: 'var(--kFg, #fff)', marginBottom: '6vh' }}>⏱ ~{avgWaitMinutes} min wait</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', background: 'var(--kBorder2)', backdropFilter: 'blur(10px)', borderRadius: 100, fontSize: 'clamp(13px, 1.8vw, 18px)', fontWeight: 600, color: 'var(--kFg)', marginBottom: '6vh' }}>⏱ ~{avgWaitMinutes} min wait</div>
         ) : null}
         <div style={{ background: '#fff', color: shade(brandColor, -30), padding: 'clamp(18px, 3vh, 28px) clamp(40px, 8vw, 100px)', borderRadius: 100, fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, boxShadow: '0 10px 40px rgba(0,0,0,0.25)', animation: 'kioskPulse 2s infinite', letterSpacing: '-0.02em' }}>{ctaLabel || 'TAP TO ORDER'}</div>
       </div>
-      <div style={{ position: 'relative', padding: '0 30px 30px', fontSize: 13, color: 'var(--kFgMuted, rgba(255,255,255,0.7))', textAlign: 'center', zIndex: 1 }}>Tap anywhere to begin</div>
+      <div style={{ position: 'relative', padding: '0 30px 30px', fontSize: 13, color: 'var(--kFgMuted)', textAlign: 'center', zIndex: 1 }}>Tap anywhere to begin</div>
       <style>{'@keyframes kioskPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }'}</style>
     </div>
   );
@@ -594,33 +585,33 @@ function shade(hex, percent) {
 // ============================================================
 // SCREEN: ORDER TYPE
 // ============================================================
-function ScreenOrderType({ brandColor, brandAccent, tableMode, isLight, fg, fgMuted, surfaceCard, onPick, onBack }) {
+function ScreenOrderType({ brandColor, brandAccent, tableMode, onPick, onBack }) {
   const dineInAvailable = tableMode !== 'none';
   const accent = brandAccent || shade(brandColor, -20);
   return (
     <div style={fullScreen()}>
       <div style={{ padding: '24px 22px 12px', flexShrink: 0 }}>
-        <button onClick={onBack} style={iconBtn(isLight)}>←</button>
+        <button onClick={onBack} style={iconBtn()}>←</button>
       </div>
       <div style={{ flex: 1, padding: '0 5vw 5vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '3vh' }}>
         <div>
-          <div style={{ fontSize: 'clamp(36px, 6vw, 56px)', fontWeight: 900, letterSpacing: '-0.03em', color: fg || '#fff', lineHeight: 1.05, marginBottom: 4 }}>Where will you<br/>be eating?</div>
+          <div style={{ fontSize: 'clamp(36px, 6vw, 56px)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--kFg)', lineHeight: 1.05, marginBottom: 4 }}>Where will you<br/>be eating?</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: dineInAvailable ? '1fr 1fr' : '1fr', gap: 'clamp(12px, 2vw, 18px)' }}>
           {dineInAvailable && (
             <button onClick={() => onPick('dineIn')} style={otHeroCard(brandColor, accent)}>
               <div style={{ fontSize: 'clamp(64px, 12vw, 110px)', filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.25))' }}>🍽️</div>
               <div style={{ marginTop: 'auto' }}>
-                <div style={{ fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--kFg, #fff)', marginBottom: 4 }}>Eat in</div>
-                <div style={{ fontSize: 'clamp(13px, 1.6vw, 16px)', color: 'var(--kFgMuted, rgba(255,255,255,0.85))', fontWeight: 500 }}>Served to your table</div>
+                <div style={{ fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', marginBottom: 4 }}>Eat in</div>
+                <div style={{ fontSize: 'clamp(13px, 1.6vw, 16px)', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>Served to your table</div>
               </div>
             </button>
           )}
           <button onClick={() => onPick('takeaway')} style={otHeroCard(accent, brandColor)}>
             <div style={{ fontSize: 'clamp(64px, 12vw, 110px)', filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.25))' }}>🥡</div>
             <div style={{ marginTop: 'auto' }}>
-              <div style={{ fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--kFg, #fff)', marginBottom: 4 }}>Takeaway</div>
-              <div style={{ fontSize: 'clamp(13px, 1.6vw, 16px)', color: 'var(--kFgMuted, rgba(255,255,255,0.85))', fontWeight: 500 }}>Collect at the counter</div>
+              <div style={{ fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', marginBottom: 4 }}>Takeaway</div>
+              <div style={{ fontSize: 'clamp(13px, 1.6vw, 16px)', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>Collect at the counter</div>
             </div>
           </button>
         </div>
@@ -635,7 +626,7 @@ function otHeroCard(c1, c2) {
     border: 0, borderRadius: 24,
     padding: 'clamp(24px, 4vw, 36px)',
     display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between',
-    cursor: 'pointer', color: 'var(--kFg, #fff)', fontFamily: 'inherit', textAlign: 'left',
+    cursor: 'pointer', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
     boxShadow: '0 14px 40px rgba(0,0,0,0.35)',
     aspectRatio: '4/5',
     minHeight: '32vh',
@@ -672,17 +663,17 @@ function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) 
 // ============================================================
 // SCREEN: MENU
 // ============================================================
-function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCategoryId, onSelectCategory, onSelectItem, cartItemCount, subtotal, onCart, orderType, activeMenuId, banner, allergenFilter, onShowAllergenPicker, isLight, fg, fgMuted, surfaceCard, onBack }) {
+function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCategoryId, onSelectCategory, onSelectItem, cartItemCount, subtotal, onCart, orderType, activeMenuId, banner, allergenFilter, onShowAllergenPicker, onBack }) {
   return (
     <div style={fullScreen()}>
       {/* top bar */}
-      <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+      <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid var(--kSurface2)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <button onClick={onBack} style={iconBtn()}>←</button>
           <button onClick={onCart} disabled={cartItemCount === 0} style={{
             display: 'flex', alignItems: 'center', gap: 8,
-            background: cartItemCount > 0 ? brandColor : 'rgba(255,255,255,0.1)',
-            color: cartItemCount > 0 ? '#fff' : 'rgba(255,255,255,0.5)',
+            background: cartItemCount > 0 ? brandColor : 'var(--kBorder1)',
+            color: cartItemCount > 0 ? '#fff' : 'var(--kFgFaint)',
             padding: '10px 18px', borderRadius: 100, fontWeight: 700, fontSize: 14,
             border: 0, fontFamily: 'inherit', cursor: cartItemCount > 0 ? 'pointer' : 'default',
           }}>
@@ -690,7 +681,7 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
           </button>
         </div>
         {banner && banner.imageUrl && (
-          <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden', marginBottom: 12, aspectRatio: '5/2', background: 'var(--kSurface1, rgba(255,255,255,0.04))' }}>
+          <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden', marginBottom: 12, aspectRatio: '5/2', background: 'var(--kSurface1)' }}>
             <img src={banner.imageUrl} alt={banner.label || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           </div>
         )}
@@ -713,14 +704,14 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
         {/* category strip */}
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
           {categories.length === 0 ? (
-            <div style={{ padding: 12, fontSize: 13, color: 'var(--kFgMuted, rgba(255,255,255,0.5))' }}>No categories on this menu yet.</div>
+            <div style={{ padding: 12, fontSize: 13, color: 'var(--kFgMuted)' }}>No categories on this menu yet.</div>
           ) : categories.map(c => {
             const active = c.id === selectedCategoryId;
             return (
               <button key={c.id} onClick={() => onSelectCategory(c.id)} style={{
                 padding: '10px 18px',
-                background: active ? brandColor : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'),
-                color: active ? '#fff' : (isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)'),
+                background: active ? brandColor : 'var(--kSurface2)',
+                color: active ? '#fff' : 'var(--kFgMuted)',
                 borderRadius: 100, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap',
                 border: 0, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
               }}>{c.label}</button>
@@ -731,7 +722,7 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
       {/* item grid */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignContent: 'start' }}>
         {items.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', padding: 60, textAlign: 'center', color: 'var(--kFgMuted, rgba(255,255,255,0.5))' }}>No items in this category.</div>
+          <div style={{ gridColumn: '1 / -1', padding: 60, textAlign: 'center', color: 'var(--kFgMuted)' }}>No items in this category.</div>
         ) : items.map(it => {
           const price = resolvePrice(it, orderType, activeMenuId);
           // v5.4.0: check if item contains any flagged allergen
@@ -739,24 +730,24 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
           const flagged = allergenFilter && Array.from(allergenFilter).some(a => itemAllergens.includes(String(a).toLowerCase()));
           return (
             <button key={it.id} onClick={() => onSelectItem(it)} style={{
-              background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
-              border: '1px solid ' + (flagged ? 'rgba(239,68,68,0.5)' : (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)')),
+              background: 'var(--kSurface1)',
+              border: '1px solid ' + (flagged ? 'rgba(239,68,68,0.5)' : 'var(--kBorder1)'),
               borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
-              fontFamily: 'inherit', textAlign: 'left', padding: 0, color: fg || 'var(--kFg, #fff)',
+              fontFamily: 'inherit', textAlign: 'left', padding: 0, color: 'var(--kFg)',
               opacity: flagged ? 0.45 : 1,
               position: 'relative',
               display: 'flex', flexDirection: 'column',
               minHeight: 250,
             }}>
               {flagged && (
-                <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, background: '#ef4444', color: 'var(--kFg, #fff)', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>UNSAFE</div>
+                <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, background: '#ef4444', color: 'var(--kFg)', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>UNSAFE</div>
               )}
-              <div style={{ width: '100%', height: 130, flexShrink: 0, background: 'linear-gradient(135deg, var(--kSurface1, rgba(255,255,255,0.05)), rgba(0,0,0,0.2))', display: 'grid', placeItems: 'center', fontSize: 50, overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: 130, flexShrink: 0, background: 'linear-gradient(135deg, var(--kSurface1), rgba(0,0,0,0.2))', display: 'grid', placeItems: 'center', fontSize: 50, overflow: 'hidden' }}>
                 {it.image ? <img src={it.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
               </div>
               <div style={{ padding: '10px 12px 14px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3, lineHeight: 1.2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--kFgMuted, rgba(255,255,255,0.55))', lineHeight: 1.3, marginBottom: 8, minHeight: 28, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.description || ''}</div>
+                <div style={{ fontSize: 11, color: 'var(--kFgMuted)', lineHeight: 1.3, marginBottom: 8, minHeight: 28, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.description || ''}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: brandColor, fontVariantNumeric: 'tabular-nums' }}>£{Number(price).toFixed(2)}</div>
                   {Array.isArray(it.allergens) && it.allergens.length > 0 && (
@@ -782,25 +773,25 @@ function ScreenItemDetail({ brandColor, item, orderType, activeMenuId, addLabel,
     <div style={fullScreen()}>
       <div style={{ position: 'relative', width: '100%', height: '40vh', background: 'linear-gradient(135deg, ' + brandColor + ', ' + shade(brandColor, -25) + ')', display: 'grid', placeItems: 'center', fontSize: 140, flexShrink: 0, overflow: 'hidden' }}>
         {item.image ? <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
-        <button onClick={onBack} style={{ position: 'absolute', top: 18, left: 18, width: 48, height: 48, borderRadius: 14, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', fontSize: 22, color: 'var(--kFg, #fff)', border: 0, cursor: 'pointer' }}>←</button>
+        <button onClick={onBack} style={{ position: 'absolute', top: 18, left: 18, width: 48, height: 48, borderRadius: 14, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', fontSize: 22, color: 'var(--kFg)', border: 0, cursor: 'pointer' }}>←</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px 26px 16px' }}>
         <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8 }}>{item.name}</div>
-        <div style={{ fontSize: 14, color: 'var(--kFgMuted, rgba(255,255,255,0.7))', lineHeight: 1.5, marginBottom: 16 }}>{item.description}</div>
+        <div style={{ fontSize: 14, color: 'var(--kFgMuted)', lineHeight: 1.5, marginBottom: 16 }}>{item.description}</div>
         {Array.isArray(item.allergens) && item.allergens.length > 0 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 22 }}>
             {item.allergens.map(a => <div key={a} style={{ padding: '5px 10px', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 8, fontSize: 11, color: '#ddc270', fontWeight: 600, textTransform: 'capitalize' }}>⚠ {a}</div>)}
           </div>
         )}
       </div>
-      <div style={{ padding: '14px 22px 22px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--kSurface1, rgba(255,255,255,0.06))', borderRadius: 100, padding: 4 }}>
+      <div style={{ padding: '14px 22px 22px', borderTop: '1px solid var(--kSurface2)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--kSurface1)', borderRadius: 100, padding: 4 }}>
           <button onClick={() => setQty(q => Math.max(1, q - 1))} style={qtyBtn()}>−</button>
           <div style={{ fontSize: 18, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{qty}</div>
           <button onClick={() => setQty(q => q + 1)} style={qtyBtn()}>+</button>
         </div>
         <button onClick={() => onAdd(qty, {})} style={{
-          flex: 1, background: brandColor, color: 'var(--kFg, #fff)',
+          flex: 1, background: brandColor, color: 'var(--kFg)',
           padding: '16px 20px', borderRadius: 100,
           fontSize: 16, fontWeight: 800,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -821,22 +812,22 @@ function ScreenItemDetail({ brandColor, item, orderType, activeMenuId, addLabel,
 function ScreenCart({ brandColor, cart, subtotal, onUpdate, onAddMore, onContinue, onBack }) {
   return (
     <div style={fullScreen()}>
-      <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid var(--kSurface2)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={onBack} style={iconBtn()}>←</button>
         <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', flex: 1 }}>Your order</div>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 22px' }}>
         {cart.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: 'var(--kFgMuted, rgba(255,255,255,0.5))' }}>Your cart is empty</div>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--kFgMuted)' }}>Your cart is empty</div>
         ) : cart.map(l => (
-          <div key={l.key} style={{ padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div key={l.key} style={{ padding: '14px 0', borderBottom: '1px solid var(--kSurface1)' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
               <div style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{l.name}</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: brandColor, fontVariantNumeric: 'tabular-nums' }}>£{l.lineTotal.toFixed(2)}</div>
             </div>
-            {l.mods && <div style={{ fontSize: 12, color: 'var(--kFgMuted, rgba(255,255,255,0.5))', marginBottom: 8 }}>{l.mods}</div>}
+            {l.mods && <div style={{ fontSize: 12, color: 'var(--kFgMuted)', marginBottom: 8 }}>{l.mods}</div>}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--kSurface1, rgba(255,255,255,0.06))', borderRadius: 100, padding: 3 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--kSurface1)', borderRadius: 100, padding: 3 }}>
                 <button onClick={() => onUpdate(l.key, -1)} style={miniQtyBtn()}>−</button>
                 <div style={{ fontSize: 14, fontWeight: 600, minWidth: 14, textAlign: 'center' }}>{l.qty}</div>
                 <button onClick={() => onUpdate(l.key, +1)} style={miniQtyBtn()}>+</button>
@@ -844,9 +835,9 @@ function ScreenCart({ brandColor, cart, subtotal, onUpdate, onAddMore, onContinu
             </div>
           </div>
         ))}
-        <button onClick={onAddMore} style={{ display: 'block', width: '100%', textAlign: 'center', padding: 14, fontSize: 14, color: 'var(--kFgMuted, rgba(255,255,255,0.6))', background: 'transparent', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>+ Add more items</button>
+        <button onClick={onAddMore} style={{ display: 'block', width: '100%', textAlign: 'center', padding: 14, fontSize: 14, color: 'var(--kFgMuted)', background: 'transparent', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>+ Add more items</button>
       </div>
-      <div style={{ padding: '16px 22px', borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+      <div style={{ padding: '16px 22px', borderTop: '1px solid var(--kSurface2)', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 800, marginBottom: 0 }}>
           <span>Subtotal</span>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>£{subtotal.toFixed(2)}</span>
@@ -883,31 +874,31 @@ function ScreenTip({ brandColor, subtotal, tipPresets, tip, onSetTip, onContinue
           <button key={pct} onClick={() => pickPercent(pct)} style={{
             ...bigCard(brandColor),
             borderColor: isPctActive(pct) ? brandColor : 'transparent',
-            background: isPctActive(pct) ? 'rgba(249,115,22,0.06)' : 'rgba(255,255,255,0.04)',
+            background: isPctActive(pct) ? 'rgba(249,115,22,0.06)' : 'var(--kSurface1)',
           }}>
             <div style={{ fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: 900, color: brandColor, minWidth: '4ch' }}>{pct}%</div>
             <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontSize: 'clamp(13px, 1.7vw, 16px)', color: 'var(--kFgMuted, rgba(255,255,255,0.6))' }}>Tip amount</div>
+              <div style={{ fontSize: 'clamp(13px, 1.7vw, 16px)', color: 'var(--kFgMuted)' }}>Tip amount</div>
               <div style={{ fontSize: 'clamp(20px, 2.8vw, 26px)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>£{(subtotal * pct / 100).toFixed(2)}</div>
             </div>
           </button>
         ))}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <button onClick={pickNone} style={{ ...smallCard(brandColor), borderColor: tip === 0 ? brandColor : 'transparent', background: tip === 0 ? 'rgba(249,115,22,0.06)' : 'rgba(255,255,255,0.04)' }}>
+          <button onClick={pickNone} style={{ ...smallCard(brandColor), borderColor: tip === 0 ? brandColor : 'transparent', background: tip === 0 ? 'rgba(249,115,22,0.06)' : 'var(--kSurface1)' }}>
             <div style={{ fontSize: 18, fontWeight: 700 }}>No tip</div>
           </button>
-          <button onClick={() => setCustomMode(true)} style={{ ...smallCard(brandColor), borderColor: customMode ? brandColor : 'transparent', background: customMode ? 'rgba(249,115,22,0.06)' : 'rgba(255,255,255,0.04)' }}>
+          <button onClick={() => setCustomMode(true)} style={{ ...smallCard(brandColor), borderColor: customMode ? brandColor : 'transparent', background: customMode ? 'rgba(249,115,22,0.06)' : 'var(--kSurface1)' }}>
             <div style={{ fontSize: 18, fontWeight: 700 }}>Custom amount</div>
           </button>
         </div>
         {customMode && (
-          <div style={{ background: 'var(--kSurface1, rgba(255,255,255,0.04))', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 14 }}>
-            <div style={{ fontSize: 11, color: 'var(--kFgMuted, rgba(255,255,255,0.5))', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Custom tip (£)</div>
+          <div style={{ background: 'var(--kSurface1)', border: '1px solid var(--kSurface2)', borderRadius: 14, padding: 14 }}>
+            <div style={{ fontSize: 11, color: 'var(--kFgMuted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Custom tip (£)</div>
             <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 22, color: 'var(--kFgFaint, rgba(255,255,255,0.4))', fontFamily: 'ui-monospace, monospace' }}>£</span>
+              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 22, color: 'var(--kFgFaint)', fontFamily: 'ui-monospace, monospace' }}>£</span>
               <input type="number" step="0.01" min="0" value={customStr} onChange={e => setCustomFromInput(e.target.value)}
                 placeholder="0.00" autoFocus
-                style={{ width: '100%', padding: '14px 14px 14px 36px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'var(--kFg, #fff)', fontSize: 22, fontFamily: 'ui-monospace, monospace', fontWeight: 700, outline: 'none' }} />
+                style={{ width: '100%', padding: '14px 14px 14px 36px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--kBorder1)', borderRadius: 10, color: 'var(--kFg)', fontSize: 22, fontFamily: 'ui-monospace, monospace', fontWeight: 700, outline: 'none' }} />
             </div>
           </div>
         )}
@@ -930,12 +921,12 @@ function ScreenPay({ brandColor, total, submitting, error, onSimulatePaid, onBac
       <ScreenHeader title="Tap or insert your card" subtitle="Use the card reader on the side of the kiosk" onBack={onBack} brandColor={brandColor} />
       <div style={{ flex: 1, padding: '6vh 5vw', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4vh' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: 'var(--kFgMuted, rgba(255,255,255,0.6))', marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Amount due</div>
-          <div style={{ fontSize: 'clamp(60px, 12vw, 110px)', fontWeight: 900, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', color: 'var(--kFg, #fff)' }}>£{total.toFixed(2)}</div>
+          <div style={{ fontSize: 14, color: 'var(--kFgMuted)', marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Amount due</div>
+          <div style={{ fontSize: 'clamp(60px, 12vw, 110px)', fontWeight: 900, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', color: 'var(--kFg)' }}>£{total.toFixed(2)}</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
           <div style={{ fontSize: 'clamp(48px, 8vw, 72px)', color: brandColor, animation: 'kioskPoint 1.5s infinite' }}>→</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--kFgMuted, rgba(255,255,255,0.85))' }}>Card reader on the side</div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--kFgMuted)' }}>Card reader on the side</div>
         </div>
         <style>{'@keyframes kioskPoint { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(8px); } }'}</style>
         {error && (
@@ -946,7 +937,7 @@ function ScreenPay({ brandColor, total, submitting, error, onSimulatePaid, onBac
         <button disabled={submitting} onClick={onSimulatePaid} style={{ ...primaryCta(brandColor), width: '100%', opacity: submitting ? 0.5 : 1 }}>
           {submitting ? 'Submitting…' : '✅ Simulate paid (demo) →'}
         </button>
-        <div style={{ textAlign: 'center', marginTop: 10, fontSize: 11, color: 'var(--kFgFaint, rgba(255,255,255,0.4))' }}>Real card reader integration in v5.2</div>
+        <div style={{ textAlign: 'center', marginTop: 10, fontSize: 11, color: 'var(--kFgFaint)' }}>Real card reader integration in v5.2</div>
       </div>
     </div>
   );
@@ -973,21 +964,21 @@ function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhon
         <div>
           <label style={fieldLabel()}>Your name <span style={{ color: brandColor }}>*</span></label>
           <input value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Sarah"
-            style={{ width: '100%', padding: '18px 20px', background: 'var(--kSurface1, rgba(255,255,255,0.06))', border: '2px solid rgba(255,255,255,0.1)', borderRadius: 14, color: 'var(--kFg, #fff)', fontSize: 22, fontFamily: 'inherit', outline: 'none' }} />
-          <div style={{ fontSize: 11, color: 'var(--kFgMuted, rgba(255,255,255,0.5))', marginTop: 6 }}>Used to call you when your order is ready</div>
+            style={{ width: '100%', padding: '18px 20px', background: 'var(--kSurface1)', border: '2px solid var(--kBorder1)', borderRadius: 14, color: 'var(--kFg)', fontSize: 22, fontFamily: 'inherit', outline: 'none' }} />
+          <div style={{ fontSize: 11, color: 'var(--kFgMuted)', marginTop: 6 }}>Used to call you when your order is ready</div>
         </div>
         <div>
-          <label style={fieldLabel()}>Mobile number <span style={{ color: 'var(--kFgFaint, rgba(255,255,255,0.4))' }}>(optional)</span></label>
+          <label style={fieldLabel()}>Mobile number <span style={{ color: 'var(--kFgFaint)' }}>(optional)</span></label>
           <input value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9 +]/g, ''))} placeholder="07*** *** ***" type="tel" inputMode="tel"
-            style={{ width: '100%', padding: '18px 20px', background: 'var(--kSurface1, rgba(255,255,255,0.06))', border: '2px solid rgba(255,255,255,0.1)', borderRadius: 14, color: 'var(--kFg, #fff)', fontSize: 22, fontFamily: 'ui-monospace, monospace', outline: 'none', letterSpacing: '0.04em' }} />
-          <div style={{ fontSize: 11, color: 'var(--kFgMuted, rgba(255,255,255,0.5))', marginTop: 6 }}>We will text your receipt and a £5 voucher — no spam</div>
+            style={{ width: '100%', padding: '18px 20px', background: 'var(--kSurface1)', border: '2px solid var(--kBorder1)', borderRadius: 14, color: 'var(--kFg)', fontSize: 22, fontFamily: 'ui-monospace, monospace', outline: 'none', letterSpacing: '0.04em' }} />
+          <div style={{ fontSize: 11, color: 'var(--kFgMuted)', marginTop: 6 }}>We will text your receipt and a £5 voucher — no spam</div>
         </div>
       </div>
       <div style={{ padding: '14px 22px 22px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button onClick={submit} disabled={!name.trim() || submitting} style={{ ...primaryCta(brandColor), width: '100%', opacity: !name.trim() || submitting ? 0.4 : 1 }}>
           {submitting ? 'Placing order…' : ((placeOrderLabel || 'Place order') + ' →')}
         </button>
-        <button onClick={skip} disabled={submitting} style={{ background: 'transparent', color: 'var(--kFgMuted, rgba(255,255,255,0.6))', padding: 12, borderRadius: 10, fontSize: 13, border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
+        <button onClick={skip} disabled={submitting} style={{ background: 'transparent', color: 'var(--kFgMuted)', padding: 12, borderRadius: 10, fontSize: 13, border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
           Skip and place anonymously
         </button>
       </div>
@@ -1008,18 +999,18 @@ function ScreenDone({ brandColor, customerName, customerPhone, orderNumber, orde
         </div>
       )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '6vw' }}>
-        <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#22c55e', display: 'grid', placeItems: 'center', fontSize: 60, color: 'var(--kFg, #fff)', marginBottom: 30, boxShadow: '0 0 80px rgba(34,197,94,0.5)' }}>✓</div>
+        <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#22c55e', display: 'grid', placeItems: 'center', fontSize: 60, color: 'var(--kFg)', marginBottom: 30, boxShadow: '0 0 80px rgba(34,197,94,0.5)' }}>✓</div>
         <div style={{ fontSize: 'clamp(22px, 3.6vw, 32px)', fontWeight: 700, marginBottom: 4 }}>{customerName ? 'Thank you, ' + customerName + '!' : 'Thank you!'}</div>
-        <div style={{ fontSize: 13, color: 'var(--kFgMuted, rgba(255,255,255,0.7))', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 40, marginBottom: 12 }}>Your order number</div>
+        <div style={{ fontSize: 13, color: 'var(--kFgMuted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 40, marginBottom: 12 }}>Your order number</div>
         <div style={{ fontSize: 'clamp(120px, 22vw, 220px)', fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.9, marginBottom: 20, fontVariantNumeric: 'tabular-nums' }}>{orderNumber || '—'}</div>
-        <div style={{ fontSize: 16, color: 'var(--kFgMuted, rgba(255,255,255,0.85))', maxWidth: 360, lineHeight: 1.5, marginBottom: 8 }}>
+        <div style={{ fontSize: 16, color: 'var(--kFgMuted)', maxWidth: 360, lineHeight: 1.5, marginBottom: 8 }}>
           {orderType === 'dineIn' && tableNumber ? 'Your order will be brought to table ' + tableNumber + '.' : 'We will call your number when ready.'}
         </div>
-        <div style={{ fontSize: 13, color: 'var(--kFgMuted, rgba(255,255,255,0.6))', marginBottom: 40 }}>Average wait: {avgWaitMinutes || 8} mins</div>
+        <div style={{ fontSize: 13, color: 'var(--kFgMuted)', marginBottom: 40 }}>Average wait: {avgWaitMinutes || 8} mins</div>
         {phoneMasked && (
-          <div style={{ fontSize: 13, color: 'var(--kFgMuted, rgba(255,255,255,0.7))', marginBottom: 30 }}>📱 Receipt sent to {phoneMasked}</div>
+          <div style={{ fontSize: 13, color: 'var(--kFgMuted)', marginBottom: 30 }}>📱 Receipt sent to {phoneMasked}</div>
         )}
-        <button onClick={onDone} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: 'var(--kFgMuted, rgba(255,255,255,0.7))', padding: '10px 24px', borderRadius: 100, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
+        <button onClick={onDone} style={{ background: 'transparent', border: '1px solid var(--kFgFaint)', color: 'var(--kFgMuted)', padding: '10px 24px', borderRadius: 100, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
       </div>
     </div>
   );
@@ -1034,7 +1025,7 @@ function ScreenHeader({ title, subtitle, onBack, brandColor }) {
       {onBack && <button onClick={onBack} style={iconBtn()}>←</button>}
       <div style={{ marginTop: onBack ? 16 : 0 }}>
         <div style={{ fontSize: 'clamp(28px, 4.8vw, 42px)', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 6 }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 'clamp(13px, 1.8vw, 16px)', color: 'var(--kFgMuted, rgba(255,255,255,0.6))' }}>{subtitle}</div>}
+        {subtitle && <div style={{ fontSize: 'clamp(13px, 1.8vw, 16px)', color: 'var(--kFgMuted)' }}>{subtitle}</div>}
       </div>
     </div>
   );
@@ -1043,7 +1034,7 @@ function ScreenHeader({ title, subtitle, onBack, brandColor }) {
 // ============================================================
 // ALLERGEN PICKER (v5.4.0)
 // ============================================================
-function AllergenPickerOverlay({ brandColor, isLight, allergens, selected, onChange, onClose }) {
+function AllergenPickerOverlay({ brandColor, allergens, selected, onChange, onClose }) {
   const COMMON = [
     { key: 'gluten', label: 'Gluten', icon: '🌾' },
     { key: 'dairy', label: 'Dairy', icon: '🥛' },
@@ -1069,24 +1060,20 @@ function AllergenPickerOverlay({ brandColor, isLight, allergens, selected, onCha
     if (next.has(key)) next.delete(key); else next.add(key);
     onChange(next);
   };
-  const overlayBg = isLight ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)';
-  const cardBg = isLight ? '#fff' : '#1a1a1f';
-  const fg = isLight ? '#111' : '#fff';
-  const fgMuted = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: overlayBg, backdropFilter: 'blur(8px)', display: 'grid', placeItems: 'center', padding: 24, zIndex: 200 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: cardBg, color: fg, border: '1px solid ' + (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'), borderRadius: 24, padding: 28, maxWidth: 460, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'var(--kOverlay)', backdropFilter: 'blur(8px)', display: 'grid', placeItems: 'center', padding: 24, zIndex: 200 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--kSurfaceRaised)', color: 'var(--kFg)', border: '1px solid var(--kBorder1)', borderRadius: 24, padding: 28, maxWidth: 460, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 6 }}>Any allergies?</div>
-        <div style={{ fontSize: 13, color: fgMuted, marginBottom: 22 }}>Tap to flag what you can't have. Items containing flagged allergens will be marked.</div>
+        <div style={{ fontSize: 13, color: 'var(--kFgMuted)', marginBottom: 22 }}>Tap to flag what you can't have. Items containing flagged allergens will be marked.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
           {finalList.map(a => {
             const isSel = selected.has(a.key);
             return (
               <button key={a.key} onClick={() => toggle(a.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
-                background: isSel ? 'rgba(239,68,68,0.15)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)'),
+                background: isSel ? 'rgba(239,68,68,0.15)' : 'var(--kSurface1)',
                 border: '2px solid ' + (isSel ? '#ef4444' : 'transparent'),
-                borderRadius: 14, cursor: 'pointer', color: fg, fontFamily: 'inherit', textAlign: 'left',
+                borderRadius: 14, cursor: 'pointer', color: 'var(--kFg)', fontFamily: 'inherit', textAlign: 'left',
               }}>
                 <span style={{ fontSize: 22 }}>{a.icon}</span>
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{a.label}</span>
@@ -1097,9 +1084,9 @@ function AllergenPickerOverlay({ brandColor, isLight, allergens, selected, onCha
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           {selected.size > 0 && (
-            <button onClick={() => onChange(new Set())} style={{ flex: 1, background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', color: fg, border: 0, padding: '14px', borderRadius: 100, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Clear all</button>
+            <button onClick={() => onChange(new Set())} style={{ flex: 1, background: 'var(--kSurface2)', color: 'var(--kFg)', border: 0, padding: '14px', borderRadius: 100, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Clear all</button>
           )}
-          <button onClick={onClose} style={{ flex: 2, background: brandColor, color: 'var(--kFg, #fff)', border: 0, padding: '14px', borderRadius: 100, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>{selected.size > 0 ? 'Show me what I can have' : 'Done'}</button>
+          <button onClick={onClose} style={{ flex: 2, background: brandColor, color: '#fff', border: 0, padding: '14px', borderRadius: 100, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>{selected.size > 0 ? 'Show me what I can have' : 'Done'}</button>
         </div>
       </div>
     </div>
@@ -1110,10 +1097,10 @@ function AllergenPickerOverlay({ brandColor, isLight, allergens, selected, onCha
 // STYLE HELPERS
 // ============================================================
 function fullScreen() { return { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }; }
-function iconBtn(isLight) { return { width: 44, height: 44, borderRadius: 14, background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', display: 'grid', placeItems: 'center', fontSize: 20, color: isLight ? '#111' : '#fff', border: 0, cursor: 'pointer', fontFamily: 'inherit' }; }
+function iconBtn() { return { width: 44, height: 44, borderRadius: 14, background: 'var(--kSurface2)', display: 'grid', placeItems: 'center', fontSize: 20, color: 'var(--kFg)', border: 0, cursor: 'pointer', fontFamily: 'inherit' }; }
 function bigCard(brandColor) {
   return {
-    background: 'var(--kSurface1, rgba(255,255,255,0.04))',
+    background: 'var(--kSurface1)',
     border: '2px solid transparent',
     borderRadius: 22,
     padding: 'clamp(20px, 3vh, 32px)',
@@ -1121,7 +1108,7 @@ function bigCard(brandColor) {
     alignItems: 'center',
     gap: 'clamp(16px, 3vw, 24px)',
     cursor: 'pointer',
-    color: 'var(--kFg, #fff)',
+    color: 'var(--kFg)',
     fontFamily: 'inherit',
     textAlign: 'left',
     transition: 'all 0.15s',
@@ -1129,19 +1116,19 @@ function bigCard(brandColor) {
 }
 function smallCard(brandColor) {
   return {
-    background: 'var(--kSurface1, rgba(255,255,255,0.04))',
+    background: 'var(--kSurface1)',
     border: '2px solid transparent',
     borderRadius: 14,
     padding: '18px',
     cursor: 'pointer',
-    color: 'var(--kFg, #fff)',
+    color: 'var(--kFg)',
     fontFamily: 'inherit',
   };
 }
 function primaryCta(brandColor) {
   return {
     background: brandColor,
-    color: 'var(--kFg, #fff)',
+    color: 'var(--kFg)',
     border: 0,
     padding: 'clamp(18px, 2.5vh, 22px) 32px',
     borderRadius: 16,
@@ -1152,7 +1139,7 @@ function primaryCta(brandColor) {
     boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
   };
 }
-function qtyBtn() { return { width: 44, height: 44, borderRadius: '50%', background: 'var(--kSurface2, rgba(255,255,255,0.08))', color: 'var(--kFg, #fff)', border: 0, fontSize: 20, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }; }
-function miniQtyBtn() { return { width: 32, height: 32, borderRadius: '50%', background: 'var(--kSurface1, rgba(255,255,255,0.06))', color: 'var(--kFg, #fff)', border: 0, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }; }
-function kpadKey() { return { padding: '20px', borderRadius: 16, background: 'var(--kSurface1, rgba(255,255,255,0.06))', color: 'var(--kFg, #fff)', fontSize: 26, fontWeight: 600, border: 0, cursor: 'pointer', fontFamily: 'inherit' }; }
-function fieldLabel() { return { display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--kFgMuted, rgba(255,255,255,0.6))', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }; }
+function qtyBtn() { return { width: 44, height: 44, borderRadius: '50%', background: 'var(--kSurface2)', color: 'var(--kFg)', border: 0, fontSize: 20, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }; }
+function miniQtyBtn() { return { width: 32, height: 32, borderRadius: '50%', background: 'var(--kSurface1)', color: 'var(--kFg)', border: 0, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }; }
+function kpadKey() { return { padding: '20px', borderRadius: 16, background: 'var(--kSurface1)', color: 'var(--kFg)', fontSize: 26, fontWeight: 600, border: 0, cursor: 'pointer', fontFamily: 'inherit' }; }
+function fieldLabel() { return { display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--kFgMuted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }; }
