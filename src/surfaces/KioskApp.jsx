@@ -742,20 +742,22 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
               background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
               border: '1px solid ' + (flagged ? 'rgba(239,68,68,0.5)' : (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)')),
               borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
-              fontFamily: 'inherit', textAlign: 'left', padding: 0, color: fg || '#fff',
+              fontFamily: 'inherit', textAlign: 'left', padding: 0, color: fg || 'var(--kFg, #fff)',
               opacity: flagged ? 0.45 : 1,
               position: 'relative',
+              display: 'flex', flexDirection: 'column',
+              minHeight: 250,
             }}>
               {flagged && (
                 <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, background: '#ef4444', color: 'var(--kFg, #fff)', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>UNSAFE</div>
               )}
-              <div style={{ width: '100%', height: 130, background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.2))', display: 'grid', placeItems: 'center', fontSize: 50, overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: 130, flexShrink: 0, background: 'linear-gradient(135deg, var(--kSurface1, rgba(255,255,255,0.05)), rgba(0,0,0,0.2))', display: 'grid', placeItems: 'center', fontSize: 50, overflow: 'hidden' }}>
                 {it.image ? <img src={it.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
               </div>
-              <div style={{ padding: '10px 12px 14px' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3, lineHeight: 1.2 }}>{it.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--kFgMuted, rgba(255,255,255,0.55))', lineHeight: 1.3, marginBottom: 8, minHeight: 28 }}>{it.description || ''}</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '10px 12px 14px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3, lineHeight: 1.2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--kFgMuted, rgba(255,255,255,0.55))', lineHeight: 1.3, marginBottom: 8, minHeight: 28, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.description || ''}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: brandColor, fontVariantNumeric: 'tabular-nums' }}>£{Number(price).toFixed(2)}</div>
                   {Array.isArray(it.allergens) && it.allergens.length > 0 && (
                     <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(234,179,8,0.15)', color: '#ddc270', fontWeight: 700, letterSpacing: '0.05em' }}>{it.allergens.slice(0, 2).map(a => a[0].toUpperCase()).join(' ')}</div>
