@@ -181,11 +181,17 @@ export default function KioskApp({ kioskId, onUnpair }) {
   // ─── Branding (from profile, fallbacks) ───
   const brandName = profile?.kiosk_brand_name || device?.name || 'Order here';
   const brandColor = profile?.kiosk_brand_color || '#f97316';
+  const brandAccent = profile?.kiosk_brand_accent_color || '#fbbf24';
+  const brandBg = profile?.kiosk_brand_bg_color || '#0e0e10';
+  const brandLogoUrl = profile?.kiosk_brand_logo_url;
   const attractVideoUrl = profile?.kiosk_attract_video_url;
+  const banners = Array.isArray(profile?.kiosk_banners) ? profile.kiosk_banners : [];
   const tipPresets = profile?.kiosk_tip_presets || [10, 12.5, 15];
-  const tableMode = profile?.kiosk_table_mode || 'either'; // 'enter' | 'dispense' | 'either' | 'none'
+  const tableMode = profile?.kiosk_table_mode || 'either';
   const loyaltyEnabled = profile?.kiosk_loyalty_enabled !== false;
   const idleTimeoutSec = profile?.kiosk_idle_timeout_sec || 60;
+  const avgWaitMinutes = profile?.kiosk_avg_wait_minutes || 8;
+  const bannerFor = (screen) => banners.find(b => b.screen === screen && b.imageUrl);
 
   // ─── Filtered menu (cats + items belonging to active menu) ───
   const visibleCategories = useMemo(() => {
@@ -391,8 +397,8 @@ export default function KioskApp({ kioskId, onUnpair }) {
 
   // ─── Render ───
   return (
-    <div onPointerDown={resetIdle} style={kioskShell(brandColor)}>
-      {screen === 'attract' && <ScreenAttract brandName={brandName} brandColor={brandColor} attractVideoUrl={attractVideoUrl} onStart={() => { resetIdle(); setScreen('orderType'); }} />}
+    <div onPointerDown={resetIdle} style={kioskShell(brandColor, brandBg)}>
+      {screen === 'attract' && <ScreenAttract brandName={brandName} brandColor={brandColor} brandAccent={brandAccent} brandLogoUrl={brandLogoUrl} attractVideoUrl={attractVideoUrl} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('attract')} onStart={() => { resetIdle(); setScreen('orderType'); }} />}
       {screen === 'orderType' && <ScreenOrderType brandColor={brandColor} tableMode={tableMode} onPick={(t) => {
         setOrderType(t);
         if (t === 'dineIn' && (tableMode === 'enter' || tableMode === 'either')) setScreen('tableNumber');
@@ -405,7 +411,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
       {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder('', ''); }} onBack={() => setScreen('tip')} />}
       {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} />}
-      {screen === 'done' && <ScreenDone brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} orderNumber={orderNumber} orderType={orderType} tableNumber={tableNumber} onDone={resetSession} />}
+      {screen === 'done' && <ScreenDone brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} orderNumber={orderNumber} orderType={orderType} tableNumber={tableNumber} avgWaitMinutes={avgWaitMinutes} onDone={resetSession} />}
 
       {/* Idle warning overlay */}
       {idleWarning && screen !== 'attract' && screen !== 'done' && (
@@ -426,11 +432,11 @@ export default function KioskApp({ kioskId, onUnpair }) {
 // SHARED STYLES
 // ============================================================
 
-function kioskShell(brandColor) {
+function kioskShell(brandColor, brandBg) {
   return {
     position: 'fixed',
     inset: 0,
-    background: '#0e0e10',
+    background: brandBg || '#0e0e10',
     color: '#fff',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
     overflow: 'hidden',
@@ -457,16 +463,23 @@ function btnGhostLight() {
 // ============================================================
 // SCREEN: ATTRACT
 // ============================================================
-function ScreenAttract({ brandName, brandColor, attractVideoUrl, onStart }) {
+function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attractVideoUrl, avgWaitMinutes, banner, onStart }) {
+  const accentEnd = brandAccent || shade(brandColor, -20);
   return (
-    <div onClick={onStart} style={{ position: 'absolute', inset: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(135deg, ' + brandColor + ' 0%, ' + shade(brandColor, -20) + ' 100%)' }}>
+    <div onClick={onStart} style={{ position: 'absolute', inset: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(135deg, ' + brandColor + ' 0%, ' + accentEnd + ' 100%)' }}>
       {attractVideoUrl ? (
         <video src={attractVideoUrl} autoPlay loop muted playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : null}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.15), transparent 60%)' }} />
       <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5vw', zIndex: 1 }}>
+        {brandLogoUrl ? (
+          <img src={brandLogoUrl} alt={brandName} style={{ maxWidth: '50%', maxHeight: '20vh', marginBottom: '3vh', objectFit: 'contain' }} />
+        ) : null}
         <div style={{ fontSize: 'clamp(48px, 9vw, 96px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#fff', textAlign: 'center', lineHeight: 1, marginBottom: '2vh', textShadow: '0 4px 30px rgba(0,0,0,0.3)' }}>{brandName}</div>
-        <div style={{ fontSize: 'clamp(16px, 2.4vw, 24px)', color: 'rgba(255,255,255,0.95)', marginBottom: '8vh', textAlign: 'center', fontWeight: 500 }}>Order · Pay · Collect</div>
+        <div style={{ fontSize: 'clamp(16px, 2.4vw, 24px)', color: 'rgba(255,255,255,0.95)', marginBottom: '2vh', textAlign: 'center', fontWeight: 500 }}>Order · Pay · Collect</div>
+        {avgWaitMinutes ? (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(10px)', borderRadius: 100, fontSize: 'clamp(13px, 1.8vw, 18px)', fontWeight: 600, color: '#fff', marginBottom: '6vh' }}>⏱ ~{avgWaitMinutes} min wait</div>
+        ) : null}
         <div style={{ background: '#fff', color: shade(brandColor, -30), padding: 'clamp(18px, 3vh, 28px) clamp(40px, 8vw, 100px)', borderRadius: 100, fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, boxShadow: '0 10px 40px rgba(0,0,0,0.25)', animation: 'kioskPulse 2s infinite', letterSpacing: '-0.02em' }}>TAP TO ORDER</div>
       </div>
       <div style={{ position: 'relative', padding: '0 30px 30px', fontSize: 13, color: 'rgba(255,255,255,0.7)', textAlign: 'center', zIndex: 1 }}>Tap anywhere to begin</div>
@@ -845,7 +858,7 @@ function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhon
 // ============================================================
 // SCREEN: DONE (order number reveal)
 // ============================================================
-function ScreenDone({ brandColor, customerName, customerPhone, orderNumber, orderType, tableNumber, onDone }) {
+function ScreenDone({ brandColor, customerName, customerPhone, orderNumber, orderType, tableNumber, avgWaitMinutes, onDone }) {
   const phoneMasked = customerPhone ? customerPhone.replace(/^(.{3}).+(.{3})$/, '$1*** *** $2') : null;
   return (
     <div style={{ ...fullScreen(), background: 'linear-gradient(180deg, #1a4d2e 0%, #0d3520 100%)' }}>
@@ -857,7 +870,7 @@ function ScreenDone({ brandColor, customerName, customerPhone, orderNumber, orde
         <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.85)', maxWidth: 360, lineHeight: 1.5, marginBottom: 8 }}>
           {orderType === 'dineIn' && tableNumber ? 'Your order will be brought to table ' + tableNumber + '.' : 'We will call your number when ready.'}
         </div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 40 }}>Average wait: 8 mins</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 40 }}>Average wait: {avgWaitMinutes || 8} mins</div>
         {phoneMasked && (
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 30 }}>📱 Receipt sent to {phoneMasked}</div>
         )}
