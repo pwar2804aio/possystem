@@ -70,14 +70,40 @@ function priceDelta(groups, selections) {
   return delta;
 }
 
-// Format selections into a human-readable summary string for the cart line.
-function summarizeSelections(groups, selections) {
+// Build the POS-compatible mods array. Each entry is { label, price, groupLabel }.
+// Duplicate option picks (e.g., 3x Biscoff Donut) appear as duplicate entries.
+function buildModsArray(groups, selections) {
+  const mods = [];
+  for (const g of groups) {
+    if (g.__isVariantGroup) continue;
+    const picked = selections[g.id] || [];
+    for (const optId of picked) {
+      const opt = (g.options || []).find(o => o.id === optId);
+      if (!opt) continue;
+      mods.push({
+        label: opt.name,
+        price: typeof opt.price === 'number' ? opt.price : 0,
+        groupLabel: g.name,
+      });
+    }
+  }
+  return mods;
+}
+
+// Build a human-readable string for the kiosk's own cart-line display.
+function summarizeForDisplay(groups, selections) {
   const parts = [];
   for (const g of groups) {
     const picked = selections[g.id] || [];
     if (picked.length === 0) continue;
-    const names = picked.map(id => (g.options || []).find(o => o.id === id)?.name).filter(Boolean);
-    if (names.length > 0) parts.push(names.join(', '));
+    const counts = {};
+    for (const id of picked) counts[id] = (counts[id] || 0) + 1;
+    const labels = Object.entries(counts).map(([id, n]) => {
+      const name = (g.options || []).find(o => o.id === id)?.name;
+      if (!name) return null;
+      return n > 1 ? (name + ' ×' + n) : name;
+    }).filter(Boolean);
+    if (labels.length > 0) parts.push(labels.join(', '));
   }
   return parts.join(' · ');
 }
@@ -184,27 +210,35 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   const totalPriceEach = effectiveBase + priceDelta(nonVariantGroups, selections);
   const totalPrice = totalPriceEach * qty;
 
-  // Toggle an option in a group. For single-select, replaces. For multi, adds/removes (capped at max).
-  const toggleOption = (group, optId) => {
+  // For single-select: tap toggles between [] and [optId].
+  // For multi-select: tap ADDS one occurrence (up to max). Use decOption to subtract.
+  const incOption = (group, optId) => {
     setShowError(false);
     setSelections(prev => {
       const current = prev[group.id] || [];
       let next;
       if (group._isSingle) {
-        next = current.includes(optId) ? [] : [optId];
+        next = current.length === 1 && current[0] === optId ? [] : [optId];
       } else {
-        if (current.includes(optId)) {
-          next = current.filter(id => id !== optId);
-        } else if (current.length >= group._max) {
-          // At cap — replace the oldest pick (FIFO)
-          next = [...current.slice(1), optId];
-        } else {
-          next = [...current, optId];
-        }
+        if (current.length >= group._max) return prev;
+        next = [...current, optId];
       }
       return { ...prev, [group.id]: next };
     });
   };
+
+  const decOption = (group, optId) => {
+    setShowError(false);
+    setSelections(prev => {
+      const current = prev[group.id] || [];
+      const idx = current.lastIndexOf(optId);
+      if (idx < 0) return prev;
+      const next = [...current.slice(0, idx), ...current.slice(idx + 1)];
+      return { ...prev, [group.id]: next };
+    });
+  };
+
+  const toggleOption = (group, optId) => incOption(group, optId);
 
   const tryAdd = () => {
     if (!isValid) {
@@ -223,7 +257,8 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
     onAdd({
       qty,
       selections,
-      summary: summarizeSelections(groups, selections),
+      mods: buildModsArray(groups, selections),
+      summary: summarizeForDisplay(groups, selections),
       priceEach: totalPriceEach,
     });
   };
@@ -288,33 +323,52 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(g.options || []).map(opt => {
-                  const isSelected = picked.includes(opt.id);
+                  const optCount = picked.filter(id => id === opt.id).length;
+                  const isSelected = optCount > 0;
                   const priceLabel = (opt.price && opt.price > 0) ? '+£' + Number(opt.price).toFixed(2) : (opt.price && opt.price < 0) ? '-£' + Math.abs(opt.price).toFixed(2) : '';
+                  const atCap = picked.length >= g._max && !g._isSingle;
+                  const showStepper = !g._isSingle && optCount > 0;
                   return (
-                    <button key={opt.id} onClick={() => toggleOption(g, opt.id)} style={{
-                      display: 'flex', alignItems: 'center', gap: 14,
+                    <div key={opt.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
                       padding: '14px 16px',
                       background: isSelected ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
                       border: '2px solid ' + (isSelected ? brandColor : (isInvalid ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)')),
                       borderRadius: 14,
-                      cursor: 'pointer',
                       color: '#fff',
-                      fontFamily: 'inherit',
-                      textAlign: 'left',
-                      transition: 'all 0.12s',
                     }}>
-                      <span style={{
-                        flexShrink: 0,
-                        width: 28, height: 28,
-                        borderRadius: g._isSingle ? '50%' : 7,
-                        border: '2px solid ' + (isSelected ? brandColor : 'rgba(255,255,255,0.3)'),
-                        display: 'grid', placeItems: 'center',
-                        background: isSelected ? brandColor : 'transparent',
-                        color: '#fff', fontSize: 16, fontWeight: 800,
-                      }}>{isSelected ? '✓' : ''}</span>
-                      <span style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{opt.name}</span>
-                      {priceLabel && <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{priceLabel}</span>}
-                    </button>
+                      <button onClick={() => incOption(g, opt.id)} disabled={!isSelected && atCap} style={{
+                        flex: 1, display: 'flex', alignItems: 'center', gap: 14,
+                        background: 'transparent', border: 0, padding: 0,
+                        cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
+                        opacity: (atCap && !isSelected) ? 0.4 : 1,
+                      }}>
+                        <span style={{
+                          flexShrink: 0,
+                          width: 28, height: 28,
+                          borderRadius: g._isSingle ? '50%' : 7,
+                          border: '2px solid ' + (isSelected ? brandColor : 'rgba(255,255,255,0.3)'),
+                          display: 'grid', placeItems: 'center',
+                          background: isSelected ? brandColor : 'transparent',
+                          color: '#fff', fontSize: 14, fontWeight: 800,
+                        }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
+                        <span style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{opt.name}</span>
+                        {priceLabel && <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>{priceLabel}</span>}
+                      </button>
+                      {showStepper && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <button onClick={(e) => { e.stopPropagation(); decOption(g, opt.id); }} style={{
+                            width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.08)',
+                            border: 0, color: '#fff', fontSize: 18, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                          }}>−</button>
+                          <button onClick={(e) => { e.stopPropagation(); incOption(g, opt.id); }} disabled={atCap} style={{
+                            width: 36, height: 36, borderRadius: '50%', background: atCap ? 'rgba(255,255,255,0.04)' : brandColor,
+                            border: 0, color: '#fff', fontSize: 18, fontWeight: 700, cursor: atCap ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                            opacity: atCap ? 0.4 : 1,
+                          }}>+</button>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
