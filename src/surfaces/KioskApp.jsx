@@ -342,9 +342,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
         source: 'kiosk',
         kiosk_id: kioskId,
         customer: (nameOverride ?? customerName) || null,
-        customer_name: (nameOverride ?? customerName) || null,
         customer_phone: (phoneOverride ?? customerPhone) || null,
-        tip_amount: tip,
         kiosk_table_number: tableNumber || null,
         covers: 1,
       });
@@ -405,7 +403,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
         else setScreen('menu');
       }} onBack={() => setScreen('attract')} />}
       {screen === 'tableNumber' && <ScreenTableNumber brandColor={brandColor} value={tableNumber} onChange={setTableNumber} onContinue={() => setScreen('menu')} onBack={() => setScreen('orderType')} />}
-      {screen === 'menu' && <ScreenMenu brandColor={brandColor} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} onBack={() => setScreen('orderType')} />}
+      {screen === 'menu' && <ScreenMenu brandColor={brandColor} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} banner={bannerFor('menu')} onBack={() => setScreen('orderType')} />}
       {screen === 'item' && selectedItem && <ScreenItemDetail brandColor={brandColor} item={selectedItem} orderType={orderType} activeMenuId={activeMenuId} onAdd={(qty, mods) => { addToCart(selectedItem, qty, mods); setScreen('menu'); }} onBack={() => setScreen('menu')} />}
       {screen === 'cart' && <ScreenCart brandColor={brandColor} cart={cart} subtotal={subtotal} onUpdate={updateCartQty} onAddMore={() => setScreen('menu')} onContinue={() => setScreen('tip')} onBack={() => setScreen('menu')} />}
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
@@ -465,12 +463,15 @@ function btnGhostLight() {
 // ============================================================
 function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attractVideoUrl, avgWaitMinutes, banner, onStart }) {
   const accentEnd = brandAccent || shade(brandColor, -20);
+  const useBannerAsBackground = !attractVideoUrl && banner && banner.imageUrl;
   return (
     <div onClick={onStart} style={{ position: 'absolute', inset: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'linear-gradient(135deg, ' + brandColor + ' 0%, ' + accentEnd + ' 100%)' }}>
       {attractVideoUrl ? (
         <video src={attractVideoUrl} autoPlay loop muted playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : useBannerAsBackground ? (
+        <img src={banner.imageUrl} alt={banner.label || brandName} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : null}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.15), transparent 60%)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: (attractVideoUrl || useBannerAsBackground) ? 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%)' : 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.15), transparent 60%)' }} />
       <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5vw', zIndex: 1 }}>
         {brandLogoUrl ? (
           <img src={brandLogoUrl} alt={brandName} style={{ maxWidth: '50%', maxHeight: '20vh', marginBottom: '3vh', objectFit: 'contain' }} />
@@ -559,7 +560,7 @@ function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) 
 // ============================================================
 // SCREEN: MENU
 // ============================================================
-function ScreenMenu({ brandColor, categories, items, selectedCategoryId, onSelectCategory, onSelectItem, cartItemCount, subtotal, onCart, orderType, activeMenuId, onBack }) {
+function ScreenMenu({ brandColor, categories, items, selectedCategoryId, onSelectCategory, onSelectItem, cartItemCount, subtotal, onCart, orderType, activeMenuId, banner, onBack }) {
   return (
     <div style={fullScreen()}>
       {/* top bar */}
@@ -576,6 +577,11 @@ function ScreenMenu({ brandColor, categories, items, selectedCategoryId, onSelec
             🛒 Cart · {cartItemCount} · £{subtotal.toFixed(2)}
           </button>
         </div>
+        {banner && banner.imageUrl && (
+          <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden', marginBottom: 12, aspectRatio: '5/2', background: 'rgba(255,255,255,0.04)' }}>
+            <img src={banner.imageUrl} alt={banner.label || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </div>
+        )}
         {/* allergen banner */}
         <div style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 12, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ fontSize: 18 }}>⚠️</div>
