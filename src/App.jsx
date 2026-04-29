@@ -47,6 +47,7 @@ import { isMock, supabase } from './lib/supabase';
 import PairingScreen from './surfaces/PairingScreen';
 import ModeSelector from './surfaces/ModeSelector';
 import CompanyAdminApp from './admin/CompanyAdminApp';
+import KioskSurface from './surfaces/KioskSurface';
 import DeviceSetup from './surfaces/DeviceSetup';
 import StatusDrawer from './components/StatusDrawer';
 import SyncBridge from './sync/SyncBridge';
@@ -2726,6 +2727,9 @@ export default function App() {
 
   // Company Admin — completely separate internal app
   if (deviceMode === 'admin') return <CompanyAdminApp />;
+
+  // Kiosk — standalone customer-facing self-ordering surface
+  if (deviceMode === 'kiosk') return <KioskSurface />;
 
   // Back office mode — go to email login (no pairing needed)
   if (deviceMode === 'backoffice' || deviceMode === 'office') return <><SyncBridge onSyncPulse={handleSyncPulse}/><BackOfficeApp /></>;
