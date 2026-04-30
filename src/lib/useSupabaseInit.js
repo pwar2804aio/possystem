@@ -48,9 +48,11 @@ export default function useSupabaseInit() {
         const current = useStore.getState().tables;
         const merged = fp.tables.map(dbT => {
           const live = current.find(t => t.id === dbT.id);
+          // v5.5.2: preserve location_id on every hydrated table so upsertFloorTable's
+          // cross-location guard can refuse silent moves between locations.
           return live
-            ? { ...live, label:dbT.label, x:dbT.x, y:dbT.y, w:dbT.w, h:dbT.h, shape:dbT.shape, maxCovers:dbT.max_covers, section:dbT.section_id }
-            : { id:dbT.id, label:dbT.label, x:dbT.x, y:dbT.y, w:dbT.w, h:dbT.h, shape:dbT.shape, maxCovers:dbT.max_covers, section:dbT.section_id, status:'available', session:null };
+            ? { ...live, label:dbT.label, x:dbT.x, y:dbT.y, w:dbT.w, h:dbT.h, shape:dbT.shape, maxCovers:dbT.max_covers, section:dbT.section_id, locationId:dbT.location_id }
+            : { id:dbT.id, label:dbT.label, x:dbT.x, y:dbT.y, w:dbT.w, h:dbT.h, shape:dbT.shape, maxCovers:dbT.max_covers, section:dbT.section_id, locationId:dbT.location_id, status:'available', session:null };
         });
         useStore.setState({ tables: merged });
       }

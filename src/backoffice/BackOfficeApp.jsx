@@ -83,17 +83,39 @@ export default function BackOfficeApp() {
         .eq('id', authUser.id)
         .single();
       if (profile) {
+        // v5.5.2: BackOfficeApp must respect the BO location override (set by LocationSwitcher)
+        // BEFORE falling back to user_profiles.location_id. Previously this ran user_profiles only,
+        // which silently disagreed with getLocationId() — that path always reads the localStorage
+        // override first. The disagreement caused the BO to LOAD floor data for one location but
+        // WRITE upserts to a different one, resulting in tables being moved across locations.
+        let overrideLocId = null;
+        try { overrideLocId = JSON.parse(localStorage.getItem('rpos-bo-location') || 'null'); } catch (e) { console.warn('[BackOfficeApp] bad rpos-bo-location:', e?.message); }
+        const effectiveLocId = overrideLocId || profile.location_id;
+
+        // If the override differs from user_profiles, fetch the correct location's name for display
+        let locationName = profile.locations?.name || null;
+        if (overrideLocId && overrideLocId !== profile.location_id) {
+          try {
+            const { data: locRow } = await supabase
+              .from('locations')
+              .select('name')
+              .eq('id', overrideLocId)
+              .single();
+            if (locRow?.name) locationName = locRow.name;
+          } catch (e) { console.warn('[BackOfficeApp] failed to fetch override location name:', e?.message); }
+        }
+
         setOrgCtx({
           role: profile.role,
           orgId: profile.org_id,
           orgName: profile.organisations?.name || 'Restaurant OS',
-          locationId: profile.location_id,
-          locationName: profile.locations?.name || null,
+          locationId: effectiveLocId,
+          locationName,
         });
-        if (profile.location_id) {
-          setResolvedLocationId(profile.location_id);
+        if (effectiveLocId) {
+          setResolvedLocationId(effectiveLocId);
           // Load all location data from Supabase
-          loadLocationData(profile.location_id);
+          loadLocationData(effectiveLocId);
         }
       }
     })();
@@ -147,7 +169,21 @@ export default function BackOfficeApp() {
       lockPricing:  item.lock_pricing  ?? item.lockPricing  ?? false,
       lockedFields: item.locked_fields ?? item.lockedFields ?? [],
     }));
-    if (floorRes.data?.tables?.length) patch.tables = floorRes.data.tables;
+    // v5.5.2: map raw floor_tables rows to the camelCase shape the rest of the app expects
+    // (maxCovers, sortOrder) AND preserve locationId so the cross-location guard in
+    // upsertFloorTable has data to work with. Previously the BO just spread raw DB rows in.
+    if (floorRes.data?.tables?.length) patch.tables = floorRes.data.tables.map(t => ({
+      id: t.id,
+      label: t.label,
+      x: t.x, y: t.y, w: t.w, h: t.h,
+      shape: t.shape,
+      maxCovers: t.max_covers ?? t.maxCovers ?? 4,
+      section: t.section ?? null,
+      sortOrder: t.sort_order ?? t.sortOrder ?? 0,
+      locationId: t.location_id,
+      status: 'available',
+      session: null,
+    }));
     // Map modifier groups from snake_case DB columns to camelCase store format
     if (modGroupsRes.data?.length) patch.modifierGroupDefs = modGroupsRes.data.map(g => ({
       id: g.id, name: g.name, min: g.min ?? 0, max: g.max ?? 1,
@@ -408,15 +444,26 @@ function PushToPOSButton() {
     }
     const deviceProfiles = (() => { try { return JSON.parse(localStorage.getItem('rpos-device-profiles') || 'null') || []; } catch { return []; } })();
 
+    // Resolve location once, stamp it on the snapshot. v5.5.2: lets the POS hydrator
+    // detect cross-location config-push leakage and lets every table in the snapshot
+    // carry its source location_id (used by the cross-location upsert guard).
+    let snapshotLocationId = null;
+    try {
+      const { getLocationId } = await import('../lib/supabase.js');
+      snapshotLocationId = await getLocationId();
+    } catch (e) { console.warn('[handlePush] snapshot locationId resolve failed:', e?.message); }
+
     const snapshot = {
       version: Date.now(),
       pushedAt: new Date().toISOString(),
       pushedBy: staff?.name || 'Manager',
+      locationId: snapshotLocationId,
       printRouting: printRouting || { centres:[], routing:{} },
       printers,
       tables: tables.map(t => ({
         id:t.id, label:t.label, x:t.x, y:t.y, w:t.w, h:t.h,
         shape:t.shape, maxCovers:t.maxCovers, section:t.section,
+        locationId: t.locationId || snapshotLocationId,
       })),
       locationSections,
       menus,

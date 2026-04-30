@@ -165,10 +165,13 @@ export default function SyncBridge({ onSyncPulse }) {
               }
               // v4.6.5 Bug 6: floor_tables uses snake_case (max_covers, sort_order) but every
               // TablesSurface read expects camelCase (maxCovers). Rename on hydration.
+              // v5.5.2: also preserve location_id so the cross-location guard in upsertFloorTable
+              // can refuse silent moves when the read/write paths disagree about location.
               return {
                 ...t,
                 maxCovers: t.max_covers ?? t.maxCovers ?? 4,
                 sortOrder: t.sort_order ?? t.sortOrder ?? 0,
+                locationId: t.location_id ?? t.locationId ?? locationId,
                 status: session ? 'occupied' : 'available',
                 session,
                 firedCourses: session?.firedCourses || inMemory?.firedCourses || [],

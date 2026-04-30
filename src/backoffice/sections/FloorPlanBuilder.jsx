@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useStore } from '../../store';
+import { getLocationId } from '../../lib/supabase';
 
 const SHAPES = [{ id:'sq', label:'Square/Rect' }, { id:'rd', label:'Round' }];
 const SECTION_PALETTE = ['#3b82f6','#e8a020','#22c55e','#a855f7','#ef4444','#22d3ee','#f97316','#ec4899'];
@@ -10,6 +11,17 @@ export default function FloorPlanBuilder() {
     locationSections, addSection, updateSection, removeSection, moveSection,
     showToast,
   } = useStore();
+
+  // v5.5.2: resolve the active location once on mount and use it as a render-time filter so
+  // any stale cross-location data leaked into store.tables (e.g., from a previous location's
+  // CONFIG_PUSH still cached in localStorage) doesn't appear on Loc 2's canvas where dragging
+  // it would silently rewrite its location_id.
+  const [activeLocationId, setActiveLocationId] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    getLocationId().then(id => { if (alive) setActiveLocationId(id); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const [selected, setSelected]   = useState(null);
   const [dragging, setDragging]   = useState(null);
@@ -35,10 +47,17 @@ export default function FloorPlanBuilder() {
     }, 300);
   }, [markBOChange]);
 
-  const displayTables = tables.filter(t =>
+  // v5.5.2: only show tables that belong to the active location. A table without a locationId
+  // is a freshly-added one (stamped on save) and is OK to show. Pre-v5.5.2 data lacks
+  // locationId entirely — those will appear at every location, but the cross-location guard
+  // in upsertFloorTable still prevents corruption.
+  const tablesForThisLocation = tables.filter(t =>
+    !t.locationId || !activeLocationId || t.locationId === activeLocationId
+  );
+  const displayTables = tablesForThisLocation.filter(t =>
     !t.parentId && (viewSection === 'all' || t.section === viewSection)
   );
-  const selectedTable = tables.find(t => t.id === selected);
+  const selectedTable = tablesForThisLocation.find(t => t.id === selected);
 
   // Drag handlers
   const handleMouseDown = useCallback((e, tableId) => {
@@ -96,7 +115,7 @@ export default function FloorPlanBuilder() {
 
           {locationSections.map(sec => {
             const active = viewSection === sec.id;
-            const count = tables.filter(t => t.section === sec.id && !t.parentId).length;
+            const count = tablesForThisLocation.filter(t => t.section === sec.id && !t.parentId).length;
             return (
               <div key={sec.id} style={{ display:'flex', alignItems:'center', marginBottom:2 }}>
                 <button onClick={() => setViewSection(sec.id)} style={{

@@ -125,6 +125,19 @@ export const upsertFloorTable = async (table, locationId = null) => {
   if (isMock) return { data: null, error: null };
   if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
   if (!locationId || locationId === 'loc-demo') return { data: null, error: new Error('No location') };
+  // v5.5.2: cross-location guard. Floor_tables PK is `id` alone, so an upsert with the same
+  // id silently rewrites location_id — moving a row from Loc A to Loc B. This caused real data
+  // corruption when the BO read tables for one location but its getLocationId() resolved to a
+  // different location (see BackOfficeApp v5.5.2 fix). Belt + suspenders: a table object that
+  // was hydrated from DB carries its source location_id (stamped in useSupabaseInit /
+  // SyncBridge / applyConfigUpdate as table.locationId). If we're about to upsert that same id
+  // to a DIFFERENT location, refuse. Pure in-memory check — runs on every drag mousemove
+  // without hitting the DB.
+  if (table.locationId && table.locationId !== locationId) {
+    const msg = `[DB] floor_tables: refusing to move table ${table.id} from ${table.locationId} to ${locationId} — would corrupt the source location's plan. The BO is reading and writing different locations; check that BackOfficeApp respects the rpos-bo-location override.`;
+    console.error(msg);
+    return { data: null, error: new Error(msg) };
+  }
   // v4.6.5 Bug 6: floor_tables columns are (id, location_id, label, x, y, w, h, shape,
   // max_covers, section, sort_order). Client state carries camelCase (maxCovers) plus
   // runtime-only fields (status, session, firedCourses, sentAt, reservation). PostgREST
@@ -148,9 +161,16 @@ export const upsertFloorTable = async (table, locationId = null) => {
   return result;
 };
 
-export const deleteFloorTable = async (id) => {
+export const deleteFloorTable = async (id, locationId = null) => {
   if (isMock) return { data: null, error: null };
-  return supabase.from('floor_tables').delete().eq('id', id);
+  // v5.5.2: scope deletes to the current location. Without this, a stray click on a leaked
+  // cross-location table in the BO canvas could delete the row from the OTHER location's
+  // floor plan. The cross-location render filter in FloorPlanBuilder should prevent this
+  // from being reachable, but defense in depth.
+  if (!locationId || locationId === 'loc-demo') locationId = await getLocationId();
+  let q = supabase.from('floor_tables').delete().eq('id', id);
+  if (locationId && locationId !== 'loc-demo') q = q.eq('location_id', locationId);
+  return q;
 };
 
 // ── 86 list ───────────────────────────────────────────────────────────────────

@@ -198,16 +198,21 @@ export const useStore = create((set, get) => ({
     // Tables: merge layout into existing live tables, AND add new tables from snapshot
     let updatedTables = useStore.getState().tables;
     if (snap.tables) {
+      // v5.5.2: preserve table.locationId on every merge path so the cross-location upsert
+      // guard has data to work with. Config snapshots may have a top-level snap.locationId
+      // that the snapshot was generated for; fall back to that if the individual table row
+      // doesn't carry it explicitly.
+      const snapLoc = snap.locationId || null;
       // Update layout of existing tables
       updatedTables = updatedTables.map(t => {
         const st = snap.tables.find(s => s.id === t.id);
-        return st ? { ...t, label:st.label, x:st.x, y:st.y, w:st.w, h:st.h, shape:st.shape, maxCovers:st.maxCovers, section:st.section } : t;
+        return st ? { ...t, label:st.label, x:st.x, y:st.y, w:st.w, h:st.h, shape:st.shape, maxCovers:st.maxCovers, section:st.section, locationId: st.locationId ?? st.location_id ?? t.locationId ?? snapLoc } : t;
       });
       // Add new tables that exist in snapshot but not in store
       const existingIds = new Set(updatedTables.map(t => t.id));
       const newTables = snap.tables
         .filter(st => !existingIds.has(st.id))
-        .map(st => ({ ...st, status:'available', session:null, firedCourses:[], sentAt:null }));
+        .map(st => ({ ...st, locationId: st.locationId ?? st.location_id ?? snapLoc, status:'available', session:null, firedCourses:[], sentAt:null }));
       updatedTables = [...updatedTables, ...newTables];
     }
 
@@ -748,15 +753,25 @@ export const useStore = create((set, get) => ({
     const full = useStore.getState().tables.find(t => t.id === id);
     if (full) upsertFloorTable(full);
   },
-  addTableToLayout: (table) => {
-    const newTable = { id:`t-${Date.now()}`, status:'available', session:null, ...table };
+  addTableToLayout: async (table) => {
+    // v5.5.2: stamp locationId at creation time so the cross-location guard in upsertFloorTable
+    // has data to work with from the very first upsert. Without this, a brand-new table has no
+    // locationId and the guard can't tell whether subsequent moves are legitimate.
+    let locId = null;
+    try { locId = await getLocationId(); } catch {}
+    const newTable = { id:`t-${Date.now()}`, status:'available', session:null, locationId: locId, ...table };
+    // If caller passed an explicit locationId in `table`, that wins (spread above).
     set(s => ({ tables: [...s.tables, newTable] }));
     upsertFloorTable(newTable);
   },
   removeTableFromLayout: (id) => {
+    // v5.5.2: pull the table's locationId BEFORE we filter it out of state, so the DB delete
+    // can be scoped to that exact location (defense against the cross-location-leak class).
+    const tbl = useStore.getState().tables.find(t => t.id === id);
+    const locId = tbl?.locationId || null;
     set(s => ({ tables: s.tables.filter(t => t.id!==id && t.parentId!==id) }));
     // v4.6.5 Bug 6: previously removed from local state only, so it re-appeared on every boot.
-    deleteFloorTable(id).catch(e => console.warn('[removeTableFromLayout] DB delete failed:', e?.message || e));
+    deleteFloorTable(id, locId).catch(e => console.warn('[removeTableFromLayout] DB delete failed:', e?.message || e));
   },
 
   // ── Tables (source of truth for all orders) ──────────
