@@ -696,10 +696,87 @@ export const setMenuItemScope = async (item, newScope) => {
   const { error: e1 } = await supabase.from('menu_items').update(sourcePatch).eq('id', item.id);
   if (e1) { console.error('[setMenuItemScope] source update error:', e1); return { ok: false, error: e1 }; }
 
+  // v5.5.12: AUTO-PROMOTE CATEGORY FIRST so peer item rows can reference the
+  // deterministic peer category IDs that get created here. The pre-v5.5.12 code
+  // promoted the category AFTER copying items, which meant peer items were
+  // created with cat=<source-loc-cat-id> — an ID that ONLY exists at the source
+  // location. Result: shared item appeared at peer locations but with no
+  // category, so it never showed up in the right category section.
+  // Now: promote the category up front, then rewrite the cat field on each
+  // peer item using the cat's master_id + peer location suffix.
+  let categoryAction = null;
+  // Map source-side category id → its master_id, so we know the deterministic
+  // peer cat id is `<catMasterId>_<peerLocSuffix>`.
+  const catMasterIdByCatId = new Map();
+  if (newScope !== 'local' && item.cat) {
+    try {
+      const { data: catRow } = await supabase.from('menu_categories').select('*').eq('id', item.cat).maybeSingle();
+      if (catRow) {
+        if ((catRow.scope || 'local') === 'local') {
+          const catResult = await setMenuCategoryScope(catRow, newScope);
+          if (catResult.ok) categoryAction = catResult.action;
+          else console.warn('[setMenuItemScope] cat auto-promote failed:', catResult.error);
+        }
+        // Re-fetch to get fresh master_id (setMenuCategoryScope just wrote it)
+        const { data: catFresh } = await supabase.from('menu_categories').select('master_id, id').eq('id', item.cat).maybeSingle();
+        const catMasterId = catFresh?.master_id || catFresh?.id || catRow.id;
+        catMasterIdByCatId.set(catRow.id, catMasterId);
+      }
+    } catch (e) {
+      console.warn('[setMenuItemScope] cat auto-promote threw:', e?.message || e);
+    }
+  }
+  // Also handle item.cats[] (multi-category mapping) — promote each local one
+  // so the peer cats[] array can be rewritten correctly.
+  if (newScope !== 'local' && Array.isArray(item.cats) && item.cats.length > 0) {
+    for (const catId of item.cats) {
+      if (catMasterIdByCatId.has(catId)) continue;
+      try {
+        const { data: catRow } = await supabase.from('menu_categories').select('*').eq('id', catId).maybeSingle();
+        if (!catRow) continue;
+        if ((catRow.scope || 'local') === 'local') {
+          await setMenuCategoryScope(catRow, newScope);
+        }
+        const { data: catFresh } = await supabase.from('menu_categories').select('master_id, id').eq('id', catId).maybeSingle();
+        const catMasterId = catFresh?.master_id || catFresh?.id || catRow.id;
+        catMasterIdByCatId.set(catRow.id, catMasterId);
+      } catch (e) {
+        console.warn('[setMenuItemScope] cats[] auto-promote threw for', catId, ':', e?.message || e);
+      }
+    }
+  }
+  // Helper: peer cat id from a master-id given the peer location's suffix.
+  const peerCatIdFor = (catMasterId, peerLocSuffix) => `${catMasterId}_${peerLocSuffix}`;
+  // Translate a source-side cat id to the peer-side cat id at a given peer location.
+  const peerCatForSourceCat = (sourceCatId, peerLocSuffix) => {
+    if (!sourceCatId) return null;
+    const cmid = catMasterIdByCatId.get(sourceCatId);
+    return cmid ? peerCatIdFor(cmid, peerLocSuffix) : null;
+  };
+
   let createdCount = 0;
+  let createdVariants = 0;
   let updatedSiblings = 0;
 
   if (isFirstPromotion) {
+    // v5.5.12: also fetch variant children (rows with parent_id = item.id) so
+    // we can replicate them at each peer location with rewritten parent_id.
+    // Without this, parent items of type='variants' got copied without any
+    // children, leaving an unselectable parent at the peer location.
+    let variants = [];
+    if (item.type === 'variants') {
+      const { data: vData, error: vErr } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('parent_id', item.id)
+        .eq('archived', false);
+      if (vErr) {
+        console.warn('[setMenuItemScope] variant fetch error:', vErr);
+      } else {
+        variants = vData || [];
+      }
+    }
+
     // 2) First-time promotion: copy this item to every peer location.
     //    Build a deterministic id per peer so re-promoting later is idempotent.
     const baseRow = {
@@ -710,8 +787,6 @@ export const setMenuItemScope = async (item, newScope) => {
       kitchen_name: item.kitchen_name ?? item.kitchenName ?? null,
       description: item.description ?? null,
       type: item.type ?? 'simple',
-      cat: item.cat ?? null,
-      cats: item.cats ?? [],
       pricing: item.pricing ?? { base: item.price ?? 0 },
       // v4.7.1 fix: 'price' column does NOT exist on menu_items — only 'pricing' jsonb.
       // Including it caused PGRST204 "column not found" error which silently failed every promote.
@@ -725,17 +800,88 @@ export const setMenuItemScope = async (item, newScope) => {
       master_id: masterId,
       lock_pricing: item.lockPricing ?? item.lock_pricing ?? false,
       locked_fields: item.lockedFields ?? item.locked_fields ?? [],
+      // Parent items have no parent
+      parent_id: null,
       updated_at: new Date().toISOString(),
     };
     for (const peerLocId of otherLocationIds) {
-      const peerId = `${masterId}_${peerLocId.slice(-8)}`;
-      const peerRow = { ...baseRow, id: peerId, location_id: peerLocId };
+      const peerLocSuffix = peerLocId.slice(-8);
+      const peerId = `${masterId}_${peerLocSuffix}`;
+      // v5.5.12: rewrite cat / cats[] to peer-side IDs so the item shows up in
+      // the right category section at each peer location.
+      const peerCat = peerCatForSourceCat(item.cat, peerLocSuffix);
+      const peerCats = Array.isArray(item.cats)
+        ? item.cats.map(c => peerCatForSourceCat(c, peerLocSuffix)).filter(Boolean)
+        : [];
+      const peerRow = {
+        ...baseRow,
+        id: peerId,
+        location_id: peerLocId,
+        cat: peerCat,
+        cats: peerCats,
+      };
       const { error } = await supabase.from('menu_items').upsert(peerRow);
       if (error) {
         console.warn('[setMenuItemScope] peer upsert failed for', peerLocId, error);
-      } else {
-        createdCount++;
+        continue; // skip variants for this peer if parent failed
       }
+      createdCount++;
+
+      // v5.5.12: replicate variant children. Each variant gets a deterministic
+      // id per peer (variantMasterId + peerLocSuffix) and parent_id rewritten
+      // to point at THIS peer's parent row.
+      for (const v of variants) {
+        const vMasterId = v.master_id || v.id;
+        const peerVariantId = `${vMasterId}_${peerLocSuffix}`;
+        // Variant's own cat: usually inherits parent, occasionally has its own.
+        // If it has its own and it's promoted, rewrite. Otherwise inherit
+        // peerCat from parent or null.
+        const variantPeerCat = v.cat
+          ? (peerCatForSourceCat(v.cat, peerLocSuffix) || peerCat || null)
+          : null;
+        const peerVariantRow = {
+          id: peerVariantId,
+          location_id: peerLocId,
+          name: v.name,
+          menu_name: v.menu_name ?? null,
+          receipt_name: v.receipt_name ?? null,
+          kitchen_name: v.kitchen_name ?? null,
+          description: v.description ?? null,
+          type: v.type ?? 'simple',
+          cat: variantPeerCat,
+          cats: [],
+          pricing: v.pricing ?? { base: 0 },
+          allergens: v.allergens ?? [],
+          assigned_modifier_groups: v.assigned_modifier_groups ?? [],
+          sort_order: v.sort_order ?? 999,
+          image: v.image ?? null,
+          scope: newScope,
+          org_id,
+          master_id: vMasterId,
+          parent_id: peerId,
+          lock_pricing: v.lock_pricing ?? false,
+          locked_fields: v.locked_fields ?? [],
+          updated_at: new Date().toISOString(),
+        };
+        const { error: vErr2 } = await supabase.from('menu_items').upsert(peerVariantRow);
+        if (vErr2) {
+          console.warn('[setMenuItemScope] peer variant upsert failed for', peerLocId, v.id, vErr2);
+        } else {
+          createdVariants++;
+        }
+      }
+    }
+
+    // v5.5.12: also write scope+master_id onto SOURCE variants so they're
+    // marked as shared too (matches the master_id pattern of the parent).
+    // Without this, source variants stay scope='local' even after parent is
+    // shared — breaking propagateGlobalEdit and confusing the BO list view.
+    for (const v of variants) {
+      const vMasterId = v.master_id || v.id;
+      const { error: vsErr } = await supabase.from('menu_items')
+        .update({ scope: newScope, org_id, master_id: vMasterId, updated_at: new Date().toISOString() })
+        .eq('id', v.id);
+      if (vsErr) console.warn('[setMenuItemScope] source variant scope update error for', v.id, vsErr);
     }
   } else {
     // 3) Re-scoping (shared ↔ global): just update scope on all sibling rows.
@@ -747,25 +893,7 @@ export const setMenuItemScope = async (item, newScope) => {
     else updatedSiblings = count || 0;
   }
 
-  // v4.7.3: when promoting an item to shared/global, also promote its primary category
-  // (Peter's rule: "the category its in should go to the other location also").
-  // Only auto-promote if the cat is currently local. If already shared/global at any scope,
-  // we leave it alone so we don't downgrade or override existing operator intent.
-  let categoryAction = null;
-  if (newScope !== 'local' && item.cat) {
-    try {
-      const { data: catRow } = await supabase.from('menu_categories').select('*').eq('id', item.cat).maybeSingle();
-      if (catRow && (catRow.scope || 'local') === 'local') {
-        const catResult = await setMenuCategoryScope(catRow, newScope);
-        if (catResult.ok) categoryAction = catResult.action;
-        else console.warn('[setMenuItemScope] cat auto-promote failed:', catResult.error);
-      }
-    } catch (e) {
-      console.warn('[setMenuItemScope] cat auto-promote threw:', e?.message || e);
-    }
-  }
-
-  return { ok: true, action: isFirstPromotion ? 'promoted' : 'rescoped', createdCount, updatedSiblings, categoryAction };
+  return { ok: true, action: isFirstPromotion ? 'promoted' : 'rescoped', createdCount, createdVariants, updatedSiblings, categoryAction };
 };
 
 /**
