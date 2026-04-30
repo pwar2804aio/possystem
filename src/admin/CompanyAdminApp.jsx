@@ -85,6 +85,14 @@ function AdminPanel({ authUser }) {
   const [selectedOrg, setSelectedOrg] = useState(null);
   const [locations, setLocations] = useState([]);
   const [users, setUsers] = useState([]);
+  // v5.5.14: super_admin can grant any user access to any location/org. The
+  // pre-v5.5.14 picker only showed users whose user_profiles.org_id matched
+  // the currently-selected org, so a brand-new org appeared to have NO
+  // available users to add — even though the super_admin themselves and
+  // every other platform user could legitimately be granted access.
+  // Load ALL users platform-wide and search/filter client-side.
+  const [allUsers, setAllUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
   const [editUsersFor, setEditUsersFor] = useState(null);
   const [editingOrg, setEditingOrg] = useState(null);   // { id, name }
   const [editingLoc, setEditingLoc] = useState(null);   // { id, name }
@@ -92,7 +100,16 @@ function AdminPanel({ authUser }) {
   const [working, setWorking] = useState(false);
   const [msg, setMsg] = useState({ type:'', text:'' });
 
-  useEffect(() => { loadOrgs(); }, []);
+  const loadAllUsers = async () => {
+    // Fetches every user_profiles row across all orgs. Only callable from
+    // CompanyAdminApp which is gated to super_admin role. RLS policy on
+    // user_profiles must allow super_admin to read all rows — otherwise
+    // this returns only the calling user's own row and the picker is empty.
+    try {
+      const { data } = await sbFetch(`user_profiles?select=id,email,full_name,org_id,role,location_id,user_locations(location_id)&order=email.asc`);
+      setAllUsers(Array.isArray(data) ? data : []);
+    } catch { setAllUsers([]); }
+  };
 
   const loadOrgs = async () => {
     setLoading(true);
@@ -112,6 +129,10 @@ function AdminPanel({ authUser }) {
     const { data } = await sbFetch(`user_profiles?select=*,user_locations(location_id)&org_id=eq.${orgId}&order=created_at.asc`);
     setUsers(Array.isArray(data) ? data : []);
   };
+
+  // v5.5.14: kick off initial loads after function declarations to keep the
+  // lint clean (no temporal-dead-zone reference inside useEffect callback).
+  useEffect(() => { loadOrgs(); loadAllUsers(); }, []);
 
   const selectOrg = async (org) => {
     setSelectedOrg(org);
@@ -283,15 +304,30 @@ function AdminPanel({ authUser }) {
     } else {
       const { error } = await sbFetch('user_locations', { method:'POST', body:{ user_id:userId, location_id:locationId } });
       if (error) return err('Failed to add: ' + error.message);
-      const u = users.find(u => u.id === userId);
+      // v5.5.14: only set user_profiles.location_id if the user has none yet.
+      // If they already have a primary location (most users do), don't change
+      // it — that would silently relocate them away from their original org.
+      // Cross-org access is correctly handled by the user_locations row alone.
+      const u = allUsers.find(u => u.id === userId) || users.find(u => u.id === userId);
       if (!u?.location_id) await sbFetch(`user_profiles?id=eq.${userId}`, { method:'PATCH', body:{ location_id:locationId }, prefer:'' });
     }
-    await loadUsers(selectedOrg.id);
+    // Refresh both lists so the picker reflects the change immediately.
+    await Promise.all([
+      selectedOrg ? loadUsers(selectedOrg.id) : Promise.resolve(),
+      loadAllUsers(),
+    ]);
     ok(hasAccess ? 'Access removed' : '✓ Access granted');
   };
 
-  const usersForLocation = (locId) =>
-    users.filter(u => u.location_id === locId || u.user_locations?.some(ul => ul.location_id === locId));
+  // v5.5.14: usersForLocation now derives from allUsers (which super_admin
+  // can fully see), not the per-org users array. A user appears in a
+  // location's "users with access" list if either:
+  //   - they have a user_locations row for that location, OR
+  //   - their user_profiles.location_id matches (legacy single-location setup)
+  const usersForLocation = (locId) => {
+    const source = allUsers.length > 0 ? allUsers : users;
+    return source.filter(u => u.location_id === locId || u.user_locations?.some(ul => ul.location_id === locId));
+  };
 
   const msgBg = { ok:{ bg:'#0d2e1a', border:'#166534', color:'#86efac' }, err:{ bg:'#2d0f0f', border:'#991b1b', color:'#fca5a5' } };
   const ms = msgBg[msg.type];
@@ -456,26 +492,48 @@ function AdminPanel({ authUser }) {
                               <div style={{ fontSize:11, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Users with access</div>
                               {isEditingUsers ? (
                                 <div style={{ background:'#0f1117', borderRadius:10, padding:16, border:'1px solid #2d3148' }}>
-                                  {users.length === 0
-                                    ? <div style={{ fontSize:13, color:'#475569', marginBottom:12 }}>No users in this organisation yet — create one first</div>
-                                    : users.map(u => {
-                                        const has = locUsers.some(lu => lu.id === u.id);
-                                        return (
-                                          <label key={u.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12, cursor:'pointer' }}>
-                                            <input type="checkbox" checked={has}
-                                              onChange={() => toggleUserLocation(u.id, loc.id, has)}
-                                              style={{ accentColor:'#6366f1', width:16, height:16, flexShrink:0 }}
-                                            />
-                                            <div>
-                                              <div style={{ fontSize:13, fontWeight:600, color:'#e2e8f0' }}>{u.full_name || u.email}</div>
-                                              <div style={{ fontSize:11, color:'#6366f1', fontFamily:'monospace' }}>{u.email || '—'}</div>
-                                            </div>
-                                            {has && <span style={{ ...S.badge, background:'#0d2e1a', color:'#86efac', marginLeft:'auto' }}>✓ Access</span>}
-                                          </label>
-                                        );
-                                      })
-                                  }
-                                  <button onClick={() => setEditUsersFor(null)} style={{ ...S.btn, ...S.btnGhost, padding:'6px 16px', fontSize:12, marginTop:4 }}>Done</button>
+                                  {/* v5.5.14: search input — searches across all platform users by email or name */}
+                                  <input
+                                    autoFocus
+                                    placeholder="Search by email or name…"
+                                    value={userSearch}
+                                    onChange={e => setUserSearch(e.target.value)}
+                                    style={{ ...S.input, width:'100%', marginBottom:14, fontSize:13 }}
+                                  />
+                                  {(() => {
+                                    const q = userSearch.trim().toLowerCase();
+                                    const allShown = allUsers.length > 0 ? allUsers : users;
+                                    const filtered = q
+                                      ? allShown.filter(u =>
+                                          (u.email || '').toLowerCase().includes(q) ||
+                                          (u.full_name || '').toLowerCase().includes(q))
+                                      : allShown;
+                                    if (allShown.length === 0) {
+                                      return <div style={{ fontSize:13, color:'#475569', marginBottom:12 }}>No users in the platform yet — create one first</div>;
+                                    }
+                                    if (filtered.length === 0) {
+                                      return <div style={{ fontSize:13, color:'#475569', marginBottom:12 }}>No users match "{userSearch}"</div>;
+                                    }
+                                    return filtered.map(u => {
+                                      const has = locUsers.some(lu => lu.id === u.id);
+                                      const sameOrg = u.org_id === selectedOrg?.id;
+                                      return (
+                                        <label key={u.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12, cursor:'pointer' }}>
+                                          <input type="checkbox" checked={has}
+                                            onChange={() => toggleUserLocation(u.id, loc.id, has)}
+                                            style={{ accentColor:'#6366f1', width:16, height:16, flexShrink:0 }}
+                                          />
+                                          <div style={{ flex:1, minWidth:0 }}>
+                                            <div style={{ fontSize:13, fontWeight:600, color:'#e2e8f0' }}>{u.full_name || u.email}</div>
+                                            <div style={{ fontSize:11, color:'#6366f1', fontFamily:'monospace' }}>{u.email || '—'}</div>
+                                          </div>
+                                          {!sameOrg && <span style={{ ...S.badge, background:'#2d2540', color:'#c89bff', marginLeft:'auto', fontSize:10 }}>cross-org</span>}
+                                          {has && <span style={{ ...S.badge, background:'#0d2e1a', color:'#86efac', marginLeft: sameOrg ? 'auto' : 6, fontSize:10 }}>✓ Access</span>}
+                                        </label>
+                                      );
+                                    });
+                                  })()}
+                                  <button onClick={() => { setEditUsersFor(null); setUserSearch(''); }} style={{ ...S.btn, ...S.btnGhost, padding:'6px 16px', fontSize:12, marginTop:4 }}>Done</button>
                                 </div>
                               ) : (
                                 <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
