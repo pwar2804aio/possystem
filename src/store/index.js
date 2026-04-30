@@ -2642,19 +2642,43 @@ export const useStore = create((set, get) => ({
   computeExpectedCash: async (drawerId) => {
     if (isMock || !supabase) return 0;
     try {
-      const sess = get().currentDrawerSession;
-      if (!sess || sess.drawer_id !== drawerId) {
-        // Reload first
-        await get().loadCurrentDrawerSession?.();
+      // v5.5.11: look up the OPEN session for THIS specific drawer.
+      // The previous version relied on currentDrawerSession (which is the
+      // device-bound drawer's session) — when called from the back office
+      // where there's no device-bound drawer, that path returned 0 even when
+      // the drawer's actual cash_movements summed to £182.85. Resulting
+      // discrepancy: Shift card showed £182.85 (read from drawer.currentFloat
+      // which is the running total), Cash up modal showed £0 (read from
+      // computeExpectedCash → wrong session). Fix: query session by drawer_id
+      // directly, same pattern cashOutDrawer already uses.
+      const { data: sessions, error: sessErr } = await supabase
+        .from('drawer_sessions')
+        .select('id, opening_float')
+        .eq('drawer_id', drawerId)
+        .in('status', ['open', 'counting'])
+        .order('cash_in_at', { ascending: false })
+        .limit(1);
+      if (sessErr) {
+        console.warn('[computeExpectedCash] drawer_sessions read failed:', sessErr.message);
+        return 0;
       }
-      const activeSess = get().currentDrawerSession;
-      if (!activeSess) return 0;
-      const { data } = await supabase
+      const sess = sessions?.[0];
+      if (!sess) {
+        console.warn('[computeExpectedCash] no open session for drawer', drawerId, '— returning 0');
+        return 0;
+      }
+      const { data: movements, error: movErr } = await supabase
         .from('cash_movements')
         .select('type, amount')
-        .eq('session_id', activeSess.id);
+        .eq('session_id', sess.id);
+      if (movErr) {
+        console.warn('[computeExpectedCash] cash_movements read failed:', movErr.message);
+        return Number(sess.opening_float) || 0;
+      }
       const SIGN = { float_in: +1, cash_sale: +1, adjustment: +1, downlift_from_safe: +1, cash_drop: -1, drop: -1, expense: -1, uplift_to_safe: -1, drawer_open: 0 };
-      const net = (data || []).reduce((s, m) => s + (SIGN[m.type] || 0) * (Number(m.amount) || 0), 0);
+      // Note: opening_float is already accounted for in cash_movements as a
+      // float_in row at session start, so we don't double-count it.
+      const net = (movements || []).reduce((s, m) => s + (SIGN[m.type] || 0) * (Number(m.amount) || 0), 0);
       return net;
     } catch (err) {
       console.warn('[computeExpectedCash] failed:', err?.message || err);
@@ -2937,13 +2961,16 @@ export const useStore = create((set, get) => ({
     try {
       await get().loadCurrentShift?.();
       const current = get().currentShift;
-      const { locationConfig } = get();
-      // Parse businessDayStart (HH:MM) into today's boundary
-      const bdStart = locationConfig?.businessDayStart || '06:00';
-      const [hh, mm] = bdStart.split(':').map(Number);
-      const today = new Date(); today.setHours(hh || 0, mm || 0, 0, 0);
-      if (Date.now() < today.getTime()) today.setDate(today.getDate() - 1);
-      const businessDayStartMs = today.getTime();
+      // v5.5.11: use the timezone-aware getBusinessDayStart() helper instead of
+      // device-local setHours(). The previous version computed "today's 6am" in
+      // the device's local timezone — wrong if the device is in a different
+      // timezone than the location. Combined with v5.5.11's fix to
+      // getLocationConfig (which previously pulled the wrong location's config
+      // in multi-location setups), shift boundaries are now consistently the
+      // location's configured business_day_start in the location's timezone.
+      const { getLocationConfig: getCfg, getBusinessDayStart } = await import('../lib/locationTime');
+      const cfg = await getCfg(); // resolves current location internally
+      const businessDayStartMs = getBusinessDayStart(cfg).getTime();
 
       if (current) {
         const openedMs = new Date(current.openedAt).getTime();

@@ -8,13 +8,33 @@
  * Checks closed between midnight and 6am belong to the PREVIOUS business day.
  */
 
-import { platformSupabase } from './supabase';
+import { platformSupabase, getLocationId } from './supabase';
 
-// Cached location config — refreshed on boot
-let _locationConfig = null;
+// v5.5.11: per-location cache. The previous module-level cache returned the
+// SAME config for every caller regardless of which location they were at.
+// In a multi-location setup that's wrong — each location has its own
+// timezone, business_day_start, and shifts schedule. We now key the cache
+// by location id so each location gets its own config.
+const _locationConfigCache = new Map();
 
-export async function getLocationConfig() {
-  if (_locationConfig) return _locationConfig;
+export async function getLocationConfig(explicitLocationId = null) {
+  // Resolve location id. The previous version did .from('locations').limit(1)
+  // with no filter — it just pulled whichever location the DB happened to
+  // return first. In multi-location, that's an unpredictable bug source for
+  // shift boundaries (causes shifts to open/close at the wrong location's
+  // business_day_start time).
+  let locationId = explicitLocationId;
+  if (!locationId) {
+    try { locationId = await getLocationId(); } catch (e) { void e; }
+  }
+  if (!locationId || locationId === 'loc-demo') {
+    // No real location — return fallback defaults so callers don't crash.
+    return { timezone: 'Europe/London', businessDayStart: '06:00', shifts: [], collectionLeadMinutes: 30 };
+  }
+
+  if (_locationConfigCache.has(locationId)) {
+    return _locationConfigCache.get(locationId);
+  }
 
   // Try Platform DB
   if (platformSupabase) {
@@ -22,27 +42,29 @@ export async function getLocationConfig() {
       const { data } = await platformSupabase
         .from('locations')
         .select('timezone, business_day_start, shifts, collection_lead_minutes')
-        .limit(1)
+        .eq('id', locationId)
         .single();
       if (data) {
-        _locationConfig = {
+        const cfg = {
           timezone: data.timezone || 'Europe/London',
           businessDayStart: data.business_day_start || '06:00',
           shifts: data.shifts || [],
           collectionLeadMinutes: typeof data.collection_lead_minutes === 'number' ? data.collection_lead_minutes : 30,
         };
-        return _locationConfig;
+        _locationConfigCache.set(locationId, cfg);
+        return cfg;
       }
-    } catch {}
+    } catch (e) { void e; }
   }
 
   // Fallback defaults
-  _locationConfig = { timezone: 'Europe/London', businessDayStart: '06:00', shifts: [] };
-  return _locationConfig;
+  const fallback = { timezone: 'Europe/London', businessDayStart: '06:00', shifts: [], collectionLeadMinutes: 30 };
+  _locationConfigCache.set(locationId, fallback);
+  return fallback;
 }
 
 export function clearLocationConfigCache() {
-  _locationConfig = null;
+  _locationConfigCache.clear();
 }
 
 /**

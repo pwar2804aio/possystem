@@ -175,6 +175,16 @@ export function purgeStaleLocationData(reason) {
   } catch (e) {
     console.warn('[tenantFence] sessionStorage wipe failed:', e?.message || e);
   }
+  // v5.5.11: clear in-memory location config cache too. The cache is keyed by
+  // location_id so it's per-location, but on a real location switch we also
+  // want to invalidate any stale entries (e.g., if the location row was edited
+  // in the BO between this device's last read and the switch).
+  try {
+    // Dynamic import — locationTime is a sibling module and importing it at
+    // the top of supabase.js would create a circular dep (locationTime imports
+    // from supabase).
+    import('./locationTime').then(m => m.clearLocationConfigCache?.()).catch(() => {});
+  } catch (e) { void e; }
   console.warn('[tenantFence] purged', wiped, 'stale keys —', reason);
 }
 
