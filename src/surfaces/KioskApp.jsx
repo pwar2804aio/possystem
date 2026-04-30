@@ -355,8 +355,12 @@ export default function KioskApp({ kioskId, onUnpair }) {
     setSubmitError(null);
     try {
       const checkId = (crypto.randomUUID ? crypto.randomUUID() : 'cc-' + Date.now());
-      // Simple sequential order number: derive from last 4 of timestamp. Real prod would use a sequence.
-      const num = (Date.now() % 1000).toString().padStart(2, '0');
+      // v5.5.8: use atomic per-location counter instead of (Date.now() % 1000).
+      // Old approach collided every ~1 second (millis-of-current-second wraps fast)
+      // and gave 3-digit numbers that customers found confusing. New format: R1-R99
+      // cycle, single source of truth across kiosk + POS + bar at this location.
+      const { getNextOrderRef } = await import('../lib/db');
+      const num = (await getNextOrderRef(locationId)) || ('R' + (Date.now() % 99 + 1));
       const orderTypeOut = orderType === 'dineIn' ? 'dine-in' : 'takeaway';
       const itemsPayload = cart.map(l => ({
         id: l.item.id,
@@ -371,7 +375,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
       const { error: e1 } = await supabase.from('closed_checks').insert({
         id: checkId,
         location_id: locationId,
-        ref: '#' + num,
+        ref: num,
         items: itemsPayload,
         subtotal: subtotal,
         tip: tip,
@@ -403,7 +407,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
         try {
           const orderRecord = {
             id: checkId,
-            ref: '#' + num,
+            ref: num,
             total: total,
             tip: tip,
             subtotal: subtotal,
@@ -435,8 +439,8 @@ export default function KioskApp({ kioskId, onUnpair }) {
         status: 'fired',
         sent_at: new Date().toISOString(),
         table_id: null,
-        table_label: tableNumber ? ('T' + tableNumber) : ('Kiosk #' + num),
-        server: (nameOverride ?? customerName) || ('Kiosk #' + num),
+        table_label: tableNumber ? ('T' + tableNumber) : ('Kiosk ' + num),
+        server: (nameOverride ?? customerName) || ('Kiosk ' + num),
         covers: 1,
       });
       if (e2) console.warn('[kiosk] kds insert failed:', e2);

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase, isMock, getLocationId } from '../lib/supabase';
 import { calculateOrderTax } from '../lib/tax';
 import { resolveServiceCharge } from '../lib/serviceCharge';
-import { upsertMenuItem, upsertFloorTable, deleteFloorTable, insertKDSTicket, insertClosedCheck, toggle86DB } from '../lib/db';
+import { upsertMenuItem, upsertFloorTable, deleteFloorTable, insertKDSTicket, insertClosedCheck, toggle86DB, getNextOrderRefLocal } from '../lib/db';
 import { printService } from '../lib/printer';
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
@@ -1480,7 +1480,7 @@ export const useStore = create((set, get) => ({
           const label = customer?.name
             ? `${orderType.charAt(0).toUpperCase()+orderType.slice(1)} · ${customer.name}`
             : orderType;
-          const ref = order.ref || `#${++_orderNum}`;
+          const ref = order.ref || getNextOrderRefLocal();
           const scheduledEntry = {
             ref, type: orderType,
             customer: { ...customer },
@@ -1536,7 +1536,7 @@ export const useStore = create((set, get) => ({
         });
       });
       // Always add walk-in orders to queue so they appear in Orders Hub
-      const ref = order.ref || `#${++_orderNum}`;
+      const ref = order.ref || getNextOrderRefLocal();
       const queueEntry = {
         ref, type: orderType,
         customer: customer ? { ...customer } : { name: customer?.name || label },
@@ -3137,7 +3137,7 @@ export const useStore = create((set, get) => ({
       try { taxBreakdown = calculateOrderTax(session.items.filter(i=>!i.voided), taxRates, 'dine-in'); } catch {}
     }
 
-    const ref = `#${Math.floor(1000 + Math.random() * 9000)}`;
+    const ref = getNextOrderRefLocal();
     const record = {
       id: `chk-${Date.now()}`,
       ref,
@@ -3233,7 +3233,7 @@ export const useStore = create((set, get) => ({
     const existingRef = walkInOrder.ref || null;
     const record = {
       id: `chk-${Date.now()}`,
-      ref: existingRef || `#${Math.floor(1000 + Math.random() * 9000)}`,
+      ref: existingRef || getNextOrderRefLocal(),
       tableId: null,
       tableLabel: null,
       server: staff?.name || 'Staff',

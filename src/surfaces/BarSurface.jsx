@@ -4,6 +4,7 @@ import { MENU_ITEMS, ALLERGENS } from '../data/seed';
 import ProductModal, { AllergenModal } from '../components/ProductModal';
 import InlineItemFlow from '../components/InlineItemFlow';
 import CheckoutModal from './CheckoutModal';
+import { getNextOrderRefLocal } from '../lib/db';
 
 const CAT_META = {
   quick:    { icon:'⚡', color:'#e8a020' },
@@ -584,7 +585,7 @@ export default function BarSurface() {
               const allItems = activeTab.rounds.flatMap(r => r.items.filter(i => !i.voided));
               const subtotal = activeTab.total || 0;
               recordWalkInClosedCheck({
-                ref: `#TAB-${Math.floor(1000+Math.random()*9000)}`,
+                ref: 'TAB-' + getNextOrderRefLocal().slice(1),  // 'TAB-' + numeric portion of R<n>
                 server: staff?.name || 'Staff',
                 covers: 1,
                 orderType: 'bar-tab',

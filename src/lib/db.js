@@ -11,6 +11,83 @@
 import { supabase, isMock, getLocationId } from './supabase';
 import { getTodayStartFallback } from './locationTime';
 
+// ── Order number generation (v5.5.8) ─────────────────────────────────────────
+// Replaces three pre-existing colliding ref generators (kiosk Date.now() % 1000,
+// POS Math.random()*9000, in-memory ++_orderNum) with a single atomic per-location
+// counter cycling R1-R99.
+//
+// Primary path: server-side SQL function next_order_number(p_location_id) — atomic
+// via INSERT ON CONFLICT on the location_order_counters row. Returns 'R<n>'.
+//
+// Fallback path: if the function doesn't exist (migration not applied yet), or
+// if there's no network, we use a per-tab in-memory counter seeded from
+// localStorage. This is per-device only — two devices at the same location may
+// briefly issue the same number until the migration is in place. Significantly
+// better than the old generators (no random collisions, no second-of-millis
+// collisions) but not as good as the DB path.
+let _localCounterMemo = null;
+function _readLocalCounter() {
+  if (_localCounterMemo != null) return _localCounterMemo;
+  try {
+    const v = parseInt(localStorage.getItem('rpos-order-counter-fallback') || '0', 10);
+    _localCounterMemo = isNaN(v) ? 0 : v;
+  } catch (e) { _localCounterMemo = 0; void e; }
+  return _localCounterMemo;
+}
+function _bumpLocalCounter() {
+  const cur = _readLocalCounter();
+  const next = (cur % 99) + 1;
+  _localCounterMemo = next;
+  try { localStorage.setItem('rpos-order-counter-fallback', String(next)); } catch (e) { void e; }
+  return next;
+}
+
+export const getNextOrderRef = async (locationId = null) => {
+  if (!locationId || locationId === 'loc-demo') {
+    try { locationId = await getLocationId(); } catch (e) { void e; }
+  }
+  // Primary path — server function. Atomic across all devices at the location.
+  if (!isMock && supabase && locationId && locationId !== 'loc-demo') {
+    try {
+      const { data, error } = await supabase.rpc('next_order_number', {
+        p_location_id: locationId,
+      });
+      if (!error && typeof data === 'string' && data.startsWith('R')) {
+        return data;
+      }
+      if (error) {
+        console.warn('[getNextOrderRef] RPC next_order_number failed:', error.message, '— using local fallback. Apply v5.5.8 migration to fix.');
+      }
+    } catch (e) {
+      console.warn('[getNextOrderRef] RPC threw:', e?.message, '— using local fallback');
+    }
+  }
+  // Fallback path — local counter, persisted to localStorage so it survives reloads.
+  // Each device at the same location runs its own counter; collisions possible if
+  // two devices both fire orders before the migration is applied. Acceptable
+  // short-term as an upgrade from Date.now()%1000 / Math.random().
+  return 'R' + _bumpLocalCounter();
+};
+
+// v5.5.8: synchronous variant for callers that can't go async without major
+// refactoring (recordClosedCheck, recordWalkInClosed, recordWalkInClosedCheck —
+// these are called from React handlers that read store state immediately after,
+// so awaiting inside them breaks the read-after-write timing). Returns 'R<n>'
+// from the local counter, persisted to localStorage. No DB call.
+//
+// Tradeoff: per-device counter, so two devices at the same location can briefly
+// issue the same number while at the same point in their independent 1-99 cycles
+// (~1% collision rate). For single-device shops this is identical to the atomic
+// DB path. Multi-device shops should run the v5.5.8 migration AND we'll move POS
+// callers to async getNextOrderRef in a follow-up commit.
+//
+// In any case this is dramatically better than what we replaced:
+//   kiosk  Date.now() % 1000 → collides every 1 second
+//   POS    Math.random()*9000 → birthday-paradox collisions at ~95 orders
+export function getNextOrderRefLocal() {
+  return 'R' + _bumpLocalCounter();
+}
+
 // ── Menu ──────────────────────────────────────────────────────────────────────
 export const fetchMenus = async (locationId = null) => {
   if (isMock) return { data: null, error: null };
