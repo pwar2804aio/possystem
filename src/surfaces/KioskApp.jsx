@@ -390,7 +390,40 @@ export default function KioskApp({ kioskId, onUnpair }) {
         covers: 1,
       });
       if (e1) throw e1;
-      // 2. kds_tickets — fire to kitchen
+      // 2. v5.5.5: customer attribution — kiosks were missing this path, so a customer
+      // who ordered at the kiosk was stamped on the closed_check (customer name + phone)
+      // but never made it into the customers table, customer_locations junction, or
+      // customer_orders. The same phone at another location (same org) wouldn't dedupe
+      // either — the existing customer record stayed un-updated, and no per-location
+      // visit row was added. POS close paths (recordClosedCheck, recordWalkInClosedCheck,
+      // recordWalkInClosed) already do this; kiosk now matches behaviour.
+      const finalName = (nameOverride ?? customerName) || null;
+      const finalPhone = (phoneOverride ?? customerPhone) || null;
+      if (finalPhone) {
+        try {
+          const orderRecord = {
+            id: checkId,
+            ref: '#' + num,
+            total: total,
+            tip: tip,
+            subtotal: subtotal,
+            items: itemsPayload,
+            method: 'card',
+            order_type: orderTypeOut,
+            location_id: locationId,
+            closedAt: Date.now(),
+            source: 'kiosk',
+          };
+          // Fire-and-forget — a CRM blip should never block order completion.
+          useStore.getState().attributeOrderToCustomer({
+            customer: { name: finalName || 'Customer', phone: finalPhone },
+            orderRecord,
+          }).catch(err => console.warn('[kiosk] attributeOrderToCustomer failed:', err?.message || err));
+        } catch (e) {
+          console.warn('[kiosk] customer attribution dispatch failed:', e?.message || e);
+        }
+      }
+      // 3. kds_tickets — fire to kitchen
       const ticketId = (crypto.randomUUID ? crypto.randomUUID() : 'tk-' + Date.now());
       const { error: e2 } = await supabase.from('kds_tickets').insert({
         id: ticketId,
@@ -407,7 +440,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
         covers: 1,
       });
       if (e2) console.warn('[kiosk] kds insert failed:', e2);
-      // 3. Heartbeat
+      // 4. Heartbeat
       await supabase.from('devices').update({ last_seen: new Date().toISOString() }).eq('id', kioskId);
       setOrderNumber(num);
       setScreen('done');

@@ -1973,16 +1973,28 @@ export const useStore = create((set, get) => ({
     if (isMock || !supabase) return null;
     try {
       const locId = await getLocationId();
-      if (!locId) return null;
+      if (!locId) {
+        console.warn('[upsertCustomer] no locationId resolved — customer not saved');
+        return null;
+      }
       let orgId = get()._cachedOrgId;
       if (!orgId) {
-        const { data: loc } = await supabase.from('locations').select('org_id').eq('id', locId).single();
+        const { data: loc, error: locErr } = await supabase.from('locations').select('org_id').eq('id', locId).single();
+        if (locErr) {
+          console.warn('[upsertCustomer] failed to read locations.org_id for', locId, ':', locErr.message);
+        }
         orgId = loc?.org_id;
         if (orgId) set({ _cachedOrgId: orgId });
       }
-      if (!orgId) return null;
+      if (!orgId) {
+        console.warn('[upsertCustomer] no orgId for location', locId, '— customer not saved. The location row may be missing org_id.');
+        return null;
+      }
       const phoneN = get()._normalisePhone(c.phone);
-      if (!phoneN) return null;
+      if (!phoneN) {
+        console.warn('[upsertCustomer] phone normalisation returned null for', c.phone);
+        return null;
+      }
       const row = {
         org_id: orgId,
         phone: phoneN,
@@ -1996,9 +2008,12 @@ export const useStore = create((set, get) => ({
         allergens: Array.isArray(c.allergens) ? c.allergens : undefined,
         updated_at: new Date().toISOString(),
       };
-      const { data: existing } = await supabase.from('customers')
+      const { data: existing, error: lookupErr } = await supabase.from('customers')
         .select('id, name, email, marketing_opt_in, allergens')
         .eq('org_id', orgId).eq('phone', phoneN).is('deleted_at', null).maybeSingle();
+      if (lookupErr) {
+        console.warn('[upsertCustomer] lookup failed:', lookupErr.message, '(may be RLS — check customers SELECT policy)');
+      }
       if (existing?.id) {
         const patch = { updated_at: row.updated_at };
         if (!existing.name && row.name) patch.name = row.name;
@@ -2011,13 +2026,14 @@ export const useStore = create((set, get) => ({
         // from the toast / detail page). Don't merge — operator decides exact set.
         if (Array.isArray(row.allergens)) patch.allergens = row.allergens;
         if (Object.keys(patch).length > 1) {
-          await supabase.from('customers').update(patch).eq('id', existing.id);
+          const { error: updErr } = await supabase.from('customers').update(patch).eq('id', existing.id);
+          if (updErr) console.warn('[upsertCustomer] update existing failed:', updErr.message);
         }
         return existing.id;
       } else {
         const { data: created, error } = await supabase.from('customers').insert(row).select('id').single();
         if (error) {
-          console.warn('[upsertCustomer] insert failed:', error.message);
+          console.warn('[upsertCustomer] insert failed:', error.message, '(may be RLS — check customers INSERT policy; or unique constraint on (org_id, phone))');
           return null;
         }
         return created?.id || null;
@@ -2032,32 +2048,92 @@ export const useStore = create((set, get) => ({
   // on customer_locations and inserts a customer_orders row. Returns customer_id.
   attributeOrderToCustomer: async ({ customer, orderRecord }) => {
     if (isMock || !supabase) return null;
-    if (!customer?.phone || !orderRecord) return null;
+    if (!customer?.phone || !orderRecord) {
+      console.warn('[attributeOrderToCustomer] skipped — missing customer.phone or orderRecord');
+      return null;
+    }
     try {
       const locId = await getLocationId();
-      if (!locId) return null;
+      if (!locId) {
+        console.warn('[attributeOrderToCustomer] skipped — no locationId resolved');
+        return null;
+      }
+      // v5.5.5: explicit step logging so we can see exactly which write failed when
+      // a customer doesn't appear in the CRM after an order. Previous version was
+      // fire-and-forget with a generic catch-all that hid which step broke.
       const customerId = await get().upsertCustomer(customer);
-      if (!customerId) return null;
-      await supabase.rpc('upsert_customer_visit', {
+      if (!customerId) {
+        console.warn('[attributeOrderToCustomer] upsertCustomer returned null for', customer.phone, '— check upsertCustomer logs above');
+        return null;
+      }
+      console.log('[attributeOrderToCustomer] step 1/3 — customer upserted:', customerId, 'phone:', customer.phone, 'location:', locId);
+
+      // Step 2: bump visit_count + lifetime_revenue on customer_locations.
+      // Try the atomic RPC first; if it doesn't exist or RLS blocks it, fall back
+      // to a direct upsert. The RPC was added in v4.6.62; older Supabase projects
+      // without the migration would silently fail without this fallback.
+      const { error: rpcErr } = await supabase.rpc('upsert_customer_visit', {
         p_customer_id: customerId,
         p_location_id: locId,
         p_revenue: Number(orderRecord.total) || 0,
         p_visit_at: new Date().toISOString(),
       });
+      if (rpcErr) {
+        console.warn('[attributeOrderToCustomer] RPC upsert_customer_visit failed:', rpcErr.message, '— falling back to direct upsert on customer_locations');
+        // Fallback: read-modify-write on customer_locations. Race-prone but better
+        // than nothing if the RPC doesn't exist or the user lacks EXECUTE on it.
+        const { data: existingLoc } = await supabase
+          .from('customer_locations')
+          .select('visit_count, lifetime_revenue')
+          .eq('customer_id', customerId)
+          .eq('location_id', locId)
+          .maybeSingle();
+        const newCount = (existingLoc?.visit_count || 0) + 1;
+        const newRevenue = (Number(existingLoc?.lifetime_revenue) || 0) + (Number(orderRecord.total) || 0);
+        const { error: upsertErr } = await supabase.from('customer_locations').upsert({
+          customer_id: customerId,
+          location_id: locId,
+          visit_count: newCount,
+          lifetime_revenue: newRevenue,
+          last_visit_at: new Date().toISOString(),
+        }, { onConflict: 'customer_id,location_id' });
+        if (upsertErr) {
+          console.warn('[attributeOrderToCustomer] customer_locations fallback upsert failed:', upsertErr.message);
+        } else {
+          console.log('[attributeOrderToCustomer] step 2/3 — customer_locations updated via fallback (visit', newCount, ')');
+        }
+      } else {
+        console.log('[attributeOrderToCustomer] step 2/3 — customer_locations updated via RPC');
+      }
+
+      // Step 3: insert customer_orders row.
       const itemSummary = (orderRecord.items || []).map(i => ({
         name: i.name, qty: i.qty, price: i.price,
       }));
-      await supabase.from('customer_orders').insert({
+      const { error: ordersErr } = await supabase.from('customer_orders').insert({
         customer_id: customerId,
         location_id: locId,
         closed_check_id: orderRecord.ref || orderRecord.id || null,
         ordered_at: new Date().toISOString(),
         total: Number(orderRecord.total) || 0,
-        channel: orderRecord.orderType || orderRecord.type || 'unknown',
+        channel: orderRecord.orderType || orderRecord.type || orderRecord.source || 'unknown',
         item_summary: itemSummary,
       });
+      if (ordersErr) {
+        console.warn('[attributeOrderToCustomer] customer_orders insert failed:', ordersErr.message);
+      } else {
+        console.log('[attributeOrderToCustomer] step 3/3 — customer_orders inserted');
+      }
+
+      // Stamp customer_id on the closed_check (best-effort; scope by location_id
+      // to avoid the cross-location ref collision that would otherwise update
+      // closed_checks at OTHER locations sharing the same ref string).
       if (orderRecord.ref) {
-        await supabase.from('closed_checks').update({ customer_id: customerId }).eq('ref', orderRecord.ref);
+        const { error: stampErr } = await supabase.from('closed_checks')
+          .update({ customer_id: customerId })
+          .eq('ref', orderRecord.ref)
+          .eq('location_id', locId);
+        if (stampErr) console.warn('[attributeOrderToCustomer] closed_checks customer_id stamp failed:', stampErr.message);
       }
       return customerId;
     } catch (err) {
