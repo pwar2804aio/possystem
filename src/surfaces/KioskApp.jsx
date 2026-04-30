@@ -448,23 +448,19 @@ export default function KioskApp({ kioskId, onUnpair }) {
       {screen === 'tableNumber' && <ScreenTableNumber brandColor={brandColor} value={tableNumber} onChange={setTableNumber} onContinue={() => setScreen('menu')} onBack={() => setScreen('orderType')} />}
       {screen === 'menu' && <ScreenMenu brandColor={brandColor} brandAccent={brandAccent} categories={visibleCategories} items={visibleItems} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} onSelectItem={(item) => { setSelectedItem(item); setScreen('item'); }} cartItemCount={cartItemCount} subtotal={subtotal} onCart={() => setScreen('cart')} orderType={orderType} activeMenuId={activeMenuId} banner={bannerFor('menu')} allergenFilter={allergenFilter} onShowAllergenPicker={() => setShowAllergenPicker(true)} onBack={() => setScreen('orderType')} />}
       {screen === 'item' && selectedItem && (
-        ((Array.isArray(selectedItem.assigned_modifier_groups) && selectedItem.assigned_modifier_groups.length > 0) || selectedItem.type === 'variants') ? (
-          <KioskProductModal
-            item={selectedItem}
-            allItems={items}
-            brandColor={brandColor}
-            brandAccent={brandAccent}
-            addLabel={labelAddToOrder}
-            basePrice={resolvePrice(selectedItem, orderType, activeMenuId)}
-            onAdd={({ qty, selections, summary, priceEach, mods, instructions }) => {
-              addToCart(selectedItem, qty, selections, summary, priceEach, mods, instructions);
-              setScreen('menu');
-            }}
-            onCancel={() => setScreen('menu')}
-          />
-        ) : (
-          <ScreenItemDetail brandColor={brandColor} item={selectedItem} orderType={orderType} activeMenuId={activeMenuId} addLabel={labelAddToOrder} onAdd={(qty, mods) => { addToCart(selectedItem, qty, mods); setScreen('menu'); }} onBack={() => setScreen('menu')} />
-        )
+        <KioskProductModal
+          item={selectedItem}
+          allItems={items}
+          brandColor={brandColor}
+          brandAccent={brandAccent}
+          addLabel={labelAddToOrder}
+          basePrice={resolvePrice(selectedItem, orderType, activeMenuId)}
+          onAdd={({ qty, selections, summary, priceEach, mods, instructions }) => {
+            addToCart(selectedItem, qty, selections, summary, priceEach, mods, instructions);
+            setScreen('menu');
+          }}
+          onCancel={() => setScreen('menu')}
+        />
       )}
       {screen === 'cart' && <ScreenCart brandColor={brandColor} cart={cart} subtotal={subtotal} onUpdate={updateCartQty} onAddMore={() => setScreen('menu')} onContinue={() => setScreen('tip')} onBack={() => setScreen('menu')} />}
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
@@ -557,14 +553,14 @@ function ScreenAttract({ brandName, brandColor, brandAccent, brandLogoUrl, attra
         {brandLogoUrl ? (
           <img src={brandLogoUrl} alt={brandName} style={{ maxWidth: '50%', maxHeight: '20vh', marginBottom: '3vh', objectFit: 'contain' }} />
         ) : null}
-        <div style={{ fontSize: 'clamp(48px, 9vw, 96px)', fontWeight: 900, letterSpacing: '-0.04em', color: 'var(--kFg)', textAlign: 'center', lineHeight: 1, marginBottom: '2vh', textShadow: '0 4px 30px rgba(0,0,0,0.3)' }}>{brandName}</div>
+        <div style={{ fontSize: 'clamp(48px, 9vw, 96px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#fff', textAlign: 'center', lineHeight: 1, marginBottom: '2vh', textShadow: '0 4px 30px rgba(0,0,0,0.3)' }}>{brandName}</div>
         {/* v5.4.0: subtitle removed */}
         {avgWaitMinutes ? (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', background: 'var(--kBorder2)', backdropFilter: 'blur(10px)', borderRadius: 100, fontSize: 'clamp(13px, 1.8vw, 18px)', fontWeight: 600, color: 'var(--kFg)', marginBottom: '6vh' }}>⏱ ~{avgWaitMinutes} min wait</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(10px)', borderRadius: 100, fontSize: 'clamp(13px, 1.8vw, 18px)', fontWeight: 600, color: '#fff', marginBottom: '6vh' }}>⏱ ~{avgWaitMinutes} min wait</div>
         ) : null}
         <div style={{ background: '#fff', color: shade(brandColor, -30), padding: 'clamp(18px, 3vh, 28px) clamp(40px, 8vw, 100px)', borderRadius: 100, fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, boxShadow: '0 10px 40px rgba(0,0,0,0.25)', animation: 'kioskPulse 2s infinite', letterSpacing: '-0.02em' }}>{ctaLabel || 'TAP TO ORDER'}</div>
       </div>
-      <div style={{ position: 'relative', padding: '0 30px 30px', fontSize: 13, color: 'var(--kFgMuted)', textAlign: 'center', zIndex: 1 }}>Tap anywhere to begin</div>
+      <div style={{ position: 'relative', padding: '0 30px 30px', fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center', zIndex: 1 }}>Tap anywhere to begin</div>
       <style>{'@keyframes kioskPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }'}</style>
     </div>
   );
@@ -687,19 +683,19 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
         )}
         {/* v5.4.0: interactive allergen filter */}
         <button onClick={onShowAllergenPicker} style={{
-          background: (allergenFilter && allergenFilter.size > 0) ? 'rgba(234,179,8,0.18)' : 'rgba(234,179,8,0.10)',
-          border: '1px solid rgba(234,179,8,0.4)',
+          background: 'var(--kAllergen-bg)',
+          border: '1px solid var(--kAllergen-border)',
           borderRadius: 12, padding: '10px 14px', marginBottom: 12,
           display: 'flex', alignItems: 'center', gap: 10,
           width: '100%', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
         }}>
           <div style={{ fontSize: 18 }}>⚠️</div>
-          <div style={{ flex: 1, fontSize: 13, color: '#ddc270', fontWeight: 600 }}>
+          <div style={{ flex: 1, fontSize: 13, color: 'var(--kAllergen-fg)', fontWeight: 600 }}>
             {(allergenFilter && allergenFilter.size > 0)
               ? 'Avoiding: ' + Array.from(allergenFilter).join(', ') + ' — unsafe items shown faded'
               : 'Have allergies? Tap to filter the menu'}
           </div>
-          <div style={{ fontSize: 16, color: '#ddc270', fontWeight: 700 }}>{(allergenFilter && allergenFilter.size > 0) ? 'Edit ›' : '›'}</div>
+          <div style={{ fontSize: 16, color: 'var(--kAllergen-fg)', fontWeight: 700 }}>{(allergenFilter && allergenFilter.size > 0) ? 'Edit ›' : '›'}</div>
         </button>
         {/* category strip */}
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
@@ -720,7 +716,7 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
         </div>
       </div>
       {/* item grid */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignContent: 'start' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14, alignContent: 'start' }}>
         {items.length === 0 ? (
           <div style={{ gridColumn: '1 / -1', padding: 60, textAlign: 'center', color: 'var(--kFgMuted)' }}>No items in this category.</div>
         ) : items.map(it => {
@@ -732,26 +728,26 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
             <button key={it.id} onClick={() => onSelectItem(it)} style={{
               background: 'var(--kSurface1)',
               border: '1px solid ' + (flagged ? 'rgba(239,68,68,0.5)' : 'var(--kBorder1)'),
-              borderRadius: 16, overflow: 'hidden', cursor: 'pointer',
+              borderRadius: 18, overflow: 'hidden', cursor: 'pointer',
               fontFamily: 'inherit', textAlign: 'left', padding: 0, color: 'var(--kFg)',
               opacity: flagged ? 0.45 : 1,
               position: 'relative',
               display: 'flex', flexDirection: 'column',
-              minHeight: 250,
+              minHeight: 290,
             }}>
               {flagged && (
-                <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, background: '#ef4444', color: 'var(--kFg)', padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>UNSAFE</div>
+                <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, background: '#ef4444', color: '#fff', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>UNSAFE</div>
               )}
-              <div style={{ width: '100%', height: 130, flexShrink: 0, background: 'linear-gradient(135deg, var(--kSurface1), rgba(0,0,0,0.2))', display: 'grid', placeItems: 'center', fontSize: 50, overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: 170, flexShrink: 0, background: 'var(--kImageBg)', display: 'grid', placeItems: 'center', fontSize: 60, overflow: 'hidden' }}>
                 {it.image ? <img src={it.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
               </div>
-              <div style={{ padding: '10px 12px 14px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3, lineHeight: 1.2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--kFgMuted)', lineHeight: 1.3, marginBottom: 8, minHeight: 28, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.description || ''}</div>
+              <div style={{ padding: '14px 16px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4, lineHeight: 1.25, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
+                <div style={{ fontSize: 13, color: 'var(--kFgMuted)', lineHeight: 1.35, marginBottom: 10, minHeight: 35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.description || ''}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: brandColor, fontVariantNumeric: 'tabular-nums' }}>£{Number(price).toFixed(2)}</div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: brandColor, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>£{Number(price).toFixed(2)}</div>
                   {Array.isArray(it.allergens) && it.allergens.length > 0 && (
-                    <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(234,179,8,0.15)', color: '#ddc270', fontWeight: 700, letterSpacing: '0.05em' }}>{it.allergens.slice(0, 2).map(a => a[0].toUpperCase()).join(' ')}</div>
+                    <div style={{ fontSize: 10, padding: '3px 7px', borderRadius: 5, background: 'var(--kAllergen-bg)', color: 'var(--kAllergen-fg)', fontWeight: 700, letterSpacing: '0.05em' }}>{it.allergens.slice(0, 2).map(a => a[0].toUpperCase()).join(' ')}</div>
                   )}
                 </div>
               </div>
@@ -764,48 +760,6 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
 }
 
 // ============================================================
-// SCREEN: ITEM DETAIL
-// ============================================================
-function ScreenItemDetail({ brandColor, item, orderType, activeMenuId, addLabel, onAdd, onBack }) {
-  const [qty, setQty] = useState(1);
-  const price = resolvePrice(item, orderType, activeMenuId);
-  return (
-    <div style={fullScreen()}>
-      <div style={{ position: 'relative', width: '100%', height: '40vh', background: 'linear-gradient(135deg, ' + brandColor + ', ' + shade(brandColor, -25) + ')', display: 'grid', placeItems: 'center', fontSize: 140, flexShrink: 0, overflow: 'hidden' }}>
-        {item.image ? <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
-        <button onClick={onBack} style={{ position: 'absolute', top: 18, left: 18, width: 48, height: 48, borderRadius: 14, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', fontSize: 22, color: 'var(--kFg)', border: 0, cursor: 'pointer' }}>←</button>
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 26px 16px' }}>
-        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8 }}>{item.name}</div>
-        <div style={{ fontSize: 14, color: 'var(--kFgMuted)', lineHeight: 1.5, marginBottom: 16 }}>{item.description}</div>
-        {Array.isArray(item.allergens) && item.allergens.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 22 }}>
-            {item.allergens.map(a => <div key={a} style={{ padding: '5px 10px', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 8, fontSize: 11, color: '#ddc270', fontWeight: 600, textTransform: 'capitalize' }}>⚠ {a}</div>)}
-          </div>
-        )}
-      </div>
-      <div style={{ padding: '14px 22px 22px', borderTop: '1px solid var(--kSurface2)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--kSurface1)', borderRadius: 100, padding: 4 }}>
-          <button onClick={() => setQty(q => Math.max(1, q - 1))} style={qtyBtn()}>−</button>
-          <div style={{ fontSize: 18, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{qty}</div>
-          <button onClick={() => setQty(q => q + 1)} style={qtyBtn()}>+</button>
-        </div>
-        <button onClick={() => onAdd(qty, {})} style={{
-          flex: 1, background: brandColor, color: 'var(--kFg)',
-          padding: '16px 20px', borderRadius: 100,
-          fontSize: 16, fontWeight: 800,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          border: 0, cursor: 'pointer', fontFamily: 'inherit',
-          boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
-        }}>
-          <span>{addLabel || 'Add to order'}</span>
-          <span>£{(qty * price).toFixed(2)}</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ============================================================
 // SCREEN: CART
 // ============================================================
@@ -898,7 +852,7 @@ function ScreenTip({ brandColor, subtotal, tipPresets, tip, onSetTip, onContinue
               <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 22, color: 'var(--kFgFaint)', fontFamily: 'ui-monospace, monospace' }}>£</span>
               <input type="number" step="0.01" min="0" value={customStr} onChange={e => setCustomFromInput(e.target.value)}
                 placeholder="0.00" autoFocus
-                style={{ width: '100%', padding: '14px 14px 14px 36px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--kBorder1)', borderRadius: 10, color: 'var(--kFg)', fontSize: 22, fontFamily: 'ui-monospace, monospace', fontWeight: 700, outline: 'none' }} />
+                style={{ width: '100%', padding: '14px 14px 14px 36px', background: 'var(--kSurface2)', border: '1px solid var(--kBorder1)', borderRadius: 10, color: 'var(--kFg)', fontSize: 22, fontFamily: 'ui-monospace, monospace', fontWeight: 700, outline: 'none' }} />
             </div>
           </div>
         )}
@@ -930,7 +884,7 @@ function ScreenPay({ brandColor, total, submitting, error, onSimulatePaid, onBac
         </div>
         <style>{'@keyframes kioskPoint { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(8px); } }'}</style>
         {error && (
-          <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#fca5a5', padding: '12px 16px', borderRadius: 10, fontSize: 13, maxWidth: 400, textAlign: 'center' }}>{error}</div>
+          <div style={{ background: 'var(--kError-bg)', border: '1px solid var(--kError-border)', color: 'var(--kError-fg)', padding: '12px 16px', borderRadius: 10, fontSize: 13, maxWidth: 400, textAlign: 'center' }}>{error}</div>
         )}
       </div>
       <div style={{ padding: '14px 22px 22px', flexShrink: 0 }}>
@@ -991,26 +945,31 @@ function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhon
 // ============================================================
 function ScreenDone({ brandColor, customerName, customerPhone, orderNumber, orderType, tableNumber, avgWaitMinutes, banner, onDone }) {
   const phoneMasked = customerPhone ? customerPhone.replace(/^(.{3}).+(.{3})$/, '$1*** *** $2') : null;
+  // The Done screen uses a fixed celebration-green gradient regardless of kiosk theme,
+  // so text must be white-on-dark in both light and dark modes.
+  const W = '#fff';
+  const Wm = 'rgba(255,255,255,0.72)';
+  const Wf = 'rgba(255,255,255,0.42)';
   return (
-    <div style={{ ...fullScreen(), background: 'linear-gradient(180deg, #1a4d2e 0%, #0d3520 100%)' }}>
+    <div style={{ ...fullScreen(), background: 'linear-gradient(180deg, #1a4d2e 0%, #0d3520 100%)', color: W }}>
       {banner && banner.imageUrl && (
         <div style={{ width: '100%', maxHeight: '22vh', overflow: 'hidden', flexShrink: 0 }}>
           <img src={banner.imageUrl} alt={banner.label || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         </div>
       )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '6vw' }}>
-        <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#22c55e', display: 'grid', placeItems: 'center', fontSize: 60, color: 'var(--kFg)', marginBottom: 30, boxShadow: '0 0 80px rgba(34,197,94,0.5)' }}>✓</div>
-        <div style={{ fontSize: 'clamp(22px, 3.6vw, 32px)', fontWeight: 700, marginBottom: 4 }}>{customerName ? 'Thank you, ' + customerName + '!' : 'Thank you!'}</div>
-        <div style={{ fontSize: 13, color: 'var(--kFgMuted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 40, marginBottom: 12 }}>Your order number</div>
-        <div style={{ fontSize: 'clamp(120px, 22vw, 220px)', fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.9, marginBottom: 20, fontVariantNumeric: 'tabular-nums' }}>{orderNumber || '—'}</div>
-        <div style={{ fontSize: 16, color: 'var(--kFgMuted)', maxWidth: 360, lineHeight: 1.5, marginBottom: 8 }}>
+        <div style={{ width: 120, height: 120, borderRadius: '50%', background: '#22c55e', display: 'grid', placeItems: 'center', fontSize: 60, color: W, marginBottom: 30, boxShadow: '0 0 80px rgba(34,197,94,0.5)' }}>✓</div>
+        <div style={{ fontSize: 'clamp(22px, 3.6vw, 32px)', fontWeight: 700, marginBottom: 4, color: W }}>{customerName ? 'Thank you, ' + customerName + '!' : 'Thank you!'}</div>
+        <div style={{ fontSize: 13, color: Wm, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 40, marginBottom: 12 }}>Your order number</div>
+        <div style={{ fontSize: 'clamp(120px, 22vw, 220px)', fontWeight: 900, letterSpacing: '-0.05em', lineHeight: 0.9, marginBottom: 20, fontVariantNumeric: 'tabular-nums', color: W }}>{orderNumber || '—'}</div>
+        <div style={{ fontSize: 16, color: Wm, maxWidth: 360, lineHeight: 1.5, marginBottom: 8 }}>
           {orderType === 'dineIn' && tableNumber ? 'Your order will be brought to table ' + tableNumber + '.' : 'We will call your number when ready.'}
         </div>
-        <div style={{ fontSize: 13, color: 'var(--kFgMuted)', marginBottom: 40 }}>Average wait: {avgWaitMinutes || 8} mins</div>
+        <div style={{ fontSize: 13, color: Wm, marginBottom: 40 }}>Average wait: {avgWaitMinutes || 8} mins</div>
         {phoneMasked && (
-          <div style={{ fontSize: 13, color: 'var(--kFgMuted)', marginBottom: 30 }}>📱 Receipt sent to {phoneMasked}</div>
+          <div style={{ fontSize: 13, color: Wm, marginBottom: 30 }}>📱 Receipt sent to {phoneMasked}</div>
         )}
-        <button onClick={onDone} style={{ background: 'transparent', border: '1px solid var(--kFgFaint)', color: 'var(--kFgMuted)', padding: '10px 24px', borderRadius: 100, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
+        <button onClick={onDone} style={{ background: 'transparent', border: '1px solid ' + Wf, color: Wm, padding: '10px 24px', borderRadius: 100, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Done</button>
       </div>
     </div>
   );
@@ -1128,7 +1087,7 @@ function smallCard(brandColor) {
 function primaryCta(brandColor) {
   return {
     background: brandColor,
-    color: 'var(--kFg)',
+    color: '#fff',
     border: 0,
     padding: 'clamp(18px, 2.5vh, 22px) 32px',
     borderRadius: 16,
@@ -1139,7 +1098,6 @@ function primaryCta(brandColor) {
     boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
   };
 }
-function qtyBtn() { return { width: 44, height: 44, borderRadius: '50%', background: 'var(--kSurface2)', color: 'var(--kFg)', border: 0, fontSize: 20, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }; }
 function miniQtyBtn() { return { width: 32, height: 32, borderRadius: '50%', background: 'var(--kSurface1)', color: 'var(--kFg)', border: 0, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }; }
 function kpadKey() { return { padding: '20px', borderRadius: 16, background: 'var(--kSurface1)', color: 'var(--kFg)', fontSize: 26, fontWeight: 600, border: 0, cursor: 'pointer', fontFamily: 'inherit' }; }
 function fieldLabel() { return { display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--kFgMuted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }; }

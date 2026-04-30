@@ -1,27 +1,35 @@
 /**
-* KioskProductModal — v5.3.0
-*
-* Touch-friendly product configurator. Replaces the simple ScreenItemDetail
-* when an item has modifier groups, requiring guided selection before adding to cart.
-*
-* Loads modifier groups from `modifier_groups` table by id (assigned_modifier_groups
-* on the item is an array of group ids).
-*
-* Modifier group shape:
-*   { id, name, min, max, selection_type ('single'|'multiple'), options: [{id, name, price}] }
-*
-* Selection state shape:
-*   { [groupId]: [optionId, ...] }   // always an array even for single-select
-*
-* Validation rules:
-*   - For each group, count selected options
-*   - Must satisfy: min <= count <= max
-*   - 'single' groups have implicit max=1
-*
-* v5.3.0 SCOPE: handles single + multi-select with min/max. Does NOT yet handle:
-*   - Variants (sub-items / parent_id) — landing in v5.3.1
-*   - Nested modifiers (an option that drills into another item) — v5.3.2
-*/
+ * KioskProductModal — v5.5.1
+ *
+ * Touch-friendly product configurator. Single-screen flow — variants, modifier
+ * groups, instruction groups, and NESTED modifiers all render inline within
+ * one scrollable surface. The Add-to-order CTA stays sticky at the bottom so
+ * the customer always sees price + total + qty.
+ *
+ * What changed in v5.5.1:
+ *   - Nested modifiers (option.subGroupId) now expand INLINE under the parent
+ *     option instead of pushing the customer to a new screen. Sub-groups are
+ *     pre-fetched on mount so there's no loading flicker on tap.
+ *   - Typography sized for kiosk distance (name 38, options 18, etc).
+ *   - All colors via [data-kiosk-theme] CSS vars from globals.css.
+ *   - Single-flow even for items without modifiers — same shell, just no
+ *     groups render, qty + add CTA sit immediately under the description.
+ *
+ * Modifier group shape (from Supabase):
+ *   { id, name, min, max, selection_type ('single'|'multiple'),
+ *     options: [{id, name, price, subGroupId?}] }
+ *
+ * Selection state shape:
+ *   selections:        { [groupId]: [optionId, ...] }   // always array
+ *   nestedSelections:  { 'groupId:optionId:occurrenceIdx':
+ *                          { [subGroupId]: [optionId, ...] } }
+ *
+ * Validation:
+ *   - Each top-level group: min <= count <= max
+ *   - Single groups have implicit max=1
+ *   - For each selected occurrence of a parent option with subGroupId,
+ *     the resolved sub-group must also satisfy its own min/max
+ */
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
@@ -31,21 +39,35 @@ import { useStore } from '../store';
 // VALIDATION HELPERS (pure)
 // ============================================================
 
-// Normalize a group's effective min/max from the various legacy fields the schema has.
-// Some rows use min/max, some min_select/max_select, some both. We pick the most
-// constrained values to be safe.
 function normalizeGroup(group) {
   const isSingle = group.selection_type === 'single';
-  // Effective min: max of (min, min_select) — prefer the higher 'minimum' to enforce required
   const min = Math.max(group.min ?? 0, group.min_select ?? 0, 0);
-  // Effective max: prefer 'max' if set, else 'max_select', else 1 for single, unlimited for multi
   const rawMax = group.max ?? group.max_select ?? null;
   const max = rawMax != null ? rawMax : (isSingle ? 1 : (group.options?.length || 99));
   return { ...group, _min: min, _max: max, _isSingle: isSingle };
 }
 
-// Returns null if valid, or a string describing the first violation.
-function validateSelections(groups, selections) {
+// Walks all selected occurrences of options-with-subGroupId and returns
+// the parent option occurrences that need a nested pick.
+function collectNestedOccurrences(groups, selections) {
+  const out = [];
+  for (const g of groups) {
+    if (g.__isVariantGroup) continue;
+    const picked = selections[g.id] || [];
+    const occCounts = {};
+    picked.forEach(optId => {
+      const opt = (g.options || []).find(o => o.id === optId);
+      if (!opt || !opt.subGroupId) return;
+      const idx = occCounts[optId] || 0;
+      occCounts[optId] = idx + 1;
+      out.push({ groupId: g.id, optionId: optId, occurrenceIdx: idx, option: opt, parentGroup: g });
+    });
+  }
+  return out;
+}
+
+function validateSelections(groups, selections, nestedSelections, subGroupsCache) {
+  // Top-level group min/max
   for (const g of groups) {
     const picked = selections[g.id] || [];
     if (picked.length < g._min) {
@@ -55,30 +77,55 @@ function validateSelections(groups, selections) {
       return 'Too many in ' + g.name + ' (max ' + g._max + ')';
     }
   }
+  // Nested sub-group min/max for each occurrence of an option with subGroupId
+  const nested = collectNestedOccurrences(groups, selections);
+  for (const n of nested) {
+    const sub = subGroupsCache[n.option.subGroupId];
+    if (!sub) continue; // sub-group not loaded — soft skip
+    const key = n.groupId + ':' + n.optionId + ':' + n.occurrenceIdx;
+    const subSel = (nestedSelections[key] && nestedSelections[key][sub.id]) || [];
+    if (subSel.length < sub._min) {
+      return sub._min === 1 ? 'Pick a ' + sub.name + ' for ' + n.option.name : 'Pick ' + sub._min + ' from ' + sub.name;
+    }
+    if (subSel.length > sub._max) {
+      return 'Too many in ' + sub.name + ' (max ' + sub._max + ')';
+    }
+  }
   return null;
 }
 
-// Sum the price delta from selected modifier options.
-function priceDelta(groups, selections) {
+function priceDelta(groups, selections, nestedSelections, subGroupsCache) {
   let delta = 0;
   for (const g of groups) {
+    if (g.__isVariantGroup) continue;
     const picked = selections[g.id] || [];
     for (const optId of picked) {
       const opt = (g.options || []).find(o => o.id === optId);
       if (opt && typeof opt.price === 'number') delta += opt.price;
     }
   }
+  // Nested option prices
+  const nested = collectNestedOccurrences(groups, selections);
+  for (const n of nested) {
+    const sub = subGroupsCache[n.option.subGroupId];
+    if (!sub) continue;
+    const key = n.groupId + ':' + n.optionId + ':' + n.occurrenceIdx;
+    const subSel = (nestedSelections[key] && nestedSelections[key][sub.id]) || [];
+    for (const subOptId of subSel) {
+      const subOpt = (sub.options || []).find(o => o.id === subOptId);
+      if (subOpt && typeof subOpt.price === 'number') delta += subOpt.price;
+    }
+  }
   return delta;
 }
 
-// Build the POS-compatible mods array. Each entry is { label, price, groupLabel }.
-// Duplicate option picks (e.g., 3x Biscoff Donut) appear as duplicate entries.
-function buildModsArray(groups, selections) {
+function buildModsArray(groups, selections, nestedSelections, subGroupsCache) {
   const mods = [];
   for (const g of groups) {
     if (g.__isVariantGroup) continue;
     const isInstrGroup = g.__isInstructionGroup;
     const picked = selections[g.id] || [];
+    const occCounts = {};
     for (const optId of picked) {
       const opt = (g.options || []).find(o => o.id === optId);
       if (!opt) continue;
@@ -88,13 +135,31 @@ function buildModsArray(groups, selections) {
         groupLabel: g.name,
         ...(isInstrGroup ? { _instruction: true } : {}),
       });
+      // If this option has nested config, emit the nested picks tagged with parent
+      if (opt.subGroupId) {
+        const idx = occCounts[optId] || 0;
+        occCounts[optId] = idx + 1;
+        const sub = subGroupsCache[opt.subGroupId];
+        if (sub) {
+          const key = g.id + ':' + optId + ':' + idx;
+          const subSel = (nestedSelections[key] && nestedSelections[key][sub.id]) || [];
+          for (const subOptId of subSel) {
+            const subOpt = (sub.options || []).find(o => o.id === subOptId);
+            if (!subOpt) continue;
+            mods.push({
+              label: subOpt.name,
+              price: typeof subOpt.price === 'number' ? subOpt.price : 0,
+              groupLabel: opt.name + ' → ' + sub.name,
+            });
+          }
+        }
+      }
     }
   }
   return mods;
 }
 
-// Build a human-readable string for the kiosk's own cart-line display.
-function summarizeForDisplay(groups, selections) {
+function summarizeForDisplay(groups, selections, nestedSelections, subGroupsCache) {
   const parts = [];
   for (const g of groups) {
     const picked = selections[g.id] || [];
@@ -108,6 +173,16 @@ function summarizeForDisplay(groups, selections) {
     }).filter(Boolean);
     if (labels.length > 0) parts.push(labels.join(', '));
   }
+  // Append nested labels
+  const nested = collectNestedOccurrences(groups, selections);
+  for (const n of nested) {
+    const sub = subGroupsCache[n.option.subGroupId];
+    if (!sub) continue;
+    const key = n.groupId + ':' + n.optionId + ':' + n.occurrenceIdx;
+    const subSel = (nestedSelections[key] && nestedSelections[key][sub.id]) || [];
+    const subNames = subSel.map(id => (sub.options || []).find(o => o.id === id)?.name).filter(Boolean);
+    if (subNames.length > 0) parts.push(n.option.name + ': ' + subNames.join(', '));
+  }
   return parts.join(' · ');
 }
 
@@ -118,48 +193,16 @@ function summarizeForDisplay(groups, selections) {
 export default function KioskProductModal({ item, allItems = [], brandColor, brandAccent, basePrice, addLabel, onAdd, onCancel }) {
   const allInstructionDefs = useStore(s => s.instructionGroupDefs) || [];
   const [groups, setGroups] = useState([]);
+  const [subGroupsCache, setSubGroupsCache] = useState({}); // { [subGroupId]: normalizedGroup }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selections, setSelections] = useState({}); // { groupId: [optionId, ...] }
+  const [nestedSelections, setNestedSelections] = useState({}); // { 'gid:oid:idx': { subGroupId: [...] } }
   const [qty, setQty] = useState(1);
   const [showError, setShowError] = useState(false);
-
-  // v5.3.5: nested modifiers
-  // childContext: { groupId, optionId, item } — when set, render a child modal for that item.
-  const [childContext, setChildContext] = useState(null);
-  // nestedSelections: { 'groupId:optionId:occurrenceIdx': { mods, summary, priceEach, selections } }
-  // Keyed by occurrenceIdx so picking the same option twice gets independent configs.
-  const [nestedSelections, setNestedSelections] = useState({});
-  // v5.4.0: special instructions / notes
   const [instructions, setInstructions] = useState('');
 
-  // Resolve a referenced item from an option ID. Options reference items by either:
-  //  - option.id is the item's id directly (e.g. 'm-1776...')
-  //  - option.id has a trailing item id (e.g. 'opt-xxx-m-1776...')
-  const resolveLinkedItem = (optionId) => {
-    if (!optionId || !Array.isArray(allItems)) return null;
-    // Direct match
-    let it = allItems.find(i => i.id === optionId);
-    if (it) return it;
-    // Trailing m-... pattern
-    const m = optionId.match(/(m-[\w-]+)$/);
-    if (m) it = allItems.find(i => i.id === m[1]);
-    return it || null;
-  };
-
-  // v5.4.2: nested if option has subGroupId (POS pattern) OR linked item has own mods
-  const isOptionNestedByOpt = (option) => {
-    if (!option) return false;
-    if (option.subGroupId) return true;
-    const linked = resolveLinkedItem(option.id);
-    return !!(linked && Array.isArray(linked.assigned_modifier_groups) && linked.assigned_modifier_groups.length > 0);
-  };
-  const isOptionNested = (optionId) => {
-    const opt = groups.flatMap(g => g.options || []).find(o => o.id === optionId);
-    return isOptionNestedByOpt(opt);
-  };
-
-  // Load modifier groups + synthesize a Size group from variants
+  // Load top-level groups + variants, then pre-fetch any sub-groups referenced by option.subGroupId
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -182,9 +225,7 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
             options: children.map(c => ({
               id: c.id,
               name: c.name,
-              // Show price DELTA from cheapest, not absolute price (so the cheapest shows as base, others as +X)
               price: ((c.pricing?.base ?? c.price ?? 0) - cheapestPrice),
-              // Stash the absolute price for later
               __absolutePrice: c.pricing?.base ?? c.price ?? 0,
             })),
           }));
@@ -192,8 +233,6 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       }
 
       // ── Load assigned_modifier_groups ──
-      // Real shape: array of objects { groupId, min, max } (per-item overrides)
-      // Fallback shape (older data): array of plain ids
       const assignments = item?.assigned_modifier_groups;
       if (Array.isArray(assignments) && assignments.length > 0) {
         const idsAndOverrides = assignments.map(a => {
@@ -208,7 +247,6 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
             .in('id', ids);
           if (error) throw error;
           if (!alive) return;
-          // Preserve order, apply per-item min/max overrides if present
           const ordered = idsAndOverrides
             .map(({ id, min, max }) => {
               const g = (data || []).find(x => x.id === id);
@@ -228,6 +266,7 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
         }
       }
 
+      // ── Instruction groups ──
       const instrAssignments = item?.assigned_instruction_groups;
       if (Array.isArray(instrAssignments) && instrAssignments.length > 0) {
         for (const a of instrAssignments) {
@@ -251,15 +290,44 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
         }
       }
 
+      // ── Pre-fetch all sub-groups referenced by option.subGroupId ──
+      const subGroupIds = new Set();
+      for (const g of result) {
+        for (const opt of (g.options || [])) {
+          if (opt && opt.subGroupId) subGroupIds.add(opt.subGroupId);
+        }
+      }
+      let subCache = {};
+      if (subGroupIds.size > 0) {
+        try {
+          const { data, error } = await supabase
+            .from('modifier_groups')
+            .select('*')
+            .in('id', Array.from(subGroupIds));
+          if (error) throw error;
+          if (!alive) return;
+          for (const sg of (data || [])) {
+            subCache[sg.id] = normalizeGroup(sg);
+          }
+        } catch (e) {
+          console.warn('[kiosk] failed to pre-fetch sub-groups:', e?.message);
+        }
+      }
+
       if (alive) {
         setGroups(result);
+        setSubGroupsCache(subCache);
         setLoading(false);
       }
     })();
     return () => { alive = false; };
   }, [item, allItems]);
 
-  const validation = useMemo(() => validateSelections(groups, selections), [groups, selections]);
+  // ── Derived state ──
+  const validation = useMemo(
+    () => validateSelections(groups, selections, nestedSelections, subGroupsCache),
+    [groups, selections, nestedSelections, subGroupsCache]
+  );
   const isValid = validation === null;
   const variantGroup = groups.find(g => g.__isVariantGroup);
   let effectiveBase = basePrice || 0;
@@ -268,42 +336,17 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
     const pickedOpt = pickedVariantId ? variantGroup.options.find(o => o.id === pickedVariantId) : null;
     effectiveBase = pickedOpt ? pickedOpt.__absolutePrice : variantGroup.__cheapestPrice;
   }
-  const nonVariantGroups = groups.filter(g => !g.__isVariantGroup);
-  // Sum nested children's priceEach contributions
-  const nestedTotal = Object.values(nestedSelections).reduce((sum, n) => sum + (n?.priceEach || 0), 0);
-  const totalPriceEach = effectiveBase + priceDelta(nonVariantGroups, selections) + nestedTotal;
+  const totalPriceEach = effectiveBase + priceDelta(groups, selections, nestedSelections, subGroupsCache);
   const totalPrice = totalPriceEach * qty;
 
-  // For single-select: tap toggles between [] and [optId].
-  // For multi-select: tap ADDS one occurrence (up to max). Use decOption to subtract.
-  // For NESTED options: open the child modal instead of toggling. The actual selection commits when child returns.
+  // ── Selection mutation ──
   const incOption = (group, optId) => {
     setShowError(false);
-    const opt = (group.options || []).find(o => o.id === optId);
-    if (isOptionNestedByOpt(opt)) {
-      const current = selections[group.id] || [];
-      if (!group._isSingle && current.length >= group._max) return;
-      let childItem;
-      if (opt.subGroupId) {
-        childItem = {
-          id: '__nested__' + opt.id,
-          name: opt.name,
-          description: '',
-          allergens: [],
-          assigned_modifier_groups: [{ groupId: opt.subGroupId, min: 1, max: 1 }],
-          assigned_instruction_groups: [],
-          pricing: { base: 0 },
-        };
-      } else {
-        childItem = resolveLinkedItem(optId);
-      }
-      setChildContext({ groupId: group.id, optionId: optId, optionName: opt?.name, item: childItem });
-      return;
-    }
     setSelections(prev => {
       const current = prev[group.id] || [];
       let next;
       if (group._isSingle) {
+        // Toggle off if same option already picked, otherwise replace
         next = current.length === 1 && current[0] === optId ? [] : [optId];
       } else {
         if (current.length >= group._max) return prev;
@@ -311,31 +354,6 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       }
       return { ...prev, [group.id]: next };
     });
-  };
-
-  // Called when child modal returns with the nested selections.
-  const commitChild = (childResult) => {
-    if (!childContext) return;
-    const { groupId, optionId } = childContext;
-    // Add the option to the parent selection (count up by 1)
-    setSelections(prev => {
-      const current = prev[groupId] || [];
-      const group = groups.find(g => g.id === groupId);
-      let next;
-      if (group?._isSingle) {
-        next = [optionId];
-      } else {
-        next = [...current, optionId];
-      }
-      return { ...prev, [groupId]: next };
-    });
-    // Stash the child config so summary/mods/priceDelta know about it
-    setNestedSelections(prev => {
-      const occurrenceIdx = ((selections[groupId] || []).filter(id => id === optionId).length);
-      const key = groupId + ':' + optionId + ':' + occurrenceIdx;
-      return { ...prev, [key]: childResult };
-    });
-    setChildContext(null);
   };
 
   const decOption = (group, optId) => {
@@ -347,10 +365,10 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       const next = [...current.slice(0, idx), ...current.slice(idx + 1)];
       return { ...prev, [group.id]: next };
     });
-    // Also drop the LAST nested selection entry for this option (if any)
+    // Drop the LAST occurrence's nested selection for this option
     setNestedSelections(prev => {
-      const current = selections[group.id] || [];
-      const lastIdx = current.filter(id => id === optId).length - 1;
+      const currentList = (selections[group.id] || []).filter(id => id === optId);
+      const lastIdx = currentList.length - 1;
       if (lastIdx < 0) return prev;
       const key = group.id + ':' + optId + ':' + lastIdx;
       if (!prev[key]) return prev;
@@ -360,12 +378,25 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
     });
   };
 
-  const toggleOption = (group, optId) => incOption(group, optId);
+  // ── Nested selection mutation ──
+  const setNestedPick = (parentKey, sub, subOptId) => {
+    setShowError(false);
+    setNestedSelections(prev => {
+      const cur = (prev[parentKey] && prev[parentKey][sub.id]) || [];
+      let next;
+      if (sub._isSingle) {
+        next = cur.length === 1 && cur[0] === subOptId ? [] : [subOptId];
+      } else {
+        if (cur.length >= sub._max) return prev;
+        next = [...cur, subOptId];
+      }
+      return { ...prev, [parentKey]: { ...(prev[parentKey] || {}), [sub.id]: next } };
+    });
+  };
 
   const tryAdd = () => {
     if (!isValid) {
       setShowError(true);
-      // Auto-scroll to first invalid group
       const firstBad = groups.find(g => {
         const picked = (selections[g.id] || []).length;
         return picked < g._min || picked > g._max;
@@ -376,79 +407,55 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       }
       return;
     }
-    // Combine parent + nested mods. Annotate nested with a 'via' field so kitchen sees the parent option.
-    const baseMods = buildModsArray(groups, selections);
-    const nestedMods = [];
-    Object.entries(nestedSelections).forEach(([key, child]) => {
-      const [, optionId] = key.split(':');
-      const parentOptName = groups.flatMap(g => g.options || []).find(o => o.id === optionId)?.name;
-      (child?.mods || []).forEach(m => nestedMods.push({ ...m, groupLabel: (parentOptName ? parentOptName + ' → ' : '') + (m.groupLabel || '') }));
-    });
-    const allMods = [...baseMods, ...nestedMods];
-    // Combine display summaries
-    const baseSummary = summarizeForDisplay(groups, selections);
-    const nestedSummaries = Object.values(nestedSelections).map(n => n?.summary).filter(Boolean);
-    const fullSummary = [baseSummary, ...nestedSummaries].filter(Boolean).join(' · ');
+    const mods = buildModsArray(groups, selections, nestedSelections, subGroupsCache);
+    const summary = summarizeForDisplay(groups, selections, nestedSelections, subGroupsCache);
     onAdd({
       qty,
       selections,
-      mods: allMods,
-      summary: fullSummary,
+      mods,
+      summary,
       priceEach: totalPriceEach,
       instructions: instructions.trim(),
     });
   };
 
-  // ─── Render ───
-  // If a nested modal is active, render it on top.
-  if (childContext) {
-    return (
-      <KioskProductModal
-        item={childContext.item}
-        allItems={allItems}
-        brandColor={brandColor}
-        brandAccent={brandAccent}
-        addLabel={addLabel}
-        basePrice={childContext.item?.pricing?.base ?? childContext.item?.price ?? 0}
-        onAdd={commitChild}
-        onCancel={() => setChildContext(null)}
-      />
-    );
-  }
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   if (loading) {
     return (
       <div style={overlayStyle()}>
-        <div style={{ color: 'var(--kFg)', fontSize: 18 }}>Loading options…</div>
+        <div style={{ color: 'var(--kFg)', fontSize: 22, padding: 60 }}>Loading…</div>
       </div>
     );
   }
 
   return (
     <div style={overlayStyle()}>
-      {/* Top bar — image + back */}
-      <div style={{ position: 'relative', width: '100%', height: '32vh', background: 'linear-gradient(135deg, ' + brandColor + ', ' + (brandAccent || brandColor) + ')', display: 'grid', placeItems: 'center', fontSize: 120, flexShrink: 0, overflow: 'hidden' }}>
-        {item?.image ? <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '\ud83c\udf7d\ufe0f'}
-        <button onClick={onCancel} style={{ position: 'absolute', top: 18, left: 18, width: 48, height: 48, borderRadius: 14, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', fontSize: 22, color: 'var(--kFg)', border: 0, cursor: 'pointer' }}>←</button>
+      {/* Hero image with back button */}
+      <div style={{ position: 'relative', width: '100%', height: '32vh', background: 'linear-gradient(135deg, ' + brandColor + ', ' + (brandAccent || brandColor) + ')', display: 'grid', placeItems: 'center', fontSize: 140, flexShrink: 0, overflow: 'hidden' }}>
+        {item?.image ? <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
+        <button onClick={onCancel} style={{ position: 'absolute', top: 18, left: 18, width: 52, height: 52, borderRadius: 16, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', fontSize: 24, color: '#fff', border: 0, cursor: 'pointer' }}>←</button>
       </div>
 
       {/* Scrollable body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px 16px' }}>
-        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8 }}>{item?.name}</div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '26px 28px 16px' }}>
+        <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 10, lineHeight: 1.1 }}>{item?.name}</div>
         {item?.description && (
-          <div style={{ fontSize: 14, color: 'var(--kFgMuted)', lineHeight: 1.5, marginBottom: 14 }}>{item.description}</div>
+          <div style={{ fontSize: 17, color: 'var(--kFgMuted)', lineHeight: 1.5, marginBottom: 18 }}>{item.description}</div>
         )}
 
         {Array.isArray(item?.allergens) && item.allergens.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 22 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
             {item.allergens.map(a => (
-              <div key={a} style={{ padding: '5px 10px', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 8, fontSize: 11, color: '#ddc270', fontWeight: 600, textTransform: 'capitalize' }}>⚠ {a}</div>
+              <div key={a} style={{ padding: '6px 12px', background: 'var(--kAllergen-bg)', border: '1px solid var(--kAllergen-border)', borderRadius: 8, fontSize: 13, color: 'var(--kAllergen-fg)', fontWeight: 600, textTransform: 'capitalize' }}>⚠ {a}</div>
             ))}
           </div>
         )}
 
         {error && (
-          <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#fca5a5', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 14 }}>{error}</div>
+          <div style={{ background: 'var(--kError-bg)', border: '1px solid var(--kError-border)', color: 'var(--kError-fg)', padding: '12px 16px', borderRadius: 12, fontSize: 14, marginBottom: 16 }}>{error}</div>
         )}
 
         {/* Modifier groups */}
@@ -463,66 +470,127 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
           else if (g._min > 0) hint = 'Required · pick ' + g._min + (g._max > g._min ? '–' + g._max : '');
           else hint = 'Optional · up to ' + g._max;
           return (
-            <div key={g.id} data-mod-group={g.id} style={{ marginBottom: 26 }}>
+            <div key={g.id} data-mod-group={g.id} style={{ marginBottom: 30 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--kFg)' }}>{g.name}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--kFg)', letterSpacing: '-0.01em' }}>{g.name}</div>
                 {picked.length > 0 && remaining > 0 && !g._isSingle && (
-                  <div style={{ fontSize: 11.5, color: 'var(--kFgMuted)' }}>{picked.length} / {g._max}</div>
+                  <div style={{ fontSize: 13, color: 'var(--kFgFaint)', fontWeight: 600 }}>{picked.length} / {g._max}</div>
                 )}
               </div>
-              <div style={{ fontSize: 12, color: isInvalid ? '#fca5a5' : 'var(--kFgMuted)', marginBottom: 12, fontWeight: isInvalid ? 700 : 400 }}>
+              <div style={{ fontSize: 14, color: isInvalid ? 'var(--kError-fg)' : 'var(--kFgMuted)', marginBottom: 14, fontWeight: isInvalid ? 700 : 500 }}>
                 {hint}{isInvalid && picked.length < g._min ? ' — you must select ' + (g._min - picked.length) + ' more' : ''}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {(g.options || []).map(opt => {
                   const optCount = picked.filter(id => id === opt.id).length;
                   const isSelected = optCount > 0;
                   const priceLabel = (opt.price && opt.price > 0) ? '+£' + Number(opt.price).toFixed(2) : (opt.price && opt.price < 0) ? '-£' + Math.abs(opt.price).toFixed(2) : '';
                   const atCap = picked.length >= g._max && !g._isSingle;
                   const showStepper = !g._isSingle && optCount > 0;
+                  const sub = opt.subGroupId ? subGroupsCache[opt.subGroupId] : null;
+
                   return (
-                    <div key={opt.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '14px 16px',
-                      background: isSelected ? 'var(--kSurface2)' : 'var(--kSurface1)',
-                      border: '2px solid ' + (isSelected ? brandColor : (isInvalid ? 'rgba(239,68,68,0.3)' : 'var(--kSurface2)')),
-                      borderRadius: 14,
-                      color: 'var(--kFg)',
-                    }}>
-                      <button onClick={() => incOption(g, opt.id)} disabled={!isSelected && atCap} style={{
-                        flex: 1, display: 'flex', alignItems: 'center', gap: 14,
-                        background: 'transparent', border: 0, padding: 0,
-                        cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer', color: 'var(--kFg)', fontFamily: 'inherit', textAlign: 'left',
-                        opacity: (atCap && !isSelected) ? 0.4 : 1,
+                    <div key={opt.id} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '16px 18px',
+                        background: isSelected ? 'var(--kSurface2)' : 'var(--kSurface1)',
+                        border: '2px solid ' + (isSelected ? brandColor : (isInvalid ? 'var(--kError-border)' : 'var(--kBorder1)')),
+                        borderRadius: sub && isSelected ? '14px 14px 0 0' : 14,
+                        color: 'var(--kFg)',
+                        transition: 'background 0.12s, border-color 0.12s',
                       }}>
-                        <span style={{
-                          flexShrink: 0,
-                          width: 28, height: 28,
-                          borderRadius: g._isSingle ? '50%' : 7,
-                          border: '2px solid ' + (isSelected ? brandColor : 'var(--kFgFaint)'),
-                          display: 'grid', placeItems: 'center',
-                          background: isSelected ? brandColor : 'transparent',
-                          color: 'var(--kFg)', fontSize: 14, fontWeight: 800,
-                        }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
-                        <span style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{opt.name}</span>
-                        {priceLabel && <span style={{ fontSize: 13, color: 'var(--kFgMuted)', fontVariantNumeric: 'tabular-nums' }}>{priceLabel}</span>}
-                        {isOptionNested(opt.id) && (
-                          <span style={{ fontSize: 11, color: brandColor, fontWeight: 700, marginLeft: 4 }}>Configure ›</span>
+                        <button onClick={() => incOption(g, opt.id)} disabled={!isSelected && atCap} style={{
+                          flex: 1, display: 'flex', alignItems: 'center', gap: 16,
+                          background: 'transparent', border: 0, padding: 0,
+                          cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer',
+                          color: 'var(--kFg)', fontFamily: 'inherit', textAlign: 'left',
+                          opacity: (atCap && !isSelected) ? 0.4 : 1,
+                        }}>
+                          <span style={{
+                            flexShrink: 0,
+                            width: 30, height: 30,
+                            borderRadius: g._isSingle ? '50%' : 8,
+                            border: '2px solid ' + (isSelected ? brandColor : 'var(--kBorder3)'),
+                            display: 'grid', placeItems: 'center',
+                            background: isSelected ? brandColor : 'transparent',
+                            color: '#fff', fontSize: 15, fontWeight: 800,
+                          }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
+                          <span style={{ flex: 1, fontSize: 18, fontWeight: 600 }}>{opt.name}</span>
+                          {priceLabel && <span style={{ fontSize: 15, color: 'var(--kFgMuted)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{priceLabel}</span>}
+                          {sub && !isSelected && (
+                            <span style={{ fontSize: 12, color: brandColor, fontWeight: 700, marginLeft: 4 }}>{sub.name} ›</span>
+                          )}
+                        </button>
+                        {showStepper && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            <button onClick={(e) => { e.stopPropagation(); decOption(g, opt.id); }} style={{
+                              width: 40, height: 40, borderRadius: '50%', background: 'var(--kSurface2)',
+                              border: 0, color: 'var(--kFg)', fontSize: 20, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                            }}>−</button>
+                            <button onClick={(e) => { e.stopPropagation(); incOption(g, opt.id); }} disabled={atCap} style={{
+                              width: 40, height: 40, borderRadius: '50%', background: atCap ? 'var(--kSurface1)' : brandColor,
+                              border: 0, color: '#fff', fontSize: 20, fontWeight: 700, cursor: atCap ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                              opacity: atCap ? 0.4 : 1,
+                            }}>+</button>
+                          </div>
                         )}
-                      </button>
-                      {showStepper && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                          <button onClick={(e) => { e.stopPropagation(); decOption(g, opt.id); }} style={{
-                            width: 36, height: 36, borderRadius: '50%', background: 'var(--kSurface2)',
-                            border: 0, color: 'var(--kFg)', fontSize: 18, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                          }}>−</button>
-                          <button onClick={(e) => { e.stopPropagation(); incOption(g, opt.id); }} disabled={atCap} style={{
-                            width: 36, height: 36, borderRadius: '50%', background: atCap ? 'var(--kSurface1)' : brandColor,
-                            border: 0, color: 'var(--kFg)', fontSize: 18, fontWeight: 700, cursor: atCap ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-                            opacity: atCap ? 0.4 : 1,
-                          }}>+</button>
-                        </div>
-                      )}
+                      </div>
+
+                      {/* Inline nested sub-group expansion — one block per occurrence */}
+                      {sub && isSelected && Array.from({ length: optCount }).map((_, occIdx) => {
+                        const parentKey = g.id + ':' + opt.id + ':' + occIdx;
+                        const subSel = (nestedSelections[parentKey] && nestedSelections[parentKey][sub.id]) || [];
+                        const isLastOcc = occIdx === optCount - 1;
+                        const subInvalid = showError && (subSel.length < sub._min || subSel.length > sub._max);
+                        return (
+                          <div key={parentKey} style={{
+                            background: 'var(--kSurface1)',
+                            borderLeft: '3px solid ' + brandColor,
+                            borderRight: '2px solid ' + brandColor,
+                            borderBottom: '2px solid ' + brandColor,
+                            borderRadius: isLastOcc ? '0 0 14px 14px' : 0,
+                            padding: '14px 16px 16px 22px',
+                            marginBottom: isLastOcc ? 0 : 2,
+                          }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--kFgMuted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                              {opt.name}{optCount > 1 ? ' #' + (occIdx + 1) : ''} · {sub.name}
+                            </div>
+                            <div style={{ fontSize: 13, color: subInvalid ? 'var(--kError-fg)' : 'var(--kFgFaint)', marginBottom: 10, fontWeight: subInvalid ? 700 : 500 }}>
+                              {sub._min > 0 ? 'Required · pick ' + (sub._min === sub._max ? sub._min : sub._min + '–' + sub._max) : 'Optional · up to ' + sub._max}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {(sub.options || []).map(subOpt => {
+                                const isSubSel = subSel.includes(subOpt.id);
+                                const subPriceLabel = (subOpt.price && subOpt.price > 0) ? '+£' + Number(subOpt.price).toFixed(2) : '';
+                                return (
+                                  <button key={subOpt.id} onClick={() => setNestedPick(parentKey, sub, subOpt.id)} style={{
+                                    display: 'flex', alignItems: 'center', gap: 14,
+                                    padding: '12px 14px',
+                                    background: isSubSel ? 'var(--kSurface3)' : 'var(--kSurface2)',
+                                    border: '2px solid ' + (isSubSel ? brandColor : 'transparent'),
+                                    borderRadius: 12,
+                                    color: 'var(--kFg)',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit', textAlign: 'left',
+                                  }}>
+                                    <span style={{
+                                      flexShrink: 0, width: 24, height: 24,
+                                      borderRadius: sub._isSingle ? '50%' : 6,
+                                      border: '2px solid ' + (isSubSel ? brandColor : 'var(--kBorder3)'),
+                                      display: 'grid', placeItems: 'center',
+                                      background: isSubSel ? brandColor : 'transparent',
+                                      color: '#fff', fontSize: 12, fontWeight: 800,
+                                    }}>{isSubSel ? '✓' : ''}</span>
+                                    <span style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{subOpt.name}</span>
+                                    {subPriceLabel && <span style={{ fontSize: 14, color: 'var(--kFgMuted)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{subPriceLabel}</span>}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
@@ -532,41 +600,41 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
         })}
       </div>
 
-      {/* v5.4.0: special instructions text */}
-      <div style={{ padding: '0 24px 16px' }}>
-        <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--kFgMuted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Anything else?</label>
+      {/* Special instructions */}
+      <div style={{ padding: '0 28px 18px' }}>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--kFgMuted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Anything else?</label>
         <textarea
           value={instructions}
           onChange={e => setInstructions(e.target.value)}
           placeholder="e.g. no ice, light sauce, allergy notes…"
           maxLength={140}
           rows={2}
-          style={{ width: '100%', background: 'var(--kSurface1)', border: '1px solid var(--kBorder1)', borderRadius: 12, padding: '12px 14px', color: 'var(--kFg)', fontFamily: 'inherit', fontSize: 14, outline: 'none', resize: 'none' }}
+          style={{ width: '100%', borderRadius: 14, padding: '14px 16px', fontFamily: 'inherit', fontSize: 15, outline: 'none', resize: 'none', borderWidth: 1, borderStyle: 'solid' }}
         />
       </div>
 
       {/* Bottom CTA bar */}
-      <div style={{ padding: '14px 22px 22px', borderTop: '1px solid var(--kSurface2)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--kSurface1)', borderRadius: 100, padding: 4 }}>
+      <div style={{ padding: '16px 24px 24px', borderTop: '1px solid var(--kBorder1)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--kSurface2)', borderRadius: 100, padding: 5 }}>
           <button onClick={() => setQty(q => Math.max(1, q - 1))} style={qtyBtn()}>−</button>
-          <div style={{ fontSize: 18, fontWeight: 700, minWidth: 16, textAlign: 'center' }}>{qty}</div>
+          <div style={{ fontSize: 20, fontWeight: 800, minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{qty}</div>
           <button onClick={() => setQty(q => q + 1)} style={qtyBtn()}>+</button>
         </div>
         <button onClick={tryAdd} style={{
           flex: 1,
-          background: isValid ? brandColor : 'var(--kBorder1)',
+          background: isValid ? brandColor : 'var(--kSurface2)',
           color: isValid ? '#fff' : 'var(--kFgFaint)',
-          padding: '16px 20px',
+          padding: '18px 22px',
           borderRadius: 100,
-          fontSize: 16, fontWeight: 800,
+          fontSize: 19, fontWeight: 800, letterSpacing: '-0.01em',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           border: 0,
           cursor: 'pointer',
           fontFamily: 'inherit',
-          boxShadow: isValid ? '0 8px 20px rgba(0,0,0,0.25)' : 'none',
+          boxShadow: isValid ? '0 10px 28px rgba(0,0,0,0.28)' : 'none',
         }}>
           <span>{isValid ? (addLabel || 'Add to order') : (validation || (addLabel || 'Add to order'))}</span>
-          {isValid && <span>£{totalPrice.toFixed(2)}</span>}
+          {isValid && <span style={{ fontVariantNumeric: 'tabular-nums' }}>£{totalPrice.toFixed(2)}</span>}
         </button>
       </div>
     </div>
@@ -577,12 +645,12 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
 function overlayStyle() {
   return {
     position: 'absolute', inset: 0,
-    background: 'var(--kSurfaceShell, #0e0e10)',
+    background: 'var(--kSurfaceShell)',
     color: 'var(--kFg)',
     display: 'flex', flexDirection: 'column',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   };
 }
 function qtyBtn() {
-  return { width: 44, height: 44, borderRadius: '50%', background: 'var(--kSurface2)', color: 'var(--kFg)', border: 0, fontSize: 20, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  return { width: 48, height: 48, borderRadius: '50%', background: 'var(--kSurface3)', color: 'var(--kFg)', border: 0, fontSize: 22, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
 }
