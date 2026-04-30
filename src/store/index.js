@@ -1421,9 +1421,25 @@ export const useStore = create((set, get) => ({
       set(s=>({
         tables: s.tables.map(t=>{
           if(t.id!==activeTableId||!t.session)return t;
+          // v5.5.4: TWO independent concepts on each item:
+          //   status: 'pending' | 'sent'  — whether the kitchen has SEEN this item yet.
+          //                                  An item is 'sent' as soon as it's printed.
+          //   fired:  bool                — whether the kitchen should COOK it now.
+          //                                  Course 0/1 are auto-fired, course 2+ are
+          //                                  printed on a HOLD ticket and only become
+          //                                  fired:true when fireCourse(N) is called.
+          // Pre-v5.5.4 bug: this map only updated status to 'sent' when the course
+          // was in firedCourses (= auto-fire courses). Course 2+ items stayed
+          // 'pending' even after save+send had printed them, so the NEXT save+send
+          // re-included them in pendingItems and re-printed every fired course's
+          // tickets. Now: every printed item flips to status:'sent', and only the
+          // 'fired' flag gates fire-vs-hold.
           const fired=[0,1];
           const firedCourses=[...new Set([...(t.session.firedCourses||[]),...fired])];
-          const items=t.session.items.map(i=>firedCourses.includes(i.course)?{...i,fired:true,status:'sent'}:i);
+          const items=t.session.items.map(i => {
+            if (i.status !== 'pending' || i.voided) return i;
+            return { ...i, fired: firedCourses.includes(i.course), status: 'sent' };
+          });
           const subtotal=items.reduce((s,i)=>s+i.price*i.qty,0);
           return {...t, status:'occupied', session:{...t.session, items, firedCourses, sentAt:t.session.sentAt||Date.now(), server:staff?.name||t.session.server, subtotal, total:subtotal*1.125 }};
         }),

@@ -59,15 +59,11 @@ export const getLocationId = async () => {
 };
 
 export const setResolvedLocationId = (id) => {
-  // v5.5.3: routed through the unified tenant-fence path so any code that calls
-  // setResolvedLocationId benefits from the same logic as the boot-time + pairing-time
-  // fence. If id matches the currently-active location, this is a no-op. If different,
-  // every location-scoped localStorage / sessionStorage key is wiped before _resolvedLocationId
-  // is updated. This was previously inlined here, but the same logic is needed in two
-  // other call sites (boot, pairing) so it's centralised below.
-  if (id !== _resolvedLocationId) {
-    purgeStaleLocationData('setResolvedLocationId: ' + (_resolvedLocationId || '<none>') + ' -> ' + id);
-  }
+  // v5.5.4: route through enforceTenantFence so the wipe decision is based on the
+  // persistent rpos-active-location TAG (durable across reloads) instead of the
+  // in-memory _resolvedLocationId (null on every fresh module load — which caused
+  // a spurious wipe on every BO load in v5.5.3, taking rpos-device with it).
+  enforceTenantFence(id);
   _resolvedLocationId = id;
 };
 export const clearResolvedLocationId = () => { _resolvedLocationId = null; };
@@ -75,7 +71,7 @@ export const LOCATION_ID = 'loc-demo';
 
 
 // ──────────────────────────────────────────────────────────────────
-// v5.5.3 — TENANT FENCE
+// v5.5.3 — TENANT FENCE  (hotfixed in v5.5.4)
 //
 // Every boot, pairing, and explicit location switch routes through enforceTenantFence
 // to guarantee that location-scoped localStorage state from a previously-active
@@ -89,10 +85,23 @@ export const LOCATION_ID = 'loc-demo';
 // The fence works in two parts:
 //   1. enforceTenantFence(activeLocId): on every boot/pair/switch, compare the
 //      active location to the rpos-active-location tag in localStorage. If they
-//      differ, purgeStaleLocationData() wipes every rpos-* key except the
-//      always-keep set, then stamps the new tag.
+//      DIFFER (real mismatch), purgeStaleLocationData() wipes every rpos-* key
+//      except the always-keep set. Then stamps the new tag.
 //   2. Application code calls enforceTenantFence as the very first thing in its
 //      boot path so the wipe happens before any reader hydrates from localStorage.
+//
+// v5.5.4: REMOVED the "tag missing → wipe for safety" branch from the previous
+// release. That branch fired on EVERY existing terminal upgrading to v5.5.3,
+// wiping rpos-device and bouncing every POS to the PairingScreen. The wipe also
+// took the in-flight session backup with it, causing fired-courses state to be
+// lost and kitchen tickets to reprint on the next save+send.
+//
+// The new behaviour: on first v5.5.4 boot for an existing terminal, the tag is
+// absent but localStorage already contains data scoped to whatever location the
+// terminal was previously paired to (rpos-device.locationId). The active location
+// is the same, so no wipe is needed — just stamp the tag and continue. The wipe
+// only fires when there's an actual MISMATCH between the current active location
+// and the recorded tag, which is the only scenario where stale data is a hazard.
 //
 // Keys that always survive a wipe:
 //   rpos-auth          — Supabase auth token; lives across all locations
@@ -100,6 +109,13 @@ export const LOCATION_ID = 'loc-demo';
 //   rpos-active-location — the tenant fence tag; written immediately after wipe
 //   rpos-device-mode   — pos|office|admin selector; cross-location
 //   rpos-theme         — UI preference; cross-location
+//   rpos-device        — POS pairing record. Carries locationId in its body and
+//                        IS the location anchor on POS terminals. Wiping it
+//                        unpairs the terminal. v5.5.4: added to keep set so
+//                        a wipe can't bounce a paired terminal to PairingScreen.
+//                        On legitimate re-pair to a different location, the
+//                        PairingScreen flow OVERWRITES rpos-device explicitly,
+//                        so keeping it across wipes does not block re-pairing.
 // ──────────────────────────────────────────────────────────────────
 
 const TENANT_FENCE_KEEP = new Set([
@@ -108,6 +124,7 @@ const TENANT_FENCE_KEEP = new Set([
   'rpos-active-location',
   'rpos-device-mode',
   'rpos-theme',
+  'rpos-device',
 ]);
 
 /**
@@ -162,9 +179,13 @@ export function purgeStaleLocationData(reason) {
 }
 
 /**
- * The boot-time + pair-time fence. Compares the currently-active location to
- * the last-recorded active-location tag. If they differ, purges all stale data.
- * Returns the activeLocId so callers can chain.
+ * The boot-time + pair-time fence. Wipes location-scoped state ONLY when the
+ * active location differs from the persistent rpos-active-location tag. Always
+ * stamps the tag with the current active location.
+ *
+ * v5.5.4: no longer wipes when the tag is absent (first-ever boot). On first
+ * boot, localStorage state is from the same single location the terminal was
+ * previously paired to, so wiping is unnecessary and harmful.
  *
  * Pass an explicit activeLocId when you know the value (e.g. immediately after
  * pairing). Pass undefined to have it read from localStorage.
@@ -175,13 +196,12 @@ export function enforceTenantFence(activeLocId) {
   try { lastActive = localStorage.getItem('rpos-active-location'); } catch { /* fall through */ }
 
   if (activeLocId && lastActive && activeLocId !== lastActive) {
+    // Real switch detected — wipe stale data from the previous location.
     purgeStaleLocationData('tenantFence: location changed ' + lastActive + ' -> ' + activeLocId);
-  } else if (activeLocId && !lastActive) {
-    // First-ever boot at this location, OR an upgrade from pre-v5.5.3 where the tag
-    // didn't exist. Either way the localStorage state may be from a different
-    // location — safest action is to wipe.
-    purgeStaleLocationData('tenantFence: first boot tag missing, wiping for safety');
   }
+  // No "tag missing → wipe" branch in v5.5.4. Existing localStorage data
+  // is from the terminal's last-known location and is safe to keep on the
+  // first v5.5.4 boot. Only real mismatches trigger a wipe.
 
   if (activeLocId) {
     try { localStorage.setItem('rpos-active-location', activeLocId); } catch { /* fall through */ }
