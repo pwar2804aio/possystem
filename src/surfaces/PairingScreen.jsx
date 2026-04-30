@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase, isMock, LOCATION_ID } from '../lib/supabase';
+import { supabase, isMock, LOCATION_ID, enforceTenantFence } from '../lib/supabase';
 import { VERSION } from '../lib/version';
 
 export default function PairingScreen({ onPaired }) {
@@ -32,6 +32,15 @@ export default function PairingScreen({ onPaired }) {
       last_seen: new Date().toISOString(),
       session_token: null,  // clear session token so old session gets kicked on next check
     }).eq('id', data.id);
+
+    // v5.5.3: TENANT FENCE at pair-time. If this terminal was previously paired to a
+    // different location, every location-scoped localStorage key (rpos-session-backup,
+    // rpos-shared-state, rpos-config-snapshot, etc.) holds the OLD location's data.
+    // The fence wipes those stale keys BEFORE we write the new pairing, so the next
+    // boot reads a clean slate scoped to the new location. Without this, re-pairing a
+    // browser that was previously at Loc 1 to Loc 2 would surface Loc 1's open
+    // orders / printers / device profiles on the Loc 2 POS.
+    enforceTenantFence(data.location_id);
 
     // Store device identity in localStorage
     const deviceEntry = {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isMock, platformSupabase, setResolvedLocationId } from '../lib/supabase';
+import { supabase, isMock, platformSupabase, setResolvedLocationId, enforceTenantFence } from '../lib/supabase';
 import { fetchAccessibleLocations } from '../lib/db';
 
 export default function LocationSwitcher({ onClose }) {
@@ -65,6 +65,11 @@ export default function LocationSwitcher({ onClose }) {
   const switchTo = async (loc) => {
     setSwitching(loc.id);
     const opsLocId = loc.ops_location_id || loc.id;
+    // v5.5.3: explicit tenant fence BEFORE we write the new location override.
+    // The wipe also happens inside setResolvedLocationId, but routing through
+    // enforceTenantFence directly keeps boot/pair/switch on the same code path
+    // and writes the rpos-active-location tag in one place.
+    enforceTenantFence(opsLocId);
     localStorage.setItem('rpos-bo-location', JSON.stringify(opsLocId));
     setResolvedLocationId(opsLocId);
     try {

@@ -59,25 +59,135 @@ export const getLocationId = async () => {
 };
 
 export const setResolvedLocationId = (id) => {
-  // v4.7.1: when switching locations, the previous location's cached menu data
-  // (config snapshot, shared zustand state, session snapshots) MUST be cleared
-  // before the upcoming page reload — otherwise the rehydrate path will
-  // restore Location A's items even though the active location is now B.
-  // The override key (rpos-bo-location), auth, device-mode and theme survive.
+  // v5.5.3: routed through the unified tenant-fence path so any code that calls
+  // setResolvedLocationId benefits from the same logic as the boot-time + pairing-time
+  // fence. If id matches the currently-active location, this is a no-op. If different,
+  // every location-scoped localStorage / sessionStorage key is wiped before _resolvedLocationId
+  // is updated. This was previously inlined here, but the same logic is needed in two
+  // other call sites (boot, pairing) so it's centralised below.
   if (id !== _resolvedLocationId) {
-    try {
-      const KEEP = new Set(['rpos-bo-location', 'rpos-auth', 'rpos-device-mode', 'rpos-theme']);
-      Object.keys(localStorage).forEach(k => {
-        if (k.startsWith('rpos-') && !KEEP.has(k)) localStorage.removeItem(k);
-      });
-    } catch (e) {
-      console.warn('[setResolvedLocationId] cache clear failed:', e?.message || e);
-    }
+    purgeStaleLocationData('setResolvedLocationId: ' + (_resolvedLocationId || '<none>') + ' -> ' + id);
   }
   _resolvedLocationId = id;
 };
 export const clearResolvedLocationId = () => { _resolvedLocationId = null; };
 export const LOCATION_ID = 'loc-demo';
+
+
+// ──────────────────────────────────────────────────────────────────
+// v5.5.3 — TENANT FENCE
+//
+// Every boot, pairing, and explicit location switch routes through enforceTenantFence
+// to guarantee that location-scoped localStorage state from a previously-active
+// location is wiped before the new location's app initialisation reads from it.
+//
+// Without this, a single browser used at Loc 1 then re-paired (or BO-switched) to
+// Loc 2 would carry Loc 1's open sessions, closed checks, KDS tickets, config
+// snapshot, printers, device profiles, etc. into Loc 2's hydrated state — because
+// every one of those localStorage keys is bare-named (no location_id in the key).
+//
+// The fence works in two parts:
+//   1. enforceTenantFence(activeLocId): on every boot/pair/switch, compare the
+//      active location to the rpos-active-location tag in localStorage. If they
+//      differ, purgeStaleLocationData() wipes every rpos-* key except the
+//      always-keep set, then stamps the new tag.
+//   2. Application code calls enforceTenantFence as the very first thing in its
+//      boot path so the wipe happens before any reader hydrates from localStorage.
+//
+// Keys that always survive a wipe:
+//   rpos-auth          — Supabase auth token; lives across all locations
+//   rpos-bo-location   — the BO location override; the wipe trigger itself
+//   rpos-active-location — the tenant fence tag; written immediately after wipe
+//   rpos-device-mode   — pos|office|admin selector; cross-location
+//   rpos-theme         — UI preference; cross-location
+// ──────────────────────────────────────────────────────────────────
+
+const TENANT_FENCE_KEEP = new Set([
+  'rpos-auth',
+  'rpos-bo-location',
+  'rpos-active-location',
+  'rpos-device-mode',
+  'rpos-theme',
+]);
+
+/**
+ * Synchronously resolve the location_id this browser is currently scoped to.
+ * Reads localStorage only — no Supabase call. Used by the boot-time tenant
+ * fence which must run before any async work.
+ *
+ * Priority matches getLocationId() so the fence agrees with later resolution:
+ *   1. rpos-bo-location    (set by LocationSwitcher; BO mode override)
+ *   2. rpos-device         (POS pairing; carries locationId)
+ *   3. null                (no location yet — pre-pairing or unauthenticated)
+ */
+export function getActiveLocationSync() {
+  try {
+    const bo = JSON.parse(localStorage.getItem('rpos-bo-location') || 'null');
+    if (bo) return bo;
+  } catch { /* fall through */ }
+  try {
+    const dev = JSON.parse(localStorage.getItem('rpos-device') || 'null');
+    if (dev?.locationId) return dev.locationId;
+  } catch { /* fall through */ }
+  return null;
+}
+
+/**
+ * Wipe every location-scoped key from localStorage and sessionStorage. Reason
+ * is logged so any unexplained state loss in production is traceable.
+ */
+export function purgeStaleLocationData(reason) {
+  let wiped = 0;
+  try {
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('rpos-') && !TENANT_FENCE_KEEP.has(k)) toRemove.push(k);
+    }
+    toRemove.forEach(k => { localStorage.removeItem(k); wiped++; });
+  } catch (e) {
+    console.warn('[tenantFence] localStorage wipe failed:', e?.message || e);
+  }
+  try {
+    const toRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith('rpos-') && !TENANT_FENCE_KEEP.has(k)) toRemove.push(k);
+    }
+    toRemove.forEach(k => { sessionStorage.removeItem(k); wiped++; });
+  } catch (e) {
+    console.warn('[tenantFence] sessionStorage wipe failed:', e?.message || e);
+  }
+  console.warn('[tenantFence] purged', wiped, 'stale keys —', reason);
+}
+
+/**
+ * The boot-time + pair-time fence. Compares the currently-active location to
+ * the last-recorded active-location tag. If they differ, purges all stale data.
+ * Returns the activeLocId so callers can chain.
+ *
+ * Pass an explicit activeLocId when you know the value (e.g. immediately after
+ * pairing). Pass undefined to have it read from localStorage.
+ */
+export function enforceTenantFence(activeLocId) {
+  if (activeLocId === undefined) activeLocId = getActiveLocationSync();
+  let lastActive = null;
+  try { lastActive = localStorage.getItem('rpos-active-location'); } catch { /* fall through */ }
+
+  if (activeLocId && lastActive && activeLocId !== lastActive) {
+    purgeStaleLocationData('tenantFence: location changed ' + lastActive + ' -> ' + activeLocId);
+  } else if (activeLocId && !lastActive) {
+    // First-ever boot at this location, OR an upgrade from pre-v5.5.3 where the tag
+    // didn't exist. Either way the localStorage state may be from a different
+    // location — safest action is to wipe.
+    purgeStaleLocationData('tenantFence: first boot tag missing, wiping for safety');
+  }
+
+  if (activeLocId) {
+    try { localStorage.setItem('rpos-active-location', activeLocId); } catch { /* fall through */ }
+  }
+  return activeLocId;
+}
 
 
 // ──────────────────────────────────────────────────────────────────

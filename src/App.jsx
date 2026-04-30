@@ -1,5 +1,19 @@
 import { useState, useCallback, useEffect } from 'react';
 import './styles/globals.css';
+// v5.5.3: TENANT FENCE. Run BEFORE any other module that reads location-scoped
+// localStorage. Compares the currently-active location to the last-recorded
+// active-location tag, and if they differ, wipes every stale rpos-* key. This
+// prevents Loc 1's open sessions / closed checks / config snapshot / printer
+// list from bleeding into Loc 2 when the same browser is repurposed.
+//
+// Why this import statement and not a function call: ES modules execute imports
+// top-down at module-init time, so the fence runs at app load BEFORE the store
+// module (./store), SyncBridge, and useSupabaseInit get a chance to read any
+// localStorage keys. The other invocation points (PairingScreen.onPair,
+// LocationSwitcher.switchTo, setResolvedLocationId) are belt-and-suspenders.
+import { enforceTenantFence } from './lib/supabase';
+enforceTenantFence();
+
 import { useStore } from './store';
 import PINScreen from './surfaces/PINScreen';
 import POSSurface from './surfaces/POSSurface';
