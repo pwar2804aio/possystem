@@ -70,7 +70,7 @@ export default function Customers() {
         // All customers in the org
         const { data: customerRows } = await supabase
           .from('customers')
-          .select('id, name, phone, phone_raw, email, marketing_opt_in, marketing_opt_in_at, notes, created_at, updated_at')
+          .select('id, name, phone, phone_raw, email, marketing_opt_in, marketing_opt_in_at, notes, allergens, created_at, updated_at')
           .eq('org_id', orgId).is('deleted_at', null)
           .order('updated_at', { ascending: false })
           .limit(1000);
