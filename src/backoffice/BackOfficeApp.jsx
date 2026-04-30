@@ -79,7 +79,7 @@ export default function BackOfficeApp() {
     (async () => {
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('role, org_id, location_id, organisations(name), locations(name)')
+        .select('role, org_id, location_id, bo_access, organisations(name), locations(name)')
         .eq('id', authUser.id)
         .single();
       if (profile) {
@@ -107,6 +107,11 @@ export default function BackOfficeApp() {
 
         setOrgCtx({
           role: profile.role,
+          // v5.5.15: bo_access flag gates BO entry. super_admin always passes.
+          // If bo_access is undefined (column missing from DB / pre-v5.5.15
+          // schema), default to true so existing deployments don't lock out
+          // their existing users before the migration runs.
+          boAccess: profile.role === 'super_admin' || profile.bo_access !== false,
           orgId: profile.org_id,
           orgName: profile.organisations?.name || 'Restaurant OS',
           locationId: effectiveLocId,
@@ -220,6 +225,30 @@ export default function BackOfficeApp() {
 
   // Show login screen if not authenticated
   if (!authUser && !isMock) return <BOLogin onLogin={setAuthUser} />;
+
+  // v5.5.15: gate access to the back office on the bo_access flag.
+  // While orgCtx is null we're still loading the profile — show spinner.
+  // If profile loaded and boAccess is explicitly false, show denial screen
+  // with sign-out. super_admin always passes (set in the useEffect above).
+  if (!isMock && authUser && orgCtx === null) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
+      <div style={{ color:'var(--t3)', fontSize:13 }}>Loading profile…</div>
+    </div>
+  );
+  if (!isMock && authUser && orgCtx && !orgCtx.boAccess) return (
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'var(--bg)', color:'var(--t1)', padding:32, gap:18 }}>
+      <div style={{ fontSize:36 }}>🔒</div>
+      <div style={{ fontSize:18, fontWeight:800, color:'var(--t1)' }}>No back-office access</div>
+      <div style={{ fontSize:13, color:'var(--t3)', textAlign:'center', maxWidth:360, lineHeight:1.5 }}>
+        Your account ({authUser.email}) doesn't have permission to use the back office.
+        Contact your administrator if you think this is wrong.
+      </div>
+      <button onClick={() => supabase.auth.signOut().then(() => window.location.reload())}
+        style={{ marginTop:8, padding:'10px 22px', borderRadius:8, border:'1px solid var(--bdr)', background:'transparent', color:'var(--t2)', cursor:'pointer', fontFamily:'inherit', fontSize:13 }}>
+        Sign out
+      </button>
+    </div>
+  );
 
   const groups = [...new Set(NAV.map(n => n.group))];
 
