@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
+import { sortTables } from '../lib/sortTables';
 
 const STATUS = {
   available: { color:'#22c55e', bg:'rgba(34,197,94,.12)',  border:'rgba(34,197,94,.35)' },
@@ -81,13 +82,17 @@ export default function SendWithoutTableModal({ items, onClose, onNameOrder, onS
   const [orderName, setOrderName] = useState('');
   const [section, setSection] = useState('all');
 
-  const activeTables = tables.filter(t =>
+  // v5.5.13: sort by section + natural-order label so T1, T2, T9, T10 render
+  // in operator-friendly order. Pre-v5.5.13 the picker showed whatever order
+  // the store happened to have — usually load order from Supabase or
+  // mutation order. Operators expect alphabetical/numeric sort.
+  const activeTables = sortTables(tables.filter(t =>
     (t.status==='open'||t.status==='occupied') && t.session && !t.parentId
-  );
-  const availableTables = tables.filter(t => t.status==='available' && !t.parentId);
-  const filteredTables = (mode==='table_picker' ? tables.filter(t => !t.parentId) : []).filter(t =>
+  ));
+  const availableTables = sortTables(tables.filter(t => t.status==='available' && !t.parentId));
+  const filteredTables = sortTables((mode==='table_picker' ? tables.filter(t => !t.parentId) : []).filter(t =>
     section==='all' || t.section === section
-  );
+  ));
 
   const sections = ['all', ...new Set(tables.filter(t=>!t.parentId).map(t=>t.section).filter(Boolean))];
 

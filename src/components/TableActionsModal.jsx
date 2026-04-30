@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
+import { sortTables } from '../lib/sortTables';
 
 /**
  * Modal opened from the POS header when on a table.
@@ -16,11 +17,13 @@ export default function TableActionsModal({ table, onClose }) {
   // v4.6.28: destinations = available (transfer) + occupied (combine).
   // Hide children (child table splits are handled elsewhere) and the
   // current table itself. Section match keeps it relevant.
-  const destinationTables = tables.filter(t =>
+  // v5.5.13: destination table picker is now natural-sorted by section +
+  // label so transfer / combine flows match operator's mental model.
+  const destinationTables = sortTables(tables.filter(t =>
     t.id !== table.id &&
     !t.parentId &&
     (t.status === 'available' || t.status === 'occupied')
-  );
+  ));
   const isCombine = transferTo?.status === 'occupied';
 
   const handleSaveCovers = () => {

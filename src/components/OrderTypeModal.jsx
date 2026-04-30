@@ -9,6 +9,7 @@
  */
 import { useState, useRef } from 'react';
 import { useStore } from '../store';
+import { sortTables } from '../lib/sortTables';
 
 const TYPES = [
   {
@@ -85,8 +86,10 @@ export default function OrderTypeModal({ items, onClose, onComplete }) {
   const itemCount = items?.length || 0;
   const subtotal  = items?.reduce((s, i) => s + i.price * i.qty, 0) || 0;
 
-  const availableTables = tables.filter(t => t.status === 'available');
-  const occupiedTables  = tables.filter(t => t.status !== 'available' && t.session);
+  // v5.5.13: natural-sorted by section + label so the picker shows T1, T2,
+  // T9, T10 in expected order rather than store-order.
+  const availableTables = sortTables(tables.filter(t => t.status === 'available'));
+  const occupiedTables  = sortTables(tables.filter(t => t.status !== 'available' && t.session));
   const openTabs        = tabs?.filter(t => t.status !== 'closed') || [];
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
