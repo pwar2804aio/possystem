@@ -105,10 +105,17 @@ function AdminPanel({ authUser }) {
     // CompanyAdminApp which is gated to super_admin role. RLS policy on
     // user_profiles must allow super_admin to read all rows — otherwise
     // this returns only the calling user's own row and the picker is empty.
-    try {
-      const { data } = await sbFetch(`user_profiles?select=id,email,full_name,org_id,role,location_id,bo_access,user_locations(location_id)&order=email.asc`);
-      setAllUsers(Array.isArray(data) ? data : []);
-    } catch { setAllUsers([]); }
+    // v5.5.16: tolerate missing bo_access column (pre-migration) — fall
+    // back to a SELECT without it. Without this, the picker stayed empty
+    // because PostgREST 4xx'd the whole query on the unknown column.
+    const fullSel = `id,email,full_name,org_id,role,location_id,bo_access,user_locations(location_id)`;
+    const safeSel = `id,email,full_name,org_id,role,location_id,user_locations(location_id)`;
+    let { data, error } = await sbFetch(`user_profiles?select=${fullSel}&order=email.asc`);
+    if (error && /bo_access|column.*not.*exist|PGRST204/i.test(error.message || '')) {
+      console.warn('[CompanyAdminApp] bo_access column missing — falling back. Run supabase/migrations/20260430_bo_access_flag.sql to enable BO-access toggles.');
+      ({ data } = await sbFetch(`user_profiles?select=${safeSel}&order=email.asc`));
+    }
+    setAllUsers(Array.isArray(data) ? data : []);
   };
 
   const loadOrgs = async () => {

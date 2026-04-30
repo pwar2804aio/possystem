@@ -77,11 +77,37 @@ export default function BackOfficeApp() {
   useEffect(() => {
     if (!authUser || isMock) return;
     (async () => {
-      const { data: profile } = await supabase
+      // v5.5.16: defensive SELECT. If supabase/migrations/20260430_bo_access_flag.sql
+      // hasn't run yet, the bo_access column doesn't exist and PostgREST returns
+      // PGRST204 (column not found) on the original SELECT. Pre-v5.5.16 the gate
+      // hung at 'Loading profile…' because the failed query left orgCtx null.
+      // Retry without bo_access if the first SELECT errors. Also surface the
+      // error to console so the next time something fails it's visible.
+      let profile = null;
+      const fullSelect = 'role, org_id, location_id, bo_access, organisations(name), locations(name)';
+      const safeSelect = 'role, org_id, location_id, organisations(name), locations(name)';
+      let { data, error } = await supabase
         .from('user_profiles')
-        .select('role, org_id, location_id, bo_access, organisations(name), locations(name)')
+        .select(fullSelect)
         .eq('id', authUser.id)
         .single();
+      if (error && /bo_access|column.*not.*exist|PGRST204/i.test(error.message || '')) {
+        console.warn('[BackOfficeApp] bo_access column missing — falling back. Run supabase/migrations/20260430_bo_access_flag.sql to enable the BO-access gate.');
+        ({ data, error } = await supabase
+          .from('user_profiles')
+          .select(safeSelect)
+          .eq('id', authUser.id)
+          .single());
+      }
+      if (error) {
+        console.error('[BackOfficeApp] user_profiles SELECT failed:', error.message);
+        // Set orgCtx anyway so the gate doesn't hang. boAccess defaults true so
+        // existing users keep working — same fallback we use when bo_access is
+        // undefined on the row.
+        setOrgCtx({ role: null, boAccess: true, orgId: null, orgName: 'Restaurant OS', locationId: null, locationName: null });
+        return;
+      }
+      profile = data;
       if (profile) {
         // v5.5.2: BackOfficeApp must respect the BO location override (set by LocationSwitcher)
         // BEFORE falling back to user_profiles.location_id. Previously this ran user_profiles only,
