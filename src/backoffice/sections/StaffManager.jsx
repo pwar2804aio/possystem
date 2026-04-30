@@ -30,6 +30,17 @@ function randomColor() {
 export default function StaffManager() {
   const { staffMembers, addStaffMember, updateStaffMember, removeStaffMember, markBOChange, showToast } = useStore();
 
+  // v5.5.17: BO-access state. Each staff member can optionally be linked to
+  // an auth user (user_profiles.id stored in staff_members.auth_user_id).
+  // The map below caches the auth user's profile so the detail panel can
+  // show email + bo_access flag without re-querying on every render.
+  // Keyed by staff_member.id; value is { authUserId, email, boAccess } | null.
+  const [authLinks, setAuthLinks] = useState({});
+  const [showGrantBO, setShowGrantBO] = useState(null); // staff_member.id | null
+  const [grantForm, setGrantForm] = useState({ email:'', password:'', confirmPassword:'' });
+  const [grantBusy, setGrantBusy] = useState(false);
+  const [grantError, setGrantError] = useState('');
+
   // Load staff from Supabase on mount (real mode only)
   useEffect(() => {
     if (isMock) return;
@@ -45,14 +56,49 @@ export default function StaffManager() {
         if (locationId) await supabase.from('user_profiles').update({ location_id: locationId }).eq('id', user.id);
       }
       if (!locationId) return;
-      const { data: rows } = await supabase.from('staff_members').select('*').eq('location_id', locationId).eq('active', true);
+      // v5.5.17: also SELECT auth_user_id so we can show / toggle BO access.
+      // Defensive: if column missing (pre-migration), drop it from the SELECT.
+      let { data: rows, error } = await supabase
+        .from('staff_members')
+        .select('id, name, role, pin, color, initials, permissions, active, auth_user_id')
+        .eq('location_id', locationId).eq('active', true);
+      if (error && /auth_user_id|column.*not.*exist|PGRST204/i.test(error.message || '')) {
+        console.warn('[StaffManager] auth_user_id column missing — falling back. Run supabase/migrations/20260430_staff_auth_link.sql to enable BO access linking.');
+        ({ data: rows } = await supabase
+          .from('staff_members')
+          .select('id, name, role, pin, color, initials, permissions, active')
+          .eq('location_id', locationId).eq('active', true));
+      }
       if (rows?.length) {
         useStore.setState({ staffMembers: rows.map(r => ({
           id: r.id, name: r.name, role: r.role, pin: r.pin,
           color: r.color || '#3b82f6', initials: r.initials || r.name.slice(0,2).toUpperCase(),
           permissions: Array.isArray(r.permissions) ? r.permissions : (ROLE_DEFAULTS[r.role] || []),
           active: r.active,
+          authUserId: r.auth_user_id || null,
         })) });
+        // Bulk-fetch profiles for any linked auth users
+        const linkedIds = rows.map(r => r.auth_user_id).filter(Boolean);
+        if (linkedIds.length > 0) {
+          let { data: profiles, error: profErr } = await supabase
+            .from('user_profiles')
+            .select('id, email, bo_access')
+            .in('id', linkedIds);
+          // Defensive — fall back without bo_access if column missing
+          if (profErr && /bo_access|column.*not.*exist|PGRST204/i.test(profErr.message || '')) {
+            ({ data: profiles } = await supabase
+              .from('user_profiles')
+              .select('id, email')
+              .in('id', linkedIds));
+          }
+          const linkMap = {};
+          rows.forEach(r => {
+            if (!r.auth_user_id) return;
+            const p = (profiles || []).find(x => x.id === r.auth_user_id);
+            if (p) linkMap[r.id] = { authUserId: p.id, email: p.email, boAccess: p.bo_access !== false };
+          });
+          setAuthLinks(linkMap);
+        }
       }
     })();
   }, []);
@@ -166,6 +212,117 @@ export default function StaffManager() {
     save(id, { permissions: cur.includes(perm) ? cur.filter(p=>p!==perm) : [...cur,perm] });
   };
 
+  // v5.5.17: BO access lifecycle
+  //
+  // grantBOAccess: creates an auth user via the create-user edge function
+  // (same one CompanyAdminApp uses), then links the new user_profiles.id
+  // back onto staff_members.auth_user_id. The user can sign in to the BO
+  // immediately afterwards. bo_access defaults true on the new user.
+  const grantBOAccess = async (staffId) => {
+    setGrantError('');
+    if (!grantForm.email.trim()) { setGrantError('Email required'); return; }
+    if (grantForm.password.length < 8) { setGrantError('Password must be at least 8 characters'); return; }
+    if (grantForm.password !== grantForm.confirmPassword) { setGrantError('Passwords do not match'); return; }
+    if (isMock) { setGrantError('Mock mode — auth user creation not available'); return; }
+
+    setGrantBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: meProfile } = await supabase.from('user_profiles').select('org_id, location_id').eq('id', user.id).single();
+      const orgId = meProfile?.org_id;
+      const locId = meProfile?.location_id;
+      if (!orgId) { setGrantError('Your account is not linked to an org — cannot create users'); setGrantBusy(false); return; }
+
+      const auth = JSON.parse(localStorage.getItem('rpos-auth') || 'null');
+      const member = staffMembers.find(s => s.id === staffId);
+      const resp = await fetch('https://tbetcegmszzotrwdtqhi.supabase.co/functions/v1/create-user', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${auth?.access_token}` },
+        body: JSON.stringify({
+          email: grantForm.email.trim(),
+          password: grantForm.password,
+          fullName: member?.name || '',
+          orgId,
+          locationId: locId || null,
+          role: 'manager',
+        }),
+      });
+      const result = await resp.json();
+      if (result.error) { setGrantError(result.error); setGrantBusy(false); return; }
+      const newUserId = result.id;
+      if (!newUserId) { setGrantError('Edge function did not return a user id'); setGrantBusy(false); return; }
+
+      // Link the new auth user to this staff_member.
+      const { error: linkErr } = await supabase
+        .from('staff_members')
+        .update({ auth_user_id: newUserId })
+        .eq('id', staffId);
+      if (linkErr) {
+        console.warn('[grantBOAccess] link update failed:', linkErr.message);
+        setGrantError('User created but linking to staff member failed: ' + linkErr.message);
+        setGrantBusy(false);
+        return;
+      }
+
+      // Update local state
+      setAuthLinks(prev => ({ ...prev, [staffId]: { authUserId: newUserId, email: grantForm.email.trim(), boAccess: true } }));
+      useStore.setState({
+        staffMembers: useStore.getState().staffMembers.map(s =>
+          s.id === staffId ? { ...s, authUserId: newUserId } : s
+        ),
+      });
+
+      setShowGrantBO(null);
+      setGrantForm({ email:'', password:'', confirmPassword:'' });
+      setGrantBusy(false);
+      showToast(`✓ Back-office access granted — ${grantForm.email.trim()} can now sign in`, 'success');
+    } catch (e) {
+      setGrantError(e.message);
+      setGrantBusy(false);
+    }
+  };
+
+  // toggleBOAccess: flips user_profiles.bo_access without touching the auth
+  // record. Lets you temporarily revoke without losing the credential.
+  const toggleBOAccess = async (staffId) => {
+    const link = authLinks[staffId];
+    if (!link) return;
+    const next = !link.boAccess;
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ bo_access: next })
+      .eq('id', link.authUserId);
+    if (error) {
+      if (/bo_access|column.*not.*exist|PGRST204/i.test(error.message || '')) {
+        showToast('Run supabase/migrations/20260430_staff_auth_link.sql first — bo_access column missing', 'error');
+        return;
+      }
+      showToast('Failed to update access: ' + error.message, 'error');
+      return;
+    }
+    setAuthLinks(prev => ({ ...prev, [staffId]: { ...link, boAccess: next } }));
+    showToast(next ? '✓ Back-office access enabled' : 'Back-office access disabled', 'success');
+  };
+
+  // unlinkBOAccess: clears auth_user_id from staff_members. Does NOT delete
+  // the auth user — they can still exist in user_profiles, just unlinked
+  // from this staff member. Useful when a person leaves the business.
+  const unlinkBOAccess = async (staffId) => {
+    if (!confirm('Unlink back-office access? The user account is preserved but no longer linked to this staff member.')) return;
+    const { error } = await supabase
+      .from('staff_members')
+      .update({ auth_user_id: null })
+      .eq('id', staffId);
+    if (error) { showToast('Failed to unlink: ' + error.message, 'error'); return; }
+    setAuthLinks(prev => { const next = { ...prev }; delete next[staffId]; return next; });
+    useStore.setState({
+      staffMembers: useStore.getState().staffMembers.map(s =>
+        s.id === staffId ? { ...s, authUserId: null } : s
+      ),
+    });
+    showToast('Unlinked', 'info');
+  };
+
   return (
     <div style={{ display:'flex', height:'100%', overflow:'hidden' }}>
 
@@ -253,6 +410,57 @@ export default function StaffManager() {
               {sel.pin && <div style={{ display:'flex', gap:6 }}>{Array(4).fill(null).map((_,i)=><div key={i} style={{ width:16, height:16, borderRadius:'50%', background:'var(--t3)' }}/>)}</div>}
             </div>
 
+            {/* v5.5.17: Back-office access card. Lets the operator give a
+                staff member email + password to sign in to the BO, separate
+                from their POS PIN. Shown for all staff but most stay
+                POS-PIN-only. */}
+            <div style={{ marginBottom:20, padding:'12px 14px', background:'var(--bg2)', borderRadius:12, border:'1px solid var(--bdr)' }}>
+              {(() => {
+                const link = authLinks[sel.id];
+                if (!link) {
+                  return (
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)', marginBottom:2 }}>Back-office access</div>
+                        <div style={{ fontSize:10, color:'var(--t3)' }}>Give this staff member email + password to sign in to the back office for reports, menu, settings, etc.</div>
+                      </div>
+                      <button
+                        onClick={()=>{ setShowGrantBO(sel.id); setGrantForm({ email:'', password:'', confirmPassword:'' }); setGrantError(''); }}
+                        style={{ padding:'6px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:12, fontWeight:700 }}
+                      >Grant access</button>
+                    </div>
+                  );
+                }
+                return (
+                  <>
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:'var(--t1)', marginBottom:2 }}>Back-office access</div>
+                        <div style={{ fontSize:10, color:'var(--t3)', fontFamily:'monospace' }}>{link.email}</div>
+                      </div>
+                      <button
+                        onClick={()=>toggleBOAccess(sel.id)}
+                        style={{
+                          padding:'6px 14px', borderRadius:8, cursor:'pointer', fontFamily:'inherit',
+                          background: link.boAccess ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.16)',
+                          border: link.boAccess ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(239,68,68,0.4)',
+                          color: link.boAccess ? '#86efac' : '#fca5a5',
+                          fontSize:11, fontWeight:700,
+                        }}
+                      >{link.boAccess ? '✓ Enabled — click to disable' : '✗ Disabled — click to enable'}</button>
+                    </div>
+                    <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
+                      <button
+                        onClick={()=>unlinkBOAccess(sel.id)}
+                        style={{ padding:'4px 10px', borderRadius:7, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t3)', fontSize:10, fontWeight:600 }}
+                        title="Disconnect this auth user from the staff record. The user account is preserved."
+                      >Unlink</button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
             {/* Permissions */}
             <div style={{ marginBottom:12 }}>
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
@@ -326,6 +534,45 @@ export default function StaffManager() {
             <div style={{ display:'flex', gap:8, marginTop:16 }}>
               <button onClick={()=>setShowAdd(false)} style={{ flex:1, padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:13 }}>Cancel</button>
               <button onClick={addMember} disabled={!newForm.name.trim()} style={{ flex:2, padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:14, fontWeight:800, opacity:newForm.name.trim()?1:.4 }}>Add staff member</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* v5.5.17: Grant back-office access modal */}
+      {showGrantBO && (
+        <div className="modal-back" onClick={e=>e.target===e.currentTarget&&setShowGrantBO(null)}>
+          <div style={{ background:'var(--bg1)', border:'1px solid var(--bdr2)', borderRadius:18, width:'100%', maxWidth:420, padding:22, boxShadow:'var(--sh3)' }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'var(--t1)', marginBottom:6 }}>Grant back-office access</div>
+            <div style={{ fontSize:11, color:'var(--t3)', marginBottom:14 }}>
+              Create sign-in credentials for {staffMembers.find(s=>s.id===showGrantBO)?.name}.
+              They'll be able to sign in to the back office to view reports, edit the menu, etc.
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <div>
+                <label style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:5, display:'block' }}>Email *</label>
+                <input style={inp} type="email" value={grantForm.email} onChange={e=>setGrantForm(f=>({...f,email:e.target.value}))} placeholder="staff@example.com" autoFocus/>
+              </div>
+              <div>
+                <label style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:5, display:'block' }}>Password *</label>
+                <input style={inp} type="password" value={grantForm.password} onChange={e=>setGrantForm(f=>({...f,password:e.target.value}))} placeholder="Min 8 characters"/>
+              </div>
+              <div>
+                <label style={{ fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:5, display:'block' }}>Confirm password *</label>
+                <input style={inp} type="password" value={grantForm.confirmPassword} onChange={e=>setGrantForm(f=>({...f,confirmPassword:e.target.value}))} placeholder="Repeat password"/>
+              </div>
+              {grantError && (
+                <div style={{ padding:'8px 12px', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:8, color:'#fca5a5', fontSize:12 }}>
+                  {grantError}
+                </div>
+              )}
+              <div style={{ fontSize:10, color:'var(--t4)', lineHeight:1.5, padding:'8px 0' }}>
+                The staff member can change this password later. They'll sign in at the same back-office URL you're using now.
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:8, marginTop:16 }}>
+              <button onClick={()=>setShowGrantBO(null)} disabled={grantBusy} style={{ flex:1, padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--bg3)', border:'1px solid var(--bdr2)', color:'var(--t2)', fontSize:13 }}>Cancel</button>
+              <button onClick={()=>grantBOAccess(showGrantBO)} disabled={grantBusy} style={{ flex:2, padding:'9px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', background:'var(--acc)', border:'none', color:'#0b0c10', fontSize:14, fontWeight:800, opacity:grantBusy?.6:1 }}>{grantBusy?'Creating…':'Grant access →'}</button>
             </div>
           </div>
         </div>

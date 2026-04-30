@@ -105,17 +105,10 @@ function AdminPanel({ authUser }) {
     // CompanyAdminApp which is gated to super_admin role. RLS policy on
     // user_profiles must allow super_admin to read all rows — otherwise
     // this returns only the calling user's own row and the picker is empty.
-    // v5.5.16: tolerate missing bo_access column (pre-migration) — fall
-    // back to a SELECT without it. Without this, the picker stayed empty
-    // because PostgREST 4xx'd the whole query on the unknown column.
-    const fullSel = `id,email,full_name,org_id,role,location_id,bo_access,user_locations(location_id)`;
-    const safeSel = `id,email,full_name,org_id,role,location_id,user_locations(location_id)`;
-    let { data, error } = await sbFetch(`user_profiles?select=${fullSel}&order=email.asc`);
-    if (error && /bo_access|column.*not.*exist|PGRST204/i.test(error.message || '')) {
-      console.warn('[CompanyAdminApp] bo_access column missing — falling back. Run supabase/migrations/20260430_bo_access_flag.sql to enable BO-access toggles.');
-      ({ data } = await sbFetch(`user_profiles?select=${safeSel}&order=email.asc`));
-    }
-    setAllUsers(Array.isArray(data) ? data : []);
+    try {
+      const { data } = await sbFetch(`user_profiles?select=id,email,full_name,org_id,role,location_id,user_locations(location_id)&order=email.asc`);
+      setAllUsers(Array.isArray(data) ? data : []);
+    } catch { setAllUsers([]); }
   };
 
   const loadOrgs = async () => {
@@ -289,45 +282,19 @@ function AdminPanel({ authUser }) {
     setWorking(true); setMsg({ type:'', text:'' });
     const auth = JSON.parse(localStorage.getItem('rpos-auth') || 'null');
     try {
-      // v5.5.15: forward bo_access flag to the create-user edge function.
-      // Default true if the operator didn't explicitly toggle (matches the
-      // pre-v5.5.15 implicit behaviour). The edge function should write this
-      // to user_profiles.bo_access; if it doesn't yet (older edge fn version)
-      // we patch it directly via REST after create as a safety net.
-      const boAccess = form.inviteBoAccess !== false; // default true
       const resp = await fetch('https://tbetcegmszzotrwdtqhi.supabase.co/functions/v1/create-user', {
         method:'POST',
         headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${auth?.access_token}` },
-        body: JSON.stringify({ email:form.inviteEmail.trim(), password:form.invitePassword, fullName:form.inviteName||'', orgId:selectedOrg.id, locationId:form.inviteLocationId||locations[0]?.id||null, role: form.inviteRole || 'manager', boAccess }),
+        body: JSON.stringify({ email:form.inviteEmail.trim(), password:form.invitePassword, fullName:form.inviteName||'', orgId:selectedOrg.id, locationId:form.inviteLocationId||locations[0]?.id||null, role:'owner' }),
       });
       const result = await resp.json();
       setWorking(false);
       if (result.error) return err(result.error);
-      // Safety net: explicit PATCH on user_profiles.bo_access in case the
-      // edge function didn't pick up the new field. Idempotent — re-running
-      // with the same value is a no-op.
-      if (result.id) {
-        try {
-          await sbFetch(`user_profiles?id=eq.${result.id}`, { method:'PATCH', body:{ bo_access: boAccess }, prefer:'' });
-        } catch (e) { console.warn('[createUser] post-create bo_access patch failed:', e?.message); }
-      }
       ok(`✓ User created: ${result.email}`);
-      setForm(p => ({ ...p, inviteEmail:'', invitePassword:'', inviteName:'', inviteLocationId:'', inviteRole:'', inviteBoAccess:undefined }));
+      setForm(p => ({ ...p, inviteEmail:'', invitePassword:'', inviteName:'', inviteLocationId:'' }));
       setSection('org-detail');
       await Promise.all([loadUsers(selectedOrg.id), loadAllUsers()]);
     } catch(e) { setWorking(false); err(e.message); }
-  };
-
-  // v5.5.15: toggle a user's BO access flag.
-  const toggleBoAccess = async (userId, current) => {
-    const next = !current;
-    const { error } = await sbFetch(`user_profiles?id=eq.${userId}`, { method:'PATCH', body:{ bo_access: next }, prefer:'' });
-    if (error) return err('Failed to update access: ' + error.message);
-    await Promise.all([
-      selectedOrg ? loadUsers(selectedOrg.id) : Promise.resolve(),
-      loadAllUsers(),
-    ]);
-    ok(next ? '✓ Back-office access granted' : 'Back-office access revoked');
   };
 
   const toggleUserLocation = async (userId, locationId, hasAccess) => {
@@ -550,8 +517,6 @@ function AdminPanel({ authUser }) {
                                     return filtered.map(u => {
                                       const has = locUsers.some(lu => lu.id === u.id);
                                       const sameOrg = u.org_id === selectedOrg?.id;
-                                      const boAccess = u.bo_access !== false; // default true
-                                      const isSuperAdmin = u.role === 'super_admin';
                                       return (
                                         <label key={u.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12, cursor:'pointer' }}>
                                           <input type="checkbox" checked={has}
@@ -562,31 +527,8 @@ function AdminPanel({ authUser }) {
                                             <div style={{ fontSize:13, fontWeight:600, color:'#e2e8f0' }}>{u.full_name || u.email}</div>
                                             <div style={{ fontSize:11, color:'#6366f1', fontFamily:'monospace' }}>{u.email || '—'}</div>
                                           </div>
-                                          {/* v5.5.15: BO access flag badge + toggle. super_admin always
-                                              has BO access; for everyone else, click to toggle. */}
-                                          {isSuperAdmin
-                                            ? <span style={{ ...S.badge, background:'#2d2540', color:'#c89bff', marginLeft:'auto', fontSize:10 }}>super-admin</span>
-                                            : (
-                                              <button
-                                                onClick={(e) => { e.preventDefault(); toggleBoAccess(u.id, boAccess); }}
-                                                title={boAccess ? 'Click to revoke back-office access' : 'Click to grant back-office access'}
-                                                style={{
-                                                  ...S.badge,
-                                                  background: boAccess ? '#0d2e1a' : '#2d0f0f',
-                                                  color: boAccess ? '#86efac' : '#fca5a5',
-                                                  marginLeft: 'auto',
-                                                  fontSize: 10,
-                                                  border: 'none',
-                                                  cursor: 'pointer',
-                                                  fontFamily: 'inherit',
-                                                }}
-                                              >
-                                                {boAccess ? '✓ BO' : '✗ BO'}
-                                              </button>
-                                            )
-                                          }
-                                          {!sameOrg && <span style={{ ...S.badge, background:'#2d2540', color:'#c89bff', marginLeft:6, fontSize:10 }}>cross-org</span>}
-                                          {has && <span style={{ ...S.badge, background:'#0d2e1a', color:'#86efac', marginLeft:6, fontSize:10 }}>✓ Access</span>}
+                                          {!sameOrg && <span style={{ ...S.badge, background:'#2d2540', color:'#c89bff', marginLeft:'auto', fontSize:10 }}>cross-org</span>}
+                                          {has && <span style={{ ...S.badge, background:'#0d2e1a', color:'#86efac', marginLeft: sameOrg ? 'auto' : 6, fontSize:10 }}>✓ Access</span>}
                                         </label>
                                       );
                                     });
@@ -667,55 +609,6 @@ function AdminPanel({ authUser }) {
                       <option value="">First location (auto)</option>
                       {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                     </select>
-                  </div>
-                </div>
-                {/* v5.5.15: role + bo_access selectors. The pre-v5.5.15 form
-                    hardcoded role='owner' and gave everyone implicit BO access.
-                    Now operator chooses both. */}
-                <div style={S.row}>
-                  <div>
-                    <label style={S.label}>Role</label>
-                    <select style={S.input} value={form.inviteRole||'manager'} onChange={e=>f('inviteRole',e.target.value)}>
-                      <option value="owner">Owner — full control</option>
-                      <option value="manager">Manager — runs the location day-to-day</option>
-                      <option value="staff">Staff — POS only</option>
-                      <option value="viewer">Viewer — reports only</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={S.label}>Back-office access</label>
-                    <div style={{ display:'flex', gap:6, marginTop:4 }}>
-                      <button
-                        type="button"
-                        onClick={() => f('inviteBoAccess', true)}
-                        style={{
-                          ...S.btn,
-                          flex:1,
-                          padding:'10px 0',
-                          background: form.inviteBoAccess !== false ? '#0d2e1a' : 'transparent',
-                          border: '1px solid ' + (form.inviteBoAccess !== false ? '#166534' : '#2d3148'),
-                          color: form.inviteBoAccess !== false ? '#86efac' : '#94a3b8',
-                          fontWeight: 600,
-                        }}
-                      >✓ Granted</button>
-                      <button
-                        type="button"
-                        onClick={() => f('inviteBoAccess', false)}
-                        style={{
-                          ...S.btn,
-                          flex:1,
-                          padding:'10px 0',
-                          background: form.inviteBoAccess === false ? '#2d0f0f' : 'transparent',
-                          border: '1px solid ' + (form.inviteBoAccess === false ? '#991b1b' : '#2d3148'),
-                          color: form.inviteBoAccess === false ? '#fca5a5' : '#94a3b8',
-                          fontWeight: 600,
-                        }}
-                      >✗ Revoked</button>
-                    </div>
-                    <div style={{ fontSize:11, color:'#64748b', marginTop:6 }}>
-                      Granted users can sign in to the back office at /admin or /office.
-                      POS terminal access is independent.
-                    </div>
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:10 }}>
