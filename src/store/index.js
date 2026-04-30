@@ -2069,42 +2069,90 @@ export const useStore = create((set, get) => ({
       console.log('[attributeOrderToCustomer] step 1/3 — customer upserted:', customerId, 'phone:', customer.phone, 'location:', locId);
 
       // Step 2: bump visit_count + lifetime_revenue on customer_locations.
-      // Try the atomic RPC first; if it doesn't exist or RLS blocks it, fall back
-      // to a direct upsert. The RPC was added in v4.6.62; older Supabase projects
-      // without the migration would silently fail without this fallback.
-      const { error: rpcErr } = await supabase.rpc('upsert_customer_visit', {
-        p_customer_id: customerId,
-        p_location_id: locId,
-        p_revenue: Number(orderRecord.total) || 0,
-        p_visit_at: new Date().toISOString(),
-      });
-      if (rpcErr) {
-        console.warn('[attributeOrderToCustomer] RPC upsert_customer_visit failed:', rpcErr.message, '— falling back to direct upsert on customer_locations');
-        // Fallback: read-modify-write on customer_locations. Race-prone but better
-        // than nothing if the RPC doesn't exist or the user lacks EXECUTE on it.
-        const { data: existingLoc } = await supabase
+      // v5.5.7: removed dependency on the upsert_customer_visit RPC entirely.
+      // Two failure modes that the v5.5.5 fallback didn't catch:
+      //   (a) RPC returns error:null but writes nothing (broken function body,
+      //       missing GRANT, RLS in SECURITY INVOKER mode that hides write).
+      //       v5.5.5's fallback only fired on rpcErr — silent success was fatal.
+      //   (b) The fallback's onConflict:'customer_id,location_id' upsert
+      //       requires that unique constraint to exist on the table. If the
+      //       v4.6.62 migration ran without creating it, the upsert errors.
+      // New approach: explicit read → INSERT or UPDATE. No RPC. No onConflict.
+      // No DB-side requirements beyond the table existing. Race-prone if two
+      // devices close orders for the same customer simultaneously, but for
+      // restaurant load that's a non-issue, and correctness > theoretical races.
+      let cl_step_status = 'unknown';
+      try {
+        const { data: existingLoc, error: readErr } = await supabase
           .from('customer_locations')
           .select('visit_count, lifetime_revenue')
           .eq('customer_id', customerId)
           .eq('location_id', locId)
           .maybeSingle();
-        const newCount = (existingLoc?.visit_count || 0) + 1;
-        const newRevenue = (Number(existingLoc?.lifetime_revenue) || 0) + (Number(orderRecord.total) || 0);
-        const { error: upsertErr } = await supabase.from('customer_locations').upsert({
-          customer_id: customerId,
-          location_id: locId,
-          visit_count: newCount,
-          lifetime_revenue: newRevenue,
-          last_visit_at: new Date().toISOString(),
-        }, { onConflict: 'customer_id,location_id' });
-        if (upsertErr) {
-          console.warn('[attributeOrderToCustomer] customer_locations fallback upsert failed:', upsertErr.message);
-        } else {
-          console.log('[attributeOrderToCustomer] step 2/3 — customer_locations updated via fallback (visit', newCount, ')');
+        if (readErr) {
+          console.warn('[attributeOrderToCustomer] customer_locations read failed:', readErr.message, '(may be RLS — check customer_locations SELECT policy)');
         }
-      } else {
-        console.log('[attributeOrderToCustomer] step 2/3 — customer_locations updated via RPC');
+        const incRevenue = Number(orderRecord.total) || 0;
+        const nowIso = new Date().toISOString();
+        if (existingLoc) {
+          // UPDATE existing row
+          const newCount = (Number(existingLoc.visit_count) || 0) + 1;
+          const newRevenue = (Number(existingLoc.lifetime_revenue) || 0) + incRevenue;
+          const { error: updErr } = await supabase
+            .from('customer_locations')
+            .update({
+              visit_count: newCount,
+              lifetime_revenue: newRevenue,
+              last_visit_at: nowIso,
+            })
+            .eq('customer_id', customerId)
+            .eq('location_id', locId);
+          if (updErr) {
+            console.warn('[attributeOrderToCustomer] customer_locations UPDATE failed:', updErr.message, '(may be RLS — check customer_locations UPDATE policy)');
+            cl_step_status = 'update_failed';
+          } else {
+            console.log('[attributeOrderToCustomer] step 2/3 — customer_locations UPDATE (visit', newCount, ', rev', newRevenue.toFixed(2), ')');
+            cl_step_status = 'updated';
+          }
+        } else {
+          // INSERT new row
+          const { error: insErr } = await supabase
+            .from('customer_locations')
+            .insert({
+              customer_id: customerId,
+              location_id: locId,
+              visit_count: 1,
+              lifetime_revenue: incRevenue,
+              last_visit_at: nowIso,
+            });
+          if (insErr) {
+            // If a concurrent insert beat us, the row exists now — try update.
+            if (/duplicate|conflict/i.test(insErr.message)) {
+              console.warn('[attributeOrderToCustomer] customer_locations INSERT raced — retrying as UPDATE');
+              const { error: retryErr } = await supabase
+                .from('customer_locations')
+                .update({ last_visit_at: nowIso })
+                .eq('customer_id', customerId).eq('location_id', locId);
+              if (retryErr) {
+                console.warn('[attributeOrderToCustomer] customer_locations retry-update failed:', retryErr.message);
+                cl_step_status = 'race_retry_failed';
+              } else {
+                cl_step_status = 'inserted_via_race_retry';
+              }
+            } else {
+              console.warn('[attributeOrderToCustomer] customer_locations INSERT failed:', insErr.message, '(may be RLS — check customer_locations INSERT policy)');
+              cl_step_status = 'insert_failed';
+            }
+          } else {
+            console.log('[attributeOrderToCustomer] step 2/3 — customer_locations INSERT (first visit at this location)');
+            cl_step_status = 'inserted';
+          }
+        }
+      } catch (e) {
+        console.warn('[attributeOrderToCustomer] customer_locations write threw:', e?.message || e);
+        cl_step_status = 'threw';
       }
+      void cl_step_status; // keep for breakpoint readability if needed
 
       // Step 3: insert customer_orders row.
       const itemSummary = (orderRecord.items || []).map(i => ({
