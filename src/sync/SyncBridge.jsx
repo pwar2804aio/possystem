@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { subscribeToSessions, scheduleFlush, teardown as teardownSessions } from './SessionSync';
 import { loadQueues, scheduleQueueFlush, teardownQueueSync } from './QueueSync';
 import { initOfflineQueue } from './OfflineQueue';
-import { isMock, supabase } from '../lib/supabase';
+import { isMock, supabase, getActiveLocationSync } from '../lib/supabase';
 import { startSessionReconciler, stopSessionReconciler } from './SessionReconciler';
 // v4.6.27: static import per ADR-008. Dynamic imports inside callbacks silently
 // fail in production bundles and have caused multiple data-loss bugs.
@@ -411,6 +411,17 @@ export default function SyncBridge({ onSyncPulse }) {
 
     channelInstance.onmessage = ({ data: msg }) => {
       if (msg.from === TAB_ID) return;
+      // v5.5.6: BroadcastChannel cross-tenant guard. Two tabs in the same browser
+      // can be at different locations (e.g., owner with multiple sites monitoring
+      // both). Without this filter, a CONFIG_PUSH or STATE_UPDATE from Loc 1's
+      // tab would be applied to Loc 2's tab, polluting state across locations.
+      // Reject if either side has a known location and they don't match. If
+      // sender is null (legacy/pre-v5.5.6) accept — preserves backwards compat.
+      const myLoc = getActiveLocationSync();
+      if (msg.locationId && myLoc && msg.locationId !== myLoc) {
+        console.warn('[SyncBridge] dropping cross-location broadcast:', msg.type, 'from', msg.locationId, '— this tab is at', myLoc);
+        return;
+      }
 
       if (msg.type === 'STATE_UPDATE') {
         // Real-time operational sync
@@ -427,7 +438,7 @@ export default function SyncBridge({ onSyncPulse }) {
       }
 
       if (msg.type === 'PING') {
-        channelInstance.postMessage({ from:TAB_ID, type:'PONG', data:getSharedState() });
+        channelInstance.postMessage({ from:TAB_ID, locationId: getActiveLocationSync(), type:'PONG', data:getSharedState() });
       }
       if (msg.type === 'PONG') {
         isApplyingRef.current = true;
@@ -436,7 +447,7 @@ export default function SyncBridge({ onSyncPulse }) {
       }
     };
 
-    channelInstance.postMessage({ from:TAB_ID, type:'PING' });
+    channelInstance.postMessage({ from:TAB_ID, locationId: getActiveLocationSync(), type:'PING' });
 
     let timer = null;
     let pending = {};
@@ -557,7 +568,7 @@ export default function SyncBridge({ onSyncPulse }) {
       timer = setTimeout(() => {
         const toSend = pending;
         pending = {};
-        channelInstance?.postMessage({ from:TAB_ID, type:'STATE_UPDATE', data:toSend });
+        channelInstance?.postMessage({ from:TAB_ID, locationId: getActiveLocationSync(), type:'STATE_UPDATE', data:toSend });
         try {
           const cur = JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
           localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...cur, ...toSend }));
@@ -575,5 +586,9 @@ export default function SyncBridge({ onSyncPulse }) {
 // Call this from Back Office to push a config snapshot to all POS terminals
 export function broadcastConfigPush(snapshot) {
   if (!channelInstance) return;
-  channelInstance.postMessage({ from:TAB_ID, type:'CONFIG_PUSH', snapshot });
+  // v5.5.6: tag with locationId so receivers in tabs at OTHER locations drop it
+  // (see the BroadcastChannel onmessage handler). Snapshot.locationId is set
+  // by handlePush in BackOfficeApp; fall back to the current sync resolver.
+  const locId = snapshot?.locationId || getActiveLocationSync();
+  channelInstance.postMessage({ from:TAB_ID, locationId: locId, type:'CONFIG_PUSH', snapshot });
 }
