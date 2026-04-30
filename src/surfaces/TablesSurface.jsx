@@ -83,6 +83,12 @@ for (let h=11; h<=23; h++) {
 }
 
 function ReservationModal({ table, existing, onConfirm, onCancel }) {
+  // v5.5.10: customer search + allergen auto-populate. When the operator types a
+  // name or phone, the modal searches the customer DB live and shows matches.
+  // Selecting a match fills name + phone AND prepends an allergen line to notes
+  // (e.g. "⚠ ALLERGENS: dairy, nuts") so the kitchen sees it on the reservation
+  // ticket. Same pattern as CustomerModal's search dropdown.
+  const { searchCustomers, searchCustomersLive } = useStore();
   const now = new Date();
   const nearestSlot = TIME_SLOTS.find(t => {
     const [h,m] = t.split(':').map(Number);
@@ -95,6 +101,78 @@ function ReservationModal({ table, existing, onConfirm, onCancel }) {
   const [time,      setTime]     = useState(existing?.time      || nearestSlot);
   const [notes,     setNotes]    = useState(existing?.notes     || '');
   const [date,      setDate]     = useState(existing?.date      || new Date().toLocaleDateString('en-CA')); // YYYY-MM-DD
+  // v5.5.10: track if a customer was matched from search — passes through to
+  // onConfirm so the callsite can skip the upsert+refetch dance (we already
+  // have the full record including allergens + opt-in flag).
+  const [selectedCustomer, setSelectedCustomer] = useState(existing?.customer || null);
+  const [results,  setResults]  = useState([]);
+  const [searched, setSearched] = useState(false);
+
+  const ALLERGEN_MARKER = '⚠ ALLERGENS: ';
+  const stripAllergenLine = (text) => (text || '')
+    .split('\n').filter(l => !l.startsWith(ALLERGEN_MARKER)).join('\n').replace(/^\n+/, '');
+
+  // Live search — mirrors CustomerModal's pattern. Triggers on 3+ chars in
+  // either name or phone field. Local cache renders instantly, Supabase live
+  // result merges in 250ms later.
+  useEffect(() => {
+    // Skip search if a customer is already locked in and the displayed values match
+    if (selectedCustomer
+        && selectedCustomer.name === name
+        && (selectedCustomer.phone === phone || selectedCustomer.phone_raw === phone)) {
+      setResults([]);
+      setSearched(false);
+      return;
+    }
+    const q = phone.length >= 3 ? phone : name.length >= 3 ? name : '';
+    if (!q) { setResults([]); setSearched(false); return; }
+    setResults(searchCustomers(q));
+    setSearched(true);
+    const t = setTimeout(async () => {
+      try {
+        const live = typeof searchCustomersLive === 'function' ? await searchCustomersLive(q) : [];
+        if (live && live.length) {
+          const seen = new Set();
+          const merged = [...live, ...searchCustomers(q)].filter(c => {
+            const k = c.phone || c.email || c.id;
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          }).slice(0, 6);
+          setResults(merged);
+        }
+      } catch (e) { void e; }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [name, phone, selectedCustomer, searchCustomers, searchCustomersLive]);
+
+  const selectCustomer = (c) => {
+    setName(c.name || '');
+    setPhone(c.phone_raw || c.phone || '');
+    setSelectedCustomer(c);
+    setResults([]);
+    setSearched(false);
+    // v5.5.10: prepend allergen line to notes. Strip any old auto-line first
+    // so changing customer doesn't accumulate stale allergen entries.
+    if (Array.isArray(c.allergens) && c.allergens.length > 0) {
+      const allergenLine = ALLERGEN_MARKER + c.allergens.join(', ');
+      const cleaned = stripAllergenLine(notes);
+      setNotes(cleaned ? allergenLine + '\n\n' + cleaned : allergenLine);
+    } else {
+      // Clear any previous auto-allergen line if the new customer has none
+      const cleaned = stripAllergenLine(notes);
+      if (cleaned !== notes) setNotes(cleaned);
+    }
+  };
+
+  const handleNameChange = (v) => {
+    setName(v);
+    if (selectedCustomer && selectedCustomer.name !== v) setSelectedCustomer(null);
+  };
+  const handlePhoneChange = (v) => {
+    setPhone(v);
+    if (selectedCustomer && selectedCustomer.phone_raw !== v && selectedCustomer.phone !== v) setSelectedCustomer(null);
+  };
 
   const canSave = name.trim().length > 0;
 
@@ -114,14 +192,62 @@ function ReservationModal({ table, existing, onConfirm, onCancel }) {
           {/* Guest name */}
           <div style={{ marginBottom:14 }}>
             <label style={L}>Guest name <span style={{ color:'var(--red)', fontWeight:400 }}>*</span></label>
-            <input className="input" placeholder="Full name" value={name} onChange={e=>setName(e.target.value)} autoFocus/>
+            <input className="input" placeholder="Start typing to find returning guests…" value={name} onChange={e=>handleNameChange(e.target.value)} autoFocus/>
           </div>
 
           {/* Phone */}
           <div style={{ marginBottom:14 }}>
             <label style={L}>Phone number</label>
-            <input className="input" type="tel" placeholder="+44 7700 000000" value={phone} onChange={e=>setPhone(e.target.value)}/>
+            <input className="input" type="tel" placeholder="+44 7700 000000" value={phone} onChange={e=>handlePhoneChange(e.target.value)}/>
           </div>
+
+          {/* v5.5.10: customer search results */}
+          {results.length > 0 && (
+            <div style={{ marginBottom: 14, background: 'var(--bg3)', borderRadius: 10, border: '1px solid var(--bdr2)', overflow: 'hidden' }}>
+              <div style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', borderBottom: '1px solid var(--bdr)' }}>
+                Returning guests
+              </div>
+              {results.map(c => (
+                <div key={c.id || c.phone} onClick={() => selectCustomer(c)} style={{
+                  padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+                  borderBottom: '1px solid var(--bdr)', transition: 'background .1s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg4)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--acc-d)', border: '1px solid var(--acc-b)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--acc)', flexShrink: 0 }}>
+                    {(c.name || '?').split(' ').map(n => n[0]).join('').slice(0,2)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {c.phone_raw || c.phone}
+                      {Array.isArray(c.allergens) && c.allergens.length > 0 && (
+                        <span style={{ marginLeft: 6, color:'#e8a020' }}>· ⚠ {c.allergens.join(', ')}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--acc)', fontWeight: 600 }}>Select →</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {searched && results.length === 0 && (
+            <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--t3)', padding: '4px 0' }}>
+              No matching guest — booking as a new customer
+            </div>
+          )}
+          {selectedCustomer && (
+            <div style={{ marginBottom: 14, padding: '8px 12px', background: 'rgba(34,197,94,.10)', border: '1px solid rgba(34,197,94,.35)', borderRadius: 10, display:'flex', alignItems:'center', justifyContent:'space-between', gap: 8 }}>
+              <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 600 }}>
+                ✓ {selectedCustomer.name} — returning guest
+                {Array.isArray(selectedCustomer.allergens) && selectedCustomer.allergens.length > 0 && (
+                  <span style={{ marginLeft: 4, color:'#e8a020', fontWeight: 500 }}> · allergens added to notes</span>
+                )}
+              </div>
+              <button onClick={()=>{ setSelectedCustomer(null); setNotes(stripAllergenLine(notes)); }}
+                style={{ background:'none', border:0, color:'var(--t3)', fontSize:11, cursor:'pointer' }}>Clear</button>
+            </div>
+          )}
 
           {/* Date + time row */}
           <div style={{ display:'flex', gap:10, marginBottom:14 }}>
@@ -153,7 +279,7 @@ function ReservationModal({ table, existing, onConfirm, onCancel }) {
           {/* Notes */}
           <div style={{ marginBottom:20 }}>
             <label style={L}>Notes <span style={{ fontWeight:400, color:'var(--t4)', textTransform:'none', letterSpacing:0 }}>optional</span></label>
-            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Birthday, dietary requirements, VIP, high chair needed…" rows={2}
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Birthday, dietary requirements, VIP, high chair needed…" rows={3}
               style={{ width:'100%', background:'var(--bg3)', border:'1.5px solid var(--bdr2)', borderRadius:11, padding:'10px 12px', color:'var(--t1)', fontSize:13, fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.5, display:'block', transition:'border-color .15s' }}
               onFocus={e=>e.target.style.borderColor='var(--acc-b)'}
               onBlur={e=>e.target.style.borderColor='var(--bdr2)'}/>
@@ -163,7 +289,7 @@ function ReservationModal({ table, existing, onConfirm, onCancel }) {
           <div style={{ display:'flex', gap:8 }}>
             <button className="btn btn-ghost" style={{ flex:1 }} onClick={onCancel}>Cancel</button>
             <button className="btn btn-acc" style={{ flex:2, height:46 }} disabled={!canSave}
-              onClick={()=>onConfirm({ name:name.trim(), phone, partySize, time, date, notes })}>
+              onClick={()=>onConfirm({ name:name.trim(), phone, partySize, time, date, notes, customer: selectedCustomer })}>
               {existing ? 'Update reservation' : 'Confirm reservation'} →
             </button>
           </div>
@@ -867,15 +993,22 @@ export default function TablesSurface() {
           table={selectedTable}
           existing={selectedTable.reservation}
           onConfirm={async (res)=>{
-            // v4.6.67: persist to the customer database when phone is provided.
-            // The returned customer (with id + allergens + opt-in flag) is
-            // stored on the reservation so seatTable can lift it into the session.
-            let customerObj = null;
-            if (res.phone) {
+            // v5.5.10: if the operator picked a returning guest from search, the
+            // modal already passed the full customer record (with id + allergens
+            // + opt-in flag). Skip the upsert+refetch dance in that case.
+            // For new guests OR operator-edited fields, fall through to the
+            // existing v4.6.67 upsert flow.
+            let customerObj = res.customer || null;
+            const fieldsMatchSelected = customerObj
+              && customerObj.name === res.name
+              && (customerObj.phone === res.phone || customerObj.phone_raw === res.phone);
+
+            if (!fieldsMatchSelected && res.phone) {
+              // Either no customer was selected, or operator edited away from the
+              // selected one — upsert the typed-in fields, then refetch with allergens.
               try {
                 const { upsertCustomer, _normalisePhone, _cachedOrgId } = useStore.getState();
                 await upsertCustomer({ name: res.name, phone: res.phone });
-                // Refetch with allergens / id
                 const phoneN = _normalisePhone(res.phone);
                 if (phoneN && _cachedOrgId) {
                   const { data } = await supabase.from('customers')
@@ -887,8 +1020,11 @@ export default function TablesSurface() {
                 console.warn('[reservation customer upsert]', err?.message || err);
               }
             }
-            // Stash the customer object on the reservation so seatTable can lift it.
-            const reservationWithCustomer = customerObj ? { ...res, customer: customerObj } : res;
+            // Strip our internal `customer` shape off res before saving — it goes
+            // back as the explicit customer field on the reservation object.
+            const { customer: _cust, ...resCore } = res;
+            void _cust;
+            const reservationWithCustomer = customerObj ? { ...resCore, customer: customerObj } : resCore;
             setReservation(selectedTable.id, reservationWithCustomer);
             setShowReservation(false);
             showToast(`${selectedTable.label} reserved for ${res.name} at ${res.time}`, 'success');
