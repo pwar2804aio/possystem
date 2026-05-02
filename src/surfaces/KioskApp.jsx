@@ -680,7 +680,7 @@ function ScreenOrderType({ brandColor, brandLogoUrl, brandName, tableMode, lang,
       <div style={{ flex: 1, padding: '0 6vw', display: 'flex', alignItems: 'center' }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: dineInAvailable ? '1fr 1fr' : '1fr',
+          gridTemplateColumns: dineInAvailable ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)',
           gap: 'clamp(14px, 2.5vw, 24px)',
           width: '100%',
           maxWidth: 720,
@@ -724,7 +724,7 @@ function otOutlineCard(brandColor) {
     background: 'var(--kSurfaceRaised)',
     border: '1.5px solid var(--kBorder3)',
     borderRadius: 28,
-    padding: 'clamp(18px, 2.5vw, 28px)',
+    padding: 'clamp(20px, 3vw, 32px)',
     // Grid with fixed rows so icon area and label area align identically
     // across both cards. Row 1 takes all available space and centers the
     // icon; row 2 is auto-sized for the label and sits at a consistent
@@ -735,7 +735,13 @@ function otOutlineCard(brandColor) {
     cursor: 'pointer',
     fontFamily: 'inherit',
     aspectRatio: '4/5',
-    minHeight: '28vh',
+    // v5.5.22: minHeight:28vh REMOVED. On a tall portrait kiosk viewport,
+    // 28vh forced cards to be ~480px+ tall. Combined with aspectRatio:4/5
+    // that implied each card wanted to be ~386px wide. With grid columns
+    // capped at 720/2 = 348px, cards overflowed their cells and the entire
+    // row shifted rightward. Letting aspect-ratio derive height from
+    // column-determined width eliminates the conflict.
+    width: '100%',
     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
     transition: 'transform 0.12s, box-shadow 0.12s, border-color 0.12s',
     color: brandColor,

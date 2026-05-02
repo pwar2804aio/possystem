@@ -73,6 +73,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.22', date: '2 May 2026', label: 'Kiosk order-type cards: real root cause — minHeight + aspectRatio overflow',
+    changes: [
+      'v5.5.21 was wrong about the cause. After Peter sent a screenshot showing cards shifted right by ~73px from center, the actual diagnosis became clear: the cards had aspectRatio:4/5 AND minHeight:28vh. On a 1720-tall portrait viewport, 28vh = 482px. With 4:5 aspect ratio, that height implied each card wanted to be 386px wide. But the grid columns (1fr 1fr inside a maxWidth:720 grid) only gave each card 348px. So cards overflowed their cells by ~38px each, and the overflow extended rightward (LTR default), pushing the visible row off-center.',
+      'Fix: removed minHeight:28vh entirely. Card height is now derived purely from column-determined width via aspect-ratio (348px column → 435px tall). No conflict, no overflow, cards sit cleanly inside their grid cells and the row is properly centered.',
+      'Also switched grid columns from 1fr 1fr to repeat(2, minmax(0, 1fr)) as an extra safety net. minmax(0, 1fr) lets columns shrink below their content min-size if needed, so even if some future card content tries to push the column wider, the grid stays within its declared width and the row stays centered.',
+      'Bumped card padding from clamp(18,2.5vw,28) to clamp(20,3vw,32) to give the bigger icons (clamp(100,24vw,170)) more breathing room now that height is no longer being inflated by min-height.',
+      'Process lesson: when "centering" looks broken, suspect intrinsic-size conflicts (aspect-ratio + min-height + grid 1fr) before second-guessing the centering CSS itself. The centering was working correctly the whole time — the cards were just bigger than the box centering them.',
+    ],
+  },
+  {
     version: '5.5.21', date: '2 May 2026', label: 'Kiosk order-type cards: bulletproof horizontal centering',
     changes: [
       'Peter reported on v5.5.20 that the two cards were right-aligned rather than centered in the viewport. Likely cause: the cards-container parent used display:flex + justify-content:center with an inner grid set to width:100% maxWidth:720. When width:100% on a flex item becomes the flex basis, justify-content centering can fail to leave leftover space to redistribute, and the item ends up biased to one side instead of centered.',
