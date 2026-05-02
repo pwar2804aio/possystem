@@ -926,25 +926,118 @@ function ScreenLanguagePicker({ brandColor, currentLang, onPick, onClose }) {
 
 
 // ============================================================
-// SCREEN: TABLE NUMBER
+// SCREEN: TABLE NUMBER  (v5.5.23 redesign)
+// Light input-field-style display, 3x4 keypad with explicit Delete
+// row, full-width primary Continue CTA. Matches the order-type
+// screen aesthetic and the reference Peter provided.
 // ============================================================
 function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) {
   const [val, setVal] = useState(value || '');
   const press = (k) => setVal(v => k === '⌫' ? v.slice(0, -1) : (v.length < 4 ? v + k : v));
   const submit = () => { if (val.trim()) { onChange(val.trim()); onContinue(); } };
+  const canSubmit = !!val.trim();
   return (
     <div style={fullScreen()}>
-      <ScreenHeader title="Your table number" subtitle="Find the number on your table and enter it below" onBack={onBack} brandColor={brandColor} />
-      <div style={{ flex: 1, padding: '4vh 5vw', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: '3vh' }}>
-        <div style={{ fontSize: 'clamp(70px, 14vw, 140px)', fontWeight: 900, letterSpacing: '-0.04em', color: brandColor, fontFamily: 'ui-monospace, monospace', minHeight: '1.2em' }}>{val || '—'}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2vh', width: '100%', maxWidth: 520 }}>
-          {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((k, i) => (
-            k === '' ? <div key={i} /> :
-            <button key={i} onClick={() => press(k)} style={kpadKey()}>{k}</button>
+      {/* Subtle back button, top-left corner */}
+      <div style={{ padding: '20px 22px 0', flexShrink: 0 }}>
+        <button onClick={onBack} aria-label={t('common.back')} style={iconBtn()}>←</button>
+      </div>
+
+      {/* Main content column, centered with safe max-width */}
+      <div style={{
+        flex: 1,
+        padding: '0 6vw 4vh',
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        maxWidth: 720,
+        marginLeft: 'auto',
+        marginRight: 'auto',
+        boxSizing: 'border-box',
+      }}>
+        {/* Title */}
+        <div style={{ padding: '4vh 0 3vh', textAlign: 'center' }}>
+          <div style={{
+            fontSize: 'clamp(32px, 5.4vw, 52px)',
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
+            color: brandColor,
+            lineHeight: 1.15,
+          }}>{t('tableNumber.title')}</div>
+        </div>
+
+        {/* Input-field-style display */}
+        <div style={{
+          background: 'var(--kSurfaceRaised)',
+          border: '1.5px solid var(--kBorder2)',
+          borderRadius: 18,
+          padding: 'clamp(20px, 2.8vw, 30px) 24px',
+          textAlign: 'center',
+          fontSize: 'clamp(22px, 3.2vw, 32px)',
+          fontWeight: 700,
+          color: brandColor,
+          letterSpacing: val ? '0.02em' : '-0.01em',
+          fontFamily: val ? 'ui-monospace, monospace' : 'inherit',
+        }}>
+          {val || t('tableNumber.placeholder')}
+        </div>
+
+        {/* Keypad: 3x4 grid (1-9, blank-0-blank) */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gap: 'clamp(10px, 1.6vw, 16px)',
+          marginTop: 'clamp(16px, 2.4vw, 22px)',
+        }}>
+          {['1','2','3','4','5','6','7','8','9','','0',''].map((k, i) => (
+            k === ''
+              ? <div key={i} aria-hidden="true" />
+              : <button key={i} onClick={() => press(k)} style={kpadKey()}>{k}</button>
           ))}
         </div>
-        <button onClick={submit} disabled={!val.trim()} style={{ ...primaryCta(brandColor), opacity: val.trim() ? 1 : 0.4, marginTop: '2vh' }}>
-          Continue →
+
+        {/* Delete (full width below keypad) */}
+        <button
+          onClick={() => press('⌫')}
+          disabled={!val}
+          style={{
+            background: 'var(--kSurfaceRaised)',
+            border: '1.5px solid var(--kBorder2)',
+            borderRadius: 18,
+            padding: 'clamp(18px, 2.4vw, 24px)',
+            fontSize: 'clamp(18px, 2.2vw, 22px)',
+            fontWeight: 600,
+            color: 'var(--kFg)',
+            cursor: val ? 'pointer' : 'not-allowed',
+            opacity: val ? 1 : 0.45,
+            fontFamily: 'inherit',
+            marginTop: 'clamp(10px, 1.6vw, 16px)',
+            width: '100%',
+          }}
+        >
+          {t('tableNumber.delete')}
+        </button>
+
+        {/* Continue (full width primary CTA at bottom) */}
+        <button
+          onClick={submit}
+          disabled={!canSubmit}
+          style={{
+            background: brandColor,
+            border: 0,
+            borderRadius: 18,
+            padding: 'clamp(20px, 2.8vw, 28px)',
+            fontSize: 'clamp(20px, 2.4vw, 26px)',
+            fontWeight: 700,
+            color: '#fff',
+            cursor: canSubmit ? 'pointer' : 'not-allowed',
+            opacity: canSubmit ? 1 : 0.45,
+            fontFamily: 'inherit',
+            marginTop: 'clamp(20px, 3vw, 32px)',
+            width: '100%',
+          }}
+        >
+          {t('tableNumber.continue')}
         </button>
       </div>
     </div>
@@ -1394,5 +1487,20 @@ function primaryCta(brandColor) {
   };
 }
 function miniQtyBtn() { return { width: 32, height: 32, borderRadius: '50%', background: 'var(--kSurface1)', color: 'var(--kFg)', border: 0, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }; }
-function kpadKey() { return { padding: '20px', borderRadius: 16, background: 'var(--kSurface1)', color: 'var(--kFg)', fontSize: 26, fontWeight: 600, border: 0, cursor: 'pointer', fontFamily: 'inherit' }; }
+function kpadKey() {
+  // v5.5.23: outlined tile style matching the order-type cards aesthetic.
+  // White surface, thin border, rounded, neutral-color number.
+  return {
+    padding: 'clamp(18px, 2.4vw, 26px) 0',
+    borderRadius: 16,
+    background: 'var(--kSurfaceRaised)',
+    color: 'var(--kFg)',
+    fontSize: 'clamp(22px, 3vw, 30px)',
+    fontWeight: 600,
+    border: '1.5px solid var(--kBorder2)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    transition: 'background 0.08s, border-color 0.08s',
+  };
+}
 function fieldLabel() { return { display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--kFgMuted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }; }

@@ -73,6 +73,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.23', date: '2 May 2026', label: 'Kiosk table-number screen redesign — input field + outline keypad + full-width Continue',
+    changes: [
+      'Table-number screen redesigned to match the new order-type aesthetic Peter approved on v5.5.22. Replaces the old big-monospace-number display with a proper input-field-style box (white surface, thin border, brand-color value or "Table number" placeholder), and the cramped Continue arrow with a full-width brand-color CTA at the bottom.',
+      'Keypad layout changed from 3x4 with backspace tile (1-9 / blank-0-⌫) to 3x4 with the bottom row holding only the 0 (1-9 / blank-0-blank) plus a separate full-width Delete button below the grid. Mirrors the reference and gives Delete a clearer affordance — a backspace symbol on a small key was easy to miss.',
+      'Title shortened from "Your table number" + subtitle "Find the number on your table and enter it below" to a single bold "Enter your table number" in brand color. Less visual noise; the input field placeholder already implies what to do.',
+      'Screen now fully translatable: 4 new keys added to i18n (tableNumber.title, .placeholder, .delete, .continue), translated to all six supported languages (en, es, fr, de, it, pt). When the customer picks Spanish on the order-type screen, the table number screen now renders in Spanish too.',
+      'Keypad tile style updated to match the outline-card aesthetic: white surface, 1.5px border, neutral-color numbers (was using subtle filled tiles before). Single helper kpadKey() updated; only consumer is this screen so no other surfaces affected.',
+      'Subtle back button retained at top-left (returns to order-type screen) — reference omits it but accessibility benefits from keeping a way back.',
+      'Existing functionality preserved: 4-digit max, backspace via Delete button, submit gated on non-empty value, value capture via onChange + onContinue.',
+    ],
+  },
+  {
     version: '5.5.22', date: '2 May 2026', label: 'Kiosk order-type cards: real root cause — minHeight + aspectRatio overflow',
     changes: [
       'v5.5.21 was wrong about the cause. After Peter sent a screenshot showing cards shifted right by ~73px from center, the actual diagnosis became clear: the cards had aspectRatio:4/5 AND minHeight:28vh. On a 1720-tall portrait viewport, 28vh = 482px. With 4:5 aspect ratio, that height implied each card wanted to be 386px wide. But the grid columns (1fr 1fr inside a maxWidth:720 grid) only gave each card 348px. So cards overflowed their cells by ~38px each, and the overflow extended rightward (LTR default), pushing the visible row off-center.',
