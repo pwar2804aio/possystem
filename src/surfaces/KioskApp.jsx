@@ -777,14 +777,15 @@ function otLanguagePill(brandColor) {
 }
 
 function EatInIcon({ color = 'currentColor', size }) {
-  // Line-art fork + knife in a 100x100 square viewBox so this renders
-  // at the same visual dimensions as TakeawayIcon.
+  // Line-art fork + knife in a 100x100 viewBox.
+  // CRITICAL: content is bounded to y=18..y=82 to match TakeawayIcon
+  // exactly, so when both render at the same pixel size their visible
+  // top + bottom edges line up. Don't change one without the other.
+  const dim = size || 'clamp(100px, 24vw, 170px)';
   return (
     <svg
       viewBox="0 0 100 100"
-      width={size || 'min(60%, 140px)'}
-      height={size || 'min(60%, 140px)'}
-      style={{ display: 'block' }}
+      style={{ width: dim, height: dim, display: 'block', flexShrink: 0 }}
       fill="none"
       stroke={color}
       strokeWidth="4.5"
@@ -792,27 +793,28 @@ function EatInIcon({ color = 'currentColor', size }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {/* Fork: 3 tines, head bowl, tapered handle, centered around x=34 */}
-      <path d="M24 14 V38" />
-      <path d="M34 14 V38" />
-      <path d="M44 14 V38" />
-      <path d="M24 38 H44 Q44 48 34 48 Q24 48 24 38 Z" />
-      <path d="M34 48 V90" />
-      {/* Knife: leaf blade + handle, centered around x=70 */}
-      <path d="M70 14 Q62 28 65 50 L75 50 Q78 28 70 14 Z" />
-      <path d="M70 50 V90" />
+      {/* Fork (left, centered around x=30): tines y=18..38, head y=38..46, handle y=46..82 */}
+      <path d="M22 18 V38" />
+      <path d="M30 18 V38" />
+      <path d="M38 18 V38" />
+      <path d="M22 38 H38 Q38 46 30 46 Q22 46 22 38 Z" />
+      <path d="M30 46 V82" />
+      {/* Knife (right, centered around x=70): blade y=18..48, handle y=48..82 */}
+      <path d="M70 18 Q63 30 65 48 L75 48 Q77 30 70 18 Z" />
+      <path d="M70 48 V82" />
     </svg>
   );
 }
 
 function TakeawayIcon({ color = 'currentColor', size }) {
-  // Classic takeout container with wire handle in a 100x100 square viewBox.
+  // Takeout container with wire handle in a 100x100 viewBox.
+  // CRITICAL: content is bounded to y=18..y=82 to match EatInIcon exactly.
+  // Wire handle peak sits at y=18, box floor at y=82.
+  const dim = size || 'clamp(100px, 24vw, 170px)';
   return (
     <svg
       viewBox="0 0 100 100"
-      width={size || 'min(60%, 140px)'}
-      height={size || 'min(60%, 140px)'}
-      style={{ display: 'block' }}
+      style={{ width: dim, height: dim, display: 'block', flexShrink: 0 }}
       fill="none"
       stroke={color}
       strokeWidth="4.5"
@@ -820,15 +822,16 @@ function TakeawayIcon({ color = 'currentColor', size }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {/* Wire handle */}
-      <path d="M28 26 Q50 8 72 26" strokeWidth="3.5" />
-      {/* Top fold-over flap */}
+      {/* Wire handle: peak y=18, anchors at y=32 */}
+      <path d="M30 32 Q50 18 70 32" strokeWidth="3.5" />
+      {/* Top edge of box (where flap folds over): y=32 */}
       <path d="M22 32 H78" />
+      {/* Fold-over flap V */}
       <path d="M32 32 L50 40 L68 32" />
-      {/* Container body */}
-      <path d="M26 32 L34 88 H66 L74 32" />
-      {/* Floor of box */}
-      <path d="M34 88 H66" />
+      {/* Box body — trapezoid from y=32 to y=82 */}
+      <path d="M26 32 L34 82 H66 L74 32" />
+      {/* Floor */}
+      <path d="M34 82 H66" />
     </svg>
   );
 }

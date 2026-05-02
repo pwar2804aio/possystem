@@ -73,6 +73,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.20', date: '2 May 2026', label: 'Kiosk order-type icons: real alignment fix (content y-bounds + viewport sizing)',
+    changes: [
+      'v5.5.19 only equalised viewBox aspect ratios — that was necessary but not sufficient. Even with both viewBoxes at 100x100, the takeaway icon still appeared higher in its card than the fork+knife because the *content inside the SVG* sat at different y-coordinates: takeaway content extended up to y=8 (wire-handle peak) while fork+knife only started at y=14. Same SVG box, different content centroids → visible misalignment.',
+      'Fix: redrew BOTH icons so their visible content is bounded to exactly y=18..y=82 inside the 100x100 viewBox. Wire-handle peak is now at y=18 to match the top of the fork tines; takeaway box floor is at y=82 to match the bottom of the utensil handles. Same content height, same content y-range, identical visual placement.',
+      'Also replaced the SVG sizing from min(60%, 140px) — which was unreliable for height because percentage heights need a definite parent height — with clamp(100px, 24vw, 170px) using viewport width. Resolves identically every render, both icons render at the exact same pixel dimensions.',
+      'Comment in source flags the y-bound contract so future edits to one icon also update the other.',
+    ],
+  },
+  {
     version: '5.5.19', date: '2 May 2026', label: 'Kiosk order-type alignment fix — icons + labels now line up across both cards',
     changes: [
       'v5.5.18 left the two icons rendering at different visual heights because their viewBoxes had different aspect ratios (fork+knife was 120x160 portrait, takeaway box was 160x160 square). Sized by width, the fork+knife rendered taller, which pushed its label down to a different y-coord than the takeaway label. Fixed by redrawing both icons inside identical 100x100 square viewBoxes so they render at matching width AND height.',
