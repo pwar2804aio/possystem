@@ -722,29 +722,30 @@ function otOutlineCard(brandColor) {
     border: '1.5px solid var(--kBorder3)',
     borderRadius: 28,
     padding: 'clamp(18px, 2.5vw, 28px)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 'clamp(12px, 2vw, 22px)',
+    // Grid with fixed rows so icon area and label area align identically
+    // across both cards. Row 1 takes all available space and centers the
+    // icon; row 2 is auto-sized for the label and sits at a consistent
+    // vertical position regardless of icon dimensions.
+    display: 'grid',
+    gridTemplateRows: '1fr auto',
+    rowGap: 'clamp(10px, 1.6vw, 18px)',
     cursor: 'pointer',
     fontFamily: 'inherit',
     aspectRatio: '4/5',
     minHeight: '28vh',
     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
     transition: 'transform 0.12s, box-shadow 0.12s, border-color 0.12s',
-    color: brandColor, // descendants can use currentColor
+    color: brandColor,
   };
 }
 
 function otIconWrap() {
   return {
-    flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
     minHeight: 0,
+    width: '100%',
   };
 }
 
@@ -754,6 +755,8 @@ function otCardLabel(brandColor) {
     fontWeight: 700,
     color: brandColor,
     letterSpacing: '-0.01em',
+    textAlign: 'center',
+    lineHeight: 1.1,
   };
 }
 
@@ -774,56 +777,58 @@ function otLanguagePill(brandColor) {
 }
 
 function EatInIcon({ color = 'currentColor', size }) {
-  // Line-art fork + knife. Uses currentColor by default so colour
-  // can be controlled via parent CSS color, but accepts override.
+  // Line-art fork + knife in a 100x100 square viewBox so this renders
+  // at the same visual dimensions as TakeawayIcon.
   return (
     <svg
-      viewBox="0 0 120 160"
-      width={size || 'min(45%, 130px)'}
-      height={size || 'auto'}
+      viewBox="0 0 100 100"
+      width={size || 'min(60%, 140px)'}
+      height={size || 'min(60%, 140px)'}
+      style={{ display: 'block' }}
       fill="none"
       stroke={color}
-      strokeWidth="5"
+      strokeWidth="4.5"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {/* Fork — three tines, head, tapered handle */}
-      <path d="M30 12 V48" />
-      <path d="M42 12 V48" />
-      <path d="M54 12 V48" />
-      <path d="M30 48 H54 Q54 60 42 60 Q30 60 30 48 Z" />
-      <path d="M42 60 V148" />
-      {/* Knife — leaf blade + handle */}
-      <path d="M82 12 Q72 32 76 70 L88 70 Q92 32 82 12 Z" />
-      <path d="M82 70 V148" />
+      {/* Fork: 3 tines, head bowl, tapered handle, centered around x=34 */}
+      <path d="M24 14 V38" />
+      <path d="M34 14 V38" />
+      <path d="M44 14 V38" />
+      <path d="M24 38 H44 Q44 48 34 48 Q24 48 24 38 Z" />
+      <path d="M34 48 V90" />
+      {/* Knife: leaf blade + handle, centered around x=70 */}
+      <path d="M70 14 Q62 28 65 50 L75 50 Q78 28 70 14 Z" />
+      <path d="M70 50 V90" />
     </svg>
   );
 }
 
 function TakeawayIcon({ color = 'currentColor', size }) {
-  // Classic takeout container with wire handle.
+  // Classic takeout container with wire handle in a 100x100 square viewBox.
   return (
     <svg
-      viewBox="0 0 160 160"
-      width={size || 'min(50%, 140px)'}
-      height={size || 'auto'}
+      viewBox="0 0 100 100"
+      width={size || 'min(60%, 140px)'}
+      height={size || 'min(60%, 140px)'}
+      style={{ display: 'block' }}
       fill="none"
       stroke={color}
-      strokeWidth="5"
+      strokeWidth="4.5"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
       {/* Wire handle */}
-      <path d="M40 36 Q80 4 120 36" strokeWidth="4" />
-      {/* Top fold-over flap (left + right halves meeting in middle) */}
-      <path d="M28 44 H132" />
-      <path d="M44 44 L80 56 L116 44" />
-      {/* Container body — trapezoid */}
-      <path d="M34 44 L46 144 H114 L126 44" />
-      {/* Subtle bottom indicator (floor of box) */}
-      <path d="M46 144 H114" />
+      <path d="M28 26 Q50 8 72 26" strokeWidth="3.5" />
+      {/* Top fold-over flap */}
+      <path d="M22 32 H78" />
+      <path d="M32 32 L50 40 L68 32" />
+      {/* Container body */}
+      <path d="M26 32 L34 88 H66 L74 32" />
+      {/* Floor of box */}
+      <path d="M34 88 H66" />
     </svg>
   );
 }

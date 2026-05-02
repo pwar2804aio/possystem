@@ -73,6 +73,15 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.19', date: '2 May 2026', label: 'Kiosk order-type alignment fix — icons + labels now line up across both cards',
+    changes: [
+      'v5.5.18 left the two icons rendering at different visual heights because their viewBoxes had different aspect ratios (fork+knife was 120x160 portrait, takeaway box was 160x160 square). Sized by width, the fork+knife rendered taller, which pushed its label down to a different y-coord than the takeaway label. Fixed by redrawing both icons inside identical 100x100 square viewBoxes so they render at matching width AND height.',
+      'Card layout switched from flex-column with justifyContent:center to a CSS grid with gridTemplateRows:1fr auto. This guarantees row 1 (the icon area) takes all available space and row 2 (the label) sits at a consistent vertical position regardless of icon size — labels across both cards now share a baseline.',
+      'Both icons sized to min(60%, 140px) of the icon area for both width and height, so they fill the card area more like the reference and remain proportional in either direction.',
+      'Label text now explicitly center-aligned with line-height 1.1 so wrapped translations (e.g. "Para llevar" vs "Take away") still line up between cards.',
+    ],
+  },
+  {
     version: '5.5.18', date: '2 May 2026', label: 'Kiosk order-type screen redesign + i18n foundation',
     changes: [
       'Kiosk first screen (order type) redesigned to a lighter outline-card aesthetic. Replaces the gradient hero cards with two bordered cards on the kiosk surface, line-art SVG icons (fork+knife for Eat in, takeout container for Take away) tinted in brand color, and brand-color labels. Title now reads "Where will you be eating today?" and is shown in brand color centered above the cards.',
