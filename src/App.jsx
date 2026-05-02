@@ -73,6 +73,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.18', date: '2 May 2026', label: 'Kiosk order-type screen redesign + i18n foundation',
+    changes: [
+      'Kiosk first screen (order type) redesigned to a lighter outline-card aesthetic. Replaces the gradient hero cards with two bordered cards on the kiosk surface, line-art SVG icons (fork+knife for Eat in, takeout container for Take away) tinted in brand color, and brand-color labels. Title now reads "Where will you be eating today?" and is shown in brand color centered above the cards.',
+      'Brand logo now appears on the order-type screen as well as the attract screen (uses kiosk_brand_logo_url from device profile; falls back to brandName text when no logo set).',
+      'Language picker added at the bottom of the order-type screen as a flag + native-name pill. Tapping opens a modal with all available languages where the customer can switch.',
+      'New src/lib/i18n.js translation module: lightweight, no external deps, uses a module-level subscriber pattern with a useKioskLang() hook. Six languages defined (en, es, fr, de, it, pt) with keys for the order-type screen and language picker translated for all six. Other kiosk screens still use hardcoded English; they can be migrated to t() incrementally screen-by-screen.',
+      'Selected language persists in localStorage as rpos-kiosk-lang, so the customer-facing language is sticky per device.',
+      'Theme support preserved: outline cards use var(--kSurfaceRaised) + var(--kBorder3) and adapt to light/dark theme automatically. Brand color drives all colored elements (icons, title, labels, language pill text).',
+      'Existing functionality preserved: tableMode hides the Eat in card when set to "none"; back button still returns to attract; idle timeout still works; all other kiosk screens (menu, item, cart, tip, pay, loyalty, done) untouched.',
+    ],
+  },
+  {
     version: '4.6.67', date: '24 Apr 2026', label: 'Reservations linked to customer DB + allergen capture per profile',
     changes: [
       'Reservations now create or match a customer record at booking time. When the operator confirms a reservation with a phone number, the system upserts the customer (phone-keyed, name preserved on existing matches), then stashes the full customer object on the reservation. When the table is seated, seatTable lifts that customer into session.customer automatically — the dine-in flow attributes the visit to their loyalty record without anyone re-typing the details.',

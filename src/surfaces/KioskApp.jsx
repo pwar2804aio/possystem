@@ -22,6 +22,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase, getLocationId } from '../lib/supabase';
 import { useStore } from '../store';
 import KioskProductModal from './KioskProductModal';
+import { t, setLang, useKioskLang, LANGUAGES, getLanguageMeta } from '../lib/i18n';
 
 // ============================================================
 // HOOKS
@@ -181,6 +182,11 @@ export default function KioskApp({ kioskId, onUnpair }) {
   const [orderNumber, setOrderNumber] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+
+  // v5.5.18: kiosk language (i18n). Subscribes via useKioskLang() so any
+  // setLang() call from the picker re-renders this component + children.
+  const lang = useKioskLang();
+  const [showLangPicker, setShowLangPicker] = useState(false);
 
   // ─── Branding (from profile, fallbacks) ───
   const brandName = profile?.kiosk_brand_name || device?.name || 'Order here';
@@ -477,7 +483,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
   return (
     <div onPointerDown={resetIdle} data-kiosk-theme={isLight ? "light" : "dark"} style={kioskShell(brandColor, effectiveBg, brandAccent)}>
       {screen === 'attract' && <ScreenAttract brandName={brandName} brandColor={brandColor} brandAccent={brandAccent} brandLogoUrl={brandLogoUrl} attractVideoUrl={attractVideoUrl} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('attract')} ctaLabel={labelTapToOrder} onStart={() => { resetIdle(); setScreen('orderType'); }} />}
-      {screen === 'orderType' && <ScreenOrderType brandColor={brandColor} brandAccent={brandAccent} tableMode={tableMode} onPick={(t) => {
+      {screen === 'orderType' && <ScreenOrderType brandColor={brandColor} brandLogoUrl={brandLogoUrl} brandName={brandName} tableMode={tableMode} lang={lang} onOpenLanguagePicker={() => setShowLangPicker(true)} onPick={(t) => {
         setOrderType(t);
         if (t === 'dineIn' && (tableMode === 'enter' || tableMode === 'either')) setScreen('tableNumber');
         else setScreen('menu');
@@ -513,6 +519,16 @@ export default function KioskApp({ kioskId, onUnpair }) {
           selected={allergenFilter}
           onChange={setAllergenFilter}
           onClose={() => setShowAllergenPicker(false)}
+        />
+      )}
+
+      {/* v5.5.18: Language picker overlay */}
+      {showLangPicker && (
+        <ScreenLanguagePicker
+          brandColor={brandColor}
+          currentLang={lang}
+          onPick={(code) => { setLang(code); setShowLangPicker(false); }}
+          onClose={() => setShowLangPicker(false)}
         />
       )}
 
@@ -616,56 +632,281 @@ function shade(hex, percent) {
 }
 
 // ============================================================
-// SCREEN: ORDER TYPE
+// SCREEN: ORDER TYPE  (v5.5.18 redesign)
+// Light surface, brand logo at top, outline cards with line-art
+// SVG icons in brand color, language picker pill at the bottom.
 // ============================================================
-function ScreenOrderType({ brandColor, brandAccent, tableMode, onPick, onBack }) {
+function ScreenOrderType({ brandColor, brandLogoUrl, brandName, tableMode, lang, onOpenLanguagePicker, onPick, onBack }) {
   const dineInAvailable = tableMode !== 'none';
-  const accent = brandAccent || shade(brandColor, -20);
+  const langMeta = getLanguageMeta(lang);
+  // Force re-render of t() strings when lang changes (parent already
+  // subscribes via useKioskLang, but listing lang in deps for clarity).
+  const title = t('orderType.title');
   return (
     <div style={fullScreen()}>
-      <div style={{ padding: '24px 22px 12px', flexShrink: 0 }}>
-        <button onClick={onBack} style={iconBtn()}>←</button>
+      {/* Subtle back button, top-left corner */}
+      <div style={{ padding: '20px 22px 0', flexShrink: 0 }}>
+        <button onClick={onBack} aria-label={t('common.back')} style={iconBtn()}>←</button>
       </div>
-      <div style={{ flex: 1, padding: '0 5vw 5vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '3vh' }}>
-        <div>
-          <div style={{ fontSize: 'clamp(36px, 6vw, 56px)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--kFg)', lineHeight: 1.05, marginBottom: 4 }}>Where will you<br/>be eating?</div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: dineInAvailable ? '1fr 1fr' : '1fr', gap: 'clamp(12px, 2vw, 18px)' }}>
+
+      {/* Logo */}
+      <div style={{ padding: '12px 24px 0', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+        {brandLogoUrl ? (
+          <img
+            src={brandLogoUrl}
+            alt={brandName || 'Brand logo'}
+            style={{ maxWidth: '70%', maxHeight: '14vh', minHeight: 60, objectFit: 'contain' }}
+          />
+        ) : (
+          <div style={{ fontSize: 'clamp(28px, 4.2vw, 44px)', fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--kFg)' }}>
+            {brandName || 'Order here'}
+          </div>
+        )}
+      </div>
+
+      {/* Title */}
+      <div style={{ padding: '4vh 6vw 3vh', textAlign: 'center', flexShrink: 0 }}>
+        <div style={{
+          fontSize: 'clamp(30px, 5vw, 48px)',
+          fontWeight: 800,
+          letterSpacing: '-0.01em',
+          color: brandColor,
+          lineHeight: 1.15,
+        }}>{title}</div>
+      </div>
+
+      {/* Cards */}
+      <div style={{ flex: 1, padding: '0 6vw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: dineInAvailable ? '1fr 1fr' : '1fr',
+          gap: 'clamp(14px, 2.5vw, 24px)',
+          width: '100%',
+          maxWidth: 720,
+        }}>
           {dineInAvailable && (
-            <button onClick={() => onPick('dineIn')} style={otHeroCard(brandColor, accent)}>
-              <div style={{ fontSize: 'clamp(64px, 12vw, 110px)', filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.25))' }}>🍽️</div>
-              <div style={{ marginTop: 'auto' }}>
-                <div style={{ fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', marginBottom: 4 }}>Eat in</div>
-                <div style={{ fontSize: 'clamp(13px, 1.6vw, 16px)', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>Served to your table</div>
+            <button onClick={() => onPick('dineIn')} style={otOutlineCard(brandColor)} aria-label={t('orderType.eatIn')}>
+              <div style={otIconWrap()}>
+                <EatInIcon color={brandColor} />
               </div>
+              <div style={otCardLabel(brandColor)}>{t('orderType.eatIn')}</div>
             </button>
           )}
-          <button onClick={() => onPick('takeaway')} style={otHeroCard(accent, brandColor)}>
-            <div style={{ fontSize: 'clamp(64px, 12vw, 110px)', filter: 'drop-shadow(0 6px 20px rgba(0,0,0,0.25))' }}>🥡</div>
-            <div style={{ marginTop: 'auto' }}>
-              <div style={{ fontSize: 'clamp(24px, 4.5vw, 38px)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', marginBottom: 4 }}>Takeaway</div>
-              <div style={{ fontSize: 'clamp(13px, 1.6vw, 16px)', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>Collect at the counter</div>
+          <button onClick={() => onPick('takeaway')} style={otOutlineCard(brandColor)} aria-label={t('orderType.takeaway')}>
+            <div style={otIconWrap()}>
+              <TakeawayIcon color={brandColor} />
             </div>
+            <div style={otCardLabel(brandColor)}>{t('orderType.takeaway')}</div>
           </button>
         </div>
+      </div>
+
+      {/* Language pill */}
+      <div style={{ padding: '3vh 6vw 4vh', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+        <button onClick={onOpenLanguagePicker} style={otLanguagePill(brandColor)} aria-label="Choose language">
+          <span style={{ fontSize: 22, lineHeight: 1 }}>{langMeta.flag}</span>
+          <span style={{ fontSize: 'clamp(15px, 1.8vw, 18px)', fontWeight: 700, color: brandColor }}>
+            {langMeta.nativeName}
+          </span>
+        </button>
       </div>
     </div>
   );
 }
 
-function otHeroCard(c1, c2) {
+// ----- ScreenOrderType styles + icon components -----
+
+function otOutlineCard(brandColor) {
   return {
-    background: 'linear-gradient(155deg, ' + c1 + ' 0%, ' + c2 + ' 100%)',
-    border: 0, borderRadius: 24,
-    padding: 'clamp(24px, 4vw, 36px)',
-    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between',
-    cursor: 'pointer', color: '#fff', fontFamily: 'inherit', textAlign: 'left',
-    boxShadow: '0 14px 40px rgba(0,0,0,0.35)',
+    background: 'var(--kSurfaceRaised)',
+    border: '1.5px solid var(--kBorder3)',
+    borderRadius: 28,
+    padding: 'clamp(18px, 2.5vw, 28px)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 'clamp(12px, 2vw, 22px)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
     aspectRatio: '4/5',
-    minHeight: '32vh',
-    transition: 'transform 0.12s',
+    minHeight: '28vh',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+    transition: 'transform 0.12s, box-shadow 0.12s, border-color 0.12s',
+    color: brandColor, // descendants can use currentColor
   };
 }
+
+function otIconWrap() {
+  return {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    minHeight: 0,
+  };
+}
+
+function otCardLabel(brandColor) {
+  return {
+    fontSize: 'clamp(20px, 3.2vw, 30px)',
+    fontWeight: 700,
+    color: brandColor,
+    letterSpacing: '-0.01em',
+  };
+}
+
+function otLanguagePill(brandColor) {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 12,
+    background: 'var(--kSurfaceRaised)',
+    border: '1.5px solid var(--kBorder2)',
+    borderRadius: 100,
+    padding: '14px 28px',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    color: brandColor,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  };
+}
+
+function EatInIcon({ color = 'currentColor', size }) {
+  // Line-art fork + knife. Uses currentColor by default so colour
+  // can be controlled via parent CSS color, but accepts override.
+  return (
+    <svg
+      viewBox="0 0 120 160"
+      width={size || 'min(45%, 130px)'}
+      height={size || 'auto'}
+      fill="none"
+      stroke={color}
+      strokeWidth="5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* Fork — three tines, head, tapered handle */}
+      <path d="M30 12 V48" />
+      <path d="M42 12 V48" />
+      <path d="M54 12 V48" />
+      <path d="M30 48 H54 Q54 60 42 60 Q30 60 30 48 Z" />
+      <path d="M42 60 V148" />
+      {/* Knife — leaf blade + handle */}
+      <path d="M82 12 Q72 32 76 70 L88 70 Q92 32 82 12 Z" />
+      <path d="M82 70 V148" />
+    </svg>
+  );
+}
+
+function TakeawayIcon({ color = 'currentColor', size }) {
+  // Classic takeout container with wire handle.
+  return (
+    <svg
+      viewBox="0 0 160 160"
+      width={size || 'min(50%, 140px)'}
+      height={size || 'auto'}
+      fill="none"
+      stroke={color}
+      strokeWidth="5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* Wire handle */}
+      <path d="M40 36 Q80 4 120 36" strokeWidth="4" />
+      {/* Top fold-over flap (left + right halves meeting in middle) */}
+      <path d="M28 44 H132" />
+      <path d="M44 44 L80 56 L116 44" />
+      {/* Container body — trapezoid */}
+      <path d="M34 44 L46 144 H114 L126 44" />
+      {/* Subtle bottom indicator (floor of box) */}
+      <path d="M46 144 H114" />
+    </svg>
+  );
+}
+
+// ============================================================
+// SCREEN: LANGUAGE PICKER  (v5.5.18)
+// ============================================================
+function ScreenLanguagePicker({ brandColor, currentLang, onPick, onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'var(--kOverlay)', display: 'grid', placeItems: 'center', zIndex: 250, padding: 24 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--kSurfaceRaised)',
+          border: '1.5px solid var(--kBorder2)',
+          borderRadius: 24,
+          padding: 'clamp(20px, 3vw, 32px)',
+          width: '100%',
+          maxWidth: 520,
+          maxHeight: '85vh',
+          overflowY: 'auto',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.35)',
+        }}
+      >
+        <div style={{ fontSize: 'clamp(20px, 3vw, 26px)', fontWeight: 800, color: brandColor, marginBottom: 18, textAlign: 'center' }}>
+          {t('language.choose')}
+        </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {LANGUAGES.map(L => {
+            const selected = L.code === currentLang;
+            return (
+              <button
+                key={L.code}
+                onClick={() => onPick(L.code)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '14px 18px',
+                  background: selected ? brandColor : 'var(--kSurface1)',
+                  color: selected ? '#fff' : 'var(--kFg)',
+                  border: '1.5px solid ' + (selected ? brandColor : 'var(--kBorder2)'),
+                  borderRadius: 14,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: 17,
+                  fontWeight: 600,
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 26, lineHeight: 1 }}>{L.flag}</span>
+                <span style={{ flex: 1 }}>{L.nativeName}</span>
+                <span style={{ fontSize: 13, opacity: 0.75 }}>{L.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: 18,
+            width: '100%',
+            padding: '14px',
+            background: 'transparent',
+            color: 'var(--kFgMuted)',
+            border: '1.5px solid var(--kBorder2)',
+            borderRadius: 14,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: 15,
+            fontWeight: 600,
+          }}
+        >
+          {t('language.close')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 // ============================================================
 // SCREEN: TABLE NUMBER
