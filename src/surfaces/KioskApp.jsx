@@ -675,14 +675,17 @@ function ScreenOrderType({ brandColor, brandLogoUrl, brandName, tableMode, lang,
         }}>{title}</div>
       </div>
 
-      {/* Cards */}
-      <div style={{ flex: 1, padding: '0 6vw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Cards — horizontally centered via margin:auto on the inner grid
+          (deterministic across browsers); vertically centered via flex on parent. */}
+      <div style={{ flex: 1, padding: '0 6vw', display: 'flex', alignItems: 'center' }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: dineInAvailable ? '1fr 1fr' : '1fr',
           gap: 'clamp(14px, 2.5vw, 24px)',
           width: '100%',
           maxWidth: 720,
+          marginLeft: 'auto',
+          marginRight: 'auto',
         }}>
           {dineInAvailable && (
             <button onClick={() => onPick('dineIn')} style={otOutlineCard(brandColor)} aria-label={t('orderType.eatIn')}>

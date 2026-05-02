@@ -73,6 +73,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.21', date: '2 May 2026', label: 'Kiosk order-type cards: bulletproof horizontal centering',
+    changes: [
+      'Peter reported on v5.5.20 that the two cards were right-aligned rather than centered in the viewport. Likely cause: the cards-container parent used display:flex + justify-content:center with an inner grid set to width:100% maxWidth:720. When width:100% on a flex item becomes the flex basis, justify-content centering can fail to leave leftover space to redistribute, and the item ends up biased to one side instead of centered.',
+      'Switched to the classic block-level auto-margin technique for horizontal centering: parent flex now only handles vertical centering (alignItems:center), and the inner grid uses marginLeft:auto + marginRight:auto. Auto margins in flex deterministically consume any leftover main-axis space equally on each side, so the grid always sits dead-center horizontally regardless of viewport width.',
+      'No other layout or icon changes — v5.5.20 icon alignment fix preserved.',
+    ],
+  },
+  {
     version: '5.5.20', date: '2 May 2026', label: 'Kiosk order-type icons: real alignment fix (content y-bounds + viewport sizing)',
     changes: [
       'v5.5.19 only equalised viewBox aspect ratios — that was necessary but not sufficient. Even with both viewBoxes at 100x100, the takeaway icon still appeared higher in its card than the fork+knife because the *content inside the SVG* sat at different y-coordinates: takeaway content extended up to y=8 (wire-handle peak) while fork+knife only started at y=14. Same SVG box, different content centroids → visible misalignment.',
