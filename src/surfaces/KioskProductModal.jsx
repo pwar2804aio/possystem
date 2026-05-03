@@ -197,6 +197,19 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   useKioskLang();
   const allInstructionDefs = useStore(s => s.instructionGroupDefs) || [];
 
+  // (v5.5.27/28 sub-item lookup + diagnostic moved below state declarations to avoid TDZ.)
+
+
+  const [groups, setGroups] = useState([]);
+  const [subGroupsCache, setSubGroupsCache] = useState({}); // { [subGroupId]: normalizedGroup }
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selections, setSelections] = useState({}); // { groupId: [optionId, ...] }
+  const [nestedSelections, setNestedSelections] = useState({}); // { 'gid:oid:idx': { subGroupId: [...] } }
+  const [qty, setQty] = useState(1);
+  const [showError, setShowError] = useState(false);
+  const [instructions, setInstructions] = useState('');
+
   // ============================================================
   // v5.5.27 / v5.5.28: Resolve effective image/description/allergens for a
   // modifier option by matching against a sold-alone sub-item.
@@ -214,6 +227,9 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   //
   // Precedence: explicit fields on the modifier option win over inherited
   // fields from the sub-item, matching POS behavior in InlineItemFlow.
+  //
+  // v5.5.29 placement: this block lives AFTER state declarations so the
+  // diagnostic useEffect's deps (loading, groups) aren't in TDZ.
   // ============================================================
   const subitemByName = useMemo(() => {
     const map = new Map();
@@ -245,14 +261,14 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
     };
   };
 
-  // v5.5.28: one-shot debug. Logs once per modal open, lists modifier options
-  // and whether each found a sold-alone sub-item match. If options are showing
-  // without images, this surfaces whether the issue is (a) no soldAlone sub-items
-  // exist, (b) name fields don't overlap, or (c) match works but image is empty.
-  // Remove once we've confirmed Peter's data flow works end-to-end.
+  // v5.5.28: one-shot diagnostic. Logs once when the modal has finished loading
+  // groups, listing each modifier option and whether each found a sold-alone
+  // sub-item match. If options render without images, this surfaces whether the
+  // issue is (a) no soldAlone sub-items, (b) name-field mismatch, or (c) match
+  // works but image/description fields are empty. Remove once confirmed working.
   useEffect(() => {
     if (loading) return;
-    if (groups.length === 0) return;
+    if (!groups || groups.length === 0) return;
     const allSubs = (allItems || []).filter(i => i.type === 'subitem' && !i.archived && i.soldAlone);
     const optInfo = [];
     for (const g of groups) {
@@ -269,22 +285,13 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       }
     }
     // eslint-disable-next-line no-console
-    console.log('[kiosk modal v5.5.28] subitem map:', {
+    console.log('[kiosk modal v5.5.29] subitem map:', {
       mapSize: subitemByName.size,
       mapKeys: Array.from(subitemByName.keys()),
       soldAloneSubItems: allSubs.map(s => ({ id: s.id, name: s.name, menuName: s.menuName, hasImage: !!s.image, hasDescription: !!s.description })),
       options: optInfo,
     });
   }, [loading, groups, allItems, subitemByName]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [groups, setGroups] = useState([]);
-  const [subGroupsCache, setSubGroupsCache] = useState({}); // { [subGroupId]: normalizedGroup }
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selections, setSelections] = useState({}); // { groupId: [optionId, ...] }
-  const [nestedSelections, setNestedSelections] = useState({}); // { 'gid:oid:idx': { subGroupId: [...] } }
-  const [qty, setQty] = useState(1);
-  const [showError, setShowError] = useState(false);
-  const [instructions, setInstructions] = useState('');
 
   // Load top-level groups + variants, then pre-fetch any sub-groups referenced by option.subGroupId
   useEffect(() => {

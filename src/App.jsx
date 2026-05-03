@@ -73,6 +73,14 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.29', date: '3 May 2026', label: 'HOTFIX: TDZ crash on kiosk product modal — sub-item lookup block placed before state declarations',
+    changes: [
+      'v5.5.28 crashed the modal on open with "ReferenceError: Cannot access \'_\' before initialization". Cause: I placed the new subitemByName useMemo + resolveOpt helper + diagnostic useEffect at line ~218, BEFORE the existing useState declarations for groups (line 279) and loading (line 281). The diagnostic effect\'s deps array referenced both — JS evaluates the deps array at render time, hits the temporal dead zone, throws.',
+      'Fix: moved the entire block (memo + helper + diagnostic effect) to immediately AFTER the state declarations and BEFORE the data-loading useEffect. groups and loading are now both initialized when the deps array evaluates. Behavior of the block itself is unchanged from v5.5.28.',
+      'Mistake worth flagging: when adding a useEffect that references state variables, place it AFTER those state declarations in source order, not before. Function-hoisting only applies to function declarations; let/const inside a function body are TDZ-bound to their declaration line. The same goes for any deps array that captures variables.',
+    ],
+  },
+  {
     version: '5.5.28', date: '3 May 2026', label: 'Sub-item descriptions in BO + multi-field name match for kiosk modifier inheritance + diagnostic log',
     changes: [
       'Peter sent v5.5.27 screenshot showing the "Box of 3" donut picker still rendering as plain text-only checkboxes — no images, no descriptions. Two real bugs identified: (1) sub-items had no description input in BO, so even if v5.5.27\'s inheritance worked, there\'d be nothing to inherit. (2) v5.5.27\'s name match was too strict — it indexed sub-items by (menuName || name) only, so a modifier option named "Bueno Filled" couldn\'t match a sub-item named "Bueno Filled Donut".',
