@@ -73,6 +73,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.27', date: '2 May 2026', label: 'Kiosk modifier options inherit image / description / allergens from sold-alone sub-items',
+    changes: [
+      'Peter flagged that "Bueno Filled donut" inside the "Box of Three" modifier group rendered with no image on the kiosk, and asked for descriptions / allergens to display on modifier options like the reference screenshot. Diagnosis: the data and BO already support this — sub-items can be marked Sold-Alone in MenuManager (via the existing toggle on row 1410), and when soldAlone=true the sub-item becomes editable in the standard Items editor with image / description / allergens fields. POS already inherits images via name match in InlineItemFlow. The kiosk modal was the only surface NOT doing the lookup. So this fix is purely the kiosk wire-up — no BO changes needed.',
+      'Added subitemByName memo in KioskProductModal that builds a name → sub-item map from allItems, scoped to type==="subitem" && soldAlone===true && !archived. The soldAlone gate is what implements Peter\'s "only when item can be sold alone also" constraint — pure-modifier sub-items (not curated for customer display) are excluded from the lookup.',
+      'Added resolveOpt(opt) helper that returns effective image / description / allergens for a modifier option. Precedence: explicit fields on the option win; otherwise inherit from the matched sold-alone sub-item. Matches POS behavior — option-level overrides are still possible without editing the underlying item.',
+      'Top-level modifier options now render the inherited image (full-width 16:9 at top of card), inherited description (muted line under name), and inherited allergens (capitalized comma list in --kAllergen-fg color, below price). Same fields previously only worked when stored directly on the modifier option, which was rarely the case in real menus.',
+      'Sub-group options (nested modifier picker) get the same treatment: inherited 48px thumbnail + description + allergens. Sub-group rendering refactored to use subEffective via resolveOpt.',
+      'Group rich-content detector updated to consider effective fields (own + inherited), so the 1-col adaptive layout kicks in even when an option carries no explicit rich content but inherits it. Behavior: if any option in a group has image / description / allergens after resolution, the whole group renders as 1-col so rich content gets full horizontal space; otherwise stays as 2-col compact.',
+      'No new BO build needed. The MenuManager soldAlone toggle and Items editor description/image/allergens fields already existed. Customers will see image+description+allergens for any modifier option whose name matches a soldAlone sub-item.',
+      'No data changes, no DB schema changes, no behavior changes for selection / validation / cart — pure additive display layer fed by an existing lookup pattern.',
+    ],
+  },
+  {
     version: '5.5.26', date: '2 May 2026', label: 'Kiosk allergen banner prominence + product modal redesign with modifier images & descriptions',
     changes: [
       'TASK 1 — Allergen filter on the menu screen made dramatically more obvious. v5.5.25 had it as a small circular icon button in the top-right corner; that was easy to miss. Now it\'s a prominent wide banner-button that stretches across most of the top bar (sits next to the back button). Inactive state shows ⚠ icon + bold "Have allergies?" + "Tap to filter the menu" subtitle in amber. Active state shows the avoidance list (e.g. "Avoiding: Eggs, Gluten") with a red badge showing the count and an "Edit ›" affordance. Banner is unmissable while still being theme-aware (uses --kAllergen-* CSS vars).',

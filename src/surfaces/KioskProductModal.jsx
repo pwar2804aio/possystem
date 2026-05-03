@@ -196,6 +196,46 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   // switches language while the modal is open.
   useKioskLang();
   const allInstructionDefs = useStore(s => s.instructionGroupDefs) || [];
+
+  // ============================================================
+  // v5.5.27: Resolve effective image/description/allergens for a modifier
+  // option by matching against a sold-alone sub-item by name. POS already
+  // does this for images via InlineItemFlow; the kiosk modal previously
+  // did not, so options that referenced curated sub-items (e.g. "Bueno
+  // Filled donut" inside a "Box of Three") rendered with no image and
+  // no description. The match is gated to `soldAlone === true` so that
+  // pure-modifier sub-items (which aren't curated for customer display)
+  // are excluded — only items that are also sold standalone contribute
+  // their description/image to the modifier picker.
+  //
+  // Precedence: explicit fields on the modifier option win over the
+  // inherited sub-item fields. This matches POS behavior and lets a
+  // modifier author override an option's appearance without editing
+  // the underlying item.
+  // ============================================================
+  const subitemByName = useMemo(() => {
+    const map = new Map();
+    for (const it of (allItems || [])) {
+      if (!it || it.archived) continue;
+      if (it.type !== 'subitem') continue;
+      if (!it.soldAlone) continue;
+      const key = (it.menuName || it.name || '').toLowerCase();
+      if (key) map.set(key, it);
+    }
+    return map;
+  }, [allItems]);
+
+  const resolveOpt = (opt) => {
+    const key = (opt?.name || '').toLowerCase();
+    const match = key ? subitemByName.get(key) : null;
+    return {
+      image: opt?.image || match?.image || null,
+      description: opt?.description || match?.description || null,
+      allergens: (Array.isArray(opt?.allergens) && opt.allergens.length > 0)
+        ? opt.allergens
+        : (Array.isArray(match?.allergens) ? match.allergens : []),
+    };
+  };
   const [groups, setGroups] = useState([]);
   const [subGroupsCache, setSubGroupsCache] = useState({}); // { [subGroupId]: normalizedGroup }
   const [loading, setLoading] = useState(true);
@@ -569,7 +609,13 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
           const hint = buildHint(g._min, g._max);
           // Decide grid columns: 2-col compact when no rich content, 1-col when any
           // option has an image OR description so that media gets full layout space.
-          const groupHasRichContent = (g.options || []).some(o => o.image || o.description);
+          // Detect rich content using resolved fields (pulls in sub-item
+          // inheritance) so 1-col layout kicks in even when an option has no
+          // explicit image/description but inherits them from a sub-item.
+          const groupHasRichContent = (g.options || []).some(o => {
+            const r = resolveOpt(o);
+            return r.image || r.description || (r.allergens && r.allergens.length > 0);
+          });
           const optGridCols = groupHasRichContent ? '1fr' : 'repeat(2, minmax(0, 1fr))';
 
           return (
@@ -620,6 +666,8 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                   const atCap = picked.length >= g._max && !g._isSingle;
                   const showStepper = !g._isSingle && optCount > 0;
                   const sub = opt.subGroupId ? subGroupsCache[opt.subGroupId] : null;
+                  // v5.5.27: pull effective display fields (own option > matched sold-alone subitem).
+                  const effective = resolveOpt(opt);
 
                   return (
                     <div key={opt.id} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -633,8 +681,8 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                         display: 'flex',
                         flexDirection: 'column',
                       }}>
-                        {/* Option image (if present) — full-width on top of the card */}
-                        {opt.image && (
+                        {/* Option image (effective: own image OR matched sub-item image) — full-width on top of card */}
+                        {effective.image && (
                           <div style={{
                             width: '100%',
                             aspectRatio: '16/9',
@@ -642,7 +690,7 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                             overflow: 'hidden',
                             flexShrink: 0,
                           }}>
-                            <img src={opt.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            <img src={effective.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                           </div>
                         )}
 
@@ -687,7 +735,7 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                               fontWeight: 800,
                             }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
 
-                            {/* Text stack — name + (description) + (price) */}
+                            {/* Text stack — name + (description) + (price) + (allergens) */}
                             <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                               <span style={{
                                 fontSize: 'clamp(17px, 2vw, 22px)',
@@ -696,13 +744,13 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                                 lineHeight: 1.25,
                                 letterSpacing: '-0.01em',
                               }}>{opt.name}</span>
-                              {opt.description && (
+                              {effective.description && (
                                 <span style={{
                                   fontSize: 'clamp(13px, 1.5vw, 16px)',
                                   color: 'var(--kFgMuted)',
                                   fontWeight: 500,
                                   lineHeight: 1.4,
-                                }}>{opt.description}</span>
+                                }}>{effective.description}</span>
                               )}
                               {priceLabel && (
                                 <span style={{
@@ -711,6 +759,17 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                                   fontVariantNumeric: 'tabular-nums',
                                   fontWeight: 600,
                                 }}>{priceLabel}</span>
+                              )}
+                              {/* v5.5.27: per-option allergens, comma list in muted brand-tinted color */}
+                              {effective.allergens && effective.allergens.length > 0 && (
+                                <span style={{
+                                  fontSize: 'clamp(12px, 1.3vw, 14px)',
+                                  color: 'var(--kAllergen-fg)',
+                                  fontWeight: 600,
+                                  lineHeight: 1.35,
+                                  textTransform: 'capitalize',
+                                  marginTop: 2,
+                                }}>{effective.allergens.join(', ')}</span>
                               )}
                               {sub && !isSelected && (
                                 <span style={{ fontSize: 'clamp(12px, 1.3vw, 14px)', color: brandColor, fontWeight: 700 }}>{sub.name} ›</span>
@@ -796,6 +855,8 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                               {(sub.options || []).map(subOpt => {
                                 const isSubSel = subSel.includes(subOpt.id);
                                 const subPriceLabel = (subOpt.price && subOpt.price > 0) ? '+£' + Number(subOpt.price).toFixed(2) : '';
+                                // v5.5.27: sub-options also inherit from sold-alone subitems by name match.
+                                const subEffective = resolveOpt(subOpt);
                                 return (
                                   <button
                                     key={subOpt.id}
@@ -827,15 +888,24 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                                       fontWeight: 800,
                                       marginTop: 1,
                                     }}>{isSubSel ? '✓' : ''}</span>
-                                    {subOpt.image && (
+                                    {subEffective.image && (
                                       <span style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: 'var(--kImageBg)' }}>
-                                        <img src={subOpt.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                        <img src={subEffective.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                       </span>
                                     )}
                                     <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                                       <span style={{ fontSize: 'clamp(15px, 1.7vw, 18px)', fontWeight: 600 }}>{subOpt.name}</span>
-                                      {subOpt.description && (
-                                        <span style={{ fontSize: 'clamp(12px, 1.3vw, 14px)', color: 'var(--kFgMuted)', lineHeight: 1.35 }}>{subOpt.description}</span>
+                                      {subEffective.description && (
+                                        <span style={{ fontSize: 'clamp(12px, 1.3vw, 14px)', color: 'var(--kFgMuted)', lineHeight: 1.35 }}>{subEffective.description}</span>
+                                      )}
+                                      {subEffective.allergens && subEffective.allergens.length > 0 && (
+                                        <span style={{
+                                          fontSize: 'clamp(11px, 1.2vw, 13px)',
+                                          color: 'var(--kAllergen-fg)',
+                                          fontWeight: 600,
+                                          textTransform: 'capitalize',
+                                          marginTop: 2,
+                                        }}>{subEffective.allergens.join(', ')}</span>
                                       )}
                                     </span>
                                     {subPriceLabel && (
