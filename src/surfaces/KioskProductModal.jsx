@@ -632,14 +632,14 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
           const hint = buildHint(g._min, g._max);
           // Decide grid columns: 2-col compact when no rich content, 1-col when any
           // option has an image OR description so that media gets full layout space.
-          // Detect rich content using resolved fields (pulls in sub-item
-          // inheritance) so 1-col layout kicks in even when an option has no
-          // explicit image/description but inherits them from a sub-item.
-          const groupHasRichContent = (g.options || []).some(o => {
-            const r = resolveOpt(o);
-            return r.image || r.description || (r.allergens && r.allergens.length > 0);
-          });
-          const optGridCols = groupHasRichContent ? '1fr' : 'repeat(2, minmax(0, 1fr))';
+          // v5.5.31: layout reverted to fixed 2-col grid per Peter's feedback.
+          // Rich content (image / description / allergens) now renders inside
+          // the option card via a small thumbnail + compact text — no need to
+          // expand the card to full width. Single-column fallback is kept for
+          // the case where the entire group genuinely is single-pick variants
+          // (handled by the natural responsive sizing of clamp() — not a
+          // content-driven override).
+          const optGridCols = 'repeat(2, minmax(0, 1fr))';
 
           return (
             <div key={g.id} data-mod-group={g.id} style={{ marginBottom: 'clamp(28px, 3.6vw, 40px)' }}>
@@ -704,25 +704,12 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                         display: 'flex',
                         flexDirection: 'column',
                       }}>
-                        {/* Option image (effective: own image OR matched sub-item image) — full-width on top of card */}
-                        {effective.image && (
-                          <div style={{
-                            width: '100%',
-                            aspectRatio: '16/9',
-                            background: 'var(--kImageBg)',
-                            overflow: 'hidden',
-                            flexShrink: 0,
-                          }}>
-                            <img src={effective.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                          </div>
-                        )}
-
-                        {/* Body row */}
+                        {/* Body row — radio + (optional thumbnail) + text + (optional stepper) */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: 'clamp(10px, 1.4vw, 14px)',
-                          padding: 'clamp(14px, 1.8vw, 20px) clamp(14px, 1.8vw, 20px)',
+                          padding: 'clamp(12px, 1.6vw, 16px) clamp(12px, 1.6vw, 16px)',
                         }}>
                           <button
                             onClick={() => incOption(g, opt.id)}
@@ -746,22 +733,38 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                             {/* Radio / checkbox bullet */}
                             <span style={{
                               flexShrink: 0,
-                              width: 'clamp(24px, 2.6vw, 30px)',
-                              height: 'clamp(24px, 2.6vw, 30px)',
+                              width: 'clamp(22px, 2.4vw, 28px)',
+                              height: 'clamp(22px, 2.4vw, 28px)',
                               borderRadius: g._isSingle ? '50%' : 8,
                               border: '2px solid ' + (isSelected ? brandColor : 'var(--kBorder3)'),
                               display: 'grid',
                               placeItems: 'center',
                               background: isSelected ? brandColor : 'transparent',
                               color: '#fff',
-                              fontSize: 'clamp(13px, 1.5vw, 16px)',
+                              fontSize: 'clamp(12px, 1.4vw, 15px)',
                               fontWeight: 800,
                             }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
 
-                            {/* Text stack — name + (description) + (price) + (allergens) */}
-                            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                            {/* v5.5.31: small inline thumbnail (only when option has image, own or inherited).
+                                Sits between the radio and the text — same compact card layout as before. */}
+                            {effective.image && (
                               <span style={{
-                                fontSize: 'clamp(17px, 2vw, 22px)',
+                                flexShrink: 0,
+                                width: 'clamp(40px, 4.6vw, 56px)',
+                                height: 'clamp(40px, 4.6vw, 56px)',
+                                borderRadius: 10,
+                                overflow: 'hidden',
+                                background: 'var(--kImageBg)',
+                                display: 'block',
+                              }}>
+                                <img src={effective.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                              </span>
+                            )}
+
+                            {/* Text stack — name + (description) + (price) + (allergens) */}
+                            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                              <span style={{
+                                fontSize: 'clamp(15px, 1.8vw, 19px)',
                                 fontWeight: 700,
                                 color: brandColor,
                                 lineHeight: 1.25,
@@ -769,33 +772,39 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                               }}>{opt.name}</span>
                               {effective.description && (
                                 <span style={{
-                                  fontSize: 'clamp(13px, 1.5vw, 16px)',
+                                  fontSize: 'clamp(11px, 1.3vw, 14px)',
                                   color: 'var(--kFgMuted)',
                                   fontWeight: 500,
-                                  lineHeight: 1.4,
+                                  lineHeight: 1.35,
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
                                 }}>{effective.description}</span>
                               )}
                               {priceLabel && (
                                 <span style={{
-                                  fontSize: 'clamp(14px, 1.6vw, 17px)',
+                                  fontSize: 'clamp(12px, 1.4vw, 15px)',
                                   color: 'var(--kFgMuted)',
                                   fontVariantNumeric: 'tabular-nums',
                                   fontWeight: 600,
                                 }}>{priceLabel}</span>
                               )}
-                              {/* v5.5.27: per-option allergens, comma list in muted brand-tinted color */}
                               {effective.allergens && effective.allergens.length > 0 && (
                                 <span style={{
-                                  fontSize: 'clamp(12px, 1.3vw, 14px)',
+                                  fontSize: 'clamp(10px, 1.2vw, 13px)',
                                   color: 'var(--kAllergen-fg)',
                                   fontWeight: 600,
-                                  lineHeight: 1.35,
+                                  lineHeight: 1.3,
                                   textTransform: 'capitalize',
-                                  marginTop: 2,
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
                                 }}>{effective.allergens.join(', ')}</span>
                               )}
                               {sub && !isSelected && (
-                                <span style={{ fontSize: 'clamp(12px, 1.3vw, 14px)', color: brandColor, fontWeight: 700 }}>{sub.name} ›</span>
+                                <span style={{ fontSize: 'clamp(11px, 1.2vw, 13px)', color: brandColor, fontWeight: 700 }}>{sub.name} ›</span>
                               )}
                             </span>
                           </button>

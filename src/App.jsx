@@ -73,6 +73,18 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.31', date: '3 May 2026', label: 'Kiosk modifier options: keep compact 2-col layout — small inline thumbnail instead of full-width hero',
+    changes: [
+      'Peter\'s feedback on v5.5.30: the inheritance now works (donut images and descriptions render) but the UI went too far. Rich-content groups were switching from 2-col to 1-col with each option getting a full-width 16:9 hero image — too dominant for what should be a quick modifier picker. Asked to keep the original compact 2-col layout, just with a small image and the description inline.',
+      'Layout reverted to fixed 2-col grid (repeat(2, minmax(0, 1fr))) regardless of whether options have images / descriptions / allergens. Removed the groupHasRichContent detector and 1-col override added in v5.5.27.',
+      'Image placement: instead of a full-width 16:9 image at the top of the card, each option now renders a small inline thumbnail (clamp(40px..56px) square, 10px radius) sitting between the radio bullet and the text — only when an option actually has an image. Cards without images keep the original radio + text layout, no empty space.',
+      'Text scale tuned down to fit within the narrower 2-col card: option name 17→19px max (was 22), description 13→14px max with 2-line clamp, price 14→15px, allergens 12→13px with 2-line clamp. All still readable but everything fits without overflow. Card padding reduced from 14..20px → 12..16px to make room.',
+      'Radio bullet sized down slightly (24..30px → 22..28px) and tighter inner gap (4px → 2px) so the text stack stays compact even with all four lines (name + description + price + allergens) populated.',
+      'Sub-group nested options were already using a small 48px thumbnail, so no change there.',
+      'Behavior unchanged: same selection / validation / cart pipeline, same v5.5.30 sub-item inheritance via name match across snake_case and camelCase shapes.',
+    ],
+  },
+  {
     version: '5.5.30', date: '3 May 2026', label: 'ROOT-CAUSE FIX: kiosk sub-item lookup reads both snake_case (raw Supabase) and camelCase (store) field shapes',
     changes: [
       'Diagnostic log on v5.5.29 from Peter\'s real Box-of-3 product showed mapSize:0 and soldAloneSubItems:0, despite him confirming via BO screenshot that "Bueno Filled" exists as a sub-item with soldAlone=true and an image attached. The data was perfect — the kiosk simply wasn\'t seeing it.',
