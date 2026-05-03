@@ -1052,104 +1052,383 @@ function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) 
 // ============================================================
 // SCREEN: MENU
 // ============================================================
+// ============================================================
+// SCREEN: MENU  (v5.5.25 redesign)
+// Layout pivot: from horizontal-pill categories + 3-col grid +
+// top cart pill, to:
+//   - LEFT SIDEBAR for categories (always visible, big bold text,
+//     active state highlighted with brand-color background)
+//   - 2-COL ITEM GRID (taller cards, bigger images, in-card "+ Add"
+//     button as the primary affordance)
+//   - FLOATING BOTTOM BAR for cart status + checkout CTA, only
+//     visible when cart has items (hidden when empty so the menu
+//     gets full vertical space)
+//   - TOP BAR simplified to back button + allergen icon button
+// All customer-facing strings translated via t().
+// ============================================================
 function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCategoryId, onSelectCategory, onSelectItem, cartItemCount, subtotal, onCart, orderType, activeMenuId, banner, allergenFilter, onShowAllergenPicker, onBack }) {
+  const hasCart = cartItemCount > 0;
+  const hasAllergenFilter = allergenFilter && allergenFilter.size > 0;
+  const itemWord = cartItemCount === 1 ? t('menu.itemSingular') : t('menu.itemPlural');
   return (
     <div style={fullScreen()}>
-      {/* top bar */}
-      <div style={{ padding: '14px 18px 10px', borderBottom: '1px solid var(--kSurface2)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <button onClick={onBack} style={iconBtn()}>←</button>
-          <button onClick={onCart} disabled={cartItemCount === 0} style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: cartItemCount > 0 ? brandColor : 'var(--kBorder1)',
-            color: cartItemCount > 0 ? '#fff' : 'var(--kFgFaint)',
-            padding: '10px 18px', borderRadius: 100, fontWeight: 700, fontSize: 14,
-            border: 0, fontFamily: 'inherit', cursor: cartItemCount > 0 ? 'pointer' : 'default',
-          }}>
-            🛒 Cart · {cartItemCount} · £{subtotal.toFixed(2)}
-          </button>
-        </div>
-        {banner && banner.imageUrl && (
-          <div style={{ width: '100%', borderRadius: 12, overflow: 'hidden', marginBottom: 12, aspectRatio: '5/2', background: 'var(--kSurface1)' }}>
-            <img src={banner.imageUrl} alt={banner.label || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          </div>
-        )}
-        {/* v5.4.0: interactive allergen filter */}
-        <button onClick={onShowAllergenPicker} style={{
-          background: 'var(--kAllergen-bg)',
-          border: '1px solid var(--kAllergen-border)',
-          borderRadius: 12, padding: '10px 14px', marginBottom: 12,
-          display: 'flex', alignItems: 'center', gap: 10,
-          width: '100%', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-        }}>
-          <div style={{ fontSize: 18 }}>⚠️</div>
-          <div style={{ flex: 1, fontSize: 13, color: 'var(--kAllergen-fg)', fontWeight: 600 }}>
-            {(allergenFilter && allergenFilter.size > 0)
-              ? 'Avoiding: ' + Array.from(allergenFilter).join(', ') + ' — unsafe items shown faded'
-              : 'Have allergies? Tap to filter the menu'}
-          </div>
-          <div style={{ fontSize: 16, color: 'var(--kAllergen-fg)', fontWeight: 700 }}>{(allergenFilter && allergenFilter.size > 0) ? 'Edit ›' : '›'}</div>
+      {/* TOP BAR — back left, allergen icon right */}
+      <div style={{
+        padding: 'clamp(14px, 2vw, 20px) clamp(16px, 2.4vw, 24px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
+        borderBottom: '1px solid var(--kBorder1)',
+      }}>
+        <button onClick={onBack} aria-label={t('common.back')} style={iconBtnLg()}>←</button>
+        <button
+          onClick={onShowAllergenPicker}
+          aria-label={t('menu.allergens.tap')}
+          style={{
+            ...iconBtnLg(),
+            background: hasAllergenFilter ? 'var(--kAllergen-bg)' : 'var(--kSurface2)',
+            color: hasAllergenFilter ? 'var(--kAllergen-fg)' : 'var(--kFg)',
+            border: hasAllergenFilter ? '1.5px solid var(--kAllergen-border)' : '0',
+            position: 'relative',
+          }}
+        >
+          ⚠
+          {hasAllergenFilter && (
+            <span style={{
+              position: 'absolute', top: -4, right: -4,
+              background: '#ef4444', color: '#fff',
+              minWidth: 18, height: 18, borderRadius: 9,
+              fontSize: 11, fontWeight: 800,
+              display: 'grid', placeItems: 'center',
+              padding: '0 5px',
+            }}>{allergenFilter.size}</span>
+          )}
         </button>
-        {/* category strip */}
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+      </div>
+
+      {/* BODY — sidebar + items grid */}
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        display: 'grid',
+        gridTemplateColumns: 'clamp(180px, 22vw, 260px) 1fr',
+      }}>
+        {/* LEFT SIDEBAR — categories */}
+        <div style={{
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: 'clamp(14px, 2vw, 22px) clamp(10px, 1.4vw, 16px)',
+          borderRight: '1px solid var(--kBorder1)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'clamp(4px, 0.6vw, 8px)',
+          // Pad bottom so last category clears the floating checkout bar
+          paddingBottom: hasCart ? 'clamp(120px, 16vw, 180px)' : 'clamp(14px, 2vw, 22px)',
+        }}>
           {categories.length === 0 ? (
-            <div style={{ padding: 12, fontSize: 13, color: 'var(--kFgMuted)' }}>No categories on this menu yet.</div>
+            <div style={{ padding: 16, fontSize: 14, color: 'var(--kFgMuted)' }}>{t('menu.noCategories')}</div>
           ) : categories.map(c => {
             const active = c.id === selectedCategoryId;
             return (
-              <button key={c.id} onClick={() => onSelectCategory(c.id)} style={{
-                padding: '10px 18px',
-                background: active ? brandColor : 'var(--kSurface2)',
-                color: active ? '#fff' : 'var(--kFgMuted)',
-                borderRadius: 100, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap',
-                border: 0, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
-              }}>{c.label}</button>
+              <button
+                key={c.id}
+                onClick={() => onSelectCategory(c.id)}
+                style={{
+                  padding: 'clamp(14px, 2vw, 20px) clamp(14px, 1.8vw, 22px)',
+                  background: active ? brandColor : 'transparent',
+                  color: active ? '#fff' : brandColor,
+                  borderRadius: 14,
+                  fontSize: 'clamp(15px, 1.9vw, 20px)',
+                  fontWeight: 700,
+                  border: 0,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  textAlign: 'left',
+                  letterSpacing: '-0.01em',
+                  lineHeight: 1.2,
+                  transition: 'background 0.1s',
+                }}
+              >{c.label}</button>
             );
           })}
         </div>
-      </div>
-      {/* item grid */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14, alignContent: 'start' }}>
-        {items.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', padding: 60, textAlign: 'center', color: 'var(--kFgMuted)' }}>No items in this category.</div>
-        ) : items.map(it => {
-          const price = resolvePrice(it, orderType, activeMenuId);
-          // v5.4.0: check if item contains any flagged allergen
-          const itemAllergens = Array.isArray(it.allergens) ? it.allergens.map(a => String(a).toLowerCase()) : [];
-          const flagged = allergenFilter && Array.from(allergenFilter).some(a => itemAllergens.includes(String(a).toLowerCase()));
-          return (
-            <button key={it.id} onClick={() => onSelectItem(it)} style={{
+
+        {/* RIGHT — items grid */}
+        <div style={{
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: 'clamp(14px, 2vw, 22px)',
+          // Pad bottom so last row clears the floating checkout bar
+          paddingBottom: hasCart ? 'clamp(120px, 16vw, 180px)' : 'clamp(14px, 2vw, 22px)',
+        }}>
+          {/* Optional banner */}
+          {banner && banner.imageUrl && (
+            <div style={{
+              width: '100%',
+              borderRadius: 16,
+              overflow: 'hidden',
+              marginBottom: 'clamp(12px, 1.8vw, 18px)',
+              aspectRatio: '5/2',
               background: 'var(--kSurface1)',
-              border: '1px solid ' + (flagged ? 'rgba(239,68,68,0.5)' : 'var(--kBorder1)'),
-              borderRadius: 18, overflow: 'hidden', cursor: 'pointer',
-              fontFamily: 'inherit', textAlign: 'left', padding: 0, color: 'var(--kFg)',
-              opacity: flagged ? 0.45 : 1,
-              position: 'relative',
-              display: 'flex', flexDirection: 'column',
-              minHeight: 290,
             }}>
-              {flagged && (
-                <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, background: '#ef4444', color: '#fff', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>UNSAFE</div>
-              )}
-              <div style={{ width: '100%', height: 170, flexShrink: 0, background: 'var(--kImageBg)', display: 'grid', placeItems: 'center', fontSize: 60, overflow: 'hidden' }}>
-                {it.image ? <img src={it.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
-              </div>
-              <div style={{ padding: '14px 16px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4, lineHeight: 1.25, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.name}</div>
-                <div style={{ fontSize: 13, color: 'var(--kFgMuted)', lineHeight: 1.35, marginBottom: 10, minHeight: 35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.description || ''}</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
-                  <div style={{ fontSize: 19, fontWeight: 800, color: brandColor, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>£{Number(price).toFixed(2)}</div>
-                  {Array.isArray(it.allergens) && it.allergens.length > 0 && (
-                    <div style={{ fontSize: 10, padding: '3px 7px', borderRadius: 5, background: 'var(--kAllergen-bg)', color: 'var(--kAllergen-fg)', fontWeight: 700, letterSpacing: '0.05em' }}>{it.allergens.slice(0, 2).map(a => a[0].toUpperCase()).join(' ')}</div>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+              <img src={banner.imageUrl} alt={banner.label || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            </div>
+          )}
+
+          {/* Allergen-active banner (only when filter is active — full picker still in top icon) */}
+          {hasAllergenFilter && (
+            <div
+              role="status"
+              style={{
+                background: 'var(--kAllergen-bg)',
+                border: '1px solid var(--kAllergen-border)',
+                borderRadius: 12,
+                padding: '12px 16px',
+                marginBottom: 'clamp(12px, 1.8vw, 18px)',
+                fontSize: 'clamp(13px, 1.5vw, 15px)',
+                color: 'var(--kAllergen-fg)',
+                fontWeight: 600,
+                lineHeight: 1.4,
+              }}
+            >
+              {t('menu.allergens.avoiding')}: {Array.from(allergenFilter).join(', ')} — {t('menu.allergens.unsafeFaded')}
+            </div>
+          )}
+
+          {/* 2-col item grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: 'clamp(12px, 1.8vw, 18px)',
+            alignContent: 'start',
+          }}>
+            {items.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', padding: 60, textAlign: 'center', color: 'var(--kFgMuted)', fontSize: 'clamp(14px, 1.7vw, 17px)' }}>{t('menu.empty')}</div>
+            ) : items.map(it => (
+              <MenuItemCard
+                key={it.id}
+                item={it}
+                price={resolvePrice(it, orderType, activeMenuId)}
+                brandColor={brandColor}
+                allergenFilter={allergenFilter}
+                onSelect={() => onSelectItem(it)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* FLOATING CHECKOUT BAR — only when cart has items */}
+      {hasCart && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 'clamp(12px, 1.6vw, 20px)',
+            right: 'clamp(12px, 1.6vw, 20px)',
+            bottom: 'clamp(12px, 1.6vw, 20px)',
+            background: 'var(--kSurfaceCheckoutBar)',
+            borderRadius: 22,
+            padding: 'clamp(14px, 2vw, 22px) clamp(16px, 2.4vw, 26px)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'clamp(12px, 2vw, 24px)',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.18)',
+            zIndex: 50,
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 'clamp(12px, 1.4vw, 14px)',
+              color: brandColor,
+              fontWeight: 700,
+              letterSpacing: '0.02em',
+              marginBottom: 4,
+            }}>
+              {t('menu.currentOrder')}
+            </div>
+            <div style={{
+              fontSize: 'clamp(18px, 2.4vw, 24px)',
+              fontWeight: 800,
+              color: '#fff',
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-0.01em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>
+              {cartItemCount} {itemWord} • £{subtotal.toFixed(2)}
+            </div>
+          </div>
+          <button
+            onClick={onCart}
+            style={{
+              background: brandColor,
+              color: '#fff',
+              border: 0,
+              borderRadius: 16,
+              padding: 'clamp(14px, 2vw, 22px) clamp(20px, 2.8vw, 32px)',
+              fontSize: 'clamp(16px, 2vw, 20px)',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {t('menu.goToCheckout')} →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ----- MenuItemCard (extracted so the grid map stays readable) -----
+function MenuItemCard({ item, price, brandColor, allergenFilter, onSelect }) {
+  const itemAllergens = Array.isArray(item.allergens) ? item.allergens.map(a => String(a).toLowerCase()) : [];
+  const flagged = allergenFilter && Array.from(allergenFilter).some(a => itemAllergens.includes(String(a).toLowerCase()));
+  return (
+    <div
+      onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+      style={{
+        background: 'var(--kSurfaceRaised)',
+        border: '1px solid ' + (flagged ? 'rgba(239,68,68,0.5)' : 'var(--kBorder1)'),
+        borderRadius: 20,
+        overflow: 'hidden',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        textAlign: 'left',
+        color: 'var(--kFg)',
+        opacity: flagged ? 0.45 : 1,
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {flagged && (
+        <div style={{
+          position: 'absolute', top: 12, right: 12, zIndex: 2,
+          background: '#ef4444', color: '#fff',
+          padding: '5px 12px', borderRadius: 8,
+          fontSize: 12, fontWeight: 800, letterSpacing: '0.04em',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+        }}>UNSAFE</div>
+      )}
+
+      {/* Image (only render when available — no emoji placeholder) */}
+      {item.image && (
+        <div style={{
+          width: '100%',
+          aspectRatio: '4/3',
+          flexShrink: 0,
+          background: 'var(--kImageBg)',
+          overflow: 'hidden',
+        }}>
+          <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </div>
+      )}
+
+      {/* Body */}
+      <div style={{
+        padding: 'clamp(14px, 1.8vw, 20px) clamp(14px, 1.8vw, 20px) clamp(14px, 1.8vw, 20px)',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'clamp(6px, 1vw, 10px)',
+      }}>
+        {/* Name + price */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{
+            flex: 1,
+            fontSize: 'clamp(17px, 2vw, 22px)',
+            fontWeight: 800,
+            lineHeight: 1.2,
+            letterSpacing: '-0.01em',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}>{item.name}</div>
+          <div style={{
+            fontSize: 'clamp(17px, 2vw, 22px)',
+            fontWeight: 800,
+            color: brandColor,
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '-0.01em',
+            whiteSpace: 'nowrap',
+          }}>£{Number(price).toFixed(2)}</div>
+        </div>
+
+        {/* Description */}
+        {item.description && (
+          <div style={{
+            fontSize: 'clamp(13px, 1.5vw, 16px)',
+            color: 'var(--kFgMuted)',
+            lineHeight: 1.4,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}>{item.description}</div>
+        )}
+
+        {/* Add button — visual affordance; same as card-tap */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onSelect(); }}
+          style={{
+            marginTop: 'auto',
+            background: brandColor,
+            color: '#fff',
+            border: 0,
+            borderRadius: 100,
+            padding: 'clamp(10px, 1.4vw, 14px) clamp(16px, 2vw, 22px)',
+            fontSize: 'clamp(14px, 1.7vw, 17px)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            width: '100%',
+          }}
+        >
+          <span style={{
+            display: 'inline-grid',
+            placeItems: 'center',
+            width: 22, height: 22,
+            borderRadius: 11,
+            border: '1.5px solid #fff',
+            fontSize: 14,
+            fontWeight: 700,
+            lineHeight: 1,
+          }}>+</span>
+          {t('menu.add')}
+        </button>
       </div>
     </div>
   );
+}
+
+// Larger circular icon button (top bar)
+function iconBtnLg() {
+  return {
+    width: 'clamp(44px, 5vw, 56px)',
+    height: 'clamp(44px, 5vw, 56px)',
+    borderRadius: '50%',
+    background: 'var(--kSurface2)',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: 'clamp(18px, 2.2vw, 24px)',
+    color: 'var(--kFg)',
+    border: 0,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  };
 }
 
 // ============================================================

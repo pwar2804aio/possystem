@@ -73,6 +73,20 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.25', date: '2 May 2026', label: 'Kiosk menu screen redesign — sidebar categories + 2-col grid + floating checkout bar',
+    changes: [
+      'Major redesign of the menu/landing screen following Peter\'s reference. Three structural changes: categories moved from a small horizontal-pill strip at the top to a full LEFT SIDEBAR that\'s always visible (much bigger, much more obvious — bold brand-color text, generous padding, active state highlighted with a brand-color background fill); cart moved from a pill in the top right to a FLOATING BOTTOM BAR that only appears when cart > 0 (dark bar with brand-color CTA, "Current order: N items • £X" on the left, "Go to checkout →" button on the right); item grid changed from 3 columns to 2 columns with bigger images (4:3 aspect), bigger text (name 17→22px max, price matched at 22px), and an explicit "+ Add" button as primary card affordance.',
+      'Top bar simplified: back button (left), allergen icon button (right) as a circular icon with a count badge when filters are active. Replaces the always-on allergen banner that took up space; tap the icon to open the picker. The avoiding-foo banner only renders inside the items area when filters ARE active, so the menu has more breathing room in the common case.',
+      'Item card layout: image at top, name + price on one row, description below, and a full-width pill-shaped Add button at the bottom of every card. Card-tap and Add-tap both call onSelectItem (same modal opens) — Add button is a visual affordance, not a separate code path. Future improvement: items with no required modifiers could quick-add directly without opening the modal.',
+      'Floating checkout bar: position:absolute with bottom/left/right insets, dark surface (--kSurfaceCheckoutBar #18181c, defined in both light and dark themes for consistency), heavy shadow for elevation. Both scroll areas (sidebar + items) get bottom-padding when the bar is visible so last items aren\'t hidden behind it. Bar disappears when cart empties.',
+      'Text scale bumped throughout: sidebar category 14→20px max, item name 17→22px max, price 19→22px max, description 13→16px max, Add button 14→17px max, checkout bar primary line 18→24px. All sizes use clamp() with viewport-width-based middle values so they scale on different kiosk screen sizes.',
+      'No image fallback: removed the 🍽️ emoji placeholder for items without images. If image is missing the body just sits at the top of the card. Cleaner and matches modern menu UI patterns; menu-manager workflow already encourages uploading images.',
+      'i18n: 10 new keys translated to all six languages (menu.add, .currentOrder, .goToCheckout, .itemSingular, .itemPlural, .empty, .noCategories, .allergens.tap, .allergens.avoiding, .allergens.unsafeFaded). German "Artikel" doesn\'t plural-change which is correct.',
+      'New iconBtnLg() helper for circular top-bar icons. Existing iconBtn() retained for non-menu screens.',
+      'No functional changes: same data flow (selectedCategoryId filter, onSelectItem opens modal, onCart navigates to cart screen), same allergen-flagging math, same banner support, same orderType/activeMenuId price resolution. Pure UI rework.',
+    ],
+  },
+  {
     version: '5.5.24', date: '2 May 2026', label: 'Kiosk table-number screen: bigger and properly centered',
     changes: [
       'Sizing pass — every element bumped roughly 25-35% larger to match the visual presence of the reference: title 32→38..64px (was 32..52), keypad tile padding 18→26..42px (was 18..26), keypad tile font 22→28..42px (was 22..30), input field padding 20→26..40px and font 22→28..40px, Delete padding 18→22..34px and font 18→20..28, Continue padding 20→26..40px and font 20→24..34. Border radii also bumped 16/18 → 20/22 to keep the proportions right at the larger size.',

@@ -308,6 +308,9 @@ button { font-family: inherit; }
   --kError-bg: rgba(239,68,68,0.12);
   --kError-border: rgba(239,68,68,0.40);
   --kError-fg: #fca5a5;
+  /* v5.5.25: Floating checkout bar — solid dark in both themes to match
+     the reference and give the bar visual weight as a fixed-position CTA. */
+  --kSurfaceCheckoutBar: #18181c;
 }
 [data-kiosk-theme="light"] {
   --kFg: #111111;
@@ -329,6 +332,7 @@ button { font-family: inherit; }
   --kError-bg: rgba(220,38,38,0.08);
   --kError-border: rgba(220,38,38,0.32);
   --kError-fg: #b91c1c;
+  --kSurfaceCheckoutBar: #18181c;
 }
 
 /* Kiosk inputs/textareas pick up theme — keeps things readable in light mode */
