@@ -926,10 +926,10 @@ function ScreenLanguagePicker({ brandColor, currentLang, onPick, onClose }) {
 
 
 // ============================================================
-// SCREEN: TABLE NUMBER  (v5.5.23 redesign)
-// Light input-field-style display, 3x4 keypad with explicit Delete
-// row, full-width primary Continue CTA. Matches the order-type
-// screen aesthetic and the reference Peter provided.
+// SCREEN: TABLE NUMBER  (v5.5.24 sizing pass)
+// Larger keypad and CTAs, content vertically + horizontally
+// centered on the full viewport. Back button is absolute-positioned
+// so it doesn't displace the centered content column.
 // ============================================================
 function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) {
   const [val, setVal] = useState(value || '');
@@ -938,27 +938,32 @@ function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) 
   const canSubmit = !!val.trim();
   return (
     <div style={fullScreen()}>
-      {/* Subtle back button, top-left corner */}
-      <div style={{ padding: '20px 22px 0', flexShrink: 0 }}>
-        <button onClick={onBack} aria-label={t('common.back')} style={iconBtn()}>←</button>
-      </div>
+      {/* Back button: absolute-positioned so it doesn't displace centered content */}
+      <button
+        onClick={onBack}
+        aria-label={t('common.back')}
+        style={{ ...iconBtn(), position: 'absolute', top: 20, left: 22, zIndex: 5 }}
+      >←</button>
 
-      {/* Main content column, centered with safe max-width */}
+      {/* Centered content column. justify-content:center vertically centers
+          inside fullScreen (which is position:absolute inset:0). margin auto
+          horizontally centers within the 6vw padded viewport. */}
       <div style={{
         flex: 1,
-        padding: '0 6vw 4vh',
+        padding: '0 6vw',
         display: 'flex',
         flexDirection: 'column',
+        justifyContent: 'center',
         width: '100%',
-        maxWidth: 720,
+        maxWidth: 820,
         marginLeft: 'auto',
         marginRight: 'auto',
         boxSizing: 'border-box',
       }}>
         {/* Title */}
-        <div style={{ padding: '4vh 0 3vh', textAlign: 'center' }}>
+        <div style={{ paddingBottom: 'clamp(20px, 3vh, 36px)', textAlign: 'center' }}>
           <div style={{
-            fontSize: 'clamp(32px, 5.4vw, 52px)',
+            fontSize: 'clamp(38px, 6.4vw, 64px)',
             fontWeight: 800,
             letterSpacing: '-0.01em',
             color: brandColor,
@@ -970,10 +975,10 @@ function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) 
         <div style={{
           background: 'var(--kSurfaceRaised)',
           border: '1.5px solid var(--kBorder2)',
-          borderRadius: 18,
-          padding: 'clamp(20px, 2.8vw, 30px) 24px',
+          borderRadius: 22,
+          padding: 'clamp(26px, 3.6vw, 40px) 28px',
           textAlign: 'center',
-          fontSize: 'clamp(22px, 3.2vw, 32px)',
+          fontSize: 'clamp(28px, 4vw, 40px)',
           fontWeight: 700,
           color: brandColor,
           letterSpacing: val ? '0.02em' : '-0.01em',
@@ -986,8 +991,8 @@ function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) 
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gap: 'clamp(10px, 1.6vw, 16px)',
-          marginTop: 'clamp(16px, 2.4vw, 22px)',
+          gap: 'clamp(12px, 1.8vw, 20px)',
+          marginTop: 'clamp(18px, 2.6vw, 26px)',
         }}>
           {['1','2','3','4','5','6','7','8','9','','0',''].map((k, i) => (
             k === ''
@@ -1003,31 +1008,31 @@ function ScreenTableNumber({ brandColor, value, onChange, onContinue, onBack }) 
           style={{
             background: 'var(--kSurfaceRaised)',
             border: '1.5px solid var(--kBorder2)',
-            borderRadius: 18,
-            padding: 'clamp(18px, 2.4vw, 24px)',
-            fontSize: 'clamp(18px, 2.2vw, 22px)',
+            borderRadius: 22,
+            padding: 'clamp(22px, 3vw, 34px)',
+            fontSize: 'clamp(20px, 2.6vw, 28px)',
             fontWeight: 600,
             color: 'var(--kFg)',
             cursor: val ? 'pointer' : 'not-allowed',
             opacity: val ? 1 : 0.45,
             fontFamily: 'inherit',
-            marginTop: 'clamp(10px, 1.6vw, 16px)',
+            marginTop: 'clamp(12px, 1.8vw, 20px)',
             width: '100%',
           }}
         >
           {t('tableNumber.delete')}
         </button>
 
-        {/* Continue (full width primary CTA at bottom) */}
+        {/* Continue (full width primary CTA) */}
         <button
           onClick={submit}
           disabled={!canSubmit}
           style={{
             background: brandColor,
             border: 0,
-            borderRadius: 18,
-            padding: 'clamp(20px, 2.8vw, 28px)',
-            fontSize: 'clamp(20px, 2.4vw, 26px)',
+            borderRadius: 22,
+            padding: 'clamp(26px, 3.6vw, 40px)',
+            fontSize: 'clamp(24px, 3vw, 34px)',
             fontWeight: 700,
             color: '#fff',
             cursor: canSubmit ? 'pointer' : 'not-allowed',
@@ -1488,14 +1493,14 @@ function primaryCta(brandColor) {
 }
 function miniQtyBtn() { return { width: 32, height: 32, borderRadius: '50%', background: 'var(--kSurface1)', color: 'var(--kFg)', border: 0, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }; }
 function kpadKey() {
-  // v5.5.23: outlined tile style matching the order-type cards aesthetic.
-  // White surface, thin border, rounded, neutral-color number.
+  // v5.5.24: bumped sizes to match the larger overall screen scale.
+  // Outlined tile style matches the order-type cards aesthetic.
   return {
-    padding: 'clamp(18px, 2.4vw, 26px) 0',
-    borderRadius: 16,
+    padding: 'clamp(26px, 3.6vw, 42px) 0',
+    borderRadius: 20,
     background: 'var(--kSurfaceRaised)',
     color: 'var(--kFg)',
-    fontSize: 'clamp(22px, 3vw, 30px)',
+    fontSize: 'clamp(28px, 4vw, 42px)',
     fontWeight: 600,
     border: '1.5px solid var(--kBorder2)',
     cursor: 'pointer',

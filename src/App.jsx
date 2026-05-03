@@ -73,6 +73,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.24', date: '2 May 2026', label: 'Kiosk table-number screen: bigger and properly centered',
+    changes: [
+      'Sizing pass — every element bumped roughly 25-35% larger to match the visual presence of the reference: title 32→38..64px (was 32..52), keypad tile padding 18→26..42px (was 18..26), keypad tile font 22→28..42px (was 22..30), input field padding 20→26..40px and font 22→28..40px, Delete padding 18→22..34px and font 18→20..28, Continue padding 20→26..40px and font 20→24..34. Border radii also bumped 16/18 → 20/22 to keep the proportions right at the larger size.',
+      'Centering — content column now uses justifyContent:center so it sits in the true vertical center of the screen, not the top. Previously had no vertical centering and started rendering content right under the back button. Combined with the existing margin auto horizontal centering, the column is now genuinely centered on the viewport.',
+      'Back button repositioned to absolute (top:20, left:22) so it floats over the screen rather than displacing the content column downward. Without this, vertically centering the content would still be biased ~64px below true center because the back button row was eating that space at the top of the flex stack.',
+      'maxWidth raised from 720 to 820 to give the larger keypad tiles enough horizontal room without feeling cramped.',
+      'No functional changes — same 4-digit max, same submit gating, same i18n keys.',
+    ],
+  },
+  {
     version: '5.5.23', date: '2 May 2026', label: 'Kiosk table-number screen redesign — input field + outline keypad + full-width Continue',
     changes: [
       'Table-number screen redesigned to match the new order-type aesthetic Peter approved on v5.5.22. Replaces the old big-monospace-number display with a proper input-field-style box (white surface, thin border, brand-color value or "Table number" placeholder), and the cramped Continue arrow with a full-width brand-color CTA at the bottom.',
