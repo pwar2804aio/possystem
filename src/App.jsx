@@ -73,6 +73,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.30', date: '3 May 2026', label: 'ROOT-CAUSE FIX: kiosk sub-item lookup reads both snake_case (raw Supabase) and camelCase (store) field shapes',
+    changes: [
+      'Diagnostic log on v5.5.29 from Peter\'s real Box-of-3 product showed mapSize:0 and soldAloneSubItems:0, despite him confirming via BO screenshot that "Bueno Filled" exists as a sub-item with soldAlone=true and an image attached. The data was perfect — the kiosk simply wasn\'t seeing it.',
+      'ROOT CAUSE: items reach the kiosk modal via two different paths. POS surfaces read normalized camelCase from the Zustand store (where SyncBridge converts sold_alone → soldAlone, menu_name → menuName, etc.). The kiosk\'s useKioskMenu hook in KioskApp.jsx, however, reads raw Supabase rows directly via supabase.from("menu_items").select("*") — those rows come back snake_case. v5.5.27/28 only checked the camelCase fields (it.soldAlone, it.menuName), so on the kiosk every sub-item failed the soldAlone gate (it.soldAlone was undefined → falsy) and was skipped. Result: lookup map was always empty, never matched anything, donut images never rendered. Took screenshots of v5.5.27/28/29 and a debug log to find this — clean but fundamental miss on my part.',
+      'Fix is small and targeted: subitemByName memo now reads BOTH shapes via nullish-coalescing — soldAlone ?? sold_alone for the gate, plus menuName ?? menu_name (and likewise for kitchen/receipt) when building the name-key index. The shape used internally by the rest of the modal isn\'t touched. POS continues to read camelCase from the store, the kiosk continues to read snake_case from Supabase, and now the modal\'s lookup understands both.',
+      'Removed the verbose v5.5.29 diagnostic console.log now that the root cause is fixed. If similar issues come up later, easy to add back temporarily.',
+      'Process lesson worth flagging: when the same data flows through different layers (store-normalized vs raw-DB), code that consumes "items" needs to be tolerant of both shapes — or all consumers need to pull from the normalized layer. POS does the latter; the kiosk uses the former for performance reasons (no full Zustand load on the customer-facing surface). Either approach is fine but ad-hoc consumers of the data must respect the chosen pattern. Going forward when adding kiosk features that read item fields beyond the basics (id/name/price/image), explicitly check both shapes.',
+    ],
+  },
+  {
     version: '5.5.29', date: '3 May 2026', label: 'HOTFIX: TDZ crash on kiosk product modal — sub-item lookup block placed before state declarations',
     changes: [
       'v5.5.28 crashed the modal on open with "ReferenceError: Cannot access \'_\' before initialization". Cause: I placed the new subitemByName useMemo + resolveOpt helper + diagnostic useEffect at line ~218, BEFORE the existing useState declarations for groups (line 279) and loading (line 281). The diagnostic effect\'s deps array referenced both — JS evaluates the deps array at render time, hits the temporal dead zone, throws.',

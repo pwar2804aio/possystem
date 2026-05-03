@@ -211,35 +211,44 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   const [instructions, setInstructions] = useState('');
 
   // ============================================================
-  // v5.5.27 / v5.5.28: Resolve effective image/description/allergens for a
-  // modifier option by matching against a sold-alone sub-item.
+  // v5.5.30: Resolve effective image/description/allergens for a modifier
+  // option by matching against a sold-alone sub-item.
   //
-  // The match uses MULTIPLE name fields on the sub-item — name, menuName,
-  // receiptName, kitchenName — because in real menus the sub-item's display
-  // name is often longer than the modifier option name (e.g. sub-item
-  // "Bueno Filled Donut" exposed as modifier option "Bueno Filled"). Indexing
-  // every name field a sub-item carries means the option only needs to match
-  // ONE of them. All lookups are case-insensitive and trimmed.
+  // CRITICAL field-name handling: items reach this modal via two different
+  // paths in the codebase. POS surfaces read normalized camelCase from the
+  // Zustand store (soldAlone, menuName, kitchenName, receiptName) — that
+  // normalization happens in SyncBridge. The kiosk's useKioskMenu, however,
+  // reads raw Supabase rows where the same fields live as snake_case
+  // (sold_alone, menu_name, kitchen_name, receipt_name). v5.5.27/28 only
+  // looked at camelCase, so on the kiosk every lookup returned undefined and
+  // no sub-item was ever matched even when the data was perfect. The fix
+  // reads both shapes for every relevant field.
   //
-  // Gated to soldAlone===true so pure-modifier sub-items (not curated for
-  // customer display) are excluded — Peter's "only when item can be sold
-  // alone also" constraint.
+  // The match is gated to soldAlone===true so pure-modifier sub-items not
+  // curated for customer display don't leak description/image — Peter's
+  // "only when item can be sold alone also" constraint.
   //
   // Precedence: explicit fields on the modifier option win over inherited
-  // fields from the sub-item, matching POS behavior in InlineItemFlow.
-  //
-  // v5.5.29 placement: this block lives AFTER state declarations so the
-  // diagnostic useEffect's deps (loading, groups) aren't in TDZ.
+  // sub-item fields, matching POS behavior in InlineItemFlow.
   // ============================================================
   const subitemByName = useMemo(() => {
     const map = new Map();
-    const candidateFields = ['name', 'menuName', 'receiptName', 'kitchenName'];
     for (const it of (allItems || [])) {
       if (!it || it.archived) continue;
       if (it.type !== 'subitem') continue;
-      if (!it.soldAlone) continue;
-      for (const f of candidateFields) {
-        const raw = it[f];
+      // Read both camelCase (store) and snake_case (raw Supabase) shapes.
+      const soldAlone = it.soldAlone ?? it.sold_alone;
+      if (!soldAlone) continue;
+      // Index under every name field this row carries — short option names
+      // ("Bueno Filled") need to match longer sub-item display names
+      // ("Bueno Filled Donut") via menuName/kitchenName/receiptName aliases.
+      const candidates = [
+        it.name,
+        it.menuName, it.menu_name,
+        it.receiptName, it.receipt_name,
+        it.kitchenName, it.kitchen_name,
+      ];
+      for (const raw of candidates) {
         if (!raw) continue;
         const key = String(raw).trim().toLowerCase();
         if (key && !map.has(key)) map.set(key, it);
@@ -257,41 +266,8 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       allergens: (Array.isArray(opt?.allergens) && opt.allergens.length > 0)
         ? opt.allergens
         : (Array.isArray(match?.allergens) ? match.allergens : []),
-      _matched: !!match, // for debug
     };
   };
-
-  // v5.5.28: one-shot diagnostic. Logs once when the modal has finished loading
-  // groups, listing each modifier option and whether each found a sold-alone
-  // sub-item match. If options render without images, this surfaces whether the
-  // issue is (a) no soldAlone sub-items, (b) name-field mismatch, or (c) match
-  // works but image/description fields are empty. Remove once confirmed working.
-  useEffect(() => {
-    if (loading) return;
-    if (!groups || groups.length === 0) return;
-    const allSubs = (allItems || []).filter(i => i.type === 'subitem' && !i.archived && i.soldAlone);
-    const optInfo = [];
-    for (const g of groups) {
-      for (const opt of (g.options || [])) {
-        const r = resolveOpt(opt);
-        optInfo.push({
-          group: g.name,
-          optName: opt.name,
-          matched: r._matched,
-          hasImage: !!r.image,
-          hasDescription: !!r.description,
-          allergens: r.allergens,
-        });
-      }
-    }
-    // eslint-disable-next-line no-console
-    console.log('[kiosk modal v5.5.29] subitem map:', {
-      mapSize: subitemByName.size,
-      mapKeys: Array.from(subitemByName.keys()),
-      soldAloneSubItems: allSubs.map(s => ({ id: s.id, name: s.name, menuName: s.menuName, hasImage: !!s.image, hasDescription: !!s.description })),
-      options: optInfo,
-    });
-  }, [loading, groups, allItems, subitemByName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load top-level groups + variants, then pre-fetch any sub-groups referenced by option.subGroupId
   useEffect(() => {
