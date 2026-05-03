@@ -34,6 +34,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store';
+import { t, useKioskLang } from '../lib/i18n';
 
 // ============================================================
 // VALIDATION HELPERS (pure)
@@ -191,6 +192,9 @@ function summarizeForDisplay(groups, selections, nestedSelections, subGroupsCach
 // ============================================================
 
 export default function KioskProductModal({ item, allItems = [], brandColor, brandAccent, basePrice, addLabel, onAdd, onCancel }) {
+  // Subscribe to language changes so t() strings re-render if the customer
+  // switches language while the modal is open.
+  useKioskLang();
   const allInstructionDefs = useStore(s => s.instructionGroupDefs) || [];
   const [groups, setGroups] = useState([]);
   const [subGroupsCache, setSubGroupsCache] = useState({}); // { [subGroupId]: normalizedGroup }
@@ -420,42 +424,141 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   };
 
   // ============================================================
-  // RENDER
+  // RENDER  (v5.5.26 redesign)
   // ============================================================
+  // Helper for hint text used by groups + sub-groups.
+  function buildHint(min, max) {
+    if (min === 0 && max === 1) return t('product.optional') + ' · ' + t('product.pickOne');
+    if (min === max && min === 1) return t('product.required') + ' · ' + t('product.pickOne');
+    if (min === max) return t('product.required') + ' · ' + t('product.pick') + ' ' + min;
+    if (min > 0) return t('product.required') + ' · ' + t('product.pick') + ' ' + min + (max > min ? '–' + max : '');
+    return t('product.optional') + ' · ' + t('product.upTo') + ' ' + max;
+  }
 
   if (loading) {
     return (
       <div style={overlayStyle()}>
-        <div style={{ color: 'var(--kFg)', fontSize: 22, padding: 60 }}>Loading…</div>
+        <div style={{ color: 'var(--kFg)', fontSize: 22, padding: 60 }}>{t('product.loading')}</div>
       </div>
     );
   }
 
   return (
     <div style={overlayStyle()}>
-      {/* Hero image with back button */}
-      <div style={{ position: 'relative', width: '100%', height: '32vh', background: 'linear-gradient(135deg, ' + brandColor + ', ' + (brandAccent || brandColor) + ')', display: 'grid', placeItems: 'center', fontSize: 140, flexShrink: 0, overflow: 'hidden' }}>
-        {item?.image ? <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🍽️'}
-        <button onClick={onCancel} style={{ position: 'absolute', top: 18, left: 18, width: 52, height: 52, borderRadius: 16, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', fontSize: 24, color: '#fff', border: 0, cursor: 'pointer' }}>←</button>
+      {/* Hero image with X close button (top-right) */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: 'clamp(240px, 36vh, 460px)',
+        background: item?.image ? '#000' : ('linear-gradient(135deg, ' + brandColor + ', ' + (brandAccent || brandColor) + ')'),
+        flexShrink: 0,
+        overflow: 'hidden',
+      }}>
+        {item?.image && (
+          <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        )}
+        <button
+          onClick={onCancel}
+          aria-label="Close"
+          style={{
+            position: 'absolute',
+            top: 'clamp(14px, 2vw, 22px)',
+            right: 'clamp(14px, 2vw, 22px)',
+            width: 'clamp(48px, 5.4vw, 60px)',
+            height: 'clamp(48px, 5.4vw, 60px)',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(10px)',
+            display: 'grid',
+            placeItems: 'center',
+            fontSize: 'clamp(20px, 2.4vw, 26px)',
+            color: '#111',
+            fontWeight: 600,
+            border: 0,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+          }}
+        >×</button>
       </div>
 
       {/* Scrollable body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '26px 28px 16px' }}>
-        <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 10, lineHeight: 1.1 }}>{item?.name}</div>
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: 'clamp(22px, 3vw, 36px) clamp(22px, 3vw, 36px) clamp(14px, 2vw, 20px)',
+      }}>
+        {/* Title — brand color */}
+        <div style={{
+          fontSize: 'clamp(30px, 4.4vw, 48px)',
+          fontWeight: 800,
+          letterSpacing: '-0.02em',
+          marginBottom: 'clamp(10px, 1.4vw, 14px)',
+          lineHeight: 1.1,
+          color: brandColor,
+        }}>{item?.name}</div>
+
+        {/* Description — muted */}
         {item?.description && (
-          <div style={{ fontSize: 17, color: 'var(--kFgMuted)', lineHeight: 1.5, marginBottom: 18 }}>{item.description}</div>
+          <div style={{
+            fontSize: 'clamp(16px, 1.9vw, 20px)',
+            color: 'var(--kFgMuted)',
+            lineHeight: 1.5,
+            marginBottom: 'clamp(16px, 2.2vw, 24px)',
+          }}>{item.description}</div>
         )}
 
+        {/* Base price — brand color, large */}
+        <div style={{
+          fontSize: 'clamp(26px, 3.4vw, 38px)',
+          fontWeight: 800,
+          color: brandColor,
+          letterSpacing: '-0.01em',
+          marginBottom: 'clamp(20px, 2.6vw, 28px)',
+          fontVariantNumeric: 'tabular-nums',
+        }}>£{Number(basePrice ?? 0).toFixed(2)}</div>
+
+        {/* Allergens — icon + label, then comma list. Brand-color text matches reference. */}
         {Array.isArray(item?.allergens) && item.allergens.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
-            {item.allergens.map(a => (
-              <div key={a} style={{ padding: '6px 12px', background: 'var(--kAllergen-bg)', border: '1px solid var(--kAllergen-border)', borderRadius: 8, fontSize: 13, color: 'var(--kAllergen-fg)', fontWeight: 600, textTransform: 'capitalize' }}>⚠ {a}</div>
-            ))}
+          <div style={{ marginBottom: 'clamp(24px, 3.2vw, 36px)' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              marginBottom: 6,
+              color: brandColor,
+            }}>
+              {/* Inline allergen-warning icon (test-tube + drop). currentColor inherits brand. */}
+              <svg viewBox="0 0 24 24" width={26} height={26} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 3 H15" />
+                <path d="M10 3 V11 L6 18 Q6 21 9 21 H15 Q18 21 18 18 L14 11 V3" />
+                <circle cx="20" cy="6" r="2.5" />
+              </svg>
+              <span style={{
+                fontSize: 'clamp(18px, 2.2vw, 22px)',
+                fontWeight: 800,
+                letterSpacing: '-0.01em',
+              }}>{t('product.allergens')}</span>
+            </div>
+            <div style={{
+              fontSize: 'clamp(16px, 1.9vw, 20px)',
+              color: brandColor,
+              fontWeight: 600,
+              textTransform: 'capitalize',
+            }}>{item.allergens.join(', ')}</div>
           </div>
         )}
 
         {error && (
-          <div style={{ background: 'var(--kError-bg)', border: '1px solid var(--kError-border)', color: 'var(--kError-fg)', padding: '12px 16px', borderRadius: 12, fontSize: 14, marginBottom: 16 }}>{error}</div>
+          <div style={{
+            background: 'var(--kError-bg)',
+            border: '1px solid var(--kError-border)',
+            color: 'var(--kError-fg)',
+            padding: '12px 16px',
+            borderRadius: 12,
+            fontSize: 14,
+            marginBottom: 16,
+          }}>{error}</div>
         )}
 
         {/* Modifier groups */}
@@ -463,78 +566,196 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
           const picked = selections[g.id] || [];
           const remaining = g._max - picked.length;
           const isInvalid = showError && (picked.length < g._min || picked.length > g._max);
-          let hint;
-          if (g._min === 0 && g._max === 1) hint = 'Optional · pick one';
-          else if (g._min === g._max && g._min === 1) hint = 'Required · pick one';
-          else if (g._min === g._max) hint = 'Required · pick ' + g._min;
-          else if (g._min > 0) hint = 'Required · pick ' + g._min + (g._max > g._min ? '–' + g._max : '');
-          else hint = 'Optional · up to ' + g._max;
+          const hint = buildHint(g._min, g._max);
+          // Decide grid columns: 2-col compact when no rich content, 1-col when any
+          // option has an image OR description so that media gets full layout space.
+          const groupHasRichContent = (g.options || []).some(o => o.image || o.description);
+          const optGridCols = groupHasRichContent ? '1fr' : 'repeat(2, minmax(0, 1fr))';
+
           return (
-            <div key={g.id} data-mod-group={g.id} style={{ marginBottom: 30 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--kFg)', letterSpacing: '-0.01em' }}>{g.name}</div>
+            <div key={g.id} data-mod-group={g.id} style={{ marginBottom: 'clamp(28px, 3.6vw, 40px)' }}>
+              {/* Group name — brand color, larger */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                marginBottom: 4,
+                gap: 12,
+              }}>
+                <div style={{
+                  fontSize: 'clamp(22px, 2.8vw, 30px)',
+                  fontWeight: 800,
+                  color: brandColor,
+                  letterSpacing: '-0.01em',
+                }}>{g.name}</div>
                 {picked.length > 0 && remaining > 0 && !g._isSingle && (
-                  <div style={{ fontSize: 13, color: 'var(--kFgFaint)', fontWeight: 600 }}>{picked.length} / {g._max}</div>
+                  <div style={{ fontSize: 'clamp(13px, 1.4vw, 15px)', color: 'var(--kFgFaint)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{picked.length} / {g._max}</div>
                 )}
               </div>
-              <div style={{ fontSize: 14, color: isInvalid ? 'var(--kError-fg)' : 'var(--kFgMuted)', marginBottom: 14, fontWeight: isInvalid ? 700 : 500 }}>
-                {hint}{isInvalid && picked.length < g._min ? ' — you must select ' + (g._min - picked.length) + ' more' : ''}
+              {/* Subtitle hint — also brand color, lighter weight */}
+              <div style={{
+                fontSize: 'clamp(14px, 1.6vw, 17px)',
+                color: isInvalid ? 'var(--kError-fg)' : brandColor,
+                marginBottom: 'clamp(14px, 1.8vw, 20px)',
+                fontWeight: isInvalid ? 700 : 600,
+                opacity: isInvalid ? 1 : 0.85,
+              }}>
+                {hint}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+              {/* Option grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: optGridCols,
+                gap: 'clamp(10px, 1.4vw, 14px)',
+              }}>
                 {(g.options || []).map(opt => {
                   const optCount = picked.filter(id => id === opt.id).length;
                   const isSelected = optCount > 0;
-                  const priceLabel = (opt.price && opt.price > 0) ? '+£' + Number(opt.price).toFixed(2) : (opt.price && opt.price < 0) ? '-£' + Math.abs(opt.price).toFixed(2) : '';
+                  const priceLabel = (opt.price && opt.price > 0)
+                    ? '+£' + Number(opt.price).toFixed(2)
+                    : (opt.price && opt.price < 0)
+                      ? '-£' + Math.abs(opt.price).toFixed(2)
+                      : '';
                   const atCap = picked.length >= g._max && !g._isSingle;
                   const showStepper = !g._isSingle && optCount > 0;
                   const sub = opt.subGroupId ? subGroupsCache[opt.subGroupId] : null;
 
                   return (
-                    <div key={opt.id} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    <div key={opt.id} style={{ display: 'flex', flexDirection: 'column' }}>
                       <div style={{
-                        display: 'flex', alignItems: 'center', gap: 14,
-                        padding: '16px 18px',
-                        background: isSelected ? 'var(--kSurface2)' : 'var(--kSurface1)',
-                        border: '2px solid ' + (isSelected ? brandColor : (isInvalid ? 'var(--kError-border)' : 'var(--kBorder1)')),
-                        borderRadius: sub && isSelected ? '14px 14px 0 0' : 14,
+                        background: 'var(--kSurfaceRaised)',
+                        border: '1.5px solid ' + (isSelected ? brandColor : (isInvalid ? 'var(--kError-border)' : 'var(--kBorder1)')),
+                        borderRadius: sub && isSelected ? '16px 16px 0 0' : 16,
                         color: 'var(--kFg)',
                         transition: 'background 0.12s, border-color 0.12s',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
                       }}>
-                        <button onClick={() => incOption(g, opt.id)} disabled={!isSelected && atCap} style={{
-                          flex: 1, display: 'flex', alignItems: 'center', gap: 16,
-                          background: 'transparent', border: 0, padding: 0,
-                          cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer',
-                          color: 'var(--kFg)', fontFamily: 'inherit', textAlign: 'left',
-                          opacity: (atCap && !isSelected) ? 0.4 : 1,
-                        }}>
-                          <span style={{
+                        {/* Option image (if present) — full-width on top of the card */}
+                        {opt.image && (
+                          <div style={{
+                            width: '100%',
+                            aspectRatio: '16/9',
+                            background: 'var(--kImageBg)',
+                            overflow: 'hidden',
                             flexShrink: 0,
-                            width: 30, height: 30,
-                            borderRadius: g._isSingle ? '50%' : 8,
-                            border: '2px solid ' + (isSelected ? brandColor : 'var(--kBorder3)'),
-                            display: 'grid', placeItems: 'center',
-                            background: isSelected ? brandColor : 'transparent',
-                            color: '#fff', fontSize: 15, fontWeight: 800,
-                          }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
-                          <span style={{ flex: 1, fontSize: 18, fontWeight: 600 }}>{opt.name}</span>
-                          {priceLabel && <span style={{ fontSize: 15, color: 'var(--kFgMuted)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{priceLabel}</span>}
-                          {sub && !isSelected && (
-                            <span style={{ fontSize: 12, color: brandColor, fontWeight: 700, marginLeft: 4 }}>{sub.name} ›</span>
-                          )}
-                        </button>
-                        {showStepper && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                            <button onClick={(e) => { e.stopPropagation(); decOption(g, opt.id); }} style={{
-                              width: 40, height: 40, borderRadius: '50%', background: 'var(--kSurface2)',
-                              border: 0, color: 'var(--kFg)', fontSize: 20, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                            }}>−</button>
-                            <button onClick={(e) => { e.stopPropagation(); incOption(g, opt.id); }} disabled={atCap} style={{
-                              width: 40, height: 40, borderRadius: '50%', background: atCap ? 'var(--kSurface1)' : brandColor,
-                              border: 0, color: '#fff', fontSize: 20, fontWeight: 700, cursor: atCap ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-                              opacity: atCap ? 0.4 : 1,
-                            }}>+</button>
+                          }}>
+                            <img src={opt.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                           </div>
                         )}
+
+                        {/* Body row */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'clamp(10px, 1.4vw, 14px)',
+                          padding: 'clamp(14px, 1.8vw, 20px) clamp(14px, 1.8vw, 20px)',
+                        }}>
+                          <button
+                            onClick={() => incOption(g, opt.id)}
+                            disabled={!isSelected && atCap}
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'clamp(10px, 1.4vw, 14px)',
+                              background: 'transparent',
+                              border: 0,
+                              padding: 0,
+                              cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer',
+                              color: 'var(--kFg)',
+                              fontFamily: 'inherit',
+                              textAlign: 'left',
+                              opacity: (atCap && !isSelected) ? 0.4 : 1,
+                              minWidth: 0,
+                            }}
+                          >
+                            {/* Radio / checkbox bullet */}
+                            <span style={{
+                              flexShrink: 0,
+                              width: 'clamp(24px, 2.6vw, 30px)',
+                              height: 'clamp(24px, 2.6vw, 30px)',
+                              borderRadius: g._isSingle ? '50%' : 8,
+                              border: '2px solid ' + (isSelected ? brandColor : 'var(--kBorder3)'),
+                              display: 'grid',
+                              placeItems: 'center',
+                              background: isSelected ? brandColor : 'transparent',
+                              color: '#fff',
+                              fontSize: 'clamp(13px, 1.5vw, 16px)',
+                              fontWeight: 800,
+                            }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
+
+                            {/* Text stack — name + (description) + (price) */}
+                            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                              <span style={{
+                                fontSize: 'clamp(17px, 2vw, 22px)',
+                                fontWeight: 700,
+                                color: brandColor,
+                                lineHeight: 1.25,
+                                letterSpacing: '-0.01em',
+                              }}>{opt.name}</span>
+                              {opt.description && (
+                                <span style={{
+                                  fontSize: 'clamp(13px, 1.5vw, 16px)',
+                                  color: 'var(--kFgMuted)',
+                                  fontWeight: 500,
+                                  lineHeight: 1.4,
+                                }}>{opt.description}</span>
+                              )}
+                              {priceLabel && (
+                                <span style={{
+                                  fontSize: 'clamp(14px, 1.6vw, 17px)',
+                                  color: 'var(--kFgMuted)',
+                                  fontVariantNumeric: 'tabular-nums',
+                                  fontWeight: 600,
+                                }}>{priceLabel}</span>
+                              )}
+                              {sub && !isSelected && (
+                                <span style={{ fontSize: 'clamp(12px, 1.3vw, 14px)', color: brandColor, fontWeight: 700 }}>{sub.name} ›</span>
+                              )}
+                            </span>
+                          </button>
+
+                          {/* Stepper for multi-pick selected options */}
+                          {showStepper && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); decOption(g, opt.id); }}
+                                style={{
+                                  width: 'clamp(36px, 4vw, 44px)',
+                                  height: 'clamp(36px, 4vw, 44px)',
+                                  borderRadius: '50%',
+                                  background: 'var(--kSurface2)',
+                                  border: 0,
+                                  color: 'var(--kFg)',
+                                  fontSize: 'clamp(18px, 2vw, 22px)',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  fontFamily: 'inherit',
+                                }}
+                              >−</button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); incOption(g, opt.id); }}
+                                disabled={atCap}
+                                style={{
+                                  width: 'clamp(36px, 4vw, 44px)',
+                                  height: 'clamp(36px, 4vw, 44px)',
+                                  borderRadius: '50%',
+                                  background: atCap ? 'var(--kSurface1)' : brandColor,
+                                  border: 0,
+                                  color: '#fff',
+                                  fontSize: 'clamp(18px, 2vw, 22px)',
+                                  fontWeight: 700,
+                                  cursor: atCap ? 'not-allowed' : 'pointer',
+                                  fontFamily: 'inherit',
+                                  opacity: atCap ? 0.4 : 1,
+                                }}
+                              >+</button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Inline nested sub-group expansion — one block per occurrence */}
@@ -547,43 +768,85 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                           <div key={parentKey} style={{
                             background: 'var(--kSurface1)',
                             borderLeft: '3px solid ' + brandColor,
-                            borderRight: '2px solid ' + brandColor,
-                            borderBottom: '2px solid ' + brandColor,
-                            borderRadius: isLastOcc ? '0 0 14px 14px' : 0,
-                            padding: '14px 16px 16px 22px',
+                            borderRight: '1.5px solid ' + brandColor,
+                            borderBottom: '1.5px solid ' + brandColor,
+                            borderRadius: isLastOcc ? '0 0 16px 16px' : 0,
+                            padding: 'clamp(12px, 1.6vw, 18px) clamp(14px, 1.8vw, 20px) clamp(14px, 1.8vw, 20px) clamp(18px, 2.2vw, 26px)',
                             marginBottom: isLastOcc ? 0 : 2,
                           }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--kFgMuted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                            <div style={{
+                              fontSize: 'clamp(12px, 1.3vw, 14px)',
+                              fontWeight: 700,
+                              color: 'var(--kFgMuted)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                              marginBottom: 4,
+                            }}>
                               {opt.name}{optCount > 1 ? ' #' + (occIdx + 1) : ''} · {sub.name}
                             </div>
-                            <div style={{ fontSize: 13, color: subInvalid ? 'var(--kError-fg)' : 'var(--kFgFaint)', marginBottom: 10, fontWeight: subInvalid ? 700 : 500 }}>
-                              {sub._min > 0 ? 'Required · pick ' + (sub._min === sub._max ? sub._min : sub._min + '–' + sub._max) : 'Optional · up to ' + sub._max}
+                            <div style={{
+                              fontSize: 'clamp(13px, 1.4vw, 15px)',
+                              color: subInvalid ? 'var(--kError-fg)' : 'var(--kFgFaint)',
+                              marginBottom: 10,
+                              fontWeight: subInvalid ? 700 : 500,
+                            }}>
+                              {buildHint(sub._min, sub._max)}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                               {(sub.options || []).map(subOpt => {
                                 const isSubSel = subSel.includes(subOpt.id);
                                 const subPriceLabel = (subOpt.price && subOpt.price > 0) ? '+£' + Number(subOpt.price).toFixed(2) : '';
                                 return (
-                                  <button key={subOpt.id} onClick={() => setNestedPick(parentKey, sub, subOpt.id)} style={{
-                                    display: 'flex', alignItems: 'center', gap: 14,
-                                    padding: '12px 14px',
-                                    background: isSubSel ? 'var(--kSurface3)' : 'var(--kSurface2)',
-                                    border: '2px solid ' + (isSubSel ? brandColor : 'transparent'),
-                                    borderRadius: 12,
-                                    color: 'var(--kFg)',
-                                    cursor: 'pointer',
-                                    fontFamily: 'inherit', textAlign: 'left',
-                                  }}>
+                                  <button
+                                    key={subOpt.id}
+                                    onClick={() => setNestedPick(parentKey, sub, subOpt.id)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: 12,
+                                      padding: 'clamp(10px, 1.4vw, 14px) clamp(12px, 1.6vw, 16px)',
+                                      background: isSubSel ? 'var(--kSurface3)' : 'var(--kSurface2)',
+                                      border: '2px solid ' + (isSubSel ? brandColor : 'transparent'),
+                                      borderRadius: 12,
+                                      color: 'var(--kFg)',
+                                      cursor: 'pointer',
+                                      fontFamily: 'inherit',
+                                      textAlign: 'left',
+                                    }}
+                                  >
                                     <span style={{
-                                      flexShrink: 0, width: 24, height: 24,
+                                      flexShrink: 0,
+                                      width: 24, height: 24,
                                       borderRadius: sub._isSingle ? '50%' : 6,
                                       border: '2px solid ' + (isSubSel ? brandColor : 'var(--kBorder3)'),
-                                      display: 'grid', placeItems: 'center',
+                                      display: 'grid',
+                                      placeItems: 'center',
                                       background: isSubSel ? brandColor : 'transparent',
-                                      color: '#fff', fontSize: 12, fontWeight: 800,
+                                      color: '#fff',
+                                      fontSize: 12,
+                                      fontWeight: 800,
+                                      marginTop: 1,
                                     }}>{isSubSel ? '✓' : ''}</span>
-                                    <span style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{subOpt.name}</span>
-                                    {subPriceLabel && <span style={{ fontSize: 14, color: 'var(--kFgMuted)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{subPriceLabel}</span>}
+                                    {subOpt.image && (
+                                      <span style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: 'var(--kImageBg)' }}>
+                                        <img src={subOpt.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                      </span>
+                                    )}
+                                    <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                                      <span style={{ fontSize: 'clamp(15px, 1.7vw, 18px)', fontWeight: 600 }}>{subOpt.name}</span>
+                                      {subOpt.description && (
+                                        <span style={{ fontSize: 'clamp(12px, 1.3vw, 14px)', color: 'var(--kFgMuted)', lineHeight: 1.35 }}>{subOpt.description}</span>
+                                      )}
+                                    </span>
+                                    {subPriceLabel && (
+                                      <span style={{
+                                        fontSize: 'clamp(13px, 1.4vw, 15px)',
+                                        color: 'var(--kFgMuted)',
+                                        fontVariantNumeric: 'tabular-nums',
+                                        fontWeight: 600,
+                                        flexShrink: 0,
+                                      }}>{subPriceLabel}</span>
+                                    )}
                                   </button>
                                 );
                               })}
@@ -601,40 +864,89 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       </div>
 
       {/* Special instructions */}
-      <div style={{ padding: '0 28px 18px' }}>
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--kFgMuted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Anything else?</label>
+      <div style={{ padding: '0 clamp(22px, 3vw, 36px) clamp(14px, 2vw, 20px)' }}>
+        <label style={{
+          display: 'block',
+          fontSize: 'clamp(12px, 1.3vw, 14px)',
+          fontWeight: 700,
+          color: 'var(--kFgMuted)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.07em',
+          marginBottom: 8,
+        }}>{t('product.anythingElse')}</label>
         <textarea
           value={instructions}
           onChange={e => setInstructions(e.target.value)}
-          placeholder="e.g. no ice, light sauce, allergy notes…"
+          placeholder={t('product.anythingElse.placeholder')}
           maxLength={140}
           rows={2}
-          style={{ width: '100%', borderRadius: 14, padding: '14px 16px', fontFamily: 'inherit', fontSize: 15, outline: 'none', resize: 'none', borderWidth: 1, borderStyle: 'solid' }}
+          style={{
+            width: '100%',
+            borderRadius: 14,
+            padding: 'clamp(12px, 1.6vw, 16px)',
+            fontFamily: 'inherit',
+            fontSize: 'clamp(14px, 1.6vw, 17px)',
+            outline: 'none',
+            resize: 'none',
+            borderWidth: 1,
+            borderStyle: 'solid',
+          }}
         />
       </div>
 
       {/* Bottom CTA bar */}
-      <div style={{ padding: '16px 24px 24px', borderTop: '1px solid var(--kBorder1)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--kSurface2)', borderRadius: 100, padding: 5 }}>
-          <button onClick={() => setQty(q => Math.max(1, q - 1))} style={qtyBtn()}>−</button>
-          <div style={{ fontSize: 20, fontWeight: 800, minWidth: 22, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{qty}</div>
-          <button onClick={() => setQty(q => q + 1)} style={qtyBtn()}>+</button>
+      <div style={{
+        padding: 'clamp(14px, 2vw, 20px) clamp(20px, 2.6vw, 28px) clamp(20px, 2.6vw, 28px)',
+        borderTop: '1px solid var(--kBorder1)',
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'clamp(10px, 1.6vw, 16px)',
+      }}>
+        {/* Qty stepper — pill */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'clamp(8px, 1.2vw, 14px)',
+          background: 'var(--kSurface2)',
+          borderRadius: 100,
+          padding: 'clamp(4px, 0.6vw, 6px)',
+          flexShrink: 0,
+        }}>
+          <button onClick={() => setQty(q => Math.max(1, q - 1))} style={qtyBtn(brandColor)}>−</button>
+          <div style={{
+            fontSize: 'clamp(20px, 2.4vw, 26px)',
+            fontWeight: 800,
+            minWidth: 'clamp(22px, 2.4vw, 28px)',
+            textAlign: 'center',
+            fontVariantNumeric: 'tabular-nums',
+          }}>{qty}</div>
+          <button onClick={() => setQty(q => q + 1)} style={qtyBtn(brandColor)}>+</button>
         </div>
+
+        {/* Add CTA — primary brand fill */}
         <button onClick={tryAdd} style={{
           flex: 1,
           background: isValid ? brandColor : 'var(--kSurface2)',
           color: isValid ? '#fff' : 'var(--kFgFaint)',
-          padding: '18px 22px',
-          borderRadius: 100,
-          fontSize: 19, fontWeight: 800, letterSpacing: '-0.01em',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: 'clamp(16px, 2.2vw, 24px)',
+          borderRadius: 18,
+          fontSize: 'clamp(18px, 2.2vw, 24px)',
+          fontWeight: 800,
+          letterSpacing: '-0.01em',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
           border: 0,
           cursor: 'pointer',
           fontFamily: 'inherit',
           boxShadow: isValid ? '0 10px 28px rgba(0,0,0,0.28)' : 'none',
         }}>
-          <span>{isValid ? (addLabel || 'Add to order') : (validation || (addLabel || 'Add to order'))}</span>
-          {isValid && <span style={{ fontVariantNumeric: 'tabular-nums' }}>£{totalPrice.toFixed(2)}</span>}
+          <span style={{ flex: 1, textAlign: 'center' }}>
+            {isValid ? (addLabel || t('product.addToOrder')) : (validation || (addLabel || t('product.addToOrder')))}
+          </span>
+          {isValid && <span style={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>£{totalPrice.toFixed(2)}</span>}
         </button>
       </div>
     </div>
@@ -651,6 +963,17 @@ function overlayStyle() {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   };
 }
-function qtyBtn() {
-  return { width: 48, height: 48, borderRadius: '50%', background: 'var(--kSurface3)', color: 'var(--kFg)', border: 0, fontSize: 22, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' };
+function qtyBtn(brandColor) {
+  return {
+    width: 'clamp(40px, 4.6vw, 52px)',
+    height: 'clamp(40px, 4.6vw, 52px)',
+    borderRadius: '50%',
+    background: brandColor,
+    color: '#fff',
+    border: 0,
+    fontSize: 'clamp(20px, 2.4vw, 26px)',
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  };
 }

@@ -1072,38 +1072,102 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
   const itemWord = cartItemCount === 1 ? t('menu.itemSingular') : t('menu.itemPlural');
   return (
     <div style={fullScreen()}>
-      {/* TOP BAR — back left, allergen icon right */}
+      {/* TOP BAR — back left, prominent allergen filter banner right (v5.5.26) */}
       <div style={{
         padding: 'clamp(14px, 2vw, 20px) clamp(16px, 2.4vw, 24px)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        gap: 'clamp(12px, 1.6vw, 18px)',
         flexShrink: 0,
         borderBottom: '1px solid var(--kBorder1)',
       }}>
         <button onClick={onBack} aria-label={t('common.back')} style={iconBtnLg()}>←</button>
+
+        {/* Allergen filter — prominent banner-button. Stretches to fill the
+            top bar so it can't be missed. Amber when inactive, brand-active
+            (with stronger fill + count badge) when filters are applied. */}
         <button
           onClick={onShowAllergenPicker}
-          aria-label={t('menu.allergens.tap')}
+          aria-label={hasAllergenFilter ? t('menu.allergens.editFilter') : t('menu.allergens.tap')}
           style={{
-            ...iconBtnLg(),
-            background: hasAllergenFilter ? 'var(--kAllergen-bg)' : 'var(--kSurface2)',
-            color: hasAllergenFilter ? 'var(--kAllergen-fg)' : 'var(--kFg)',
-            border: hasAllergenFilter ? '1.5px solid var(--kAllergen-border)' : '0',
-            position: 'relative',
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'clamp(10px, 1.4vw, 14px)',
+            background: 'var(--kAllergen-bg)',
+            border: '1.5px solid var(--kAllergen-border)',
+            borderRadius: 16,
+            padding: 'clamp(12px, 1.6vw, 18px) clamp(14px, 2vw, 22px)',
+            color: 'var(--kAllergen-fg)',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            textAlign: 'left',
+            minHeight: 'clamp(48px, 5.4vw, 60px)',
+            boxSizing: 'border-box',
           }}
         >
-          ⚠
-          {hasAllergenFilter && (
-            <span style={{
-              position: 'absolute', top: -4, right: -4,
-              background: '#ef4444', color: '#fff',
-              minWidth: 18, height: 18, borderRadius: 9,
-              fontSize: 11, fontWeight: 800,
-              display: 'grid', placeItems: 'center',
-              padding: '0 5px',
-            }}>{allergenFilter.size}</span>
-          )}
+          <span style={{
+            flexShrink: 0,
+            fontSize: 'clamp(22px, 2.6vw, 28px)',
+            lineHeight: 1,
+          }}>⚠</span>
+          <span style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
+            {hasAllergenFilter ? (
+              <>
+                <div style={{
+                  fontSize: 'clamp(11px, 1.3vw, 13px)',
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  opacity: 0.8,
+                }}>{t('menu.allergens.avoiding')}</div>
+                <div style={{
+                  fontSize: 'clamp(14px, 1.7vw, 17px)',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}>{Array.from(allergenFilter).join(', ')}</div>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  fontSize: 'clamp(15px, 1.8vw, 18px)',
+                  fontWeight: 800,
+                  letterSpacing: '-0.01em',
+                }}>{t('menu.allergens.haveAllergies')}</div>
+                <div style={{
+                  fontSize: 'clamp(12px, 1.4vw, 14px)',
+                  fontWeight: 600,
+                  opacity: 0.85,
+                }}>{t('menu.allergens.tapToFilter')}</div>
+              </>
+            )}
+          </span>
+          <span style={{
+            flexShrink: 0,
+            fontSize: 'clamp(14px, 1.6vw, 17px)',
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            {hasAllergenFilter && (
+              <span style={{
+                background: '#ef4444',
+                color: '#fff',
+                minWidth: 22,
+                height: 22,
+                borderRadius: 11,
+                fontSize: 12,
+                fontWeight: 800,
+                display: 'inline-grid',
+                placeItems: 'center',
+                padding: '0 6px',
+              }}>{allergenFilter.size}</span>
+            )}
+            <span>{hasAllergenFilter ? t('menu.allergens.editFilter') + ' ›' : '›'}</span>
+          </span>
         </button>
       </div>
 
@@ -1176,25 +1240,7 @@ function ScreenMenu({ brandColor, brandAccent, categories, items, selectedCatego
             </div>
           )}
 
-          {/* Allergen-active banner (only when filter is active — full picker still in top icon) */}
-          {hasAllergenFilter && (
-            <div
-              role="status"
-              style={{
-                background: 'var(--kAllergen-bg)',
-                border: '1px solid var(--kAllergen-border)',
-                borderRadius: 12,
-                padding: '12px 16px',
-                marginBottom: 'clamp(12px, 1.8vw, 18px)',
-                fontSize: 'clamp(13px, 1.5vw, 15px)',
-                color: 'var(--kAllergen-fg)',
-                fontWeight: 600,
-                lineHeight: 1.4,
-              }}
-            >
-              {t('menu.allergens.avoiding')}: {Array.from(allergenFilter).join(', ')} — {t('menu.allergens.unsafeFaded')}
-            </div>
-          )}
+          {/* Allergen banner removed in v5.5.26 — top bar now carries this prominently. */}
 
           {/* 2-col item grid */}
           <div style={{
