@@ -73,6 +73,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.28', date: '3 May 2026', label: 'Sub-item descriptions in BO + multi-field name match for kiosk modifier inheritance + diagnostic log',
+    changes: [
+      'Peter sent v5.5.27 screenshot showing the "Box of 3" donut picker still rendering as plain text-only checkboxes — no images, no descriptions. Two real bugs identified: (1) sub-items had no description input in BO, so even if v5.5.27\'s inheritance worked, there\'d be nothing to inherit. (2) v5.5.27\'s name match was too strict — it indexed sub-items by (menuName || name) only, so a modifier option named "Bueno Filled" couldn\'t match a sub-item named "Bueno Filled Donut".',
+      'BO FIX — Removed the !isSub gate on the description textarea in MenuManager ItemEditor (line 1760ish). Sub-items now have a Description field with hint text "(shown in modifier picker on kiosk)" so it\'s clear what the field controls. The placeholder also adapts: "Brief description shown when this sub-item appears in a modifier group…" for sub-items vs the original "Brief description shown to customers…" for regular items.',
+      'KIOSK FIX — subitemByName lookup map now indexes each sold-alone sub-item under FOUR name fields: name, menuName, receiptName, kitchenName. All keys lowercase + trim()ed. The modifier option only needs to match ONE field — so if the sub-item is "Bueno Filled Donut" but its kitchenName is "Bueno Filled" (or vice versa), the lookup succeeds. First-write-wins on key collision so we don\'t overwrite an earlier mapping with a later sub-item that shares a name.',
+      'DIAGNOSTIC LOG — Added a one-shot console.log when the modal opens (and again if data changes) that dumps: the size of the lookup map, all keys in the map, all sold-alone sub-items with their name fields and image/description presence, and each modifier option with its match status / hasImage / hasDescription / allergens. Goal: if matches still fail, this log will show exactly why (no soldAlone sub-items, name-field mismatch, or empty image field). Once Peter confirms it works end-to-end this log can be removed.',
+      'STILL gated to soldAlone===true. Pure-modifier sub-items not curated for display still don\'t leak description/image to customer-facing modifier picker.',
+      'No DB schema changes. Description is already a column on menu_items — sub-items just couldn\'t edit it via UI before. POS behavior unchanged (POS uses InlineItemFlow which has its own separate name match logic).',
+    ],
+  },
+  {
     version: '5.5.27', date: '2 May 2026', label: 'Kiosk modifier options inherit image / description / allergens from sold-alone sub-items',
     changes: [
       'Peter flagged that "Bueno Filled donut" inside the "Box of Three" modifier group rendered with no image on the kiosk, and asked for descriptions / allergens to display on modifier options like the reference screenshot. Diagnosis: the data and BO already support this — sub-items can be marked Sold-Alone in MenuManager (via the existing toggle on row 1410), and when soldAlone=true the sub-item becomes editable in the standard Items editor with image / description / allergens fields. POS already inherits images via name match in InlineItemFlow. The kiosk modal was the only surface NOT doing the lookup. So this fix is purely the kiosk wire-up — no BO changes needed.',

@@ -1757,12 +1757,12 @@ function ItemEditor({ item, allCategories, onUpdate, onArchive, onClone, onClose
               </div>
             )}
 
-            {!isSub && (
-              <div>
-                <span style={lbl}>Description <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0 }}>(kiosk & online)</span></span>
-                <textarea style={{ ...inp, resize:'none', height:56 }} value={item.description||''} onChange={e=>f('description',e.target.value)} placeholder="Brief description shown to customers…"/>
-              </div>
-            )}
+            {/* v5.5.28: description is editable for sub-items too. The text shows on the
+                kiosk modifier picker when the option matches this sub-item by name. */}
+            <div>
+              <span style={lbl}>Description <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0 }}>{isSub ? '(shown in modifier picker on kiosk)' : '(kiosk & online)'}</span></span>
+              <textarea style={{ ...inp, resize:'none', height:56 }} value={item.description||''} onChange={e=>f('description',e.target.value)} placeholder={isSub ? 'Brief description shown when this sub-item appears in a modifier group…' : 'Brief description shown to customers…'}/>
+            </div>
 
             <ItemImageUpload item={item} onUpdate={onUpdate} markBOChange={markBOChange} showToast={showToast} />
 

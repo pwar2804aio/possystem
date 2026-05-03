@@ -198,35 +198,42 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   const allInstructionDefs = useStore(s => s.instructionGroupDefs) || [];
 
   // ============================================================
-  // v5.5.27: Resolve effective image/description/allergens for a modifier
-  // option by matching against a sold-alone sub-item by name. POS already
-  // does this for images via InlineItemFlow; the kiosk modal previously
-  // did not, so options that referenced curated sub-items (e.g. "Bueno
-  // Filled donut" inside a "Box of Three") rendered with no image and
-  // no description. The match is gated to `soldAlone === true` so that
-  // pure-modifier sub-items (which aren't curated for customer display)
-  // are excluded — only items that are also sold standalone contribute
-  // their description/image to the modifier picker.
+  // v5.5.27 / v5.5.28: Resolve effective image/description/allergens for a
+  // modifier option by matching against a sold-alone sub-item.
   //
-  // Precedence: explicit fields on the modifier option win over the
-  // inherited sub-item fields. This matches POS behavior and lets a
-  // modifier author override an option's appearance without editing
-  // the underlying item.
+  // The match uses MULTIPLE name fields on the sub-item — name, menuName,
+  // receiptName, kitchenName — because in real menus the sub-item's display
+  // name is often longer than the modifier option name (e.g. sub-item
+  // "Bueno Filled Donut" exposed as modifier option "Bueno Filled"). Indexing
+  // every name field a sub-item carries means the option only needs to match
+  // ONE of them. All lookups are case-insensitive and trimmed.
+  //
+  // Gated to soldAlone===true so pure-modifier sub-items (not curated for
+  // customer display) are excluded — Peter's "only when item can be sold
+  // alone also" constraint.
+  //
+  // Precedence: explicit fields on the modifier option win over inherited
+  // fields from the sub-item, matching POS behavior in InlineItemFlow.
   // ============================================================
   const subitemByName = useMemo(() => {
     const map = new Map();
+    const candidateFields = ['name', 'menuName', 'receiptName', 'kitchenName'];
     for (const it of (allItems || [])) {
       if (!it || it.archived) continue;
       if (it.type !== 'subitem') continue;
       if (!it.soldAlone) continue;
-      const key = (it.menuName || it.name || '').toLowerCase();
-      if (key) map.set(key, it);
+      for (const f of candidateFields) {
+        const raw = it[f];
+        if (!raw) continue;
+        const key = String(raw).trim().toLowerCase();
+        if (key && !map.has(key)) map.set(key, it);
+      }
     }
     return map;
   }, [allItems]);
 
   const resolveOpt = (opt) => {
-    const key = (opt?.name || '').toLowerCase();
+    const key = String(opt?.name || '').trim().toLowerCase();
     const match = key ? subitemByName.get(key) : null;
     return {
       image: opt?.image || match?.image || null,
@@ -234,8 +241,41 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
       allergens: (Array.isArray(opt?.allergens) && opt.allergens.length > 0)
         ? opt.allergens
         : (Array.isArray(match?.allergens) ? match.allergens : []),
+      _matched: !!match, // for debug
     };
   };
+
+  // v5.5.28: one-shot debug. Logs once per modal open, lists modifier options
+  // and whether each found a sold-alone sub-item match. If options are showing
+  // without images, this surfaces whether the issue is (a) no soldAlone sub-items
+  // exist, (b) name fields don't overlap, or (c) match works but image is empty.
+  // Remove once we've confirmed Peter's data flow works end-to-end.
+  useEffect(() => {
+    if (loading) return;
+    if (groups.length === 0) return;
+    const allSubs = (allItems || []).filter(i => i.type === 'subitem' && !i.archived && i.soldAlone);
+    const optInfo = [];
+    for (const g of groups) {
+      for (const opt of (g.options || [])) {
+        const r = resolveOpt(opt);
+        optInfo.push({
+          group: g.name,
+          optName: opt.name,
+          matched: r._matched,
+          hasImage: !!r.image,
+          hasDescription: !!r.description,
+          allergens: r.allergens,
+        });
+      }
+    }
+    // eslint-disable-next-line no-console
+    console.log('[kiosk modal v5.5.28] subitem map:', {
+      mapSize: subitemByName.size,
+      mapKeys: Array.from(subitemByName.keys()),
+      soldAloneSubItems: allSubs.map(s => ({ id: s.id, name: s.name, menuName: s.menuName, hasImage: !!s.image, hasDescription: !!s.description })),
+      options: optInfo,
+    });
+  }, [loading, groups, allItems, subitemByName]); // eslint-disable-line react-hooks/exhaustive-deps
   const [groups, setGroups] = useState([]);
   const [subGroupsCache, setSubGroupsCache] = useState({}); // { [subGroupId]: normalizedGroup }
   const [loading, setLoading] = useState(true);
