@@ -694,43 +694,67 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
 
                   return (
                     <div key={opt.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                      <div style={{
-                        background: 'var(--kSurfaceRaised)',
-                        border: '1.5px solid ' + (isSelected ? brandColor : (isInvalid ? 'var(--kError-border)' : 'var(--kBorder1)')),
-                        borderRadius: sub && isSelected ? '16px 16px 0 0' : 16,
-                        color: 'var(--kFg)',
-                        transition: 'background 0.12s, border-color 0.12s',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column',
-                      }}>
-                        {/* Body row — radio + (optional thumbnail) + text + (optional stepper) */}
+                      <div
+                        onClick={(!isSelected && atCap) ? undefined : () => incOption(g, opt.id)}
+                        style={{
+                          background: 'var(--kSurfaceRaised)',
+                          border: '1.5px solid ' + (isSelected ? brandColor : (isInvalid ? 'var(--kError-border)' : 'var(--kBorder1)')),
+                          borderRadius: sub && isSelected ? '16px 16px 0 0' : 16,
+                          color: 'var(--kFg)',
+                          transition: 'background 0.12s, border-color 0.12s',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer',
+                          opacity: (atCap && !isSelected) ? 0.4 : 1,
+                          position: 'relative',
+                        }}
+                      >
+                        {/* v5.5.32: image-on-top, matching the menu landing-page product card style.
+                            4:3 aspect, full card width. Selected state shown as a brand-color radio
+                            badge in the top-right corner of the image so the customer can scan
+                            multiple selections at a glance. Cards without images fall back to a
+                            radio bullet inside the body row. */}
+                        {effective.image ? (
+                          <div style={{
+                            width: '100%',
+                            aspectRatio: '4/3',
+                            background: 'var(--kImageBg)',
+                            overflow: 'hidden',
+                            flexShrink: 0,
+                            position: 'relative',
+                          }}>
+                            <img src={effective.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            {/* Selected badge — top-right corner overlay */}
+                            <span style={{
+                              position: 'absolute',
+                              top: 10, right: 10,
+                              width: 'clamp(28px, 3.2vw, 36px)',
+                              height: 'clamp(28px, 3.2vw, 36px)',
+                              borderRadius: g._isSingle ? '50%' : 10,
+                              border: '2px solid ' + (isSelected ? brandColor : 'rgba(255,255,255,0.85)'),
+                              display: 'grid',
+                              placeItems: 'center',
+                              background: isSelected ? brandColor : 'rgba(0,0,0,0.35)',
+                              backdropFilter: 'blur(6px)',
+                              color: '#fff',
+                              fontSize: 'clamp(13px, 1.5vw, 16px)',
+                              fontWeight: 800,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                              pointerEvents: 'none',
+                            }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
+                          </div>
+                        ) : null}
+
+                        {/* Body — name, description, price, allergens */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: 'clamp(10px, 1.4vw, 14px)',
-                          padding: 'clamp(12px, 1.6vw, 16px) clamp(12px, 1.6vw, 16px)',
+                          padding: 'clamp(12px, 1.6vw, 16px)',
                         }}>
-                          <button
-                            onClick={() => incOption(g, opt.id)}
-                            disabled={!isSelected && atCap}
-                            style={{
-                              flex: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 'clamp(10px, 1.4vw, 14px)',
-                              background: 'transparent',
-                              border: 0,
-                              padding: 0,
-                              cursor: (atCap && !isSelected) ? 'not-allowed' : 'pointer',
-                              color: 'var(--kFg)',
-                              fontFamily: 'inherit',
-                              textAlign: 'left',
-                              opacity: (atCap && !isSelected) ? 0.4 : 1,
-                              minWidth: 0,
-                            }}
-                          >
-                            {/* Radio / checkbox bullet */}
+                          {/* Radio fallback when there's no image — still shows a tappable bullet */}
+                          {!effective.image && (
                             <span style={{
                               flexShrink: 0,
                               width: 'clamp(22px, 2.4vw, 28px)',
@@ -744,70 +768,54 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
                               fontSize: 'clamp(12px, 1.4vw, 15px)',
                               fontWeight: 800,
                             }}>{isSelected ? (g._isSingle ? '✓' : optCount) : ''}</span>
+                          )}
 
-                            {/* v5.5.31: small inline thumbnail (only when option has image, own or inherited).
-                                Sits between the radio and the text — same compact card layout as before. */}
-                            {effective.image && (
+                          {/* Text stack — name + (description) + (price) + (allergens) */}
+                          <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                            <span style={{
+                              fontSize: 'clamp(15px, 1.8vw, 19px)',
+                              fontWeight: 700,
+                              color: brandColor,
+                              lineHeight: 1.25,
+                              letterSpacing: '-0.01em',
+                            }}>{opt.name}</span>
+                            {effective.description && (
                               <span style={{
-                                flexShrink: 0,
-                                width: 'clamp(40px, 4.6vw, 56px)',
-                                height: 'clamp(40px, 4.6vw, 56px)',
-                                borderRadius: 10,
+                                fontSize: 'clamp(11px, 1.3vw, 14px)',
+                                color: 'var(--kFgMuted)',
+                                fontWeight: 500,
+                                lineHeight: 1.35,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
                                 overflow: 'hidden',
-                                background: 'var(--kImageBg)',
-                                display: 'block',
-                              }}>
-                                <img src={effective.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                              </span>
+                              }}>{effective.description}</span>
                             )}
-
-                            {/* Text stack — name + (description) + (price) + (allergens) */}
-                            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                            {priceLabel && (
                               <span style={{
-                                fontSize: 'clamp(15px, 1.8vw, 19px)',
-                                fontWeight: 700,
-                                color: brandColor,
-                                lineHeight: 1.25,
-                                letterSpacing: '-0.01em',
-                              }}>{opt.name}</span>
-                              {effective.description && (
-                                <span style={{
-                                  fontSize: 'clamp(11px, 1.3vw, 14px)',
-                                  color: 'var(--kFgMuted)',
-                                  fontWeight: 500,
-                                  lineHeight: 1.35,
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                }}>{effective.description}</span>
-                              )}
-                              {priceLabel && (
-                                <span style={{
-                                  fontSize: 'clamp(12px, 1.4vw, 15px)',
-                                  color: 'var(--kFgMuted)',
-                                  fontVariantNumeric: 'tabular-nums',
-                                  fontWeight: 600,
-                                }}>{priceLabel}</span>
-                              )}
-                              {effective.allergens && effective.allergens.length > 0 && (
-                                <span style={{
-                                  fontSize: 'clamp(10px, 1.2vw, 13px)',
-                                  color: 'var(--kAllergen-fg)',
-                                  fontWeight: 600,
-                                  lineHeight: 1.3,
-                                  textTransform: 'capitalize',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                }}>{effective.allergens.join(', ')}</span>
-                              )}
-                              {sub && !isSelected && (
-                                <span style={{ fontSize: 'clamp(11px, 1.2vw, 13px)', color: brandColor, fontWeight: 700 }}>{sub.name} ›</span>
-                              )}
-                            </span>
-                          </button>
+                                fontSize: 'clamp(12px, 1.4vw, 15px)',
+                                color: 'var(--kFgMuted)',
+                                fontVariantNumeric: 'tabular-nums',
+                                fontWeight: 600,
+                              }}>{priceLabel}</span>
+                            )}
+                            {effective.allergens && effective.allergens.length > 0 && (
+                              <span style={{
+                                fontSize: 'clamp(10px, 1.2vw, 13px)',
+                                color: 'var(--kAllergen-fg)',
+                                fontWeight: 600,
+                                lineHeight: 1.3,
+                                textTransform: 'capitalize',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}>{effective.allergens.join(', ')}</span>
+                            )}
+                            {sub && !isSelected && (
+                              <span style={{ fontSize: 'clamp(11px, 1.2vw, 13px)', color: brandColor, fontWeight: 700 }}>{sub.name} ›</span>
+                            )}
+                          </span>
 
                           {/* Stepper for multi-pick selected options */}
                           {showStepper && (

@@ -73,6 +73,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.32', date: '3 May 2026', label: 'Kiosk modifier options: image-on-top card style matching menu landing-page product cards',
+    changes: [
+      'Peter feedback on v5.5.31 thumbnail approach: image needs to be more prominent — match the menu landing-page product card pattern (image on top, body below) but stay within the 2-col modifier-picker grid. v5.5.27 already tried this with full-width 16:9 hero images but it went too far (1-col layout, cards huge). This pass uses 4:3 aspect inside the existing 2-col grid — image is prominent without making the option cards dominate the page.',
+      'Image on top: 4:3 aspect ratio when an option has an image (own or inherited via sub-item). Renders flush to the card top edge with overflow hidden so it sits cleanly inside the 16px-radius card.',
+      'Selection indicator moved to the image: when a card has an image, the radio bullet now floats as an overlay badge in the top-right corner of the image (rounded square or circle depending on group type, brand-color filled when selected, blurred semi-transparent dark when unselected). Frees the body row of any radio so the text can use full width below the image.',
+      'Cards without images keep the previous compact body layout — radio bullet on the left of the text — so the picker still works for plain text-only modifier groups (Bun: Brioche / Sesame / Gluten-Free etc.) without empty space.',
+      'Wrapper changed from <button> to <div onClick> because we now have content layered over the image (the selection badge has pointerEvents:none so click-through works). The whole card is still tappable to toggle selection, and the stepper +/- buttons use stopPropagation as before.',
+      'Layout still fixed at 2-col (repeat(2, minmax(0, 1fr))) — no rich-content branching. Text scale and 2-line clamps from v5.5.31 retained for the body.',
+      'Sub-group inline expansion still uses the small 48px thumbnail layout — appropriate for nested context where space is more constrained.',
+      'Behavior unchanged: same selection / validation / cart pipeline.',
+    ],
+  },
+  {
     version: '5.5.31', date: '3 May 2026', label: 'Kiosk modifier options: keep compact 2-col layout — small inline thumbnail instead of full-width hero',
     changes: [
       'Peter\'s feedback on v5.5.30: the inheritance now works (donut images and descriptions render) but the UI went too far. Rich-content groups were switching from 2-col to 1-col with each option getting a full-width 16:9 hero image — too dominant for what should be a quick modifier picker. Asked to keep the original compact 2-col layout, just with a small image and the description inline.',
