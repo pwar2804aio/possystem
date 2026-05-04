@@ -21,6 +21,8 @@ import AIAssistantSection from './sections/AIAssistantSection';
 import NetworkStatus from './sections/NetworkStatus';
 import LocationSettings from './sections/LocationSettings';
 import TaxManager from './sections/TaxManager';
+import BillingManager from './sections/BillingManager';
+import StripeTestHarness from './sections/StripeTestHarness';
 
 const NAV = [
   { id:'overview',   label:'Overview',        icon:'◈',  group:'Dashboard' },
@@ -35,6 +37,8 @@ const NAV = [
   { id:'reports',    label:'Reports',           icon:'📊',  group:'Analytics' },
   { id:'eod',        label:'End of day',        icon:'🔒',  group:'Analytics' },
   { id:'tax',        label:'Tax & VAT',          icon:'%',   group:'Analytics' },
+  { id:'billing',    label:'Billing',            icon:'💳',  group:'Analytics' },
+  { id:'stripe_test',label:'Stripe test',        icon:'🧪',  group:'Analytics' },
   { id:'ai',         label:'AI Assistant',      icon:'✦',   group:'Analytics' },
   { id:'network',    label:'Network & Sync',     icon:'📡',  group:'Analytics' },
   { id:'location',   label:'Location settings', icon:'⚙️',  group:'Analytics' },
@@ -332,6 +336,8 @@ export default function BackOfficeApp() {
           {section === 'network'     && <NetworkStatus />}
           {section === 'location'   && <LocationSettings />}
           {section === 'tax'        && <TaxManager />}
+          {section === 'billing'    && <BillingManager   orgId={orgCtx?.orgId} currentUser={{ role: orgCtx?.role }} />}
+          {section === 'stripe_test'&& <StripeTestHarness orgId={orgCtx?.orgId} currentUser={{ role: orgCtx?.role }} />}
         </div>
       </div>
       {showLocationSwitcher && <LocationSwitcher onClose={() => setShowLocationSwitcher(false)} />}
