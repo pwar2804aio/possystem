@@ -73,6 +73,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.33', date: '3 May 2026', label: 'Kiosk modifier-group rules: defensive shape-handling for min/max/selectionType + diagnostic log',
+    changes: [
+      'Peter reported that on the Box-of-3 donut picker the kiosk shows "Optional · up to 3" instead of "Required · pick 3", and Add to Cart isn\'t blocked at quantities below 3. Validation logic itself is correct (tryAdd blocks if !isValid, scrolls to first under-picked group), so the bug is in the values being read — the kiosk thinks min is 0 even when BO has min set to 3.',
+      'normalizeGroup now reads BOTH snake_case and camelCase variants for every rule field, defensively. selection_type ?? selectionType, min ?? min_select ?? minSelect, max ?? max_select ?? maxSelect. The kiosk hits raw Supabase rows (snake_case) and POS surfaces hit normalized store data (camelCase) — making the kiosk modal tolerate both means future surface mismatches won\'t silently default min to 0 again. Same defensive pattern as the v5.5.30 fix for sub-item field shapes.',
+      'Added a safety clamp: _min is now Math.min(rawMin, _max) so a BO write of min:5 max:3 (which shouldn\'t happen but might from legacy data) can\'t produce an unsatisfiable group that blocks Add forever.',
+      'buildHint refined: when min === max && min > 1 the hint now reads "Required · pick N" (e.g. "Required · pick 3"), making the rule unmistakable. Previous code did this correctly but the conditional was less clean — broken out into its own branch with an explicit > 1 guard.',
+      'Diagnostic added: one-shot console log when groups load, prints raw_min, raw_max, raw_selection_type, raw_selectionType, normalized_min, normalized_max, plus per-group flags (isInstructionGroup, isVariantGroup, _isSingle) and option count. If Peter still sees "Optional · up to 3" after reload, the log will show whether the issue is (a) BO never saved min:3, (b) DB has min:3 but column name differs, or (c) something else entirely. Same investigation pattern that nailed the v5.5.30 sub-item snake-case bug.',
+      'Removed once we confirm the rule is being read correctly, same as the v5.5.30 diagnostic.',
+    ],
+  },
+  {
     version: '5.5.32', date: '3 May 2026', label: 'Kiosk modifier options: image-on-top card style matching menu landing-page product cards',
     changes: [
       'Peter feedback on v5.5.31 thumbnail approach: image needs to be more prominent — match the menu landing-page product card pattern (image on top, body below) but stay within the 2-col modifier-picker grid. v5.5.27 already tried this with full-width 16:9 hero images but it went too far (1-col layout, cards huge). This pass uses 4:3 aspect inside the existing 2-col grid — image is prominent without making the option cards dominate the page.',

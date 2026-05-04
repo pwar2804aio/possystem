@@ -41,11 +41,20 @@ import { t, useKioskLang } from '../lib/i18n';
 // ============================================================
 
 function normalizeGroup(group) {
-  const isSingle = group.selection_type === 'single';
-  const min = Math.max(group.min ?? 0, group.min_select ?? 0, 0);
-  const rawMax = group.max ?? group.max_select ?? null;
+  // v5.5.33: read both selection_type (DB column) and selectionType (camelCase
+  // legacy/store-normalized) to defensively cover any data shape. POS data is
+  // normalized to camelCase via SyncBridge; the kiosk reads raw Supabase rows
+  // so it sees snake_case. Either should resolve correctly here.
+  const selType = group.selection_type ?? group.selectionType ?? 'single';
+  const isSingle = selType === 'single';
+  // min/max are plain field names in both shapes — read defensively from
+  // both possible aliases just in case.
+  const min = Math.max(group.min ?? group.min_select ?? group.minSelect ?? 0, 0);
+  const rawMax = group.max ?? group.max_select ?? group.maxSelect ?? null;
   const max = rawMax != null ? rawMax : (isSingle ? 1 : (group.options?.length || 99));
-  return { ...group, _min: min, _max: max, _isSingle: isSingle };
+  // Clamp min to never exceed max (defensive against bad BO writes).
+  const safeMin = Math.min(min, max);
+  return { ...group, _min: safeMin, _max: max, _isSingle: isSingle, _selectionType: selType };
 }
 
 // Walks all selected occurrences of options-with-subGroupId and returns
@@ -396,6 +405,29 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
     [groups, selections, nestedSelections, subGroupsCache]
   );
   const isValid = validation === null;
+
+  // v5.5.33: one-shot diagnostic — prints the rule values for each loaded
+  // group. Helps confirm whether the kiosk is reading the same min/max/
+  // selectionType the BO saved. Only logs once per group set.
+  useEffect(() => {
+    if (loading) return;
+    if (!groups || groups.length === 0) return;
+    // eslint-disable-next-line no-console
+    console.log('[kiosk modal v5.5.33] modifier group rules', groups.map(g => ({
+      id: g.id,
+      name: g.name,
+      raw_min: g.min,
+      raw_max: g.max,
+      raw_selection_type: g.selection_type,
+      raw_selectionType: g.selectionType,
+      normalized_min: g._min,
+      normalized_max: g._max,
+      normalized_isSingle: g._isSingle,
+      optionCount: (g.options || []).length,
+      __isInstructionGroup: !!g.__isInstructionGroup,
+      __isVariantGroup: !!g.__isVariantGroup,
+    })));
+  }, [loading, groups]);
   const variantGroup = groups.find(g => g.__isVariantGroup);
   let effectiveBase = basePrice || 0;
   if (variantGroup) {
@@ -491,12 +523,19 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
   // ============================================================
   // Helper for hint text used by groups + sub-groups.
   function buildHint(min, max) {
+    // v5.5.33: clearer "pick exactly N" wording when min === max > 1.
     if (min === 0 && max === 1) return t('product.optional') + ' · ' + t('product.pickOne');
     if (min === max && min === 1) return t('product.required') + ' · ' + t('product.pickOne');
-    if (min === max) return t('product.required') + ' · ' + t('product.pick') + ' ' + min;
+    if (min === max && min > 1) return t('product.required') + ' · ' + t('product.pick') + ' ' + min;
     if (min > 0) return t('product.required') + ' · ' + t('product.pick') + ' ' + min + (max > min ? '–' + max : '');
     return t('product.optional') + ' · ' + t('product.upTo') + ' ' + max;
   }
+
+  // v5.5.33: one-shot diagnostic — prints loaded group rules so we can verify
+  // the kiosk is reading the same min/max/selectionType the BO has saved. Logs
+  // per-group: id, name, raw stored values, normalized _min/_max, selection
+  // type. Fires once after groups load and again if they change. Remove once
+  // the group-rules-not-respected issue is confirmed resolved.
 
   if (loading) {
     return (
