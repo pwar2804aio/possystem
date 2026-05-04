@@ -73,6 +73,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.36', date: '3 May 2026', label: 'Kiosk cart screen redesign — line cards with thumbnails + brand totals pill + view-allergens header',
+    changes: [
+      'Kiosk cart screen redesigned to match the reference. Header: brand-color title left ("Pick up order" for takeaway, "Dine-in order" for dine-in, depending on orderType), outlined "View Allergens" button right that opens the existing allergen-picker overlay (re-using v5.5.26\'s picker rather than building a separate kiosk-cart-allergen UI).',
+      'Line cards: each cart line is now a white surface card with rounded thumbnail (item image, ~64-92px square) on the left, item name + line total on top right, modifier summary in muted text below if any, and a controls row with an outlined-pill stepper (− qty +) plus a circular trash icon for removing the whole line. Stepper minus uses muted background, plus uses brand fill — matches the reference. Trash uses a clean SVG can icon (5-path stroke).',
+      'Footer reorganised into two stacked sections. Top: white surface card with "Items total" + price (replaces the inline subtotal row). Bottom: circular back button on the left, brand-color totals pill on the right with three regions — white-circle item-count badge, "Total to pay" label, price. Pill is disabled (muted bg) when cart is empty, otherwise brand-fill with shadow.',
+      'Cart line construction uses item.image directly from the cart payload (already captured in addToCart since the cart line carries the full item ref). Cards without images render a name+price-only layout with no thumbnail gap.',
+      'Item count comes from the existing cartItemCount derived value (sum of qty across lines), passed as a new prop. orderType is also passed so the title can switch between takeaway / dine-in.',
+      'Behavior preserved: same updateCartQty handler for ± stepper; remove-line uses the same handler with delta of -line.qty (one-shot zero-out, then existing filter clears it). No new cart APIs.',
+      'i18n: 8 new keys (cart.title.pickup, .title.dineIn, .viewAllergens, .empty, .addMore, .itemsTotal, .totalToPay, .removeLine) translated for en/es/fr/de/it/pt.',
+      'New CartLineCard component extracted from the inline map for readability; new cartStepBtn() helper. Old miniQtyBtn() helper still referenced elsewhere so left in place.',
+    ],
+  },
+  {
     version: '5.5.35', date: '3 May 2026', label: 'Kiosk renders customer-facing display name (menuName) instead of internal name',
     changes: [
       'Peter renamed "Donut 1" to "Bueno Filled Donut" via BO and the kiosk still showed "Donut 1" on the product card. Cause: items have two name fields — `name` (internal/admin identity, rarely changed) and `menuName` / `menu_name` (customer-facing display, what BO\'s rename input writes). The kiosk was rendering `item.name` raw at three call sites: menu grid card, cart line, product modal title. Renames in BO went to menuName but never reached the screen.',

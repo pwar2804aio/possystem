@@ -510,7 +510,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
           onCancel={() => setScreen('menu')}
         />
       )}
-      {screen === 'cart' && <ScreenCart brandColor={brandColor} cart={cart} subtotal={subtotal} onUpdate={updateCartQty} onAddMore={() => setScreen('menu')} onContinue={() => setScreen('tip')} onBack={() => setScreen('menu')} />}
+      {screen === 'cart' && <ScreenCart brandColor={brandColor} cart={cart} subtotal={subtotal} cartItemCount={cartItemCount} orderType={orderType} onUpdate={updateCartQty} onAddMore={() => setScreen('menu')} onContinue={() => setScreen('tip')} onShowAllergenPicker={() => setShowAllergenPicker(true)} onBack={() => setScreen('menu')} />}
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
       {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder('', ''); }} onBack={() => setScreen('tip')} />}
       {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} placeOrderLabel={labelPlaceOrder} />}
@@ -1486,47 +1486,354 @@ function iconBtnLg() {
 // ============================================================
 // SCREEN: CART
 // ============================================================
-function ScreenCart({ brandColor, cart, subtotal, onUpdate, onAddMore, onContinue, onBack }) {
+// ============================================================
+// SCREEN: CART  (v5.5.36 redesign)
+// Header: brand-color title left, outlined "View Allergens" right.
+// Body: line cards with thumbnail + name + price + stepper + delete.
+// Footer: "Items total" card + brand-color totals pill with item-count
+// badge + circular back button on the left.
+// ============================================================
+function ScreenCart({ brandColor, cart, subtotal, cartItemCount, orderType, onUpdate, onAddMore, onContinue, onShowAllergenPicker, onBack }) {
+  const isPickup = orderType === 'takeaway';
+  const titleKey = isPickup ? 'cart.title.pickup' : 'cart.title.dineIn';
   return (
     <div style={fullScreen()}>
-      <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid var(--kSurface2)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={iconBtn()}>←</button>
-        <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', flex: 1 }}>Your order</div>
+      {/* Header — title left, View Allergens outlined button right */}
+      <div style={{
+        padding: 'clamp(20px, 2.6vw, 28px) clamp(20px, 2.6vw, 28px) clamp(14px, 1.8vw, 18px)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'clamp(12px, 1.6vw, 18px)',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          flex: 1,
+          fontSize: 'clamp(22px, 3.2vw, 32px)',
+          fontWeight: 800,
+          letterSpacing: '-0.02em',
+          color: brandColor,
+          minWidth: 0,
+        }}>{t(titleKey)}</div>
+        <button
+          onClick={onShowAllergenPicker}
+          style={{
+            background: 'transparent',
+            border: '1.5px solid ' + brandColor,
+            borderRadius: 16,
+            padding: 'clamp(14px, 1.8vw, 20px) clamp(20px, 2.6vw, 30px)',
+            color: brandColor,
+            fontSize: 'clamp(15px, 1.8vw, 19px)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >{t('cart.viewAllergens')}</button>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 22px' }}>
+
+      {/* Cart line list */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '0 clamp(20px, 2.6vw, 28px)',
+      }}>
         {cart.length === 0 ? (
-          <div style={{ padding: 60, textAlign: 'center', color: 'var(--kFgMuted)' }}>Your cart is empty</div>
-        ) : cart.map(l => (
-          <div key={l.key} style={{ padding: '14px 0', borderBottom: '1px solid var(--kSurface1)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
-              <div style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{l.name}</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: brandColor, fontVariantNumeric: 'tabular-nums' }}>£{l.lineTotal.toFixed(2)}</div>
-            </div>
-            {l.mods && <div style={{ fontSize: 12, color: 'var(--kFgMuted)', marginBottom: 8 }}>{l.mods}</div>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--kSurface1)', borderRadius: 100, padding: 3 }}>
-                <button onClick={() => onUpdate(l.key, -1)} style={miniQtyBtn()}>−</button>
-                <div style={{ fontSize: 14, fontWeight: 600, minWidth: 14, textAlign: 'center' }}>{l.qty}</div>
-                <button onClick={() => onUpdate(l.key, +1)} style={miniQtyBtn()}>+</button>
-              </div>
-            </div>
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--kFgMuted)', fontSize: 'clamp(15px, 1.8vw, 18px)' }}>
+            {t('cart.empty')}
           </div>
-        ))}
-        <button onClick={onAddMore} style={{ display: 'block', width: '100%', textAlign: 'center', padding: 14, fontSize: 14, color: 'var(--kFgMuted)', background: 'transparent', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>+ Add more items</button>
+        ) : (
+          <>
+            {cart.map(l => (
+              <CartLineCard
+                key={l.key}
+                line={l}
+                brandColor={brandColor}
+                onInc={() => onUpdate(l.key, +1)}
+                onDec={() => onUpdate(l.key, -1)}
+                onRemove={() => onUpdate(l.key, -l.qty)}
+              />
+            ))}
+            <button
+              onClick={onAddMore}
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'center',
+                padding: 'clamp(16px, 2vw, 20px)',
+                marginTop: 'clamp(8px, 1vw, 12px)',
+                fontSize: 'clamp(14px, 1.6vw, 16px)',
+                color: 'var(--kFgMuted)',
+                background: 'transparent',
+                border: 0,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >{t('cart.addMore')}</button>
+          </>
+        )}
       </div>
-      <div style={{ padding: '16px 22px', borderTop: '1px solid var(--kSurface2)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 800, marginBottom: 0 }}>
-          <span>Subtotal</span>
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>£{subtotal.toFixed(2)}</span>
+
+      {/* Footer — Items total card on top, totals pill + back below */}
+      <div style={{
+        padding: '0 clamp(20px, 2.6vw, 28px) clamp(20px, 2.6vw, 28px)',
+        flexShrink: 0,
+      }}>
+        {/* Items total card */}
+        <div style={{
+          background: 'var(--kSurfaceRaised)',
+          borderRadius: 16,
+          padding: 'clamp(18px, 2.2vw, 24px) clamp(20px, 2.6vw, 28px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 'clamp(12px, 1.6vw, 16px)',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        }}>
+          <span style={{
+            fontSize: 'clamp(18px, 2.2vw, 22px)',
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
+            color: 'var(--kFg)',
+          }}>{t('cart.itemsTotal')}</span>
+          <span style={{
+            fontSize: 'clamp(18px, 2.2vw, 22px)',
+            fontWeight: 800,
+            color: 'var(--kFg)',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '-0.01em',
+          }}>£{subtotal.toFixed(2)}</span>
         </div>
-      </div>
-      <div style={{ padding: '14px 22px 22px', flexShrink: 0 }}>
-        <button disabled={cart.length === 0} onClick={onContinue} style={{ ...primaryCta(brandColor), width: '100%', opacity: cart.length === 0 ? 0.4 : 1 }}>
-          Continue →
-        </button>
+
+        {/* Totals row — circular back button + brand-fill pill with count badge */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'clamp(10px, 1.4vw, 14px)',
+        }}>
+          <button
+            onClick={onBack}
+            aria-label={t('common.back')}
+            style={{
+              flexShrink: 0,
+              width: 'clamp(54px, 6vw, 70px)',
+              height: 'clamp(54px, 6vw, 70px)',
+              borderRadius: '50%',
+              background: 'var(--kSurfaceRaised)',
+              border: '1.5px solid var(--kBorder1)',
+              color: 'var(--kFg)',
+              fontSize: 'clamp(22px, 2.6vw, 28px)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'grid',
+              placeItems: 'center',
+            }}
+          >‹</button>
+
+          <button
+            onClick={onContinue}
+            disabled={cart.length === 0}
+            style={{
+              flex: 1,
+              background: cart.length === 0 ? 'var(--kSurface2)' : brandColor,
+              color: cart.length === 0 ? 'var(--kFgFaint)' : '#fff',
+              border: 0,
+              borderRadius: 'clamp(28px, 3.2vw, 38px)',
+              padding: 'clamp(16px, 2vw, 22px) clamp(22px, 2.6vw, 30px)',
+              cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'clamp(12px, 1.6vw, 18px)',
+              boxShadow: cart.length === 0 ? 'none' : '0 8px 24px rgba(0,0,0,0.18)',
+            }}
+          >
+            {/* Item count badge — white circle with brand-color number */}
+            <span style={{
+              flexShrink: 0,
+              width: 'clamp(36px, 4vw, 46px)',
+              height: 'clamp(36px, 4vw, 46px)',
+              borderRadius: '50%',
+              background: '#fff',
+              color: brandColor,
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 'clamp(16px, 2vw, 20px)',
+              fontWeight: 800,
+              fontVariantNumeric: 'tabular-nums',
+            }}>{cartItemCount}</span>
+
+            <span style={{
+              flex: 1,
+              textAlign: 'left',
+              fontSize: 'clamp(17px, 2.2vw, 22px)',
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+            }}>{t('cart.totalToPay')}</span>
+
+            <span style={{
+              flexShrink: 0,
+              fontSize: 'clamp(18px, 2.4vw, 24px)',
+              fontWeight: 800,
+              fontVariantNumeric: 'tabular-nums',
+              letterSpacing: '-0.01em',
+            }}>£{subtotal.toFixed(2)}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
+}
+
+// ----- CartLineCard (extracted) -----
+function CartLineCard({ line, brandColor, onInc, onDec, onRemove }) {
+  const img = line.item?.image;
+  return (
+    <div style={{
+      background: 'var(--kSurfaceRaised)',
+      borderRadius: 16,
+      padding: 'clamp(12px, 1.6vw, 16px)',
+      marginBottom: 'clamp(10px, 1.4vw, 14px)',
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 'clamp(12px, 1.6vw, 18px)',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+    }}>
+      {/* Thumbnail */}
+      {img ? (
+        <div style={{
+          flexShrink: 0,
+          width: 'clamp(64px, 7.5vw, 92px)',
+          height: 'clamp(64px, 7.5vw, 92px)',
+          borderRadius: 12,
+          overflow: 'hidden',
+          background: 'var(--kImageBg)',
+        }}>
+          <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </div>
+      ) : null}
+
+      {/* Body */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'clamp(8px, 1.2vw, 12px)' }}>
+        {/* Name + price row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{
+            flex: 1,
+            fontSize: 'clamp(15px, 1.9vw, 20px)',
+            fontWeight: 800,
+            color: 'var(--kFg)',
+            lineHeight: 1.25,
+            letterSpacing: '-0.01em',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            minWidth: 0,
+          }}>{line.name}</div>
+          <div style={{
+            fontSize: 'clamp(15px, 1.9vw, 20px)',
+            fontWeight: 800,
+            color: 'var(--kFg)',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '-0.01em',
+            whiteSpace: 'nowrap',
+          }}>£{line.lineTotal.toFixed(2)}</div>
+        </div>
+
+        {/* Modifier summary */}
+        {line.mods && (
+          <div style={{
+            fontSize: 'clamp(12px, 1.4vw, 14px)',
+            color: 'var(--kFgMuted)',
+            lineHeight: 1.4,
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}>{line.mods}</div>
+        )}
+
+        {/* Stepper + delete */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(10px, 1.4vw, 14px)' }}>
+          {/* Pill stepper — outlined to match reference */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'clamp(8px, 1vw, 12px)',
+            background: 'var(--kSurface1)',
+            border: '1.5px solid ' + brandColor,
+            borderRadius: 100,
+            padding: 'clamp(3px, 0.5vw, 5px)',
+          }}>
+            <button
+              onClick={onDec}
+              disabled={line.qty <= 1}
+              style={cartStepBtn(brandColor, line.qty > 1, false)}
+            >−</button>
+            <div style={{
+              fontSize: 'clamp(16px, 2vw, 20px)',
+              fontWeight: 800,
+              minWidth: 'clamp(18px, 2vw, 22px)',
+              textAlign: 'center',
+              color: 'var(--kFg)',
+              fontVariantNumeric: 'tabular-nums',
+            }}>{line.qty}</div>
+            <button
+              onClick={onInc}
+              style={cartStepBtn(brandColor, true, true)}
+            >+</button>
+          </div>
+
+          {/* Trash icon — circular, outlined */}
+          <button
+            onClick={onRemove}
+            aria-label="Remove"
+            style={{
+              flexShrink: 0,
+              width: 'clamp(40px, 4.4vw, 50px)',
+              height: 'clamp(40px, 4.4vw, 50px)',
+              borderRadius: '50%',
+              background: 'transparent',
+              border: '1.5px solid var(--kBorder2)',
+              color: 'var(--kFg)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'grid',
+              placeItems: 'center',
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="clamp(16, 1.8vw, 20)" height="clamp(16, 1.8vw, 20)" style={{ width: 'clamp(16px, 1.8vw, 20px)', height: 'clamp(16px, 1.8vw, 20px)' }} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6 H21" />
+              <path d="M8 6 V4 H16 V6" />
+              <path d="M5 6 L6 20 H18 L19 6" />
+              <path d="M10 11 V16" />
+              <path d="M14 11 V16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Stepper button — minus is muted background, plus is brand fill (matches reference)
+function cartStepBtn(brandColor, enabled, isPlus) {
+  return {
+    width: 'clamp(36px, 4vw, 44px)',
+    height: 'clamp(36px, 4vw, 44px)',
+    borderRadius: '50%',
+    background: isPlus
+      ? (enabled ? brandColor : 'var(--kSurface2)')
+      : (enabled ? 'var(--kSurface2)' : 'var(--kSurface1)'),
+    color: isPlus ? '#fff' : 'var(--kFg)',
+    border: 0,
+    fontSize: 'clamp(18px, 2vw, 22px)',
+    fontWeight: 700,
+    cursor: enabled ? 'pointer' : 'not-allowed',
+    opacity: enabled ? 1 : 0.4,
+    fontFamily: 'inherit',
+  };
 }
 
 // ============================================================
