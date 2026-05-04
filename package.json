@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^6.3.0",
+    "@stripe/stripe-js": "^9.4.0",
     "@supabase/supabase-js": "^2.103.0",
     "exceljs": "^4.4.0",
     "mammoth": "^1.12.0",

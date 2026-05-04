@@ -73,6 +73,28 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.38', date: '4 May 2026', label: 'Stripe Connect platform scaffold — merchant services foundation',
+    changes: [
+      'PLATFORM DB SCHEMA (run supabase-billing-schema.sql in yhzjgyrkyjabvhblqxzu): extends subscriptions with stripe_account_id, stripe_account_link_method (express_onboarding|admin_manual), charges_enabled, payouts_enabled, details_submitted, capabilities, requirements, country, default_currency, linked_at, linked_by_user_id, last_webhook_at. Adds billing_invoices (one row per period close, snapshots GMV + tier + Transfer skim record). Adds stripe_webhook_events (idempotency log).',
+      'NEW RPC get_plan_and_fee_for_gmv(gmv, currency): returns tier name + fee amount for a given GMV. Tiers (GBP): Free £0 (£0–£5K), Starter £99 (£5,001–£8K), Growth £149 (£8,001–£10K), Scale £199 (£10,001–£20K), Enterprise £249 (£20,001+). USD branch returns NULL fee until US tier prices are decided.',
+      'NEW RPC increment_gmv(location_id, amount): atomic GMV bump on subscriptions row. Auto-promotes plan if a tier boundary is crossed. Tier locks at highest reached for the whole month — only PROMOTES within a period, never demotes.',
+      'NEW RPC close_billing_period(location_id): snapshots gmv_this_month → billing_invoices, resets rolling, rolls billing_period_start forward, plan back to free for new period. For monthly cron (next sprint).',
+      'EDGE FUNCTIONS (deploy to Ops alongside create-user, talk to Platform DB via PLATFORM_SUPABASE_* secrets):',
+      '  - stripe-webhook (--no-verify-jwt): platform events (payout.paid, balance.available)',
+      '  - stripe-webhook-connect (--no-verify-jwt, "Listen to events on Connected accounts" required): account.updated → updates subscription Stripe fields, capability.updated → updates capabilities map, payment_intent.succeeded → marks closed_check paid via metadata.closed_check_id, payment_intent.payment_failed, charge.refunded (logged only, NOT netted from GMV per spec)',
+      '  - stripe-link-merchant: super_admin paste-acct flow. Validates the acct_... with Stripe, fetches charges_enabled / capabilities / country / currency, upserts subscription row with link_method=admin_manual.',
+      '  - stripe-create-payment-intent: DIRECT charge on connected account via stripeAccount header. Merchant is merchant of record. Platform takes NO application_fee per transaction. Used for both online (Stripe.js) and card-present (Terminal SDK).',
+      '  - stripe-terminal-connection-token: issues Stripe Terminal connection tokens scoped to the merchant\'s connected account, for the Sunmi APK\'s Stripe M2 reader pairing flow.',
+      'FRONTEND: src/lib/stripeClient.js (Stripe.js loader cached per connected account, fetch helpers for createPaymentIntent + linkMerchantAccount). src/lib/billing.js (incrementGmv RPC wrapper for the recordClosedCheck hook).',
+      'BO: NEW Billing section (per-location Stripe link status, charges_enabled indicator, current period GMV stats, plan, monthly fee, paste-acct link form for super_admin, unlink button). NEW Stripe test section (TEST MODE ONLY — fires real PaymentIntent end-to-end with Stripe Elements; use card 4242 4242 4242 4242 / any future expiry / any CVC; validates entire platform → fns → Stripe → webhook → DB loop. Remove from prod build before going live.).',
+      'DEPS: +@stripe/stripe-js +@stripe/react-stripe-js.',
+      'ARCHITECTURE: customer payments via DIRECT charges (merchant of record, no application_fee, processing fees come out of merchant balance, brand on receipts is merchant brand). SaaS fee collection via Option 2 — Transfers API skim from connected balance to platform balance before payout, calculated monthly per location. New accounts always start FOC. Tier locks at highest reached during period for the whole month — no proration. GMV definition: total processed (cash + card + giftcard + tips), NOT netted of refunds.',
+      'CARD-PRESENT: Stripe M2 reader paired via Stripe Terminal Android SDK on Sunmi D3 Pro. Region-locked per reader (UK M2 only processes UK transactions). Server endpoint stripe-terminal-connection-token is deployment-ready; Kotlin TokenProvider in Sunmi APK is next-sprint work.',
+      'DEPLOY GUIDE: STRIPE_SETUP.md in repo root has full deploy steps (SQL migration, secrets, function deploys, webhook URL update in Stripe dashboard, env vars in Vercel). Merchant services don\'t become functional until those run.',
+      'NOT YET WIRED (next sprint): GMV bump in recordClosedCheck path; replace kiosk "Simulate paid" with createPaymentIntent + Stripe.js confirm; Sunmi APK Kotlin TokenProvider; monthly stripe-billing-skim cron (close_billing_period RPC + Transfer fire); US tier USD pricing; Express onboarding link generation function (admin-paste covers Phase 1).',
+    ],
+  },
+  {
     version: '5.5.37', date: '3 May 2026', label: 'Kiosk customer-details screen redesign + phone-keyed customer lookup with loyalty rewards/credit STUB',
     changes: [
       'Customer-details screen (formerly ScreenLoyalty, kept the function name to avoid prop-routing churn) redesigned to match Peter\'s reference: modal-style centered card with brand-color border, X close button top-right, brand-color "Enter your name" title, subtitle copy, name input, mobile input with GB +44 country prefix block, dashed "Optional - for your receipt" divider in brand color, optional email input, full-width Continue CTA, marketing opt-in checkbox row at the bottom.',
