@@ -47,11 +47,26 @@ function normalizeGroup(group) {
   // so it sees snake_case. Either should resolve correctly here.
   const selType = group.selection_type ?? group.selectionType ?? 'single';
   const isSingle = selType === 'single';
+  const isQuantity = selType === 'quantity';
   // min/max are plain field names in both shapes — read defensively from
   // both possible aliases just in case.
-  const min = Math.max(group.min ?? group.min_select ?? group.minSelect ?? 0, 0);
+  const rawMinExplicit = group.min ?? group.min_select ?? group.minSelect;
+  const rawMin = Math.max(rawMinExplicit ?? 0, 0);
   const rawMax = group.max ?? group.max_select ?? group.maxSelect ?? null;
   const max = rawMax != null ? rawMax : (isSingle ? 1 : (group.options?.length || 99));
+  // v5.5.34: For quantity-mode groups (e.g. "Box of 3" / "Box of 6") where the
+  // customer must pick a fixed number of items, default min to max when the
+  // operator hasn't explicitly set min. Quantity mode semantically means
+  // "container of N" — leaving with fewer than N defeats the purpose. This
+  // protects against legacy BO data where min was left at 0 by accident.
+  // Operators who genuinely want "between 1 and max" can still set min
+  // explicitly to a non-null value below max. Going forward, the BO
+  // selection-mode picker auto-sets min=max on quantity-mode click so this
+  // defensive default rarely fires for new data.
+  let min = rawMin;
+  if (isQuantity && (rawMinExplicit == null || rawMinExplicit === 0) && max > 1) {
+    min = max;
+  }
   // Clamp min to never exceed max (defensive against bad BO writes).
   const safeMin = Math.min(min, max);
   return { ...group, _min: safeMin, _max: max, _isSingle: isSingle, _selectionType: selType };

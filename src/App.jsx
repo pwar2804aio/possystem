@@ -73,6 +73,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.34', date: '3 May 2026', label: 'Quantity-mode modifier groups: min defaults to max in BO + defensive enforcement in kiosk',
+    changes: [
+      'Peter\'s Box-of-3 still showed "Optional · up to 3" after v5.5.33. Tracing back to BO: clicking "Pick with qty" sets max but leaves min at 0. To make the rule "pick exactly 3" the operator has to ALSO click "Required — must pick" AND ALSO click "3" in the min-picks row. Three steps, easy to miss the last two — exactly what happened on the donut box.',
+      'BO FIX (defaults): When the operator clicks the "Pick with qty" mode in MenuManager modifier-group editor, min now auto-defaults to match the new max. Quantity mode is for fixed-size containers (Box of 3, Box of 6) where the customer must pick exactly N items — defaulting min to max means the operator only has to set max and the rule "pick exactly N" is implied. They can still drop min for genuine ranges (1-3 etc.) by clicking the min picker. Single and multiple modes preserve old default behavior — only quantity gets the auto-required treatment.',
+      'KIOSK FIX (defensive enforcement): normalizeGroup now treats quantity-mode groups with no explicitly-set min (or min=0) as if min=max. Protects against existing legacy BO data where min was left at 0 by accident — operators don\'t need to re-edit every group. Going forward the BO change above means new groups won\'t hit this path.',
+      'Both fixes apply only when selectionType === "quantity". Multi-select groups ("pick up to 3") and single-select groups are untouched, so genuinely-optional modifiers still behave as optional.',
+      'After Peter\'s next reload, the donut Box-of-3 picker should now show "Required · pick 3" and Add to Cart will be blocked until 3 are picked. If for any reason it still shows "Optional", the diagnostic log from v5.5.33 will show the raw values the kiosk loaded — that tells us whether to look at the BO save path or somewhere else.',
+    ],
+  },
+  {
     version: '5.5.33', date: '3 May 2026', label: 'Kiosk modifier-group rules: defensive shape-handling for min/max/selectionType + diagnostic log',
     changes: [
       'Peter reported that on the Box-of-3 donut picker the kiosk shows "Optional · up to 3" instead of "Required · pick 3", and Add to Cart isn\'t blocked at quantities below 3. Validation logic itself is correct (tryAdd blocks if !isValid, scrolls to first under-picked group), so the bug is in the values being read — the kiosk thinks min is 0 even when BO has min set to 3.',

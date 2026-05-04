@@ -2516,11 +2516,19 @@ function ModifiersTab() {
               ].map(mode => {
                 const act = sel.selectionType === mode.id || (!sel.selectionType && mode.id === 'single');
                 return (
-                  <button key={mode.id} onClick={()=>upd({
-                    selectionType: mode.id,
-                    max: mode.id==='single' ? 1 : (sel.max||1)===1 ? 3 : (sel.max||3),
-                    min: sel.min||0,
-                  })} style={{ padding:'8px 8px 7px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`2px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)' }}>
+                  <button key={mode.id} onClick={()=>{
+                    // v5.5.34: when switching to 'quantity' mode (Pick with qty),
+                    // default min to match max. Quantity-mode is for fixed-size
+                    // containers like "Box of 3" / "Box of 6" where the customer
+                    // MUST pick exactly that many. Defaulting min to max means the
+                    // operator only has to set max — the rule "pick exactly N"
+                    // is implied. They can still drop min for "between 1 and N"
+                    // ranges if needed. Single and multiple modes preserve old
+                    // default of min:sel.min||0 (optional).
+                    const newMax = mode.id==='single' ? 1 : (sel.max||1)===1 ? 3 : (sel.max||3);
+                    const newMin = mode.id==='quantity' ? newMax : (sel.min||0);
+                    upd({ selectionType: mode.id, max: newMax, min: newMin });
+                  }} style={{ padding:'8px 8px 7px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left', border:`2px solid ${act?'var(--acc)':'var(--bdr)'}`, background:act?'var(--acc-d)':'var(--bg3)' }}>
                     <div style={{ fontSize:15, marginBottom:3 }}>{mode.icon}</div>
                     <div style={{ fontSize:11, fontWeight:700, color:act?'var(--acc)':'var(--t2)' }}>{mode.label}</div>
                     <div style={{ fontSize:9, color:'var(--t4)', lineHeight:1.4 }}>{mode.hint}</div>
