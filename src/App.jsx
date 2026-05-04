@@ -73,6 +73,16 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.35', date: '3 May 2026', label: 'Kiosk renders customer-facing display name (menuName) instead of internal name',
+    changes: [
+      'Peter renamed "Donut 1" to "Bueno Filled Donut" via BO and the kiosk still showed "Donut 1" on the product card. Cause: items have two name fields — `name` (internal/admin identity, rarely changed) and `menuName` / `menu_name` (customer-facing display, what BO\'s rename input writes). The kiosk was rendering `item.name` raw at three call sites: menu grid card, cart line, product modal title. Renames in BO went to menuName but never reached the screen.',
+      'New shared util `src/lib/itemDisplay.js` exporting `displayName(item)` with the canonical precedence: `item.menuName ?? item.menu_name ?? item.name ?? ""`. Same defensive snake/camel pattern as v5.5.30 and v5.5.33 — kiosk\'s useKioskMenu reads raw Supabase rows (snake_case `menu_name`) while POS reads from Zustand store via SyncBridge (camelCase `menuName`).',
+      'Three call sites updated to use displayName: (1) ScreenMenu item grid card (KioskApp.jsx ~line 1420), (2) cart line construction in addToCart payload (~line 335), (3) KioskProductModal title (~line 616). All three previously rendered the unedited internal `name` field.',
+      'Result: now when an operator updates "Donut 1" → "Bueno Filled Donut" in BO Items editor (which writes menuName), the kiosk shows "Bueno Filled Donut" everywhere — menu grid card, modal title when tapped, cart line when added.',
+      'Process lesson worth flagging: the same field-shape pitfall keeps surfacing. Anywhere the kiosk reads an item field beyond {id, price, image}, check whether the field has a customer-facing camelCase variant (menuName, soldAlone, selectionType etc.) AND a snake_case DB column. Pattern: read both, fall back to internal name as last resort. Centralizing in `itemDisplay.js` so any future surface that needs the display name doesn\'t reimplement the precedence.',
+    ],
+  },
+  {
     version: '5.5.34', date: '3 May 2026', label: 'Quantity-mode modifier groups: min defaults to max in BO + defensive enforcement in kiosk',
     changes: [
       'Peter\'s Box-of-3 still showed "Optional · up to 3" after v5.5.33. Tracing back to BO: clicking "Pick with qty" sets max but leaves min at 0. To make the rule "pick exactly 3" the operator has to ALSO click "Required — must pick" AND ALSO click "3" in the min-picks row. Three steps, easy to miss the last two — exactly what happened on the donut box.',

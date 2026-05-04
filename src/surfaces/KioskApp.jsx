@@ -23,6 +23,7 @@ import { supabase, getLocationId } from '../lib/supabase';
 import { useStore } from '../store';
 import KioskProductModal from './KioskProductModal';
 import { t, setLang, useKioskLang, LANGUAGES, getLanguageMeta } from '../lib/i18n';
+import { displayName } from '../lib/itemDisplay';
 
 // ============================================================
 // HOOKS
@@ -154,6 +155,10 @@ function resolvePrice(item, orderType, menuId) {
   }
   return (p[key] !== null && p[key] !== undefined) ? p[key] : (p.base || 0);
 }
+
+// v5.5.35: customer-facing display name lives in a shared util so the
+// modal can use it too. See src/lib/itemDisplay.js for the precedence
+// rationale (menuName / menu_name / name).
 
 // ============================================================
 // MAIN ORCHESTRATOR
@@ -332,7 +337,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
       return [...prev, {
         key,
         item,
-        name: item.name,
+        name: displayName(item),
         qty,
         mods: modSummary + ((instructions && instructions.trim()) ? ((modSummary ? ' · ' : '') + 'Note: ' + instructions.trim()) : ''),
         modsArray,
@@ -1398,7 +1403,7 @@ function MenuItemCard({ item, price, brandColor, allergenFilter, onSelect }) {
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
-          }}>{item.name}</div>
+          }}>{displayName(item)}</div>
           <div style={{
             fontSize: 'clamp(17px, 2vw, 22px)',
             fontWeight: 800,

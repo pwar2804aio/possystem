@@ -35,6 +35,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store';
 import { t, useKioskLang } from '../lib/i18n';
+import { displayName } from '../lib/itemDisplay';
 
 // ============================================================
 // VALIDATION HELPERS (pure)
@@ -613,7 +614,7 @@ export default function KioskProductModal({ item, allItems = [], brandColor, bra
           marginBottom: 'clamp(10px, 1.4vw, 14px)',
           lineHeight: 1.1,
           color: brandColor,
-        }}>{item?.name}</div>
+        }}>{displayName(item)}</div>
 
         {/* Description — muted */}
         {item?.description && (
