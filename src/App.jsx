@@ -73,6 +73,17 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.39', date: '4 May 2026', label: 'Stripe Connect: schema correction — Platform DB had evolved past supabase-auth-schema.sql doc',
+    changes: [
+      'When v5.5.38 migration was run against Platform DB (yhzjgyrkyjabvhblqxzu), got "relation subscriptions does not exist". Investigated — actual Platform DB tables are companies/locations/platform_users/user_company_roles/user_access. There is NO subscriptions/organisations/user_profiles. supabase-auth-schema.sql in the repo is stale.',
+      'NEW migration supabase-billing-schema-v2.sql adapted to actual schema: creates 4 new tables from scratch (merchant_stripe_accounts, billing_state replacing the missing subscriptions, billing_invoices, stripe_webhook_events). RLS uses user_company_roles + user_access for read scoping. Migration ran cleanly (verified all tables + RPCs exist).',
+      'Edge functions rewritten: merchant_stripe_accounts replaces subscriptions for Stripe Connect state. billing_state holds rolling GMV. company_id replaces org_id. Caller auth still goes through Ops DB user_profiles.role check (matches existing create-user pattern; super_admin gate). PaymentIntent metadata.closed_check_id is set, but updating closed_checks in Ops DB on payment_intent.succeeded is deferred — locations.ops_db_url indicates per-tenant Ops DBs which adds cross-DB complexity (next sprint).',
+      'BillingManager.jsx + StripeTestHarness.jsx: read from merchant_stripe_accounts + billing_state. Auth from supabase (Ops DB) session, not platformSupabase, since edge fns expect Ops DB tokens.',
+      'NOT YET WIRED (still): kiosk online card flow, POS card-present flow with M2 reader, Sunmi APK Kotlin TokenProvider, GMV bump in recordClosedCheck (cross-DB so needs ops_db_url resolution), monthly skim cron.',
+      'NOTE on multi-tenancy: locations table on Platform DB has ops_db_url + ops_location_id columns indicating each location may live in its OWN Ops DB. Current static reference to tbetcegmszzotrwdtqhi for edge function deployment is correct only because that is where create-user already lives, but the cross-DB GMV bump path will need to dynamically resolve which Ops DB to write to per location. Flagged for next sprint design.',
+    ],
+  },
+  {
     version: '5.5.38', date: '4 May 2026', label: 'Stripe Connect platform scaffold — merchant services foundation',
     changes: [
       'PLATFORM DB SCHEMA (run supabase-billing-schema.sql in yhzjgyrkyjabvhblqxzu): extends subscriptions with stripe_account_id, stripe_account_link_method (express_onboarding|admin_manual), charges_enabled, payouts_enabled, details_submitted, capabilities, requirements, country, default_currency, linked_at, linked_by_user_id, last_webhook_at. Adds billing_invoices (one row per period close, snapshots GMV + tier + Transfer skim record). Adds stripe_webhook_events (idempotency log).',
