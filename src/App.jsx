@@ -59,6 +59,22 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '4.1.0', date: 'May 2026', label: 'Stripe Connect platform scaffold — merchant services foundation',
+    changes: [
+      'Schema (Platform DB): extends subscriptions with stripe_account_id, charges_enabled, capabilities, requirements; adds billing_invoices for period close snapshots + Transfer skim records; adds stripe_webhook_events for idempotency.',
+      'RPC get_plan_and_fee_for_gmv: returns tier + fee for a given GMV. Tiers: Free £0/£0–5K, Starter £99/£5K–8K, Growth £149/£8K–10K, Scale £199/£10K–20K, Enterprise £249/£20K+.',
+      'RPC increment_gmv: atomic GMV bump on subscriptions row, auto-promotes plan if a tier boundary is crossed within the period. Tier locks at highest reached for the whole month.',
+      'RPC close_billing_period: snapshots GMV → invoice, resets rolling, rolls period_start forward. For monthly cron (next sprint).',
+      'Edge fns: stripe-webhook (platform events), stripe-webhook-connect (account.updated, capability.updated, payment_intent.*), stripe-link-merchant (admin paste-acct flow), stripe-create-payment-intent (direct charge on connected account), stripe-terminal-connection-token (Stripe M2 / Terminal SDK pairing tokens for Sunmi APK).',
+      'Architecture: DIRECT charges on connected account — merchant is merchant of record, no application_fee per transaction. SaaS fee collected separately via Transfers API skim before payout (Option 2). New accounts start FOC.',
+      'GMV definition: total processed value (cash + card + giftcard + tips), NOT netted of refunds.',
+      'Frontend: src/lib/stripeClient.js (Stripe.js loader cached per connected account, edge fn helpers), src/lib/billing.js (incrementGmv RPC wrapper).',
+      'BO: new Billing section (per-location Stripe status, paste-acct link form, period GMV stats). New Stripe test section (TEST MODE ONLY — fires real PaymentIntent end-to-end with test card 4242 4242 4242 4242, validates platform → fns → Stripe → webhook → DB loop).',
+      'Deps: +@stripe/stripe-js +@stripe/react-stripe-js.',
+      'Deploy guide: STRIPE_SETUP.md in repo root.',
+    ],
+  },
+  {
     version: '4.0.9', date: 'Apr 2026', label: 'Native Android printer bridge — direct TCP to WiFi printers',
     changes: [
       'Android: PrinterBridge.java exposes window.RposPrinter to the React app via JavascriptInterface',
