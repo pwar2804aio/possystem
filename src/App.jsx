@@ -73,6 +73,19 @@ import { VERSION } from './lib/version';
 
 const CHANGELOG = [
   {
+    version: '5.5.37', date: '3 May 2026', label: 'Kiosk customer-details screen redesign + phone-keyed customer lookup with loyalty rewards/credit STUB',
+    changes: [
+      'Customer-details screen (formerly ScreenLoyalty, kept the function name to avoid prop-routing churn) redesigned to match Peter\'s reference: modal-style centered card with brand-color border, X close button top-right, brand-color "Enter your name" title, subtitle copy, name input, mobile input with GB +44 country prefix block, dashed "Optional - for your receipt" divider in brand color, optional email input, full-width Continue CTA, marketing opt-in checkbox row at the bottom.',
+      'NEW src/lib/customerLookup.js — phone-keyed customer lookup util. Exports normalisePhone() (mirror of store._normalisePhone, UK-default) and fetchCustomerByPhone(rawPhone, locationId). The lookup resolves org_id from the location with a module-level cache, queries the customers table by (org_id, phone), and returns { customerId, name, email, marketingOptIn, knownCustomer:true, rewards:[], credit:0 } on match or null otherwise.',
+      'LOYALTY HOOK (stub): rewards and credit are STUBS that always return empty/zero today. The contract is locked in so when the loyalty system is built, only customerLookup.js needs updating — extend the SELECT to JOIN against a future customer_rewards table, or add a sibling query, and populate the rewards array / credit number. The kiosk UI already reserves layout space with the rendering branches in place — just no rewards to render yet.',
+      'Live phone-input lookup with 600ms debounce: while the customer types their phone, every keystroke after the 10-digit threshold debounces and queries fetchCustomerByPhone. On match the screen pre-fills name + email (only if the customer hasn\'t typed anything in those fields — explicit input wins), flips the marketing opt-in if the saved customer had it, and renders a "Welcome back, NAME" callout in brand-tinted color. Lookup-in-flight chip "Checking your details…" shows under the mobile input while debouncing.',
+      'Email + marketing opt-in are NEW fields in the kiosk session state (customerEmail, customerMarketingOptIn). Both reset on resetSession. Both flow through to attributeOrderToCustomer\'s customer object alongside name/phone — store\'s upsertCustomer already accepts email + marketingOptIn so no store changes were needed.',
+      '13 new i18n keys for the screen (details.title, .subtitle, .name.label, .name.placeholder, .mobile.label, .mobile.placeholder, .optional, .email.label, .email.placeholder, .continue, .optIn, .skip, .welcome, .lookupChecking) translated for en/es/fr/de/it/pt.',
+      'Submit logic preserved: clicking Continue lifts name/phone/email/optIn back to parent state and triggers submitOrder. Clicking the X (skip) clears all four and triggers anonymous submit. Continue is disabled while name is empty or order is mid-submission.',
+      'Loyalty system itself is the next sprint — when ready, the rewards-list rendering branch already exists and the customerLookup return shape is the contract. Look for "STUB" comments in customerLookup.js to find what to extend.',
+    ],
+  },
+  {
     version: '5.5.36', date: '3 May 2026', label: 'Kiosk cart screen redesign — line cards with thumbnails + brand totals pill + view-allergens header',
     changes: [
       'Kiosk cart screen redesigned to match the reference. Header: brand-color title left ("Pick up order" for takeaway, "Dine-in order" for dine-in, depending on orderType), outlined "View Allergens" button right that opens the existing allergen-picker overlay (re-using v5.5.26\'s picker rather than building a separate kiosk-cart-allergen UI).',

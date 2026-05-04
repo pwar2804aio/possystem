@@ -24,6 +24,7 @@ import { useStore } from '../store';
 import KioskProductModal from './KioskProductModal';
 import { t, setLang, useKioskLang, LANGUAGES, getLanguageMeta } from '../lib/i18n';
 import { displayName } from '../lib/itemDisplay';
+import { fetchCustomerByPhone } from '../lib/customerLookup';
 
 // ============================================================
 // HOOKS
@@ -182,6 +183,10 @@ export default function KioskApp({ kioskId, onUnpair }) {
   const [tip, setTip] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  // v5.5.37: kiosk now captures email + marketing opt-in alongside name/phone.
+  // Email is optional (for emailed receipts); opt-in defaults to false.
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerMarketingOptIn, setCustomerMarketingOptIn] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [orderNumber, setOrderNumber] = useState(null);
@@ -302,6 +307,8 @@ export default function KioskApp({ kioskId, onUnpair }) {
     setTip(0);
     setCustomerName('');
     setCustomerPhone('');
+    setCustomerEmail('');
+    setCustomerMarketingOptIn(false);
     setSelectedItem(null);
     setSelectedCategoryId(null);
     setAllergenFilter(new Set());
@@ -431,7 +438,12 @@ export default function KioskApp({ kioskId, onUnpair }) {
           };
           // Fire-and-forget — a CRM blip should never block order completion.
           useStore.getState().attributeOrderToCustomer({
-            customer: { name: finalName || 'Customer', phone: finalPhone },
+            customer: {
+              name: finalName || 'Customer',
+              phone: finalPhone,
+              email: customerEmail || null,
+              marketingOptIn: !!customerMarketingOptIn,
+            },
             orderRecord,
           }).catch(err => console.warn('[kiosk] attributeOrderToCustomer failed:', err?.message || err));
         } catch (e) {
@@ -467,7 +479,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, kioskId, locationId, cart, subtotal, total, tip, orderType, customerName, customerPhone, tableNumber, resetSession]);
+  }, [submitting, kioskId, locationId, cart, subtotal, total, tip, orderType, customerName, customerPhone, customerEmail, customerMarketingOptIn, tableNumber, resetSession]);
 
   // ─── Loading + error gates ───
   if (profLoading || menuLoading) {
@@ -513,7 +525,7 @@ export default function KioskApp({ kioskId, onUnpair }) {
       {screen === 'cart' && <ScreenCart brandColor={brandColor} cart={cart} subtotal={subtotal} cartItemCount={cartItemCount} orderType={orderType} onUpdate={updateCartQty} onAddMore={() => setScreen('menu')} onContinue={() => setScreen('tip')} onShowAllergenPicker={() => setShowAllergenPicker(true)} onBack={() => setScreen('menu')} />}
       {screen === 'tip' && <ScreenTip brandColor={brandColor} subtotal={subtotal} tipPresets={tipPresets} tip={tip} onSetTip={setTip} onContinue={() => setScreen('pay')} onBack={() => setScreen('cart')} />}
       {screen === 'pay' && <ScreenPay brandColor={brandColor} total={total} submitting={submitting} error={submitError} onSimulatePaid={() => { if (loyaltyEnabled) setScreen('loyalty'); else submitOrder('', ''); }} onBack={() => setScreen('tip')} />}
-      {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} onName={setCustomerName} onPhone={setCustomerPhone} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} placeOrderLabel={labelPlaceOrder} />}
+      {screen === 'loyalty' && <ScreenLoyalty brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} customerEmail={customerEmail} marketingOptIn={customerMarketingOptIn} locationId={locationId} onName={setCustomerName} onPhone={setCustomerPhone} onEmail={setCustomerEmail} onMarketingOptIn={setCustomerMarketingOptIn} onContinue={(n, p) => submitOrder(n, p)} onSkip={(n, p) => submitOrder(n, p)} submitting={submitting} placeOrderLabel={labelPlaceOrder} />}
       {screen === 'done' && <ScreenDone brandColor={brandColor} customerName={customerName} customerPhone={customerPhone} orderNumber={orderNumber} orderType={orderType} tableNumber={tableNumber} avgWaitMinutes={avgWaitMinutes} banner={bannerFor('done')} onDone={resetSession} />}
 
       {/* v5.4.0: Allergen picker overlay */}
@@ -1930,44 +1942,388 @@ function ScreenPay({ brandColor, total, submitting, error, onSimulatePaid, onBac
 // ============================================================
 // SCREEN: LOYALTY (single-screen name + phone)
 // ============================================================
-function ScreenLoyalty({ brandColor, customerName, customerPhone, onName, onPhone, onContinue, onSkip, submitting, placeOrderLabel }) {
-  const [name, setName] = useState(customerName);
-  const [phone, setPhone] = useState(customerPhone);
+// ============================================================
+// SCREEN: CUSTOMER DETAILS  (v5.5.37 redesign — formerly "loyalty")
+// Modal-style card centered on screen with brand-color title, name field,
+// mobile field with country prefix, divider, optional email field, brand-
+// color Continue, opt-in checkbox.
+//
+// LOYALTY HOOK (stubbed): when a complete phone is typed (debounced ~600ms),
+// fetchCustomerByPhone() looks up the customers table for the active org.
+// On match, the screen pre-fills name + email and reserves vertical space
+// for a "Welcome back, NAME" + rewards/credit block. Today rewards/credit
+// are stubs returning empty/zero — when the loyalty system is built, only
+// src/lib/customerLookup.js needs updating (extend fetch to return real
+// rewards). The render block in this screen is already in place.
+// ============================================================
+function ScreenLoyalty({ brandColor, customerName, customerPhone, customerEmail, marketingOptIn, locationId, onName, onPhone, onEmail, onMarketingOptIn, onContinue, onSkip, submitting, placeOrderLabel }) {
+  // Local field state mirrors props on mount; we lift back to parent on submit.
+  const [name, setName] = useState(customerName || '');
+  const [phone, setPhone] = useState(customerPhone || '');
+  const [email, setEmail] = useState(customerEmail || '');
+  const [optIn, setOptIn] = useState(!!marketingOptIn);
+
+  // ── Loyalty hook: phone-keyed customer lookup ─────────────────
+  // null = not looked up yet; { knownCustomer:true, ... } = match;
+  // false = looked up, no match.
+  const [customerLookup, setCustomerLookup] = useState(null);
+  const [lookingUp, setLookingUp] = useState(false);
+
+  // Debounce phone changes — only query after the user pauses typing.
+  // 600ms feels right for a customer-facing input.
+  useEffect(() => {
+    let cancelled = false;
+    const phoneClean = phone.replace(/[^\d+]/g, '');
+    // Need at least 10 digits before we bother querying (UK mobile is 11
+    // including the leading 0, or 12 with +44 prefix). Reset state below
+    // that threshold so we don't hold stale results from a previous query.
+    if (phoneClean.length < 10) {
+      setCustomerLookup(null);
+      setLookingUp(false);
+      return undefined;
+    }
+    setLookingUp(true);
+    const timer = setTimeout(async () => {
+      const result = await fetchCustomerByPhone(phone, locationId);
+      if (cancelled) return;
+      setLookingUp(false);
+      if (result) {
+        setCustomerLookup(result);
+        // Auto-fill name/email if the customer hasn't already typed something.
+        // If they typed a different name, respect their input — don't overwrite.
+        setName(prev => prev.trim() ? prev : result.name);
+        setEmail(prev => prev.trim() ? prev : (result.email || ''));
+        if (result.marketingOptIn) setOptIn(true);
+      } else {
+        setCustomerLookup(false);
+      }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [phone, locationId]);
+
   const submit = () => {
     const n = name.trim();
     const p = phone.trim();
+    const e = email.trim();
     onName(n);
     onPhone(p);
+    onEmail(e);
+    onMarketingOptIn(optIn);
     onContinue(n, p);
   };
-  const skip = () => { onName(''); onPhone(''); onSkip('', ''); };
+
+  const skip = () => {
+    onName('');
+    onPhone('');
+    onEmail('');
+    onMarketingOptIn(false);
+    onSkip('', '');
+  };
+
+  const canSubmit = name.trim().length > 0 && !submitting;
+
+  // Loyalty greeting — renders when we have a known customer match.
+  // Today rewards/credit are always empty/zero — when loyalty ships, this
+  // block will also render the rewards list / credit balance.
+  const showWelcome = !!(customerLookup && customerLookup.knownCustomer);
+  const hasRewards = !!(customerLookup && customerLookup.rewards && customerLookup.rewards.length > 0);
+  const hasCredit = !!(customerLookup && customerLookup.credit > 0);
+
   return (
-    <div style={fullScreen()}>
-      <ScreenHeader title="Almost done" subtitle="Add your details to receive your receipt" brandColor={brandColor} />
-      <div style={{ flex: 1, padding: '4vh 5vw', display: 'flex', flexDirection: 'column', gap: '2vh' }}>
-        <div>
-          <label style={fieldLabel()}>Your name <span style={{ color: brandColor }}>*</span></label>
-          <input value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Sarah"
-            style={{ width: '100%', padding: '18px 20px', background: 'var(--kSurface1)', border: '2px solid var(--kBorder1)', borderRadius: 14, color: 'var(--kFg)', fontSize: 22, fontFamily: 'inherit', outline: 'none' }} />
-          <div style={{ fontSize: 11, color: 'var(--kFgMuted)', marginTop: 6 }}>Used to call you when your order is ready</div>
+    <div style={{ ...fullScreen(), display: 'grid', placeItems: 'center', padding: '4vh 4vw' }}>
+      {/* Modal-style card */}
+      <div style={{
+        background: 'var(--kSurfaceRaised)',
+        border: '1.5px solid ' + brandColor,
+        borderRadius: 28,
+        padding: 'clamp(20px, 3vw, 36px) clamp(20px, 3vw, 36px) clamp(24px, 3.4vw, 40px)',
+        width: '100%',
+        maxWidth: 720,
+        maxHeight: '92vh',
+        overflowY: 'auto',
+        position: 'relative',
+        boxShadow: '0 8px 28px rgba(0,0,0,0.06)',
+      }}>
+        {/* X close (top-right) */}
+        <button
+          onClick={skip}
+          aria-label="Skip"
+          style={{
+            position: 'absolute',
+            top: 'clamp(14px, 2vw, 20px)',
+            right: 'clamp(14px, 2vw, 20px)',
+            width: 'clamp(40px, 4.6vw, 52px)',
+            height: 'clamp(40px, 4.6vw, 52px)',
+            borderRadius: '50%',
+            background: 'var(--kSurfaceRaised)',
+            border: '1px solid var(--kBorder1)',
+            color: 'var(--kFg)',
+            fontSize: 'clamp(18px, 2.2vw, 24px)',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            display: 'grid',
+            placeItems: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          }}
+        >×</button>
+
+        {/* Title */}
+        <div style={{
+          textAlign: 'center',
+          fontSize: 'clamp(22px, 3vw, 30px)',
+          fontWeight: 800,
+          letterSpacing: '-0.01em',
+          color: brandColor,
+          marginTop: 'clamp(20px, 3vw, 32px)',
+          marginBottom: 'clamp(12px, 1.6vw, 18px)',
+        }}>{t('details.title')}</div>
+
+        {/* Subtitle */}
+        <div style={{
+          textAlign: 'center',
+          fontSize: 'clamp(15px, 1.8vw, 19px)',
+          color: 'var(--kFg)',
+          fontWeight: 700,
+          lineHeight: 1.4,
+          marginBottom: 'clamp(20px, 3vw, 32px)',
+          padding: '0 clamp(0px, 2vw, 16px)',
+        }}>{t('details.subtitle')}</div>
+
+        {/* Welcome-back / loyalty placeholder block.
+            Renders when a known customer is matched. Today shows the welcome
+            line only — the rewards/credit list is wired but stays empty until
+            the loyalty system populates customerLookup.rewards / .credit. */}
+        {showWelcome && (
+          <div style={{
+            background: brandColor + '15', // 15 hex ≈ 8% opacity
+            border: '1.5px solid ' + brandColor,
+            borderRadius: 16,
+            padding: 'clamp(14px, 1.8vw, 20px)',
+            marginBottom: 'clamp(20px, 2.6vw, 28px)',
+          }}>
+            <div style={{
+              fontSize: 'clamp(15px, 1.8vw, 19px)',
+              fontWeight: 800,
+              color: brandColor,
+              letterSpacing: '-0.01em',
+            }}>
+              {t('details.welcome')}{customerLookup.name ? ', ' + customerLookup.name : ''}!
+            </div>
+            {/* Rewards list — empty array today; loyalty system will populate */}
+            {hasRewards && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {customerLookup.rewards.map(r => (
+                  <div key={r.id} style={{
+                    fontSize: 'clamp(13px, 1.5vw, 16px)',
+                    color: 'var(--kFg)',
+                    fontWeight: 600,
+                  }}>★ {r.label}</div>
+                ))}
+              </div>
+            )}
+            {hasCredit && (
+              <div style={{
+                marginTop: 8,
+                fontSize: 'clamp(13px, 1.5vw, 16px)',
+                fontWeight: 700,
+                color: 'var(--kFg)',
+              }}>£{customerLookup.credit.toFixed(2)} in credit</div>
+            )}
+          </div>
+        )}
+
+        {/* Your name */}
+        <div style={{ marginBottom: 'clamp(16px, 2.2vw, 22px)' }}>
+          <div style={detailsLabelStyle(brandColor)}>{t('details.name.label')}</div>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder={t('details.name.placeholder')}
+            autoFocus
+            style={detailsInputStyle()}
+          />
         </div>
-        <div>
-          <label style={fieldLabel()}>Mobile number <span style={{ color: 'var(--kFgFaint)' }}>(optional)</span></label>
-          <input value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9 +]/g, ''))} placeholder="07*** *** ***" type="tel" inputMode="tel"
-            style={{ width: '100%', padding: '18px 20px', background: 'var(--kSurface1)', border: '2px solid var(--kBorder1)', borderRadius: 14, color: 'var(--kFg)', fontSize: 22, fontFamily: 'ui-monospace, monospace', outline: 'none', letterSpacing: '0.04em' }} />
-          <div style={{ fontSize: 11, color: 'var(--kFgMuted)', marginTop: 6 }}>We will text your receipt and a £5 voucher — no spam</div>
+
+        {/* Your mobile — country prefix + number */}
+        <div style={{ marginBottom: 'clamp(16px, 2vw, 20px)' }}>
+          <div style={detailsLabelStyle(brandColor)}>{t('details.mobile.label')}</div>
+          <div style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            background: 'var(--kSurfaceRaised)',
+            border: '1px solid var(--kBorder2)',
+            borderRadius: 14,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              padding: 'clamp(14px, 1.8vw, 18px) clamp(14px, 1.6vw, 20px)',
+              borderRight: '1px solid var(--kBorder2)',
+              fontSize: 'clamp(15px, 1.8vw, 18px)',
+              fontWeight: 600,
+              color: 'var(--kFg)',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexShrink: 0,
+            }}>
+              GB +44 <span style={{ color: 'var(--kFgFaint)', fontSize: 12 }}>▾</span>
+            </div>
+            <input
+              value={phone}
+              onChange={e => setPhone(e.target.value.replace(/[^0-9 +]/g, ''))}
+              placeholder={t('details.mobile.placeholder')}
+              type="tel"
+              inputMode="tel"
+              style={{
+                flex: 1,
+                padding: 'clamp(14px, 1.8vw, 18px) clamp(14px, 1.6vw, 20px)',
+                background: 'transparent',
+                border: 0,
+                outline: 'none',
+                fontSize: 'clamp(15px, 1.8vw, 18px)',
+                fontFamily: 'ui-monospace, monospace',
+                color: 'var(--kFg)',
+                letterSpacing: '0.02em',
+                minWidth: 0,
+              }}
+            />
+          </div>
+          {/* Lookup status chip — only shows while a query is in flight */}
+          {lookingUp && (
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--kFgMuted)', fontWeight: 600 }}>
+              {t('details.lookupChecking')}
+            </div>
+          )}
         </div>
-      </div>
-      <div style={{ padding: '14px 22px 22px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <button onClick={submit} disabled={!name.trim() || submitting} style={{ ...primaryCta(brandColor), width: '100%', opacity: !name.trim() || submitting ? 0.4 : 1 }}>
-          {submitting ? 'Placing order…' : ((placeOrderLabel || 'Place order') + ' →')}
+
+        {/* Optional divider */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          margin: 'clamp(18px, 2.4vw, 26px) 0',
+        }}>
+          <div style={{ flex: 1, height: 1, background: brandColor, opacity: 0.4 }} />
+          <span style={{
+            fontSize: 'clamp(12px, 1.4vw, 15px)',
+            fontWeight: 600,
+            color: brandColor,
+            whiteSpace: 'nowrap',
+          }}>{t('details.optional')}</span>
+          <div style={{ flex: 1, height: 1, background: brandColor, opacity: 0.4 }} />
+        </div>
+
+        {/* Your email */}
+        <div style={{ marginBottom: 'clamp(20px, 2.6vw, 28px)' }}>
+          <div style={detailsLabelStyle(brandColor)}>{t('details.email.label')}</div>
+          <input
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder={t('details.email.placeholder')}
+            type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            style={detailsInputStyle()}
+          />
+        </div>
+
+        {/* Continue */}
+        <button
+          onClick={submit}
+          disabled={!canSubmit}
+          style={{
+            width: '100%',
+            background: canSubmit ? brandColor : 'var(--kSurface2)',
+            color: canSubmit ? '#fff' : 'var(--kFgFaint)',
+            border: 0,
+            borderRadius: 18,
+            padding: 'clamp(16px, 2.2vw, 22px)',
+            fontSize: 'clamp(17px, 2.2vw, 22px)',
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
+            cursor: canSubmit ? 'pointer' : 'not-allowed',
+            opacity: canSubmit ? 1 : 0.6,
+            fontFamily: 'inherit',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            boxShadow: canSubmit ? '0 6px 20px rgba(0,0,0,0.12)' : 'none',
+            marginBottom: 'clamp(16px, 2vw, 20px)',
+          }}
+        >
+          {submitting ? 'Placing order…' : t('details.continue')}
+          {!submitting && <span style={{ fontSize: 14 }}>›</span>}
         </button>
-        <button onClick={skip} disabled={submitting} style={{ background: 'transparent', color: 'var(--kFgMuted)', padding: 12, borderRadius: 10, fontSize: 13, border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Skip and place anonymously
-        </button>
+
+        {/* Marketing opt-in row */}
+        <div
+          onClick={() => setOptIn(v => !v)}
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+            padding: 'clamp(8px, 1vw, 12px)',
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+        >
+          <span style={{
+            flexShrink: 0,
+            width: 'clamp(26px, 3vw, 32px)',
+            height: 'clamp(26px, 3vw, 32px)',
+            borderRadius: '50%',
+            background: optIn ? brandColor : 'transparent',
+            border: '2px solid ' + brandColor,
+            display: 'grid',
+            placeItems: 'center',
+            color: '#fff',
+            fontSize: 'clamp(13px, 1.5vw, 17px)',
+            fontWeight: 800,
+            transition: 'background 0.12s',
+            marginTop: 2,
+          }}>
+            {optIn ? '✓' : ''}
+          </span>
+          <span style={{
+            flex: 1,
+            fontSize: 'clamp(13px, 1.5vw, 16px)',
+            color: 'var(--kFg)',
+            lineHeight: 1.4,
+            fontWeight: 500,
+          }}>{t('details.optIn')}</span>
+        </div>
       </div>
     </div>
   );
+}
+
+function detailsLabelStyle(brandColor) {
+  return {
+    fontSize: 'clamp(15px, 1.8vw, 19px)',
+    fontWeight: 800,
+    color: brandColor,
+    marginBottom: 'clamp(8px, 1vw, 10px)',
+    letterSpacing: '-0.01em',
+  };
+}
+
+function detailsInputStyle() {
+  return {
+    width: '100%',
+    padding: 'clamp(14px, 1.8vw, 18px) clamp(14px, 1.6vw, 20px)',
+    background: 'var(--kSurfaceRaised)',
+    border: '1px solid var(--kBorder2)',
+    borderRadius: 14,
+    color: 'var(--kFg)',
+    fontSize: 'clamp(15px, 1.8vw, 18px)',
+    fontFamily: 'inherit',
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
 }
 
 // ============================================================
